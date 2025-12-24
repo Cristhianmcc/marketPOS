@@ -105,6 +105,8 @@ export default function ReceiptPage() {
     );
   }
 
+  const isAnulada = Number(sale.total) === 0 && Number(sale.subtotal) === 0;
+
   return (
     <>
       {/* Action buttons - hidden on print */}
@@ -144,7 +146,16 @@ export default function ReceiptPage() {
             {sale.store.address && <div className="store-info">{sale.store.address}</div>}
             {sale.store.phone && <div className="store-info">Tel: {sale.store.phone}</div>}
           </div>
-
+          {/* Mostrar si está anulado */}
+          {isAnulada && (
+            <>
+              <div className="separator">================================</div>
+              <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', margin: '10px 0', color: '#dc2626' }}>
+                *** TICKET ANULADO ***
+              </div>
+              <div className="separator">================================</div>
+            </>
+          )}
           <div className="separator">================================</div>
 
           {/* Sale info */}
@@ -198,49 +209,61 @@ export default function ReceiptPage() {
 
           <div className="separator">================================</div>
 
-          {/* Totals */}
-          <div className="totals">
-            <div className="total-row">
-              <span>Subtotal:</span>
-              <span>{formatMoney(sale.subtotal)}</span>
-            </div>
-            {sale.tax > 0 && (
-              <div className="total-row">
-                <span>IGV (18%):</span>
-                <span>{formatMoney(sale.tax)}</span>
+          {/* Totals - Solo si NO está anulado */}
+          {!isAnulada && (
+            <>
+              <div className="totals">
+                <div className="total-row">
+                  <span>Subtotal:</span>
+                  <span>{formatMoney(sale.subtotal)}</span>
+                </div>
+                {sale.tax > 0 && (
+                  <div className="total-row">
+                    <span>IGV (18%):</span>
+                    <span>{formatMoney(sale.tax)}</span>
+                  </div>
+                )}
+                <div className="total-row total-final">
+                  <span>TOTAL:</span>
+                  <span>{formatMoney(sale.total)}</span>
+                </div>
               </div>
-            )}
-            <div className="total-row total-final">
-              <span>TOTAL:</span>
-              <span>{formatMoney(sale.total)}</span>
-            </div>
-          </div>
 
-          <div className="separator">================================</div>
+              <div className="separator">================================</div>
 
-          {/* Payment */}
-          <div className="payment">
-            <div className="payment-method">
-              Pago: {
-                sale.paymentMethod === 'CASH' ? 'Efectivo' :
-                sale.paymentMethod === 'YAPE' ? 'Yape' :
-                sale.paymentMethod === 'PLIN' ? 'Plin' :
-                'Tarjeta'
-              }
+              {/* Payment */}
+              <div className="payment">
+                <div className="payment-method">
+                  Pago: {
+                    sale.paymentMethod === 'CASH' ? 'Efectivo' :
+                    sale.paymentMethod === 'YAPE' ? 'Yape' :
+                    sale.paymentMethod === 'PLIN' ? 'Plin' :
+                    'Tarjeta'
+                  }
+                </div>
+                {sale.paymentMethod === 'CASH' && (
+                  <>
+                    <div className="payment-row">
+                      <span>Recibido:</span>
+                      <span>{formatMoney(sale.amountPaid)}</span>
+                    </div>
+                    <div className="payment-row">
+                      <span>Vuelto:</span>
+                      <span>{formatMoney(sale.changeAmount)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Si está anulado mostrar mensaje */}
+          {isAnulada && (
+            <div style={{ textAlign: 'center', margin: '20px 0', color: '#dc2626' }}>
+              <div>Este ticket ha sido anulado</div>
+              <div style={{ fontSize: '12px', marginTop: '5px' }}>Los productos han sido devueltos al stock</div>
             </div>
-            {sale.paymentMethod === 'CASH' && (
-              <>
-                <div className="payment-row">
-                  <span>Recibido:</span>
-                  <span>{formatMoney(sale.amountPaid)}</span>
-                </div>
-                <div className="payment-row">
-                  <span>Vuelto:</span>
-                  <span>{formatMoney(sale.changeAmount)}</span>
-                </div>
-              </>
-            )}
-          </div>
+          )}
 
           <div className="separator">================================</div>
 

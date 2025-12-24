@@ -74,7 +74,7 @@ export default function ShiftsPage() {
         const salesData = await salesRes.json();
         console.log('Sales data:', salesData);
         const cashTotal = salesData.sales
-          ?.filter((s: any) => s.paymentMethod === 'CASH')
+          ?.filter((s: any) => s.paymentMethod === 'CASH' && s.total > 0) // Excluir anuladas
           .reduce((sum: number, s: any) => sum + parseFloat(s.total || 0), 0) || 0;
         console.log('Cash total calculated:', cashTotal);
         setCashSales(cashTotal);

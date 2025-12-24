@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: any = {
       storeId: session.storeId,
+      total: { gt: 0 }, // Exclude cancelled sales
     };
 
     if (from) {

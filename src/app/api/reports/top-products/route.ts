@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
         WHERE s.store_id = ${session.storeId}
           AND s.created_at >= ${fromDate}
           AND s.created_at <= ${toDate}
+          AND s.total > 0
           ${userFilter}
         GROUP BY si.product_name, si.product_content, si.unit_type
         ORDER BY ${Prisma.raw(orderByClause)} DESC

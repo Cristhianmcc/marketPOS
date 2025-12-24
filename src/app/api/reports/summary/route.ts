@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
         gte: fromDate,
         lte: toDate,
       },
+      total: {
+        gt: 0, // Excluir ventas anuladas
+      },
     };
 
     // CASHIER sees only their sales
@@ -77,6 +80,7 @@ export async function GET(request: NextRequest) {
             WHERE s.store_id = ${session.storeId}
               AND s.created_at >= ${fromDate}
               AND s.created_at <= ${toDate}
+              AND s.total > 0
               ${userFilter}
             GROUP BY si.product_name, si.product_content
             ORDER BY total_amount DESC

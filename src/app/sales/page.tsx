@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import { formatMoney } from '@/lib/money';
 import { Search, Printer } from 'lucide-react';
+import { toast, Toaster } from 'sonner';
 
 interface Sale {
   id: string;
@@ -27,10 +28,29 @@ export default function SalesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [userRole, setUserRole] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
+    loadUserInfo();
     fetchSales();
   }, []);
+
+  const loadUserInfo = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        setUserRole(data.user.role);
+        setUserId(data.user.id);
+      }
+    } catch (error) {
+      console.error('Error loading user info:', error);
+    }
+  };
 
   const fetchSales = async () => {
     try {
@@ -54,6 +74,63 @@ export default function SalesPage() {
     fetchSales();
   };
 
+  const canCancelSale = (sale: Sale): boolean => {
+    // Venta ya anulada
+    if (sale.total === 0 && sale.subtotal === 0) return false;
+
+    // OWNER puede anular cualquiera
+    if (userRole === 'OWNER') return true;
+
+    // CASHIER solo su último ticket
+    if (userRole === 'CASHIER') {
+      const userSales = sales.filter(s => s.total > 0);
+      const sortedSales = userSales.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      return sortedSales.length > 0 && sortedSales[0].id === sale.id;
+    }
+
+    return false;
+  };
+
+  const handleCancelClick = (sale: Sale) => {
+    setSelectedSale(sale);
+    setShowCancelModal(true);
+  };
+
+  const confirmCancel = async () => {
+    if (!selectedSale) return;
+
+    setCancelling(selectedSale.id);
+    setShowCancelModal(false);
+
+    try {
+      const res = await fetch(`/api/sales/${selectedSale.id}/cancel`, {
+        method: 'POST',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || 'Error al anular venta');
+        return;
+      }
+
+      toast.success('Venta anulada correctamente');
+      fetchSales();
+    } catch (error) {
+      toast.error('Error de red al anular venta');
+    } finally {
+      setCancelling(null);
+      setSelectedSale(null);
+    }
+  };
+
+  const closeCancelModal = () => {
+    setShowCancelModal(false);
+    setSelectedSale(null);
+  };
+
   const getPaymentMethodLabel = (method: string) => {
     const labels: Record<string, string> = {
       CASH: 'Efectivo',
@@ -67,6 +144,34 @@ export default function SalesPage() {
   return (
     <AuthLayout storeName="Historial de Ventas">
       <div className="container mx-auto px-4 py-6">
+        {/* Modal de confirmación */}
+        {showCancelModal && selectedSale && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Confirmar Anulación</h2>
+              <p className="text-gray-600 mb-6">
+                ¿Seguro que deseas anular el ticket {selectedSale.saleNumber}?
+                <br />
+                <strong>Esta acción no se puede deshacer.</strong>
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={confirmCancel}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Anular Venta
+                </button>
+                <button
+                  onClick={closeCancelModal}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow">
           {/* Filters */}
           <div className="p-6 border-b border-gray-200">
@@ -174,13 +279,15 @@ export default function SalesPage() {
                       Estado
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                      Acción
+                      Acciones
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {sales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-gray-50">
+                  {sales.map((sale) => {
+                    const isAnulada = sale.total === 0 && sale.subtotal === 0;
+                    return (
+                    <tr key={sale.id} className={`hover:bg-gray-50 ${isAnulada ? 'bg-red-50' : ''}`}>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">
                         {sale.saleNumber}
                       </td>
@@ -194,7 +301,11 @@ export default function SalesPage() {
                         })}
                       </td>
                       <td className="px-6 py-4 text-sm text-right font-medium text-gray-900">
-                        {formatMoney(sale.total)}
+                        {isAnulada ? (
+                          <span className="text-red-600 line-through">S/ 0.00</span>
+                        ) : (
+                          formatMoney(sale.total)
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {getPaymentMethodLabel(sale.paymentMethod)}
@@ -203,33 +314,43 @@ export default function SalesPage() {
                         {sale.user.name}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        {sale.printedAt ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-green-100 text-green-700 text-xs font-medium">
-                            Impreso
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-gray-600 text-xs font-medium">
-                            Sin imprimir
-                          </span>
-                        )}
+                        <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
+                          isAnulada
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {isAnulada ? 'ANULADA' : 'ACTIVA'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => router.push(`/receipt/${sale.id}`)}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
-                        >
-                          <Printer className="w-4 h-4" />
-                          Ver/Imprimir
-                        </button>
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={() => router.push(`/receipt/${sale.id}`)}
+                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                          >
+                            <Printer className="w-4 h-4" />
+                            Ver
+                          </button>
+                          {canCancelSale(sale) && (
+                            <button
+                              onClick={() => handleCancelClick(sale)}
+                              disabled={cancelling === sale.id}
+                              className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 transition-colors text-sm"
+                            >
+                              {cancelling === sale.id ? 'Anulando...' : 'Anular'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             )}
           </div>
         </div>
       </div>
+      <Toaster position="top-right" richColors />
     </AuthLayout>
   );
 }

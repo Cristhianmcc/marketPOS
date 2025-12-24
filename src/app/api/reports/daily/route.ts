@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
         WHERE s.store_id = ${session.storeId}
           AND s.created_at >= ${fromDate}
           AND s.created_at <= ${toDate}
+          AND s.total > 0
           ${userFilter}
         GROUP BY DATE(s.created_at)
         ORDER BY sale_date DESC

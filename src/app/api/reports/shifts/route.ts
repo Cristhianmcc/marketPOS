@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
           where: {
             shiftId: shift.id,
             storeId: session.storeId,
+            total: { gt: 0 },
           },
           _sum: {
             total: true,
