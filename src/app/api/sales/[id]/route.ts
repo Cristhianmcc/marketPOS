@@ -4,9 +4,10 @@ import { prisma } from '@/infra/db/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getSession();
     if (!session.userId) {
       return NextResponse.json(
@@ -17,7 +18,7 @@ export async function GET(
 
     const sale = await prisma.sale.findUnique({
       where: {
-        id: params.id,
+        id,
         storeId: session.storeId,
       },
       include: {

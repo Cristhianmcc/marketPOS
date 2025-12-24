@@ -4,9 +4,10 @@ import { prisma } from '@/infra/db/prisma';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getSession();
     if (!session.userId) {
       return NextResponse.json(
@@ -17,7 +18,7 @@ export async function POST(
 
     const sale = await prisma.sale.findUnique({
       where: {
-        id: params.id,
+        id,
         storeId: session.storeId,
       },
     });
@@ -31,7 +32,7 @@ export async function POST(
 
     // Update printedAt
     const updatedSale = await prisma.sale.update({
-      where: { id: params.id },
+      where: { id },
       data: { printedAt: new Date() },
     });
 
