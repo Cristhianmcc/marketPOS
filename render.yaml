@@ -1,11 +1,4 @@
 services:
-  # PostgreSQL Database
-  - type: pserv
-    name: market-pos-db
-    env: docker
-    plan: free
-    region: oregon
-    
   # Next.js Web Service
   - type: web
     name: market-pos
@@ -25,3 +18,9 @@ services:
       - key: NODE_ENV
         value: production
     autoDeploy: true
+
+databases:
+  - name: market-pos-db
+    plan: free
+    databaseName: market_pos
+    user: market_user
