@@ -1,0 +1,260 @@
+// prisma/schema.prisma
+// Compatible with PostgreSQL (dev) and MySQL (future desktop offline)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//// ENUMS
+
+enum UserRole {
+  OWNER
+  CASHIER
+}
+
+enum UnitType {
+  UNIT // unidad
+  KG   // kilogramo
+}
+
+enum MovementType {
+  SALE
+  PURCHASE
+  ADJUSTMENT
+}
+
+enum PaymentMethod {
+  CASH
+  YAPE
+  PLIN
+  CARD
+}
+
+//// MODELS
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  ruc       String?
+  address   String?
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users         User[]
+  storeProducts StoreProduct[]
+  sales         Sale[]
+  shifts        Shift[]
+  movements     Movement[]
+  settings      StoreSettings?
+
+  @@map("stores")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  storeId   String   @map("store_id")
+  email     String   @unique
+  name      String
+  password  String // hashed in module 2
+  role      UserRole
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  // Shifts relations
+  openedShifts Shift[] @relation("ShiftOpenedBy")
+  closedShifts Shift[] @relation("ShiftClosedBy")
+
+  // Sales relation (cashier)
+  sales Sale[]
+
+  // Movements created by user
+  movements Movement[]
+
+  @@index([storeId])
+  @@map("users")
+}
+
+// Catálogo maestro
+model ProductMaster {
+  id          String   @id @default(cuid())
+  barcode     String?  @unique // Nullable para productos sin código
+  internalSku String   @unique @map("internal_sku")
+  name        String
+  brand       String?
+  content     String? // Ej: "500 ml", "1 kg"
+  category    String   @default("Otros")
+  unitType    UnitType @map("unit_type") // ✅ unitType pertenece al producto
+  imageUrl    String?  @map("image_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  storeProducts StoreProduct[]
+
+  @@index([barcode])
+  @@index([name])
+  @@index([internalSku])
+  @@map("products_master")
+}
+
+// Precio/stock por tienda
+model StoreProduct {
+  id        String   @id @default(cuid())
+  storeId   String   @map("store_id")
+  productId String   @map("product_id")
+
+  price    Decimal  @db.Decimal(10, 2)
+  stock    Decimal? @db.Decimal(10, 3) // null permitido (ej: kg sin control)
+  minStock Decimal? @map("min_stock") @db.Decimal(10, 3)
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product ProductMaster @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  saleItems  SaleItem[]
+  movements  Movement[]
+
+  @@unique([storeId, productId])
+  @@index([storeId])
+  @@index([productId])
+  @@map("store_products")
+}
+
+// Turnos / Corte de caja
+model Shift {
+  id        String   @id @default(cuid())
+  storeId   String   @map("store_id")
+
+  openedById String  @map("opened_by")
+  closedById String? @map("closed_by")
+
+  openedAt DateTime  @default(now()) @map("opened_at")
+  closedAt DateTime? @map("closed_at")
+
+  openingCash Decimal @map("opening_cash") @db.Decimal(10, 2)
+  closingCash Decimal? @map("closing_cash") @db.Decimal(10, 2)
+
+  expectedCash Decimal? @map("expected_cash") @db.Decimal(10, 2)
+  difference   Decimal? @db.Decimal(10, 2)
+
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store    Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  openedBy User @relation("ShiftOpenedBy", fields: [openedById], references: [id], onDelete: Cascade)
+  closedBy User? @relation("ShiftClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+
+  sales Sale[]
+
+  @@index([storeId, openedAt])
+  @@map("shifts")
+}
+
+// Venta (cabecera)
+model Sale {
+  id        String  @id @default(cuid())
+  storeId   String  @map("store_id")
+  userId    String  @map("user_id") // cashier
+  shiftId   String? @map("shift_id")
+
+  saleNumber Int @map("sale_number") // correlativo por tienda
+
+  subtotal Decimal @db.Decimal(10, 2) // total sin impuestos (o antes de tax)
+  tax      Decimal @db.Decimal(10, 2) // puede ser 0
+  total    Decimal @db.Decimal(10, 2)
+
+  paymentMethod PaymentMethod @map("payment_method")
+  amountPaid    Decimal?       @map("amount_paid") @db.Decimal(10, 2) // efectivo
+  changeAmount  Decimal?       @map("change_amount") @db.Decimal(10, 2) // vuelto
+
+  printedAt DateTime? @map("printed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  shift Shift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  items SaleItem[]
+
+  @@unique([storeId, saleNumber])
+  @@index([storeId, createdAt])
+  @@map("sales")
+}
+
+// Detalle de venta (snapshot)
+model SaleItem {
+  id             String  @id @default(cuid())
+  saleId         String  @map("sale_id")
+  storeProductId String  @map("store_product_id")
+
+  // Snapshot para que el ticket histórico no cambie si editas el producto luego
+  productName    String  @map("product_name")
+  productContent String? @map("product_content")
+  unitType       UnitType @map("unit_type")
+
+  quantity  Decimal @db.Decimal(10, 3)
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([storeProductId])
+  @@map("sale_items")
+}
+
+// Movimientos (inventario / auditoría)
+model Movement {
+  id             String       @id @default(cuid())
+  storeId        String       @map("store_id")
+  storeProductId String       @map("store_product_id")
+  type           MovementType
+
+  quantity  Decimal  @db.Decimal(10, 3)
+  unitPrice Decimal? @map("unit_price") @db.Decimal(10, 2)
+  total     Decimal? @db.Decimal(10, 2)
+
+  notes     String?
+  createdById String? @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store       Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+  @@index([storeProductId, createdAt])
+  @@map("movements")
+}
+
+// Configuración por tienda (ticket, impuestos, etc.)
+model StoreSettings {
+  id           String  @id @default(cuid())
+  storeId      String  @unique @map("store_id")
+
+  ticketFooter String? @map("ticket_footer") @db.Text
+  taxRate      Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("store_settings")
+}
