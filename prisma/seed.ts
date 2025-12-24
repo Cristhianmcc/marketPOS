@@ -99,7 +99,6 @@ async function main() {
       category: 'Bebidas Alcohólicas',
       unitType: UnitType.UNIT,
     },
-    },
 
     // Productos sin código de barras (UNIT)
     {
