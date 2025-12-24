@@ -28,6 +28,14 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check if user is active
+    if (!user.active) {
+      return NextResponse.json(
+        { error: 'Usuario desactivado. Contacta al administrador.' },
+        { status: 403 }
+      );
+    }
+
     // Verify password
     const isValidPassword = await verifyPassword(password, user.password);
 

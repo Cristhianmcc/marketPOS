@@ -1,0 +1,310 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export default function AdminUsersPage() {
+  const router = useRouter();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+  });
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  async function loadUsers() {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.status === 403) {
+        router.push('/');
+        return;
+      }
+      if (!res.ok) throw new Error('Error al cargar usuarios');
+      const data = await res.json();
+      setUsers(data.users);
+    } catch (err) {
+      setError('Error al cargar usuarios');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setNewPassword('');
+    setCreating(true);
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || 'Error al crear usuario');
+        return;
+      }
+
+      // Mostrar password temporal
+      setNewPassword(data.temporaryPassword);
+
+      // Recargar lista y resetear form
+      loadUsers();
+      setFormData({ name: '', email: '' });
+    } catch (err) {
+      setError('Error de red');
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleToggleUser(userId: string) {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/toggle`, {
+        method: 'PATCH',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.message || 'Error al actualizar usuario');
+        return;
+      }
+
+      loadUsers();
+    } catch (err) {
+      alert('Error de red');
+    }
+  }
+
+  async function handleResetPassword(userId: string) {
+    if (!confirm('¿Resetear contraseña de este usuario?')) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.message || 'Error al resetear contraseña');
+        return;
+      }
+
+      const data = await res.json();
+      alert(`Nueva contraseña temporal:\n\n${data.temporaryPassword}\n\nCópiala ahora, no se mostrará de nuevo.`);
+    } catch (err) {
+      alert('Error de red');
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-6xl mx-auto">
+          <p>Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
+            <p className="text-gray-600 mt-2">Administrar cajeros y permisos</p>
+          </div>
+          <button
+            onClick={() => router.push('/')}
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          >
+            Volver
+          </button>
+        </div>
+
+        {/* Botón crear usuario */}
+        <div className="mb-6">
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          >
+            {showForm ? 'Cancelar' : '+ Nuevo Cajero'}
+          </button>
+        </div>
+
+        {/* Formulario crear usuario */}
+        {showForm && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-bold mb-4">Crear Nuevo Cajero</h2>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+                {error}
+              </div>
+            )}
+
+            {newPassword && (
+              <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded mb-4">
+                <p className="font-bold">¡Usuario creado!</p>
+                <p className="mt-2">Contraseña temporal (cópiala ahora):</p>
+                <p className="font-mono bg-white px-3 py-2 rounded mt-2 border border-green-300 text-lg">
+                  {newPassword}
+                </p>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre Completo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {creating ? 'Creando...' : 'Crear Cajero'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Tabla de usuarios */}
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-100 border-b">
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Usuario</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Rol</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Creado</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                    No hay usuarios registrados
+                  </td>
+                </tr>
+              ) : (
+                users.map((user) => (
+                  <tr key={user.id} className="border-b hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="font-medium text-gray-900">{user.name}</p>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        user.role === 'OWNER' 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        user.active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {user.active ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-500 text-sm">
+                      {new Date(user.createdAt).toLocaleDateString('es-PE')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        {user.role !== 'OWNER' && (
+                          <>
+                            <button
+                              onClick={() => handleToggleUser(user.id)}
+                              className={`px-3 py-1 text-xs font-medium rounded ${
+                                user.active
+                                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              }`}
+                            >
+                              {user.active ? 'Desactivar' : 'Activar'}
+                            </button>
+                            <button
+                              onClick={() => handleResetPassword(user.id)}
+                              className="px-3 py-1 text-xs font-medium rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            >
+                              Resetear Pass
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
