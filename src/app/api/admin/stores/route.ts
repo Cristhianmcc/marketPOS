@@ -12,14 +12,14 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session?.user?.email) {
+    if (!session?.email) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    if (!isSuperAdmin(session.user.email)) {
+    if (!isSuperAdmin(session.email)) {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -53,14 +53,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session?.user?.email) {
+    if (!session?.email) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    if (!isSuperAdmin(session.user.email)) {
+    if (!isSuperAdmin(session.email)) {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -68,12 +68,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { storeName, storeRuc, storeAddress, storePhone, ownerName, ownerEmail } = body;
+    const { storeName, storeRuc, storeAddress, storePhone, ownerName, ownerEmail, ownerPassword } = body;
 
     // Validaciones
-    if (!storeName || !ownerName || !ownerEmail) {
+    if (!storeName || !ownerName || !ownerEmail || !ownerPassword) {
       return NextResponse.json(
-        { code: 'VALIDATION_ERROR', message: 'Nombre de tienda, nombre y email del owner son requeridos' },
+        { code: 'VALIDATION_ERROR', message: 'Nombre de tienda, nombre, email y contraseña del owner son requeridos' },
+        { status: 400 }
+      );
+    }
+
+    if (ownerPassword.length < 6) {
+      return NextResponse.json(
+        { code: 'VALIDATION_ERROR', message: 'La contraseña debe tener al menos 6 caracteres' },
         { status: 400 }
       );
     }
@@ -90,9 +97,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generar password temporal
-    const temporaryPassword = generateTemporaryPassword();
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+    // Hash de la contraseña
+    const hashedPassword = await bcrypt.hash(ownerPassword, 10);
 
     // Crear Store + Settings + Owner en transacción
     const result = await prisma.$transaction(async (tx) => {
@@ -127,7 +133,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return { store, owner, temporaryPassword };
+      return { store, owner };
     });
 
     return NextResponse.json({
@@ -137,7 +143,6 @@ export async function POST(request: NextRequest) {
         id: result.owner.id,
         email: result.owner.email,
         name: result.owner.name,
-        temporaryPassword: result.temporaryPassword, // Mostrar SOLO una vez
       },
     }, { status: 201 });
 

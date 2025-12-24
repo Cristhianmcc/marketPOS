@@ -30,8 +30,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to POS
-      router.push('/pos');
+      // Redirect to dashboard
+      router.push('/');
       router.refresh();
     } catch (err) {
       console.error('Login error:', err);

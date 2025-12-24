@@ -13,14 +13,14 @@ export async function PATCH(
     const { id } = await params;
     const session = await getSession();
 
-    if (!session?.user?.id || !session.user.storeId) {
+    if (!session?.userId || !session.storeId) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    if (session.user.role !== 'OWNER') {
+    if (session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -39,7 +39,7 @@ export async function PATCH(
       );
     }
 
-    if (targetUser.storeId !== session.user.storeId) {
+    if (targetUser.storeId !== session.storeId) {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -47,7 +47,7 @@ export async function PATCH(
     }
 
     // No permitir que el owner se desactive a sí mismo
-    if (targetUser.id === session.user.id) {
+    if (targetUser.id === session.userId) {
       return NextResponse.json(
         { code: 'VALIDATION_ERROR', message: 'No puedes desactivarte a ti mismo' },
         { status: 400 }

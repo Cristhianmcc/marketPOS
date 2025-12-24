@@ -10,14 +10,14 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session?.user?.id || !session.user.storeId) {
+    if (!session?.userId || !session.storeId) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    if (session.user.role !== 'OWNER') {
+    if (session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     // Obtener Store y Settings
     const store = await prisma.store.findUnique({
-      where: { id: session.user.storeId },
+      where: { id: session.storeId },
       include: { settings: true },
     });
 
@@ -61,14 +61,14 @@ export async function PATCH(request: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session?.user?.id || !session.user.storeId) {
+    if (!session?.userId || !session.storeId) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    if (session.user.role !== 'OWNER') {
+    if (session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -82,7 +82,7 @@ export async function PATCH(request: NextRequest) {
     const result = await prisma.$transaction(async (tx) => {
       // 1. Actualizar Store
       const updatedStore = await tx.store.update({
-        where: { id: session.user.storeId },
+        where: { id: session.storeId },
         data: {
           name: storeName,
           ruc: storeRuc || null,
@@ -93,13 +93,13 @@ export async function PATCH(request: NextRequest) {
 
       // 2. Actualizar o crear Settings
       const existingSettings = await tx.storeSettings.findUnique({
-        where: { storeId: session.user.storeId },
+        where: { storeId: session.storeId },
       });
 
       let updatedSettings;
       if (existingSettings) {
         updatedSettings = await tx.storeSettings.update({
-          where: { storeId: session.user.storeId },
+          where: { storeId: session.storeId },
           data: {
             ticketFooter: ticketFooter || null,
             taxRate: taxRate !== undefined ? taxRate : 0,
@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest) {
       } else {
         updatedSettings = await tx.storeSettings.create({
           data: {
-            storeId: session.user.storeId,
+            storeId: session.storeId,
             ticketFooter: ticketFooter || null,
             taxRate: taxRate !== undefined ? taxRate : 0,
           },

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session?.user?.id || !session.user.storeId) {
+    if (!session?.userId || !session.storeId) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Solo OWNER puede acceder
-    if (session.user.role !== 'OWNER') {
+    if (session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     const users = await prisma.user.findMany({
-      where: { storeId: session.user.storeId },
+      where: { storeId: session.storeId },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
 
-    if (!session?.user?.id || !session.user.storeId) {
+    if (!session?.userId || !session.storeId) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    if (session.user.role !== 'OWNER') {
+    if (session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -70,11 +70,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email } = body;
+    const { name, email, password } = body;
 
-    if (!name || !email) {
+    if (!name || !email || !password) {
       return NextResponse.json(
-        { code: 'VALIDATION_ERROR', message: 'Nombre y email son requeridos' },
+        { code: 'VALIDATION_ERROR', message: 'Nombre, email y contraseña son requeridos' },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { code: 'VALIDATION_ERROR', message: 'La contraseña debe tener al menos 6 caracteres' },
         { status: 400 }
       );
     }
@@ -92,13 +99,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Generar password temporal
-    const temporaryPassword = generateTemporaryPassword();
-    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Crear cajero
     const user = await prisma.user.create({
       data: {
-        storeId: session.user.storeId,
+        storeId: session.storeId,
         email,
         name,
         password: hashedPassword,
@@ -117,7 +123,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       user,
-      temporaryPassword, // Mostrar SOLO una vez
     }, { status: 201 });
 
   } catch (error) {

@@ -6,20 +6,20 @@ import Link from 'next/link';
 export default async function HomePage() {
   const session = await getSession();
   
-  if (!session?.user?.email) {
+  if (!session?.isLoggedIn) {
     redirect('/login');
   }
 
-  const isSuperAdminUser = isSuperAdmin(session.user.email);
-  const isOwner = session.user.role === 'OWNER';
+  const isSuperAdminUser = isSuperAdmin(session.email);
+  const isOwner = session.role === 'OWNER';
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-md p-8 mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Market POS</h1>
-          <p className="text-gray-600">Bienvenido, {session.user.name}</p>
-          <p className="text-sm text-gray-500 mt-1">Rol: {session.user.role}</p>
+          <p className="text-gray-600">Bienvenido, {session.name}</p>
+          <p className="text-sm text-gray-500 mt-1">Rol: {session.role}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

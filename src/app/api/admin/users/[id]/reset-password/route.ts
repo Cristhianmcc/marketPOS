@@ -15,14 +15,14 @@ export async function POST(
     const { id } = await params;
     const session = await getSession();
 
-    if (!session?.user?.id || !session.user.storeId) {
+    if (!session?.userId || !session.storeId) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    if (session.user.role !== 'OWNER') {
+    if (session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -41,16 +41,26 @@ export async function POST(
       );
     }
 
-    if (targetUser.storeId !== session.user.storeId) {
+    if (targetUser.storeId !== session.storeId) {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
       );
     }
 
-    // Generar nueva contraseña temporal
-    const newPassword = generateTemporaryPassword();
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // Obtener nueva contraseña del body
+    const body = await request.json();
+    const { password } = body;
+
+    if (!password || password.length < 6) {
+      return NextResponse.json(
+        { code: 'VALIDATION_ERROR', message: 'La contraseña debe tener al menos 6 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    // Actualizar contraseña
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     await prisma.user.update({
       where: { id },
@@ -59,8 +69,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Contraseña reseteada',
-      temporaryPassword: newPassword, // Mostrar SOLO una vez
+      message: 'Contraseña actualizada',
     });
   } catch (error) {
     console.error('Error resetting password:', error);
