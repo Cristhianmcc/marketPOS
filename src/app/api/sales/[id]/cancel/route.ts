@@ -53,7 +53,7 @@ export async function POST(
     }
 
     // Verificar si ya está anulada
-    if (sale.total === 0 && sale.subtotal === 0 && sale.tax === 0) {
+    if (Number(sale.total) === 0 && Number(sale.subtotal) === 0 && Number(sale.tax) === 0) {
       return NextResponse.json(
         { code: 'SALE_ALREADY_CANCELLED', message: 'Esta venta ya está anulada' },
         { status: 409 }
