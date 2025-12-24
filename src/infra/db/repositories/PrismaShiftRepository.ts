@@ -143,17 +143,35 @@ export class PrismaShiftRepository implements IShiftRepository {
   }
 
   async getCashSalesTotal(shiftId: string): Promise<number> {
-    const result = await prisma.sale.aggregate({
+    // 1. Ventas en CASH (excluir FIADO)
+    const salesResult = await prisma.sale.aggregate({
       where: {
         shiftId,
         paymentMethod: 'CASH',
+        total: { gt: 0 }, // Excluir ventas anuladas
       },
       _sum: {
         total: true,
       },
     });
 
-    return result._sum.total?.toNumber() || 0;
+    const cashSalesTotal = salesResult._sum.total?.toNumber() || 0;
+
+    // 2. Pagos de FIADO en CASH durante este turno
+    const paymentsResult = await prisma.receivablePayment.aggregate({
+      where: {
+        shiftId,
+        method: 'CASH',
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const cashPaymentsTotal = paymentsResult._sum.amount?.toNumber() || 0;
+
+    // Total = Ventas CASH + Pagos FIADO CASH
+    return cashSalesTotal + cashPaymentsTotal;
   }
 
   private toDomain(shift: any): Shift {

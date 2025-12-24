@@ -51,6 +51,12 @@ export async function GET(request: NextRequest) {
             name: true,
           },
         },
+        customer: {
+          select: {
+            name: true,
+            phone: true,
+          },
+        },
         shift: {
           select: {
             openedAt: true,
@@ -73,6 +79,8 @@ export async function GET(request: NextRequest) {
       'Metodo Pago',
       'Monto Pagado',
       'Vuelto',
+      'Cliente',
+      'Telefono Cliente',
       'Cajero',
       'Turno',
       'Impreso',
@@ -86,8 +94,10 @@ export async function GET(request: NextRequest) {
       escapeCSV(Number(s.tax).toFixed(2)),
       escapeCSV(Number(s.total).toFixed(2)),
       escapeCSV(s.paymentMethod),
-      escapeCSV(Number(s.amountPaid).toFixed(2)),
-      escapeCSV(Number(s.changeAmount).toFixed(2)),
+      escapeCSV(s.amountPaid !== null ? Number(s.amountPaid).toFixed(2) : ''),
+      escapeCSV(s.changeAmount !== null ? Number(s.changeAmount).toFixed(2) : ''),
+      escapeCSV(s.customer?.name || ''),
+      escapeCSV(s.customer?.phone || ''),
       escapeCSV(s.user.name),
       escapeCSV(s.shift ? new Date(s.shift.openedAt).toLocaleString('es-PE') : ''),
       escapeCSV(s.printedAt ? 'Si' : 'No'),

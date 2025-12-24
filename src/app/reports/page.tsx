@@ -20,6 +20,9 @@ interface SummaryData {
     totalSales: number;
     ticketCount: number;
     averageTicket: number;
+    totalFiado: number;
+    fiadoCobrado: number;
+    saldoPendiente: number;
     dateRange: { from: string; to: string };
   };
   paymentMethods: Record<string, { count: number; total: number }>;
@@ -283,8 +286,8 @@ export default function ReportsPage() {
 
           {summaryData && (
             <div>
-              {/* Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {/* Cards principales */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-medium text-gray-700">
@@ -319,6 +322,51 @@ export default function ReportsPage() {
                   <p className="text-3xl font-bold text-gray-900">
                     {formatMoney(summaryData.summary.averageTicket)}
                   </p>
+                </div>
+              </div>
+
+              {/* Cards de FIADO */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold mb-4 text-gray-900">Cuentas por Cobrar (FIADO)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-medium text-orange-700">
+                        Total Vendido a Crédito
+                      </h3>
+                      <ShoppingCart className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <p className="text-3xl font-bold text-orange-900">
+                      {formatMoney(summaryData.summary.totalFiado)}
+                    </p>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-medium text-green-700">
+                        Cobrado en el Período
+                      </h3>
+                      <DollarSign className="w-5 h-5 text-green-600" />
+                    </div>
+                    <p className="text-3xl font-bold text-green-900">
+                      {formatMoney(summaryData.summary.fiadoCobrado)}
+                    </p>
+                  </div>
+
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-medium text-red-700">
+                        Saldo Pendiente Total
+                      </h3>
+                      <Clock className="w-5 h-5 text-red-600" />
+                    </div>
+                    <p className="text-3xl font-bold text-red-900">
+                      {formatMoney(summaryData.summary.saldoPendiente)}
+                    </p>
+                    <p className="text-xs text-red-600 mt-1">
+                      Todas las cuentas abiertas
+                    </p>
+                  </div>
                 </div>
               </div>
 

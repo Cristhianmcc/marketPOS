@@ -14,8 +14,9 @@ interface CheckoutItem {
 
 interface CheckoutBody {
   items: CheckoutItem[];
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
   amountPaid?: number;
+  customerId?: string; // ✅ Para ventas FIADO
 }
 
 interface ErrorResponse {
@@ -39,10 +40,11 @@ class CheckoutError extends Error {
 async function executeCheckout(
   session: { storeId: string; userId: string },
   items: CheckoutItem[],
-  shiftId: string,
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD',
-  amountPaid?: number
-): Promise<{ sale: any; saleItems: any[] }> {
+  shiftId: string | null, // ✅ Puede ser null para FIADO
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO',
+  amountPaid?: number,
+  customerId?: string // ✅ Para FIADO
+): Promise<{ sale: any; saleItems: any[]; receivable?: any }> {
   return await prisma.$transaction(async (tx) => {
     // 1. Validar stock disponible y tipos
     const storeProducts = await tx.storeProduct.findMany({
@@ -137,6 +139,20 @@ async function executeCheckout(
       changeAmount = amountPaid - total;
     }
 
+    // 3b. Para FIADO: amountPaid y changeAmount deben ser null
+    if (paymentMethod === 'FIADO') {
+      if (!customerId) {
+        throw new CheckoutError('CUSTOMER_REQUIRED', 400, 'Debes seleccionar un cliente para ventas FIADO');
+      }
+      // Verificar que el cliente existe y pertenece a la tienda
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, storeId: session.storeId, active: true },
+      });
+      if (!customer) {
+        throw new CheckoutError('CUSTOMER_NOT_FOUND', 404, 'Cliente no encontrado o inactivo');
+      }
+    }
+
     // 4. Obtener el siguiente número de venta
     const lastSale = await tx.sale.findFirst({
       where: { storeId: session.storeId },
@@ -147,20 +163,30 @@ async function executeCheckout(
     const nextSaleNumber = (lastSale?.saleNumber ?? 0) + 1;
 
     // 5. Crear Sale con paymentMethod y amountPaid
-    const sale = await tx.sale.create({
-      data: {
-        storeId: session.storeId,
-        userId: session.userId,
-        shiftId: shiftId,
-        saleNumber: nextSaleNumber,
-        total: new Prisma.Decimal(total),
-        subtotal: new Prisma.Decimal(total),
-        tax: new Prisma.Decimal(0),
-        paymentMethod: paymentMethod,
-        amountPaid: amountPaid !== undefined ? new Prisma.Decimal(amountPaid) : null,
-        changeAmount: changeAmount !== null ? new Prisma.Decimal(changeAmount) : null,
-      },
-    });
+    const saleData: any = {
+      storeId: session.storeId,
+      userId: session.userId,
+      saleNumber: nextSaleNumber,
+      total: new Prisma.Decimal(total),
+      subtotal: new Prisma.Decimal(total),
+      tax: new Prisma.Decimal(0),
+      paymentMethod: paymentMethod,
+    };
+
+    // Para FIADO: shiftId es null, amountPaid y changeAmount null, agregar customerId
+    if (paymentMethod === 'FIADO') {
+      saleData.shiftId = null;
+      saleData.amountPaid = null;
+      saleData.changeAmount = null;
+      saleData.customerId = customerId;
+    } else {
+      // Para otros métodos: shiftId requerido
+      saleData.shiftId = shiftId;
+      saleData.amountPaid = amountPaid !== undefined ? new Prisma.Decimal(amountPaid) : null;
+      saleData.changeAmount = changeAmount !== null ? new Prisma.Decimal(changeAmount) : null;
+    }
+
+    const sale = await tx.sale.create({ data: saleData });
 
     // 5. Crear SaleItems con snapshot de datos
     const saleItems = await Promise.all(
@@ -213,7 +239,23 @@ async function executeCheckout(
       })
     );
 
-    return { sale, saleItems };
+    // 8. Si es FIADO, crear Receivable
+    let receivable = null;
+    if (paymentMethod === 'FIADO') {
+      receivable = await tx.receivable.create({
+        data: {
+          storeId: session.storeId,
+          customerId: customerId!,
+          saleId: sale.id,
+          originalAmount: new Prisma.Decimal(total),
+          balance: new Prisma.Decimal(total),
+          status: 'OPEN',
+          createdById: session.userId,
+        },
+      });
+    }
+
+    return { sale, saleItems, receivable };
   });
 }
 
@@ -239,7 +281,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CheckoutBody = await req.json();
-    const { items, paymentMethod, amountPaid } = body;
+    const { items, paymentMethod, amountPaid, customerId } = body;
 
     // Validaciones básicas
     if (!items || items.length === 0) {
@@ -251,11 +293,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar paymentMethod
-    if (!paymentMethod || !['CASH', 'YAPE', 'PLIN', 'CARD'].includes(paymentMethod)) {
+    if (!paymentMethod || !['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO'].includes(paymentMethod)) {
       const error: ErrorResponse = {
         code: 'INVALID_PAYMENT_METHOD',
         message: 'Método de pago inválido',
-        details: { allowedMethods: ['CASH', 'YAPE', 'PLIN', 'CARD'] },
+        details: { allowedMethods: ['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO'] },
       };
       return NextResponse.json(error, { status: 400 });
     }
@@ -281,6 +323,23 @@ export async function POST(req: NextRequest) {
         };
         return NextResponse.json(error, { status: 409 });
       }
+    } else if (paymentMethod === 'FIADO') {
+      // Para FIADO, validar customerId
+      if (!customerId || typeof customerId !== 'string') {
+        const error: ErrorResponse = {
+          code: 'CUSTOMER_REQUIRED',
+          message: 'Debes seleccionar un cliente para ventas FIADO',
+        };
+        return NextResponse.json(error, { status: 400 });
+      }
+      // amountPaid debe ser undefined o null
+      if (amountPaid !== undefined && amountPaid !== null) {
+        const error: ErrorResponse = {
+          code: 'PAYMENT_NOT_ALLOWED',
+          message: 'No se puede especificar monto pagado para ventas FIADO',
+        };
+        return NextResponse.json(error, { status: 400 });
+      }
     } else {
       // Para otros métodos, amountPaid debe ser undefined o null
       if (amountPaid !== undefined && amountPaid !== null) {
@@ -305,15 +364,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // VALIDACIÓN CRÍTICA: Verificar que hay turno abierto
-    const currentShift = await shiftRepo.getCurrentShift(session.storeId, session.userId);
+    // VALIDACIÓN CRÍTICA: Verificar que hay turno abierto (excepto para FIADO)
+    let currentShift = null;
+    if (paymentMethod !== 'FIADO') {
+      currentShift = await shiftRepo.getCurrentShift(session.storeId, session.userId);
 
-    if (!currentShift) {
-      const error: ErrorResponse = {
-        code: 'SHIFT_REQUIRED',
-        message: 'Debes abrir un turno antes de realizar ventas',
-      };
-      return NextResponse.json(error, { status: 409 });
+      if (!currentShift) {
+        const error: ErrorResponse = {
+          code: 'SHIFT_REQUIRED',
+          message: 'Debes abrir un turno antes de realizar ventas',
+        };
+        return NextResponse.json(error, { status: 409 });
+      }
     }
 
     // Ejecutar checkout con reintentos en caso de colisión de saleNumber
@@ -323,7 +385,14 @@ export async function POST(req: NextRequest) {
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        result = await executeCheckout(session, items, currentShift.id, paymentMethod, amountPaid);
+        result = await executeCheckout(
+          session,
+          items,
+          currentShift?.id || null,
+          paymentMethod,
+          amountPaid,
+          customerId
+        );
         break; // Éxito, salir del bucle
       } catch (error: any) {
         lastError = error;

@@ -39,6 +39,12 @@ export async function GET(
             role: true,
           },
         },
+        customer: {
+          select: {
+            name: true,
+            phone: true,
+          },
+        },
         shift: {
           include: {
             openedBy: {

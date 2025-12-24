@@ -19,7 +19,7 @@ enum UserRole {
 
 enum UnitType {
   UNIT // unidad
-  KG   // kilogramo
+  KG // kilogramo
 }
 
 enum MovementType {
@@ -33,6 +33,13 @@ enum PaymentMethod {
   YAPE
   PLIN
   CARD
+  FIADO
+}
+
+enum ReceivableStatus {
+  OPEN
+  PAID
+  CANCELLED
 }
 
 //// MODELS
@@ -52,6 +59,8 @@ model Store {
   shifts        Shift[]
   movements     Movement[]
   settings      StoreSettings?
+  customers     Customer[] // ✅ Clientes de la tienda
+  receivables   Receivable[] // ✅ Cuentas por cobrar
 
   @@map("stores")
 }
@@ -78,6 +87,10 @@ model User {
 
   // Movements created by user
   movements Movement[]
+
+  // Receivables created
+  receivablesCreated Receivable[]        @relation("ReceivableCreatedBy")
+  receivablePayments ReceivablePayment[] @relation("PaymentCreatedBy")
 
   @@index([storeId])
   @@map("users")
@@ -107,9 +120,9 @@ model ProductMaster {
 
 // Precio/stock por tienda
 model StoreProduct {
-  id        String   @id @default(cuid())
-  storeId   String   @map("store_id")
-  productId String   @map("product_id")
+  id        String @id @default(cuid())
+  storeId   String @map("store_id")
+  productId String @map("product_id")
 
   price    Decimal  @db.Decimal(10, 2)
   stock    Decimal? @db.Decimal(10, 3) // null permitido (ej: kg sin control)
@@ -122,8 +135,8 @@ model StoreProduct {
   store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product ProductMaster @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  saleItems  SaleItem[]
-  movements  Movement[]
+  saleItems SaleItem[]
+  movements Movement[]
 
   @@unique([storeId, productId])
   @@index([storeId])
@@ -133,8 +146,8 @@ model StoreProduct {
 
 // Turnos / Corte de caja
 model Shift {
-  id        String   @id @default(cuid())
-  storeId   String   @map("store_id")
+  id      String @id @default(cuid())
+  storeId String @map("store_id")
 
   openedById String  @map("opened_by")
   closedById String? @map("closed_by")
@@ -142,7 +155,7 @@ model Shift {
   openedAt DateTime  @default(now()) @map("opened_at")
   closedAt DateTime? @map("closed_at")
 
-  openingCash Decimal @map("opening_cash") @db.Decimal(10, 2)
+  openingCash Decimal  @map("opening_cash") @db.Decimal(10, 2)
   closingCash Decimal? @map("closing_cash") @db.Decimal(10, 2)
 
   expectedCash Decimal? @map("expected_cash") @db.Decimal(10, 2)
@@ -152,12 +165,13 @@ model Shift {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  store    Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  openedBy User @relation("ShiftOpenedBy", fields: [openedById], references: [id], onDelete: Cascade)
+  openedBy User  @relation("ShiftOpenedBy", fields: [openedById], references: [id], onDelete: Cascade)
   closedBy User? @relation("ShiftClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
 
-  sales Sale[]
+  sales              Sale[]
+  receivablePayments ReceivablePayment[] // ✅ Pagos de FIADO en este turno
 
   @@index([storeId, openedAt])
   @@map("shifts")
@@ -165,10 +179,11 @@ model Shift {
 
 // Venta (cabecera)
 model Sale {
-  id        String  @id @default(cuid())
-  storeId   String  @map("store_id")
-  userId    String  @map("user_id") // cashier
-  shiftId   String? @map("shift_id")
+  id         String  @id @default(cuid())
+  storeId    String  @map("store_id")
+  userId     String  @map("user_id") // cashier
+  shiftId    String? @map("shift_id")
+  customerId String? @map("customer_id") // ✅ Para ventas FIADO
 
   saleNumber Int @map("sale_number") // correlativo por tienda
 
@@ -177,35 +192,37 @@ model Sale {
   total    Decimal @db.Decimal(10, 2)
 
   paymentMethod PaymentMethod @map("payment_method")
-  amountPaid    Decimal?       @map("amount_paid") @db.Decimal(10, 2) // efectivo
-  changeAmount  Decimal?       @map("change_amount") @db.Decimal(10, 2) // vuelto
+  amountPaid    Decimal?      @map("amount_paid") @db.Decimal(10, 2) // efectivo
+  changeAmount  Decimal?      @map("change_amount") @db.Decimal(10, 2) // vuelto
 
   printedAt DateTime? @map("printed_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shift    Shift?    @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  shift Shift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
-
-  items SaleItem[]
+  items      SaleItem[]
+  receivable Receivable? // ✅ Relación uno a uno con cuenta por cobrar
 
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
+  @@index([customerId])
   @@map("sales")
 }
 
 // Detalle de venta (snapshot)
 model SaleItem {
-  id             String  @id @default(cuid())
-  saleId         String  @map("sale_id")
-  storeProductId String  @map("store_product_id")
+  id             String @id @default(cuid())
+  saleId         String @map("sale_id")
+  storeProductId String @map("store_product_id")
 
   // Snapshot para que el ticket histórico no cambie si editas el producto luego
-  productName    String  @map("product_name")
-  productContent String? @map("product_content")
+  productName    String   @map("product_name")
+  productContent String?  @map("product_content")
   unitType       UnitType @map("unit_type")
 
   quantity  Decimal @db.Decimal(10, 3)
@@ -231,15 +248,15 @@ model Movement {
   unitPrice Decimal? @map("unit_price") @db.Decimal(10, 2)
   total     Decimal? @db.Decimal(10, 2)
 
-  notes     String?
+  notes       String?
   createdById String? @map("created_by")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  store       Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
-  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([storeId, createdAt])
   @@index([storeProductId, createdAt])
@@ -248,8 +265,8 @@ model Movement {
 
 // Configuración por tienda (ticket, impuestos, etc.)
 model StoreSettings {
-  id           String  @id @default(cuid())
-  storeId      String  @unique @map("store_id")
+  id      String @id @default(cuid())
+  storeId String @unique @map("store_id")
 
   ticketFooter String? @map("ticket_footer") @db.Text
   taxRate      Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
@@ -257,4 +274,75 @@ model StoreSettings {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@map("store_settings")
+}
+
+// ✅ MÓDULO 12: CLIENTES + FIADO
+
+// Clientes
+model Customer {
+  id      String  @id @default(cuid())
+  storeId String  @map("store_id")
+  name    String
+  phone   String?
+  dni     String?
+  notes   String?
+  active  Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store       Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sales       Sale[]
+  receivables Receivable[]
+
+  @@index([storeId, name])
+  @@map("customers")
+}
+
+// Cuenta por cobrar (una por venta FIADO)
+model Receivable {
+  id             String           @id @default(cuid())
+  storeId        String           @map("store_id")
+  customerId     String           @map("customer_id")
+  saleId         String           @unique @map("sale_id") // ✅ Uno a uno
+  originalAmount Decimal          @map("original_amount") @db.Decimal(10, 2)
+  balance        Decimal          @db.Decimal(10, 2) // Saldo pendiente
+  status         ReceivableStatus @default(OPEN)
+  createdById    String           @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store     Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer  Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sale      Sale                @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  createdBy User                @relation("ReceivableCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  payments  ReceivablePayment[]
+
+  @@index([storeId, status])
+  @@index([customerId])
+  @@map("receivables")
+}
+
+// Pagos de cuentas por cobrar (abonos)
+model ReceivablePayment {
+  id           String        @id @default(cuid())
+  storeId      String        @map("store_id")
+  receivableId String        @map("receivable_id")
+  shiftId      String        @map("shift_id") // ✅ Turno en el que se cobró
+  amount       Decimal       @db.Decimal(10, 2)
+  method       PaymentMethod // CASH, YAPE, PLIN, CARD
+  notes        String?
+  createdById  String        @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  receivable Receivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
+  shift      Shift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  createdBy  User       @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([receivableId])
+  @@index([shiftId])
+  @@index([storeId, createdAt])
+  @@map("receivable_payments")
 }

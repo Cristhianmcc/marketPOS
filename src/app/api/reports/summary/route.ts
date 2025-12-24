@@ -95,6 +95,38 @@ export async function GET(request: NextRequest) {
     const ticketCount = sales.length;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
 
+    // FIADO metrics
+    const totalFiado = sales
+      .filter(s => s.paymentMethod === 'FIADO')
+      .reduce((sum, s) => sum + Number(s.total), 0);
+
+    // Get FIADO payments in date range
+    const fiadoPayments = await prisma.receivablePayment.aggregate({
+      where: {
+        storeId: session.storeId,
+        createdAt: {
+          gte: fromDate,
+          lte: toDate,
+        },
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+    const fiadoCobrado = Number(fiadoPayments._sum.amount || 0);
+
+    // Get current pending balance (all open receivables)
+    const openReceivables = await prisma.receivable.aggregate({
+      where: {
+        storeId: session.storeId,
+        status: 'OPEN',
+      },
+      _sum: {
+        balance: true,
+      },
+    });
+    const saldoPendiente = Number(openReceivables._sum.balance || 0);
+
     // Sales by payment method
     const paymentMethodSummary = sales.reduce((acc: any, sale) => {
       const method = sale.paymentMethod;
@@ -111,6 +143,9 @@ export async function GET(request: NextRequest) {
         totalSales,
         ticketCount,
         averageTicket,
+        totalFiado,
+        fiadoCobrado,
+        saldoPendiente,
         dateRange: {
           from: fromDate.toISOString(),
           to: toDate.toISOString(),

@@ -21,15 +21,20 @@ interface Sale {
   subtotal: number;
   tax: number;
   total: number;
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
-  amountPaid: number;
-  changeAmount: number;
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
+  amountPaid: number | null;
+  changeAmount: number | null;
   createdAt: string;
   printedAt: string | null;
+  customerId: string | null;
   items: SaleItem[];
   user: {
     name: string;
   };
+  customer: {
+    name: string;
+    phone: string | null;
+  } | null;
   shift: {
     openedAt: string;
   } | null;
@@ -172,6 +177,20 @@ export default function ReceiptPage() {
               <span>Cajero:</span>
               <span>{sale.user.name}</span>
             </div>
+            {sale.customer && (
+              <>
+                <div className="info-row">
+                  <span>Cliente:</span>
+                  <span>{sale.customer.name}</span>
+                </div>
+                {sale.customer.phone && (
+                  <div className="info-row">
+                    <span>Tel:</span>
+                    <span>{sale.customer.phone}</span>
+                  </div>
+                )}
+              </>
+            )}
             {sale.shift && (
               <div className="info-row">
                 <span>Turno:</span>
@@ -238,21 +257,32 @@ export default function ReceiptPage() {
                     sale.paymentMethod === 'CASH' ? 'Efectivo' :
                     sale.paymentMethod === 'YAPE' ? 'Yape' :
                     sale.paymentMethod === 'PLIN' ? 'Plin' :
-                    'Tarjeta'
+                    sale.paymentMethod === 'CARD' ? 'Tarjeta' :
+                    'Fiado'
                   }
                 </div>
-                {sale.paymentMethod === 'CASH' && (
+                {sale.paymentMethod === 'FIADO' ? (
+                  <>
+                    <div className="payment-row" style={{ fontWeight: 'bold', marginTop: '10px' }}>
+                      <span>Saldo pendiente:</span>
+                      <span>{formatMoney(sale.total)}</span>
+                    </div>
+                    <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '10px', padding: '8px 0' }}>
+                      Cliente debe pagar en caja posteriormente
+                    </div>
+                  </>
+                ) : sale.paymentMethod === 'CASH' ? (
                   <>
                     <div className="payment-row">
                       <span>Recibido:</span>
-                      <span>{formatMoney(sale.amountPaid)}</span>
+                      <span>{formatMoney(sale.amountPaid!)}</span>
                     </div>
                     <div className="payment-row">
                       <span>Vuelto:</span>
-                      <span>{formatMoney(sale.changeAmount)}</span>
+                      <span>{formatMoney(sale.changeAmount!)}</span>
                     </div>
                   </>
-                )}
+                ) : null}
               </div>
             </>
           )}

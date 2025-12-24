@@ -92,7 +92,7 @@ export async function POST(
       );
     }
 
-    // TRANSACCIÓN ACID: Anular venta + Revertir stock
+    // TRANSACCIÓN ACID: Anular venta + Revertir stock + Cancelar receivable si existe
     const result = await prisma.$transaction(async (tx) => {
       // 1. Marcar venta como anulada
       const cancelledSale = await tx.sale.update({
@@ -104,7 +104,18 @@ export async function POST(
         },
       });
 
-      // 2. Por cada item: revertir stock + crear movement inverso
+      // 2. Si es venta FIADO, cancelar receivable
+      if (sale.paymentMethod === 'FIADO') {
+        await tx.receivable.updateMany({
+          where: { saleId },
+          data: {
+            status: 'CANCELLED',
+            balance: 0,
+          },
+        });
+      }
+
+      // 3. Por cada item: revertir stock + crear movement inverso
       for (const item of sale.items) {
         const storeProduct = item.storeProduct;
 
