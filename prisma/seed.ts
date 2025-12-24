@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UnitType } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -52,7 +52,7 @@ async function main() {
       brand: 'Coca-Cola',
       content: '500 ml',
       category: 'Bebidas',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
     },
     {
       barcode: '7750109004567',
@@ -61,7 +61,7 @@ async function main() {
       brand: 'Coca-Cola',
       content: '1 L',
       category: 'Bebidas',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
     },
     {
       barcode: '7750912003344',
@@ -70,7 +70,7 @@ async function main() {
       brand: 'Frito Lay',
       content: '30 g',
       category: 'Snacks',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
     },
     {
       barcode: '7750885007890',
@@ -79,7 +79,7 @@ async function main() {
       brand: 'Nestlé',
       content: '30 g',
       category: 'Golosinas',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
     },
     {
       barcode: '7750103000123',
@@ -88,7 +88,7 @@ async function main() {
       brand: 'Gloria',
       content: '1 L',
       category: 'Lácteos',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
     },
     {
       barcode: '7751271001234',
@@ -97,7 +97,8 @@ async function main() {
       brand: 'Backus',
       content: '650 ml',
       category: 'Bebidas Alcohólicas',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
+    },
     },
 
     // Productos sin código de barras (UNIT)
@@ -108,7 +109,7 @@ async function main() {
       brand: null,
       content: 'unidad',
       category: 'Panadería',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
     },
     {
       barcode: null,
@@ -117,7 +118,7 @@ async function main() {
       brand: null,
       content: 'unidad',
       category: 'Abarrotes',
-      unitType: 'UNIT',
+      unitType: UnitType.UNIT,
     },
 
     // Productos por peso (KG)
@@ -128,7 +129,7 @@ async function main() {
       brand: null,
       content: 'kg',
       category: 'Verduras',
-      unitType: 'KG',
+      unitType: UnitType.KG,
     },
     {
       barcode: null,
@@ -137,7 +138,7 @@ async function main() {
       brand: null,
       content: 'kg',
       category: 'Verduras',
-      unitType: 'KG',
+      unitType: UnitType.KG,
     },
     {
       barcode: null,
@@ -146,7 +147,7 @@ async function main() {
       brand: null,
       content: 'kg',
       category: 'Abarrotes',
-      unitType: 'KG',
+      unitType: UnitType.KG,
     },
     {
       barcode: null,
@@ -155,7 +156,7 @@ async function main() {
       brand: null,
       content: 'kg',
       category: 'Abarrotes',
-      unitType: 'KG',
+      unitType: UnitType.KG,
     },
   ];
 
