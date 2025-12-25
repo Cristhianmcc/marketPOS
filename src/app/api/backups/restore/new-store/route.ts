@@ -334,17 +334,22 @@ export async function POST(request: NextRequest) {
         for (const payment of receivable.payments) {
           const newShiftId = payment.shiftId ? shiftIdMap.get(payment.shiftId) : undefined;
 
+          const paymentData: any = {
+            storeId: newStore.id,
+            receivableId: newReceivable.id,
+            amount: payment.amount,
+            method: payment.method,
+            notes: payment.notes,
+            createdById: newOwner.id,
+            createdAt: new Date(payment.createdAt),
+          };
+
+          if (newShiftId) {
+            paymentData.shiftId = newShiftId;
+          }
+
           await tx.receivablePayment.create({
-            data: {
-              storeId: newStore.id,
-              receivableId: newReceivable.id,
-              ...(newShiftId && { shiftId: newShiftId }),
-              amount: payment.amount,
-              method: payment.method,
-              notes: payment.notes,
-              createdById: newOwner.id,
-              createdAt: new Date(payment.createdAt),
-            },
+            data: paymentData,
           });
         }
       }
