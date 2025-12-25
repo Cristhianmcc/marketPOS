@@ -7,7 +7,7 @@ const SUPERADMIN_EMAILS = process.env.SUPERADMIN_EMAILS?.split(',').map(e => e.t
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getIronSession<SessionData>(request, NextResponse.next(), {
@@ -36,6 +36,7 @@ export async function PATCH(
       );
     }
 
+    const params = await props.params;
     const { id: storeId } = params;
     const body = await request.json();
     const { email: newEmail } = body;

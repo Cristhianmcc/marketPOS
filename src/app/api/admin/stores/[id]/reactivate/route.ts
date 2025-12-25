@@ -7,7 +7,7 @@ const SUPERADMIN_EMAILS = process.env.SUPERADMIN_EMAILS?.split(',').map(e => e.t
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getIronSession<SessionData>(request, NextResponse.next(), {
@@ -36,6 +36,7 @@ export async function POST(
       );
     }
 
+    const params = await props.params;
     const storeId = params.id;
 
     // Validate store exists and is ARCHIVED
