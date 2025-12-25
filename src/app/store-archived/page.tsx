@@ -1,9 +1,9 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 
-export default function StoreArchivedPage() {
+function StoreArchivedContent() {
   const searchParams = useSearchParams();
   const storeName = searchParams.get('storeName');
 
@@ -67,5 +67,17 @@ export default function StoreArchivedPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function StoreArchivedPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p>Cargando...</p>
+      </div>
+    }>
+      <StoreArchivedContent />
+    </Suspense>
   );
 }
