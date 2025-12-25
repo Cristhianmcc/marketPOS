@@ -61,11 +61,25 @@ export default function POSPage() {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Cargar turno actual al montar
   useEffect(() => {
     fetchCurrentShift();
+    checkSuperAdmin();
   }, []);
+
+  const checkSuperAdmin = async () => {
+    try {
+      const res = await fetch('/api/auth/is-superadmin');
+      if (res.ok) {
+        const data = await res.json();
+        setIsSuperAdmin(data.isSuperAdmin);
+      }
+    } catch (error) {
+      console.error('Error checking superadmin:', error);
+    }
+  };
 
   const fetchCurrentShift = async () => {
     try {
@@ -404,6 +418,18 @@ export default function POSPage() {
   return (
     <AuthLayout storeName="Punto de Venta">
       <Toaster position="top-right" richColors />
+      {/* Botón flotante para SUPERADMIN */}
+      {isSuperAdmin && (
+        <a
+          href="/admin/backups"
+          className="fixed bottom-6 right-6 z-50 bg-purple-600 text-white px-4 py-3 rounded-full shadow-lg hover:bg-purple-700 transition-colors flex items-center gap-2 font-medium"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+          </svg>
+          Admin Backups
+        </a>
+      )}
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">          {/* Banner de turno */}
           {!currentShift && (

@@ -252,6 +252,20 @@ export default function SettingsPage() {
             </div>
           </form>
         </div>
+
+        {/* Backups Section */}
+        <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Copias de Seguridad</h2>
+          <p className="text-gray-600 mb-4">
+            Exporta y gestiona backups de tu tienda para recuperación ante desastres.
+          </p>
+          <button
+            onClick={() => router.push('/settings/backups')}
+            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
+          >
+            Gestionar Backups
+          </button>
+        </div>
       </div>
     </div>
   );
