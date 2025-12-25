@@ -42,16 +42,23 @@ enum ReceivableStatus {
   CANCELLED
 }
 
+enum StoreStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 //// MODELS
 
 model Store {
-  id        String   @id @default(cuid())
-  name      String
-  ruc       String?
-  address   String?
-  phone     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String      @id @default(cuid())
+  name       String
+  ruc        String?
+  address    String?
+  phone      String?
+  status     StoreStatus @default(ACTIVE)
+  archivedAt DateTime?   @map("archived_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
 
   users         User[]
   storeProducts StoreProduct[]

@@ -10,6 +10,8 @@ interface Store {
   ruc: string | null;
   address: string | null;
   phone: string | null;
+  status: 'ACTIVE' | 'ARCHIVED';
+  archivedAt: string | null;
   createdAt: string;
   _count: {
     users: number;
@@ -25,6 +27,8 @@ export default function AdminStoresPage() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [actioningStoreId, setActioningStoreId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -38,11 +42,11 @@ export default function AdminStoresPage() {
 
   useEffect(() => {
     loadStores();
-  }, []);
+  }, [showArchived]);
 
   async function loadStores() {
     try {
-      const res = await fetch('/api/admin/stores');
+      const res = await fetch(`/api/admin/stores?showArchived=${showArchived}`);
       if (res.status === 403) {
         router.push('/');
         return;
@@ -54,6 +58,60 @@ export default function AdminStoresPage() {
       setError('Error al cargar tiendas');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleArchiveStore(storeId: string) {
+    if (!confirm('¿Seguro que quieres archivar esta tienda? Los usuarios no podrán acceder a las operaciones.')) {
+      return;
+    }
+
+    setActioningStoreId(storeId);
+    try {
+      const res = await fetch(`/api/admin/stores/${storeId}/archive`, {
+        method: 'POST',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Error al archivar tienda');
+        return;
+      }
+
+      toast.success(data.message);
+      loadStores();
+    } catch (err) {
+      toast.error('Error de red');
+    } finally {
+      setActioningStoreId(null);
+    }
+  }
+
+  async function handleReactivateStore(storeId: string) {
+    if (!confirm('¿Seguro que quieres reactivar esta tienda?')) {
+      return;
+    }
+
+    setActioningStoreId(storeId);
+    try {
+      const res = await fetch(`/api/admin/stores/${storeId}/reactivate`, {
+        method: 'POST',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Error al reactivar tienda');
+        return;
+      }
+
+      toast.success(data.message);
+      loadStores();
+    } catch (err) {
+      toast.error('Error de red');
+    } finally {
+      setActioningStoreId(null);
     }
   }
 
@@ -95,6 +153,8 @@ export default function AdminStoresPage() {
     }
   }
 
+  const archivedCount = stores.filter(s => s.status === 'ARCHIVED').length;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
@@ -122,13 +182,26 @@ export default function AdminStoresPage() {
         </div>
 
         {/* Botón crear tienda */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => setShowForm(!showForm)}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
           >
             {showForm ? 'Cancelar' : '+ Nueva Tienda'}
           </button>
+
+          {/* Toggle mostrar archivadas */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700">
+              Mostrar archivadas {archivedCount > 0 && `(${archivedCount})`}
+            </span>
+          </label>
         </div>
 
         {/* Formulario crear tienda */}
@@ -280,34 +353,71 @@ export default function AdminStoresPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tienda</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">RUC</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Usuarios</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Productos</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Creada</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {stores.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                    No hay tiendas registradas
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    {showArchived ? 'No hay tiendas archivadas' : 'No hay tiendas activas'}
                   </td>
                 </tr>
               ) : (
                 stores.map((store) => (
-                  <tr key={store.id} className="border-b hover:bg-gray-50">
+                  <tr 
+                    key={store.id} 
+                    className={`border-b hover:bg-gray-50 ${store.status === 'ARCHIVED' ? 'bg-gray-50' : ''}`}
+                  >
                     <td className="px-6 py-4">
                       <div>
-                        <p className="font-medium text-gray-900">{store.name}</p>
+                        <p className={`font-medium ${store.status === 'ARCHIVED' ? 'text-gray-500' : 'text-gray-900'}`}>
+                          {store.name}
+                        </p>
                         {store.address && (
                           <p className="text-sm text-gray-500">{store.address}</p>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-700">{store.ruc || '-'}</td>
+                    <td className="px-6 py-4">
+                      {store.status === 'ACTIVE' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          ACTIVA
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          ARCHIVADA
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-gray-700">{store._count.users}</td>
                     <td className="px-6 py-4 text-gray-700">{store._count.storeProducts}</td>
                     <td className="px-6 py-4 text-gray-500 text-sm">
                       {new Date(store.createdAt).toLocaleDateString('es-PE')}
+                    </td>
+                    <td className="px-6 py-4">
+                      {store.status === 'ACTIVE' ? (
+                        <button
+                          onClick={() => handleArchiveStore(store.id)}
+                          disabled={actioningStoreId === store.id}
+                          className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50"
+                        >
+                          {actioningStoreId === store.id ? 'Archivando...' : 'Archivar'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReactivateStore(store.id)}
+                          disabled={actioningStoreId === store.id}
+                          className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+                        >
+                          {actioningStoreId === store.id ? 'Reactivando...' : 'Reactivar'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

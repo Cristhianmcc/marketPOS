@@ -113,13 +113,22 @@ export async function POST(request: NextRequest) {
 
     // Transacción para crear todo
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Crear Store
+      // Generar nombre con fecha de restauración (formato DD/MM/YYYY)
+      const now = new Date();
+      const day = now.getDate().toString().padStart(2, '0');
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const year = now.getFullYear();
+      const restoredName = `${backupData.store.name} (Restaurado ${day}/${month}/${year})`;
+
+      // 1. Crear Store como ARCHIVED por defecto
       const newStore = await tx.store.create({
         data: {
-          name: backupData.store.name,
+          name: restoredName,
           ruc: backupData.store.ruc,
           address: backupData.store.address,
           phone: backupData.store.phone,
+          status: 'ARCHIVED', // Crear como ARCHIVED por seguridad
+          archivedAt: new Date(),
         },
       });
 
@@ -359,16 +368,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Tienda restaurada exitosamente',
+      message: 'Tienda restaurada exitosamente como ARCHIVED',
       store: {
         id: result.newStore.id,
         name: result.newStore.name,
+        status: result.newStore.status,
       },
       owner: {
         email: result.newOwner.email,
         temporaryPassword: result.tempPassword,
       },
       warning: 'Cambiar password inmediatamente',
+      note: 'La tienda fue creada como ARCHIVED. Un SUPERADMIN debe reactivarla para que sea operativa.',
       ...(isLegacyBackup && { 
         legacyWarning: '⚠️ BACKUP LEGACY: Restaurado sin verificación de integridad (sin checksum). Verifica la integridad de los datos manualmente.' 
       })

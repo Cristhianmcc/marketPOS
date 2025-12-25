@@ -1,0 +1,88 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getIronSession } from 'iron-session';
+import { SessionData } from '@/lib/session';
+import { prisma } from '@/infra/db/prisma';
+
+const SUPERADMIN_EMAILS = process.env.SUPERADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getIronSession<SessionData>(request, NextResponse.next(), {
+      password: process.env.SESSION_SECRET || 'complex_password_at_least_32_characters_long_for_security',
+      cookieName: 'market_pos_session',
+      cookieOptions: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+      },
+    });
+
+    if (!session.isLoggedIn || !session.email) {
+      return NextResponse.json(
+        { error: 'No autenticado' },
+        { status: 401 }
+      );
+    }
+
+    // Check SUPERADMIN
+    if (!SUPERADMIN_EMAILS.includes(session.email)) {
+      return NextResponse.json(
+        { error: 'No autorizado. Solo SUPERADMIN puede archivar tiendas.' },
+        { status: 403 }
+      );
+    }
+
+    const storeId = params.id;
+
+    // Validate store exists and is ACTIVE
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { id: true, name: true, status: true },
+    });
+
+    if (!store) {
+      return NextResponse.json(
+        { error: 'Tienda no encontrada' },
+        { status: 404 }
+      );
+    }
+
+    if (store.status === 'ARCHIVED') {
+      return NextResponse.json(
+        { error: 'La tienda ya está archivada' },
+        { status: 400 }
+      );
+    }
+
+    // Archive store
+    const updatedStore = await prisma.store.update({
+      where: { id: storeId },
+      data: {
+        status: 'ARCHIVED',
+        archivedAt: new Date(),
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        archivedAt: true,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Tienda "${updatedStore.name}" archivada exitosamente`,
+      store: updatedStore,
+    });
+  } catch (error) {
+    console.error('Error archiving store:', error);
+    return NextResponse.json(
+      { error: 'Error al archivar tienda' },
+      { status: 500 }
+    );
+  }
+}

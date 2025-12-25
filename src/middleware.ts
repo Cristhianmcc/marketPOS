@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { SessionData } from './lib/session';
+import { prisma } from './infra/db/prisma';
 
 const protectedRoutes = ['/pos', '/inventory', '/admin', '/settings'];
 const authRoutes = ['/login'];
+
+// Rutas que se bloquean si la tienda está ARCHIVED
+const operationalRoutes = ['/pos', '/inventory', '/sales', '/shifts', '/customers', '/receivables'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -36,6 +40,27 @@ export async function middleware(request: NextRequest) {
   // Redirect to dashboard if trying to access login while already authenticated
   if (isAuthRoute && isLoggedIn) {
     return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  // Check if accessing operational route with ARCHIVED store
+  const isOperationalRoute = operationalRoutes.some((route) => pathname.startsWith(route));
+  if (isLoggedIn && isOperationalRoute && session.storeId) {
+    try {
+      const store = await prisma.store.findUnique({
+        where: { id: session.storeId },
+        select: { status: true, name: true },
+      });
+
+      if (store && store.status === 'ARCHIVED') {
+        // Redirect to blocked page or show error
+        const blockedUrl = new URL('/store-archived', request.url);
+        blockedUrl.searchParams.set('storeName', store.name);
+        return NextResponse.redirect(blockedUrl);
+      }
+    } catch (error) {
+      console.error('Error checking store status:', error);
+      // Continue on error to avoid blocking legitimate access
+    }
   }
 
   return response;

@@ -26,7 +26,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Permitir filtrado de tiendas archivadas via query param
+    const { searchParams } = new URL(request.url);
+    const showArchived = searchParams.get('showArchived') === 'true';
+
     const stores = await prisma.store.findMany({
+      where: showArchived ? {} : { status: 'ACTIVE' },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
