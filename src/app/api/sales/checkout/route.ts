@@ -10,6 +10,9 @@ interface CheckoutItem {
   storeProductId: string;
   quantity: number;
   unitPrice: number;
+  // Descuentos (Módulo 14)
+  discountType?: 'PERCENT' | 'AMOUNT';
+  discountValue?: number;
 }
 
 interface CheckoutBody {
@@ -17,6 +20,7 @@ interface CheckoutBody {
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
   amountPaid?: number;
   customerId?: string; // ✅ Para ventas FIADO
+  discountTotal?: number; // Descuento global (Módulo 14)
 }
 
 interface ErrorResponse {
@@ -43,7 +47,8 @@ async function executeCheckout(
   shiftId: string | null, // ✅ Puede ser null para FIADO
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO',
   amountPaid?: number,
-  customerId?: string // ✅ Para FIADO
+  customerId?: string, // ✅ Para FIADO
+  discountTotal?: number // Módulo 14: descuento global
 ): Promise<{ sale: any; saleItems: any[]; receivable?: any }> {
   return await prisma.$transaction(async (tx) => {
     // 1. Validar stock disponible y tipos
@@ -130,10 +135,89 @@ async function executeCheckout(
       }
     }
 
-    // 2. Calcular total
-    const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    // 2. Validar y calcular descuentos por ítem
+    const itemsWithDiscounts = items.map((item) => {
+      const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
+      const subtotalItem = item.quantity * item.unitPrice;
+      
+      let discountAmount = 0;
+      
+      if (item.discountType && item.discountValue !== undefined) {
+        // Validar discountValue presente
+        if (item.discountValue === null || item.discountValue === undefined) {
+          throw new CheckoutError(
+            'DISCOUNT_VALUE_REQUIRED',
+            400,
+            `${sp.product.name}: discountValue es requerido cuando se especifica discountType`
+          );
+        }
 
-    // 3. Calcular changeAmount si es efectivo
+        if (item.discountType === 'PERCENT') {
+          // Validar porcentaje válido
+          if (item.discountValue <= 0 || item.discountValue > 100) {
+            throw new CheckoutError(
+              'INVALID_DISCOUNT',
+              400,
+              `${sp.product.name}: el descuento porcentual debe estar entre 0 y 100`
+            );
+          }
+          discountAmount = Math.round((subtotalItem * item.discountValue) / 100 * 100) / 100;
+        } else if (item.discountType === 'AMOUNT') {
+          // Validar monto válido
+          if (item.discountValue <= 0 || item.discountValue > subtotalItem) {
+            throw new CheckoutError(
+              'DISCOUNT_EXCEEDS_SUBTOTAL',
+              409,
+              `${sp.product.name}: el descuento no puede ser mayor al subtotal del ítem (S/ ${subtotalItem.toFixed(2)})`
+            );
+          }
+          discountAmount = item.discountValue;
+        }
+      }
+
+      const totalLine = subtotalItem - discountAmount;
+
+      return {
+        ...item,
+        subtotalItem,
+        discountAmount,
+        totalLine,
+      };
+    });
+
+    // 3. Calcular totales
+    const subtotalBeforeDiscounts = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
+    const itemDiscountsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0);
+    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - itemDiscountsTotal;
+    
+    // Tax (usando lógica actual, puede ser 0)
+    const tax = 0;
+    
+    const totalBeforeGlobalDiscount = subtotalAfterItemDiscounts + tax;
+    
+    // Validar descuento global
+    const globalDiscount = discountTotal ?? 0;
+    if (globalDiscount < 0) {
+      throw new CheckoutError(
+        'INVALID_DISCOUNT',
+        400,
+        'El descuento global no puede ser negativo'
+      );
+    }
+    if (globalDiscount > totalBeforeGlobalDiscount) {
+      throw new CheckoutError(
+        'DISCOUNT_EXCEEDS_TOTAL',
+        409,
+        `El descuento global no puede ser mayor al total (S/ ${totalBeforeGlobalDiscount.toFixed(2)})`
+      );
+    }
+    
+    const total = totalBeforeGlobalDiscount - globalDiscount;
+    
+    // Total de descuentos (ítems + global) para guardar en discountTotal
+    const totalDiscounts = itemDiscountsTotal + globalDiscount;
+
+    // 4. Calcular changeAmount si es efectivo
     let changeAmount: number | null = null;
     if (paymentMethod === 'CASH' && amountPaid !== undefined) {
       changeAmount = amountPaid - total;
@@ -162,14 +246,16 @@ async function executeCheckout(
 
     const nextSaleNumber = (lastSale?.saleNumber ?? 0) + 1;
 
-    // 5. Crear Sale con paymentMethod y amountPaid
+    // 5. Crear Sale con descuentos
     const saleData: any = {
       storeId: session.storeId,
       userId: session.userId,
       saleNumber: nextSaleNumber,
+      subtotal: new Prisma.Decimal(subtotalBeforeDiscounts),
+      tax: new Prisma.Decimal(tax),
+      discountTotal: new Prisma.Decimal(totalDiscounts),
+      totalBeforeDiscount: new Prisma.Decimal(totalBeforeGlobalDiscount),
       total: new Prisma.Decimal(total),
-      subtotal: new Prisma.Decimal(total),
-      tax: new Prisma.Decimal(0),
       paymentMethod: paymentMethod,
     };
 
@@ -188,9 +274,9 @@ async function executeCheckout(
 
     const sale = await tx.sale.create({ data: saleData });
 
-    // 5. Crear SaleItems con snapshot de datos
+    // 6. Crear SaleItems con snapshot y descuentos
     const saleItems = await Promise.all(
-      items.map((item) => {
+      itemsWithDiscounts.map((item) => {
         const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
         return tx.saleItem.create({
           data: {
@@ -201,15 +287,19 @@ async function executeCheckout(
             unitType: sp.product.unitType,
             quantity: new Prisma.Decimal(item.quantity),
             unitPrice: new Prisma.Decimal(item.unitPrice),
-            subtotal: new Prisma.Decimal(item.quantity * item.unitPrice),
+            subtotal: new Prisma.Decimal(item.subtotalItem),
+            discountType: item.discountType ?? null,
+            discountValue: item.discountValue !== undefined ? new Prisma.Decimal(item.discountValue) : null,
+            discountAmount: new Prisma.Decimal(item.discountAmount),
+            totalLine: new Prisma.Decimal(item.totalLine),
           },
         });
       })
     );
 
-    // 6. Crear Movements
+    // 7. Crear Movements (sin cambios - usa subtotal original)
     await Promise.all(
-      items.map((item) => {
+      itemsWithDiscounts.map((item) => {
         return tx.movement.create({
           data: {
             storeId: session.storeId,
@@ -217,7 +307,7 @@ async function executeCheckout(
             type: 'SALE',
             quantity: new Prisma.Decimal(-item.quantity), // Negativo = salida
             unitPrice: new Prisma.Decimal(item.unitPrice),
-            total: new Prisma.Decimal(item.quantity * item.unitPrice),
+            total: new Prisma.Decimal(item.subtotalItem), // Usa subtotal sin descuento para movements
             notes: `Venta #${nextSaleNumber}`,
             createdById: session.userId,
           },
@@ -225,9 +315,9 @@ async function executeCheckout(
       })
     );
 
-    // 7. Actualizar stock
+    // 8. Actualizar stock
     await Promise.all(
-      items.map((item) => {
+      itemsWithDiscounts.map((item) => {
         const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
         const currentStock = sp.stock ? sp.stock.toNumber() : 0;
         const newStock = currentStock - item.quantity;
@@ -239,7 +329,7 @@ async function executeCheckout(
       })
     );
 
-    // 8. Si es FIADO, crear Receivable
+    // 9. Si es FIADO, crear Receivable
     let receivable = null;
     if (paymentMethod === 'FIADO') {
       receivable = await tx.receivable.create({
@@ -281,7 +371,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CheckoutBody = await req.json();
-    const { items, paymentMethod, amountPaid, customerId } = body;
+    const { items, paymentMethod, amountPaid, customerId, discountTotal } = body;
 
     // Validaciones básicas
     if (!items || items.length === 0) {
@@ -312,8 +402,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(error, { status: 400 });
       }
 
-      // Calcular total
-      const total = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+      // Calcular total incluyendo descuentos
+      const itemsSubtotal = items.reduce((sum, item) => {
+        const subtotalItem = item.quantity * item.unitPrice;
+        let discountAmount = 0;
+        
+        if (item.discountType && item.discountValue) {
+          if (item.discountType === 'PERCENT') {
+            discountAmount = Math.round((subtotalItem * item.discountValue) / 100 * 100) / 100;
+          } else if (item.discountType === 'AMOUNT') {
+            discountAmount = item.discountValue;
+          }
+        }
+        
+        return sum + (subtotalItem - discountAmount);
+      }, 0);
+      
+      const globalDiscount = discountTotal ?? 0;
+      const total = itemsSubtotal - globalDiscount;
 
       if (amountPaid < total) {
         const error: ErrorResponse = {
@@ -391,7 +497,8 @@ export async function POST(req: NextRequest) {
           currentShift?.id || null,
           paymentMethod,
           amountPaid,
-          customerId
+          customerId,
+          discountTotal
         );
         break; // Éxito, salir del bucle
       } catch (error: any) {

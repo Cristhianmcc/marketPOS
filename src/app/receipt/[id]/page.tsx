@@ -13,6 +13,10 @@ interface SaleItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  discountType: 'PERCENT' | 'AMOUNT' | null;
+  discountValue: number | null;
+  discountAmount: number;
+  totalLine: number;
 }
 
 interface Sale {
@@ -20,6 +24,8 @@ interface Sale {
   saleNumber: string;
   subtotal: number;
   tax: number;
+  discountTotal: number;
+  totalBeforeDiscount: number;
   total: number;
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
   amountPaid: number | null;
@@ -222,6 +228,23 @@ export default function ReceiptPage() {
                   </span>
                   <span>{formatMoney(item.subtotal)}</span>
                 </div>
+                {/* Descuento del ítem */}
+                {item.discountAmount > 0 && (
+                  <>
+                    <div className="item-discount">
+                      <span>
+                        Desc: {item.discountType === 'PERCENT' 
+                          ? `${item.discountValue}%` 
+                          : formatMoney(item.discountValue!)}
+                      </span>
+                      <span>-{formatMoney(item.discountAmount)}</span>
+                    </div>
+                    <div className="item-total">
+                      <span>Total línea:</span>
+                      <span>{formatMoney(item.totalLine)}</span>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -236,6 +259,13 @@ export default function ReceiptPage() {
                   <span>Subtotal:</span>
                   <span>{formatMoney(sale.subtotal)}</span>
                 </div>
+                {/* Descuentos */}
+                {sale.discountTotal > 0 && (
+                  <div className="total-row discount-row">
+                    <span>Descuentos:</span>
+                    <span>-{formatMoney(sale.discountTotal)}</span>
+                  </div>
+                )}
                 {sale.tax > 0 && (
                   <div className="total-row">
                     <span>IGV (18%):</span>
@@ -388,6 +418,28 @@ export default function ReceiptPage() {
           display: flex;
           justify-content: space-between;
           font-size: 10px;
+        }
+
+        .item-discount {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          color: #ea580c;
+          margin-top: 2px;
+          padding-left: 8px;
+        }
+
+        .item-total {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          font-weight: bold;
+          margin-top: 2px;
+          padding-left: 8px;
+        }
+
+        .discount-row {
+          color: #ea580c;
         }
 
         .payment-method {

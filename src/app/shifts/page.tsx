@@ -22,6 +22,7 @@ export default function ShiftsPage() {
   const [closingCash, setClosingCash] = useState('');
   const [notes, setNotes] = useState('');
   const [cashSales, setCashSales] = useState(0);
+  const [salesByMethod, setSalesByMethod] = useState<Record<string, { total: number; count: number }>>({});
 
   useEffect(() => {
     fetchCurrentShift();
@@ -72,12 +73,25 @@ export default function ShiftsPage() {
       const salesRes = await fetch(`/api/sales?shiftId=${currentShift.id}`);
       if (salesRes.ok) {
         const salesData = await salesRes.json();
-        console.log('Sales data:', salesData);
-        const cashTotal = salesData.sales
-          ?.filter((s: any) => s.paymentMethod === 'CASH' && s.total > 0) // Excluir anuladas
-          .reduce((sum: number, s: any) => sum + parseFloat(s.total || 0), 0) || 0;
-        console.log('Cash total calculated:', cashTotal);
+        const sales = salesData.sales || [];
+        
+        // Calcular total CASH
+        const cashTotal = sales
+          .filter((s: any) => s.paymentMethod === 'CASH' && s.total > 0)
+          .reduce((sum: number, s: any) => sum + parseFloat(s.total || 0), 0);
         setCashSales(cashTotal);
+        
+        // Calcular por método de pago
+        const byMethod: Record<string, { total: number; count: number }> = {};
+        sales.filter((s: any) => s.total > 0).forEach((s: any) => {
+          const method = s.paymentMethod;
+          if (!byMethod[method]) {
+            byMethod[method] = { total: 0, count: 0 };
+          }
+          byMethod[method].total += parseFloat(s.total || 0);
+          byMethod[method].count += 1;
+        });
+        setSalesByMethod(byMethod);
       }
     } catch (error) {
       console.error('Error fetching cash sales:', error);
@@ -202,6 +216,27 @@ export default function ShiftsPage() {
                   Caja inicial ({formatMoney(currentShift.openingCash)}) + Ventas ({formatMoney(cashSales)})
                 </p>
               </div>
+
+              {/* Desglose por método de pago */}
+              {Object.keys(salesByMethod).length > 0 && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Ventas por Método de Pago</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {Object.entries(salesByMethod).map(([method, data]) => (
+                      <div key={method} className="bg-gray-50 p-3 rounded">
+                        <p className="text-xs text-gray-600">
+                          {method === 'CASH' ? 'Efectivo' :
+                           method === 'YAPE' ? 'Yape' :
+                           method === 'PLIN' ? 'Plin' :
+                           method === 'CARD' ? 'Tarjeta' : 'Fiado'}
+                        </p>
+                        <p className="text-lg font-semibold">{formatMoney(data.total)}</p>
+                        <p className="text-xs text-gray-500">{data.count} ticket{data.count !== 1 ? 's' : ''}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <button
                 onClick={() => setShowCloseModal(true)}

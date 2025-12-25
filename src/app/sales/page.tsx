@@ -12,6 +12,7 @@ interface Sale {
   saleNumber: string;
   subtotal: number;
   tax: number;
+  discountTotal: number;
   total: number;
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
   createdAt: string;
@@ -267,6 +268,9 @@ export default function SalesPage() {
                       Fecha
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Descuentos
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Total
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -299,6 +303,13 @@ export default function SalesPage() {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-orange-600">
+                        {sale.discountTotal > 0 ? (
+                          <span>-{formatMoney(sale.discountTotal)}</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-right font-medium text-gray-900">
                         {isAnulada ? (

@@ -72,20 +72,38 @@ export async function GET(request: NextRequest) {
       'Cantidad',
       'Precio Unit',
       'Subtotal',
+      'Desc. Tipo',
+      'Desc. Valor',
+      'Desc. Monto',
+      'Total Linea',
       'Metodo Pago',
     ];
 
-    const rows = items.map(item => [
-      escapeCSV(item.sale.saleNumber),
-      escapeCSV(new Date(item.sale.createdAt).toLocaleString('es-PE')),
-      escapeCSV(item.productName),
-      escapeCSV(item.productContent || ''),
-      escapeCSV(item.unitType),
-      escapeCSV(Number(item.quantity).toFixed(3)),
-      escapeCSV(Number(item.unitPrice).toFixed(2)),
-      escapeCSV(Number(item.subtotal).toFixed(2)),
-      escapeCSV(item.sale.paymentMethod),
-    ]);
+    const rows = items.map(item => {
+      const discountTypeLabel = item.discountType === 'PERCENT' ? 'Porcentaje' : 
+                                item.discountType === 'AMOUNT' ? 'Monto' : '-';
+      const discountValueLabel = item.discountValue 
+        ? (item.discountType === 'PERCENT' 
+            ? `${Number(item.discountValue).toFixed(0)}%` 
+            : Number(item.discountValue).toFixed(2))
+        : '-';
+      
+      return [
+        escapeCSV(item.sale.saleNumber),
+        escapeCSV(new Date(item.sale.createdAt).toLocaleString('es-PE')),
+        escapeCSV(item.productName),
+        escapeCSV(item.productContent || ''),
+        escapeCSV(item.unitType),
+        escapeCSV(Number(item.quantity).toFixed(3)),
+        escapeCSV(Number(item.unitPrice).toFixed(2)),
+        escapeCSV(Number(item.subtotal).toFixed(2)),
+        escapeCSV(discountTypeLabel),
+        escapeCSV(discountValueLabel),
+        escapeCSV(Number(item.discountAmount).toFixed(2)),
+        escapeCSV(Number(item.totalLine).toFixed(2)),
+        escapeCSV(item.sale.paymentMethod),
+      ];
+    });
 
     const csv = [
       headers.join(';'),

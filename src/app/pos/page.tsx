@@ -27,6 +27,8 @@ interface StoreProduct {
 interface CartItem {
   storeProduct: StoreProduct;
   quantity: number;
+  discountType?: 'PERCENT' | 'AMOUNT';
+  discountValue?: number;
 }
 
 interface Customer {
@@ -62,6 +64,13 @@ export default function POSPage() {
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Estados para descuentos
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountItemId, setDiscountItemId] = useState<string | null>(null);
+  const [discountType, setDiscountType] = useState<'PERCENT' | 'AMOUNT'>('PERCENT');
+  const [discountValue, setDiscountValue] = useState('');
+  const [globalDiscount, setGlobalDiscount] = useState(0);
 
   // Cargar turno actual al montar
   useEffect(() => {
@@ -217,14 +226,46 @@ export default function POSPage() {
 
   const clearCart = () => {
     setCart([]);
+    setGlobalDiscount(0);
   };
 
   const getTotalItems = () => {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   };
 
+  const calculateItemSubtotal = (item: CartItem) => {
+    return item.quantity * item.storeProduct.price;
+  };
+
+  const calculateItemDiscount = (item: CartItem) => {
+    if (!item.discountType || !item.discountValue) return 0;
+    
+    const subtotal = calculateItemSubtotal(item);
+    
+    if (item.discountType === 'PERCENT') {
+      return Math.round((subtotal * item.discountValue) / 100 * 100) / 100;
+    } else {
+      return item.discountValue;
+    }
+  };
+
+  const calculateItemTotal = (item: CartItem) => {
+    const subtotal = calculateItemSubtotal(item);
+    const discount = calculateItemDiscount(item);
+    return subtotal - discount;
+  };
+
+  const getSubtotalBeforeDiscounts = () => {
+    return cart.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
+  };
+
+  const getTotalItemDiscounts = () => {
+    return cart.reduce((sum, item) => sum + calculateItemDiscount(item), 0);
+  };
+
   const getCartTotal = () => {
-    return cart.reduce((sum, item) => sum + item.quantity * item.storeProduct.price, 0);
+    const subtotalAfterItemDiscounts = cart.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+    return subtotalAfterItemDiscounts - globalDiscount;
   };
 
   const handleCheckout = async () => {
@@ -244,6 +285,67 @@ export default function POSPage() {
     setAmountPaid('');
     setSelectedCustomer(null);
     setShowPaymentModal(true);
+  };
+
+  const handleOpenDiscountModal = (storeProductId: string) => {
+    const item = cart.find((i) => i.storeProduct.id === storeProductId);
+    if (!item) return;
+
+    setDiscountItemId(storeProductId);
+    setDiscountType(item.discountType || 'PERCENT');
+    setDiscountValue(item.discountValue?.toString() || '');
+    setShowDiscountModal(true);
+  };
+
+  const handleApplyDiscount = () => {
+    if (!discountItemId) return;
+
+    const value = parseFloat(discountValue);
+    
+    // Validar valor
+    if (isNaN(value) || value <= 0) {
+      toast.error('Ingresa un valor válido');
+      return;
+    }
+
+    const item = cart.find((i) => i.storeProduct.id === discountItemId);
+    if (!item) return;
+
+    const subtotal = calculateItemSubtotal(item);
+
+    // Validar según tipo
+    if (discountType === 'PERCENT') {
+      if (value > 100) {
+        toast.error('El porcentaje no puede ser mayor a 100%');
+        return;
+      }
+    } else if (discountType === 'AMOUNT') {
+      if (value > subtotal) {
+        toast.error('El descuento no puede ser mayor al subtotal del ítem');
+        return;
+      }
+    }
+
+    // Aplicar descuento
+    setCart(cart.map((i) =>
+      i.storeProduct.id === discountItemId
+        ? { ...i, discountType, discountValue: value }
+        : i
+    ));
+
+    toast.success('Descuento aplicado');
+    setShowDiscountModal(false);
+    setDiscountItemId(null);
+    setDiscountValue('');
+  };
+
+  const handleRemoveItemDiscount = (storeProductId: string) => {
+    setCart(cart.map((i) =>
+      i.storeProduct.id === storeProductId
+        ? { ...i, discountType: undefined, discountValue: undefined }
+        : i
+    ));
+    toast.success('Descuento eliminado');
   };
 
   const searchCustomers = async (query: string) => {
@@ -347,8 +449,11 @@ export default function POSPage() {
           storeProductId: item.storeProduct.id,
           quantity: item.quantity,
           unitPrice: item.storeProduct.price,
+          discountType: item.discountType,
+          discountValue: item.discountValue,
         })),
         paymentMethod,
+        discountTotal: globalDiscount > 0 ? globalDiscount : undefined,
       };
 
       // Solo enviar amountPaid si es CASH
@@ -587,7 +692,12 @@ export default function POSPage() {
                   ) : (
                     <>
                       <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {cart.map((item) => (
+                        {cart.map((item) => {
+                          const subtotal = calculateItemSubtotal(item);
+                          const discount = calculateItemDiscount(item);
+                          const itemTotal = calculateItemTotal(item);
+                          
+                          return (
                           <div
                             key={item.storeProduct.id}
                             className="border border-gray-200 rounded-lg p-3"
@@ -609,7 +719,7 @@ export default function POSPage() {
                               </button>
                             </div>
 
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() =>
@@ -645,11 +755,39 @@ export default function POSPage() {
                                 </button>
                               </div>
                               <div className="text-sm font-semibold text-[#1F2A37]">
-                                S/ {(item.quantity * item.storeProduct.price).toFixed(2)}
+                                S/ {subtotal.toFixed(2)}
                               </div>
                             </div>
+
+                            {/* Descuento del ítem */}
+                            {item.discountType && item.discountValue ? (
+                              <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                                <div className="flex justify-between items-center text-xs">
+                                  <div className="text-orange-700">
+                                    Desc: {item.discountType === 'PERCENT' ? `${item.discountValue}%` : `S/ ${item.discountValue.toFixed(2)}`}
+                                    {' '}(-S/ {discount.toFixed(2)})
+                                  </div>
+                                  <button
+                                    onClick={() => handleRemoveItemDiscount(item.storeProduct.id)}
+                                    className="text-orange-600 hover:text-orange-700"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <div className="text-xs font-semibold text-orange-900 mt-1">
+                                  Total: S/ {itemTotal.toFixed(2)}
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenDiscountModal(item.storeProduct.id)}
+                                className="mt-2 w-full py-1.5 text-xs border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                              >
+                                + Aplicar Descuento
+                              </button>
+                            )}
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
@@ -657,7 +795,63 @@ export default function POSPage() {
                           <span>Items</span>
                           <span>{getTotalItems()}</span>
                         </div>
-                        <div className="flex justify-between text-lg font-bold text-[#1F2A37]">
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>Subtotal</span>
+                          <span>S/ {getSubtotalBeforeDiscounts().toFixed(2)}</span>
+                        </div>
+                        
+                        {/* Descuentos por ítem */}
+                        {getTotalItemDiscounts() > 0 && (
+                          <div className="flex justify-between text-sm text-orange-600">
+                            <span>Desc. ítems</span>
+                            <span>-S/ {getTotalItemDiscounts().toFixed(2)}</span>
+                          </div>
+                        )}
+
+                        {/* Descuento global */}
+                        {globalDiscount > 0 ? (
+                          <div className="p-2 bg-orange-50 border border-orange-200 rounded">
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-orange-700">Desc. global</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-orange-700 font-medium">-S/ {globalDiscount.toFixed(2)}</span>
+                                <button
+                                  onClick={() => setGlobalDiscount(0)}
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              const maxDiscount = getSubtotalBeforeDiscounts() - getTotalItemDiscounts();
+                              if (maxDiscount <= 0) {
+                                toast.error('No hay monto disponible para descuento global');
+                                return;
+                              }
+                              const value = prompt(`Descuento global (máx S/ ${maxDiscount.toFixed(2)}):`);
+                              if (value) {
+                                const discount = parseFloat(value);
+                                if (isNaN(discount) || discount <= 0) {
+                                  toast.error('Ingresa un valor válido');
+                                } else if (discount > maxDiscount) {
+                                  toast.error('El descuento excede el total disponible');
+                                } else {
+                                  setGlobalDiscount(discount);
+                                  toast.success('Descuento global aplicado');
+                                }
+                              }
+                            }}
+                            className="w-full py-1.5 text-xs border border-dashed border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                          >
+                            + Descuento Global
+                          </button>
+                        )}
+
+                        <div className="flex justify-between text-lg font-bold text-[#1F2A37] pt-2 border-t">
                           <span>Total</span>
                           <span>S/ {getCartTotal().toFixed(2)}</span>
                         </div>
@@ -1071,6 +1265,130 @@ export default function POSPage() {
                 disabled={creatingCustomer}
               >
                 {creatingCustomer ? 'Creando...' : 'Crear'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Aplicar Descuento */}
+      {showDiscountModal && discountItemId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Aplicar Descuento</h3>
+              <button
+                onClick={() => {
+                  setShowDiscountModal(false);
+                  setDiscountItemId(null);
+                  setDiscountValue('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tipo de descuento */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo de descuento
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setDiscountType('PERCENT')}
+                  className={`py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
+                    discountType === 'PERCENT'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Porcentaje (%)
+                </button>
+                <button
+                  onClick={() => setDiscountType('AMOUNT')}
+                  className={`py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
+                    discountType === 'AMOUNT'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Monto fijo (S/)
+                </button>
+              </div>
+            </div>
+
+            {/* Valor del descuento */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {discountType === 'PERCENT' ? 'Porcentaje (0-100%)' : 'Monto (S/)'}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0.00"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleApplyDiscount()}
+              />
+            </div>
+
+            {/* Preview */}
+            {discountValue && parseFloat(discountValue) > 0 && discountItemId && (() => {
+              const item = cart.find((i) => i.storeProduct.id === discountItemId);
+              if (!item) return null;
+              
+              const subtotal = calculateItemSubtotal(item);
+              let previewDiscount = 0;
+              
+              if (discountType === 'PERCENT') {
+                previewDiscount = Math.round((subtotal * parseFloat(discountValue)) / 100 * 100) / 100;
+              } else {
+                previewDiscount = parseFloat(discountValue);
+              }
+              
+              const previewTotal = subtotal - previewDiscount;
+              
+              return (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="text-sm text-blue-700 mb-1">Vista previa</div>
+                  <div className="text-xs text-blue-600 space-y-1">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>S/ {subtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <span>Descuento:</span>
+                      <span>-S/ {previewDiscount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-blue-700 pt-1 border-t border-blue-300">
+                      <span>Total:</span>
+                      <span>S/ {previewTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Botones */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDiscountModal(false);
+                  setDiscountItemId(null);
+                  setDiscountValue('');
+                }}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleApplyDiscount}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              >
+                Aplicar
               </button>
             </div>
           </div>

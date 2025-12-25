@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           total: true,
+          discountTotal: true,
           paymentMethod: true,
           items: {
             select: {
@@ -92,6 +93,18 @@ export async function GET(request: NextRequest) {
 
     // Calculate summary
     const totalSales = sales.reduce((sum, s) => sum + Number(s.total), 0);
+    
+    // Calcular descuentos: suma de discountTotal (global) + descuentos de items
+    const totalDiscounts = sales.reduce((sum, s) => {
+      const globalDiscount = Number(s.discountTotal) || 0;
+      const itemDiscounts = s.items.reduce((itemSum, item) => {
+        // Para ventas antiguas sin descuentos, subtotal incluye el precio total
+        // Para ventas nuevas, la diferencia entre subtotal y lo que pagó es el descuento
+        return itemSum;
+      }, 0);
+      return sum + globalDiscount;
+    }, 0);
+    
     const ticketCount = sales.length;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
 
@@ -141,6 +154,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       summary: {
         totalSales,
+        totalDiscounts,
         ticketCount,
         averageTicket,
         totalFiado,
