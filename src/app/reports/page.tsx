@@ -10,7 +10,8 @@ import {
   ShoppingCart, 
   Calendar,
   Award,
-  Clock
+  Clock,
+  Tag
 } from 'lucide-react';
 
 type Tab = 'resumen' | 'diario' | 'turnos' | 'productos' | 'exportar';
@@ -20,6 +21,7 @@ interface SummaryData {
     totalSales: number;
     totalPromotions: number;
     totalDiscounts: number;
+    totalCoupons: number; // ✅ Cupones (Módulo 14.2-A)
     ticketCount: number;
     averageTicket: number;
     totalFiado: number;
@@ -289,7 +291,7 @@ export default function ReportsPage() {
           {summaryData && (
             <div>
               {/* Cards principales */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-medium text-gray-700">
@@ -323,6 +325,19 @@ export default function ReportsPage() {
                   </div>
                   <p className="text-3xl font-bold text-orange-900">
                     -{formatMoney(summaryData.summary.totalDiscounts)}
+                  </p>
+                </div>
+
+                {/* ✅ Cupones (Módulo 14.2-A) */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-green-700">
+                      Cupones
+                    </h3>
+                    <Tag className="w-5 h-5 text-green-600" />
+                  </div>
+                  <p className="text-3xl font-bold text-green-900">
+                    -{formatMoney(summaryData.summary.totalCoupons)}
                   </p>
                 </div>
 

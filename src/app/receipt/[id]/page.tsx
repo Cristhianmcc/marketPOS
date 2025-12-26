@@ -29,6 +29,12 @@ interface Sale {
   tax: number;
   discountTotal: number;
   totalBeforeDiscount: number;
+  // ✅ Cupones (Módulo 14.2-A)
+  totalBeforeCoupon: number;
+  couponCode: string | null;
+  couponType: 'PERCENT' | 'AMOUNT' | null;
+  couponValue: number | null;
+  couponDiscount: number;
   total: number;
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
   amountPaid: number | null;
@@ -279,6 +285,13 @@ export default function ReceiptPage() {
                   <div className="total-row discount-row">
                     <span>Descuentos:</span>
                     <span>-{formatMoney(sale.discountTotal)}</span>
+                  </div>
+                )}
+                {/* ✅ Cupones (Módulo 14.2-A) */}
+                {sale.couponDiscount > 0 && sale.couponCode && (
+                  <div className="total-row discount-row">
+                    <span>Cupón {sale.couponCode}:</span>
+                    <span>-{formatMoney(sale.couponDiscount)}</span>
                   </div>
                 )}
                 {sale.tax > 0 && (

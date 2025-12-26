@@ -76,6 +76,16 @@ export default function POSPage() {
   const [discountValue, setDiscountValue] = useState('');
   const [globalDiscount, setGlobalDiscount] = useState(0);
 
+  // Estados para cupones (Módulo 14.2-A)
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discount: number;
+    type: string;
+    value: number;
+  } | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
   // Cargar turno actual al montar
   useEffect(() => {
     fetchCurrentShift();
@@ -281,6 +291,8 @@ export default function POSPage() {
   const clearCart = () => {
     setCart([]);
     setGlobalDiscount(0);
+    setAppliedCoupon(null); // ✅ Limpiar cupón
+    setCouponCode('');
   };
 
   const getTotalItems = () => {
@@ -330,7 +342,69 @@ export default function POSPage() {
 
   const getCartTotal = () => {
     const subtotalAfterItemDiscounts = cart.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+    const totalBeforeCoupon = subtotalAfterItemDiscounts - globalDiscount;
+    const couponDiscount = appliedCoupon?.discount ?? 0;
+    return totalBeforeCoupon - couponDiscount;
+  };
+
+  const getTotalBeforeCoupon = () => {
+    const subtotalAfterItemDiscounts = cart.reduce((sum, item) => sum + calculateItemTotal(item), 0);
     return subtotalAfterItemDiscounts - globalDiscount;
+  };
+
+  // ✅ Validar y aplicar cupón (Módulo 14.2-A)
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error('Ingresa un código de cupón');
+      return;
+    }
+
+    const totalBeforeCoupon = getTotalBeforeCoupon();
+    if (totalBeforeCoupon <= 0) {
+      toast.error('No hay monto disponible para aplicar cupón');
+      return;
+    }
+
+    setValidatingCoupon(true);
+
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: couponCode,
+          totalBeforeCoupon,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || 'Cupón inválido');
+        return;
+      }
+
+      if (data.valid) {
+        setAppliedCoupon({
+          code: data.couponCode,
+          discount: data.discountAmount,
+          type: data.couponType,
+          value: data.couponValue,
+        });
+        toast.success(`Cupón ${data.couponCode} aplicado: -S/ ${data.discountAmount.toFixed(2)}`);
+      }
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      toast.error('Error al validar cupón');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    toast.success('Cupón eliminado');
   };
 
   const handleCheckout = async () => {
@@ -519,6 +593,7 @@ export default function POSPage() {
         })),
         paymentMethod,
         discountTotal: globalDiscount > 0 ? globalDiscount : undefined,
+        couponCode: appliedCoupon?.code, // ✅ Cupón (Módulo 14.2-A)
       };
 
       // Solo enviar amountPaid si es CASH
@@ -948,6 +1023,50 @@ export default function POSPage() {
                           >
                             + Descuento Global
                           </button>
+                        )}
+
+                        {/* ✅ Cupón (Módulo 14.2-A) */}
+                        {appliedCoupon ? (
+                          <div className="p-2 bg-green-50 border border-green-200 rounded">
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-green-700">Cupón {appliedCoupon.code}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-green-700 font-medium">-S/ {appliedCoupon.discount.toFixed(2)}</span>
+                                <button
+                                  onClick={handleRemoveCoupon}
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={couponCode}
+                                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleApplyCoupon();
+                                  }
+                                }}
+                                placeholder="Código de cupón"
+                                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded"
+                                disabled={validatingCoupon}
+                              />
+                              <button
+                                onClick={handleApplyCoupon}
+                                disabled={validatingCoupon || !couponCode.trim()}
+                                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {validatingCoupon ? 'Validando...' : 'Aplicar'}
+                              </button>
+                            </div>
+                          </div>
                         )}
 
                         <div className="flex justify-between text-lg font-bold text-[#1F2A37] pt-2 border-t">

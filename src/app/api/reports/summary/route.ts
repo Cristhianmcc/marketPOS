@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
           id: true,
           total: true,
           discountTotal: true,
+          couponDiscount: true, // ✅ Cupones (Módulo 14.2-A)
           paymentMethod: true,
           items: {
             select: {
@@ -107,6 +108,11 @@ export async function GET(request: NextRequest) {
     const totalDiscounts = sales.reduce((sum, s) => {
       return sum + Number(s.discountTotal || 0);
     }, 0);
+
+    // ✅ Calcular cupones totales (Módulo 14.2-A)
+    const totalCoupons = sales.reduce((sum, s) => {
+      return sum + Number(s.couponDiscount || 0);
+    }, 0);
     
     const ticketCount = sales.length;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
@@ -159,6 +165,7 @@ export async function GET(request: NextRequest) {
         totalSales,
         totalPromotions,
         totalDiscounts,
+        totalCoupons, // ✅ Cupones (Módulo 14.2-A)
         ticketCount,
         averageTicket,
         totalFiado,

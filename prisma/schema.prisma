@@ -58,6 +58,11 @@ enum PromotionType {
   HAPPY_HOUR
 }
 
+enum CouponType {
+  PERCENT
+  AMOUNT
+}
+
 //// MODELS
 
 model Store {
@@ -80,6 +85,7 @@ model Store {
   customers     Customer[] // ✅ Clientes de la tienda
   receivables   Receivable[] // ✅ Cuentas por cobrar
   promotions    Promotion[] // ✅ Promociones de la tienda
+  coupons       Coupon[] // ✅ Cupones de la tienda
 
   @@map("stores")
 }
@@ -214,6 +220,13 @@ model Sale {
   // Descuentos (Módulo 14)
   discountTotal        Decimal @default(0) @map("discount_total") @db.Decimal(10, 2)
   totalBeforeDiscount  Decimal @default(0) @map("total_before_discount") @db.Decimal(10, 2)
+
+  // Cupones (Módulo 14.2-A) - Snapshot
+  couponCode          String?     @map("coupon_code")
+  couponType          CouponType? @map("coupon_type")
+  couponValue         Decimal?    @map("coupon_value") @db.Decimal(10, 2)
+  couponDiscount      Decimal     @default(0) @map("coupon_discount") @db.Decimal(10, 2)
+  totalBeforeCoupon   Decimal     @default(0) @map("total_before_coupon") @db.Decimal(10, 2)
 
   paymentMethod PaymentMethod @map("payment_method")
   amountPaid    Decimal?      @map("amount_paid") @db.Decimal(10, 2) // efectivo
@@ -417,4 +430,27 @@ model Promotion {
   @@index([storeId, active])
   @@index([productId])
   @@map("promotions")
+}
+
+// Cupones por código (NAVIDAD10, MAMA5, etc.)
+model Coupon {
+  id        String     @id @default(cuid())
+  storeId   String     @map("store_id")
+  code      String
+  type      CouponType
+  value     Decimal    @db.Decimal(10, 2) // 10 (%) o 5.00 (S/)
+  minTotal  Decimal?   @map("min_total") @db.Decimal(10, 2) // mínimo de compra
+  startsAt  DateTime?  @map("starts_at")
+  endsAt    DateTime?  @map("ends_at")
+  maxUses   Int?       @map("max_uses") // null = ilimitado
+  usesCount Int        @default(0) @map("uses_count")
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, code])
+  @@index([storeId, active])
+  @@map("coupons")
 }

@@ -104,7 +104,26 @@ export async function POST(
         },
       });
 
-      // 2. Si es venta FIADO, cancelar receivable
+      // 2. Si había cupón aplicado, decrementar usesCount (Módulo 14.2-A)
+      if (sale.couponCode && Number(sale.couponDiscount) > 0) {
+        const coupon = await tx.coupon.findUnique({
+          where: {
+            storeId_code: {
+              storeId: sale.storeId,
+              code: sale.couponCode,
+            },
+          },
+        });
+
+        if (coupon && coupon.usesCount > 0) {
+          await tx.coupon.update({
+            where: { id: coupon.id },
+            data: { usesCount: { decrement: 1 } },
+          });
+        }
+      }
+
+      // 3. Si es venta FIADO, cancelar receivable
       if (sale.paymentMethod === 'FIADO') {
         await tx.receivable.updateMany({
           where: { saleId },

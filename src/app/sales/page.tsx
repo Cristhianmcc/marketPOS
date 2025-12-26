@@ -14,6 +14,8 @@ interface Sale {
   tax: number;
   discountTotal: number;
   promotionsTotal?: number;
+  couponCode?: string | null;
+  couponDiscount?: number;
   total: number;
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
   createdAt: string;
@@ -275,6 +277,9 @@ export default function SalesPage() {
                       Descuentos
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Cupón
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Total
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -318,6 +323,16 @@ export default function SalesPage() {
                       <td className="px-6 py-4 text-sm text-right text-orange-600">
                         {sale.discountTotal > 0 ? (
                           <span>-{formatMoney(sale.discountTotal)}</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right">
+                        {sale.couponCode && sale.couponDiscount && sale.couponDiscount > 0 ? (
+                          <div className="flex flex-col items-end">
+                            <span className="text-green-700 font-medium">-{formatMoney(sale.couponDiscount)}</span>
+                            <span className="text-xs text-gray-500">{sale.couponCode}</span>
+                          </div>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}

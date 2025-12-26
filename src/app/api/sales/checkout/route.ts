@@ -4,6 +4,11 @@ import { prisma } from '@/infra/db/prisma';
 import { Prisma } from '@prisma/client';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 import { applyBestPromotion, type Promotion } from '@/lib/promotions';
+import {
+  normalizeCouponCode,
+  validateAndComputeCouponDiscount,
+  type CouponError,
+} from '@/lib/coupons';
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -22,6 +27,7 @@ interface CheckoutBody {
   amountPaid?: number;
   customerId?: string; // ✅ Para ventas FIADO
   discountTotal?: number; // Descuento global (Módulo 14)
+  couponCode?: string; // ✅ Cupón (Módulo 14.2-A)
 }
 
 interface ErrorResponse {
@@ -49,7 +55,8 @@ async function executeCheckout(
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO',
   amountPaid?: number,
   customerId?: string, // ✅ Para FIADO
-  discountTotal?: number // Módulo 14: descuento global
+  discountTotal?: number, // Módulo 14: descuento global
+  couponCode?: string // ✅ Módulo 14.2-A: cupón
 ): Promise<{ sale: any; saleItems: any[]; receivable?: any }> {
   return await prisma.$transaction(async (tx) => {
     // 1. Validar stock disponible y tipos
@@ -258,10 +265,111 @@ async function executeCheckout(
       );
     }
     
-    const total = totalBeforeGlobalDiscount - globalDiscount;
+    // Total después de descuento global (ANTES de cupón)
+    const totalBeforeCoupon = totalBeforeGlobalDiscount - globalDiscount;
     
     // Total de descuentos (ítems + global) para guardar en discountTotal
     const totalDiscounts = itemDiscountsTotal + globalDiscount;
+
+    // ✅ 4.5. CUPÓN (Módulo 14.2-A)
+    let couponDiscount = 0;
+    let couponSnapshot: {
+      couponCode: string;
+      couponType: string;
+      couponValue: number;
+    } | null = null;
+
+    if (couponCode) {
+      const normalizedCouponCode = normalizeCouponCode(couponCode);
+
+      if (!normalizedCouponCode) {
+        throw new CheckoutError(
+          'INVALID_COUPON_CODE_FORMAT',
+          400,
+          'El código del cupón es inválido'
+        );
+      }
+
+      // Buscar cupón (con lock para evitar race conditions en usesCount)
+      const couponData = await tx.coupon.findUnique({
+        where: {
+          storeId_code: {
+            storeId: session.storeId,
+            code: normalizedCouponCode,
+          },
+        },
+      });
+
+      // Convertir a formato de interfaz Coupon
+      const coupon = couponData ? {
+        id: couponData.id,
+        storeId: couponData.storeId,
+        code: couponData.code,
+        type: couponData.type,
+        value: Number(couponData.value),
+        minTotal: couponData.minTotal ? Number(couponData.minTotal) : null,
+        startsAt: couponData.startsAt,
+        endsAt: couponData.endsAt,
+        maxUses: couponData.maxUses,
+        usesCount: couponData.usesCount,
+        active: couponData.active,
+      } : null;
+
+      // Hora actual Lima (UTC-5)
+      const nowLocalLima = new Date(Date.now() - 5 * 60 * 60 * 1000);
+
+      // Validar y calcular descuento
+      try {
+        const result = validateAndComputeCouponDiscount(
+          coupon,
+          totalBeforeCoupon,
+          nowLocalLima
+        );
+
+        couponDiscount = result.discountAmount;
+        couponSnapshot = result.snapshotFields;
+
+        // Incrementar usesCount (dentro de transacción)
+        await tx.coupon.update({
+          where: { id: coupon!.id },
+          data: { usesCount: { increment: 1 } },
+        });
+
+        // Validar nuevamente que no excedió maxUses después del incremento
+        if (coupon!.maxUses !== null) {
+          const updatedCoupon = await tx.coupon.findUnique({
+            where: { id: coupon!.id },
+            select: { usesCount: true, maxUses: true },
+          });
+
+          if (updatedCoupon && updatedCoupon.usesCount > updatedCoupon.maxUses!) {
+            throw new CheckoutError(
+              'COUPON_MAX_USES_REACHED',
+              409,
+              'El cupón ha alcanzado su límite de usos',
+              {
+                maxUses: updatedCoupon.maxUses,
+                usesCount: updatedCoupon.usesCount,
+              }
+            );
+          }
+        }
+      } catch (error) {
+        const couponError = error as CouponError | CheckoutError;
+        if (couponError instanceof CheckoutError) {
+          throw couponError;
+        }
+        throw new CheckoutError(
+          couponError.code,
+          409,
+          couponError.message,
+          couponError.details
+        );
+      }
+    }
+
+    // Total FINAL (después de cupón)
+    const total = totalBeforeCoupon - couponDiscount;
 
     // 5. Calcular changeAmount si es efectivo
     let changeAmount: number | null = null;
@@ -292,7 +400,7 @@ async function executeCheckout(
 
     const nextSaleNumber = (lastSale?.saleNumber ?? 0) + 1;
 
-    // 5. Crear Sale con descuentos
+    // 5. Crear Sale con descuentos y cupón
     const saleData: any = {
       storeId: session.storeId,
       userId: session.userId,
@@ -301,6 +409,12 @@ async function executeCheckout(
       tax: new Prisma.Decimal(tax),
       discountTotal: new Prisma.Decimal(totalDiscounts),
       totalBeforeDiscount: new Prisma.Decimal(totalBeforeGlobalDiscount),
+      // ✅ Cupón (Módulo 14.2-A)
+      totalBeforeCoupon: new Prisma.Decimal(totalBeforeCoupon),
+      couponCode: couponSnapshot?.couponCode ?? null,
+      couponType: couponSnapshot?.couponType ?? null,
+      couponValue: couponSnapshot?.couponValue ? new Prisma.Decimal(couponSnapshot.couponValue) : null,
+      couponDiscount: new Prisma.Decimal(couponDiscount),
       total: new Prisma.Decimal(total),
       paymentMethod: paymentMethod,
     };
@@ -422,7 +536,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CheckoutBody = await req.json();
-    const { items, paymentMethod, amountPaid, customerId, discountTotal } = body;
+    const { items, paymentMethod, amountPaid, customerId, discountTotal, couponCode } = body;
 
     // Validaciones básicas
     if (!items || items.length === 0) {
@@ -453,32 +567,37 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(error, { status: 400 });
       }
 
-      // Calcular total incluyendo descuentos
-      const itemsSubtotal = items.reduce((sum, item) => {
-        const subtotalItem = item.quantity * item.unitPrice;
-        let discountAmount = 0;
-        
-        if (item.discountType && item.discountValue) {
-          if (item.discountType === 'PERCENT') {
-            discountAmount = Math.round((subtotalItem * item.discountValue) / 100 * 100) / 100;
-          } else if (item.discountType === 'AMOUNT') {
-            discountAmount = item.discountValue;
+      // Módulo 14.2-A: Si hay cupón, NO validar monto aquí
+      // El frontend ya validó y calculó el total correcto
+      // La validación completa se hace en executeCheckout dentro de la transacción
+      if (!couponCode) {
+        // Solo validar monto si NO hay cupón
+        const itemsSubtotal = items.reduce((sum, item) => {
+          const subtotalItem = item.quantity * item.unitPrice;
+          let discountAmount = 0;
+          
+          if (item.discountType && item.discountValue) {
+            if (item.discountType === 'PERCENT') {
+              discountAmount = Math.round((subtotalItem * item.discountValue) / 100 * 100) / 100;
+            } else if (item.discountType === 'AMOUNT') {
+              discountAmount = item.discountValue;
+            }
           }
-        }
+          
+          return sum + (subtotalItem - discountAmount);
+        }, 0);
         
-        return sum + (subtotalItem - discountAmount);
-      }, 0);
-      
-      const globalDiscount = discountTotal ?? 0;
-      const total = itemsSubtotal - globalDiscount;
+        const globalDiscount = discountTotal ?? 0;
+        const total = itemsSubtotal - globalDiscount;
 
-      if (amountPaid < total) {
-        const error: ErrorResponse = {
-          code: 'AMOUNT_INSUFFICIENT',
-          message: 'El monto pagado es menor al total',
-          details: { total, amountPaid, missing: total - amountPaid },
-        };
-        return NextResponse.json(error, { status: 409 });
+        if (amountPaid < total) {
+          const error: ErrorResponse = {
+            code: 'AMOUNT_INSUFFICIENT',
+            message: 'El monto pagado es menor al total',
+            details: { total, amountPaid, missing: total - amountPaid },
+          };
+          return NextResponse.json(error, { status: 409 });
+        }
       }
     } else if (paymentMethod === 'FIADO') {
       // Para FIADO, validar customerId
@@ -549,7 +668,8 @@ export async function POST(req: NextRequest) {
           paymentMethod,
           amountPaid,
           customerId,
-          discountTotal
+          discountTotal,
+          couponCode
         );
         break; // Éxito, salir del bucle
       } catch (error: any) {

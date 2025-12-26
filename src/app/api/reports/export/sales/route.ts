@@ -75,6 +75,10 @@ export async function GET(request: NextRequest) {
       'Hora',
       'Subtotal',
       'Descuentos',
+      'Cupon Codigo', // ✅ Cupones (Módulo 14.2-A)
+      'Cupon Tipo',
+      'Cupon Valor',
+      'Cupon Descuento',
       'Impuesto',
       'Total',
       'Metodo Pago',
@@ -93,6 +97,11 @@ export async function GET(request: NextRequest) {
       escapeCSV(new Date(s.createdAt).toLocaleTimeString('es-PE')),
       escapeCSV(Number(s.subtotal).toFixed(2)),
       escapeCSV(Number(s.discountTotal).toFixed(2)),
+      // ✅ Cupones (Módulo 14.2-A)
+      escapeCSV(s.couponCode || ''),
+      escapeCSV(s.couponType || ''),
+      escapeCSV(s.couponValue !== null ? Number(s.couponValue).toFixed(2) : ''),
+      escapeCSV(Number(s.couponDiscount).toFixed(2)),
       escapeCSV(Number(s.tax).toFixed(2)),
       escapeCSV(Number(s.total).toFixed(2)),
       escapeCSV(s.paymentMethod),
