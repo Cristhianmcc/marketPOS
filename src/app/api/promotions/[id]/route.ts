@@ -18,7 +18,7 @@ export async function PATCH(
     const { active } = await request.json();
     const { id } = await params;
 
-    const promotion = await prisma.promotion.update(
+    const promotion = await prisma.promotion.update({
       where: {
         id,
         storeId: session.storeId,
