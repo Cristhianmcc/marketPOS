@@ -13,6 +13,9 @@ interface SaleItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  promotionType: 'TWO_FOR_ONE' | 'PACK_PRICE' | 'HAPPY_HOUR' | null;
+  promotionName: string | null;
+  promotionDiscount: number;
   discountType: 'PERCENT' | 'AMOUNT' | null;
   discountValue: number | null;
   discountAmount: number;
@@ -228,6 +231,15 @@ export default function ReceiptPage() {
                   </span>
                   <span>{formatMoney(item.subtotal)}</span>
                 </div>
+                {/* Promoción del ítem */}
+                {item.promotionDiscount > 0 && (
+                  <div className="item-discount">
+                    <span>
+                      Promo: {item.promotionName}
+                    </span>
+                    <span>-{formatMoney(item.promotionDiscount)}</span>
+                  </div>
+                )}
                 {/* Descuento del ítem */}
                 {item.discountAmount > 0 && (
                   <>
@@ -239,11 +251,14 @@ export default function ReceiptPage() {
                       </span>
                       <span>-{formatMoney(item.discountAmount)}</span>
                     </div>
-                    <div className="item-total">
-                      <span>Total línea:</span>
-                      <span>{formatMoney(item.totalLine)}</span>
-                    </div>
                   </>
+                )}
+                {/* Total línea si hay promoción o descuento */}
+                {(item.promotionDiscount > 0 || item.discountAmount > 0) && (
+                  <div className="item-total">
+                    <span>Total línea:</span>
+                    <span>{formatMoney(item.totalLine)}</span>
+                  </div>
                 )}
               </div>
             ))}

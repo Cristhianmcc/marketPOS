@@ -77,6 +77,14 @@ export default async function HomePage() {
               </Link>
 
               <Link
+                href="/promotions"
+                className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 hover:border-blue-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-blue-900 mb-2">🎁 Promociones</h2>
+                <p className="text-blue-700">Gestionar promociones</p>
+              </Link>
+
+              <Link
                 href="/settings"
                 className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 hover:border-blue-300 transition-colors"
               >

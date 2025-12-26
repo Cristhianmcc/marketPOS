@@ -72,6 +72,9 @@ export async function GET(request: NextRequest) {
       'Cantidad',
       'Precio Unit',
       'Subtotal',
+      'Promo Tipo',
+      'Promo Nombre',
+      'Promo Monto',
       'Desc. Tipo',
       'Desc. Valor',
       'Desc. Monto',
@@ -80,6 +83,10 @@ export async function GET(request: NextRequest) {
     ];
 
     const rows = items.map(item => {
+      const promoTypeLabel = item.promotionType === 'TWO_FOR_ONE' ? '2x1' :
+                             item.promotionType === 'PACK_PRICE' ? 'Pack' :
+                             item.promotionType === 'HAPPY_HOUR' ? 'Happy Hour' : '-';
+      
       const discountTypeLabel = item.discountType === 'PERCENT' ? 'Porcentaje' : 
                                 item.discountType === 'AMOUNT' ? 'Monto' : '-';
       const discountValueLabel = item.discountValue 
@@ -94,9 +101,12 @@ export async function GET(request: NextRequest) {
         escapeCSV(item.productName),
         escapeCSV(item.productContent || ''),
         escapeCSV(item.unitType),
-        escapeCSV(Number(item.quantity).toFixed(3)),
+        escapeCSV(item.unitType === 'UNIT' ? Number(item.quantity).toFixed(0) : Number(item.quantity).toFixed(3)),
         escapeCSV(Number(item.unitPrice).toFixed(2)),
         escapeCSV(Number(item.subtotal).toFixed(2)),
+        escapeCSV(promoTypeLabel),
+        escapeCSV(item.promotionName || '-'),
+        escapeCSV(Number(item.promotionDiscount).toFixed(2)),
         escapeCSV(discountTypeLabel),
         escapeCSV(discountValueLabel),
         escapeCSV(Number(item.discountAmount).toFixed(2)),

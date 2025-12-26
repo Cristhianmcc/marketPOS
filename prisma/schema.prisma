@@ -52,6 +52,12 @@ enum DiscountType {
   AMOUNT
 }
 
+enum PromotionType {
+  TWO_FOR_ONE
+  PACK_PRICE
+  HAPPY_HOUR
+}
+
 //// MODELS
 
 model Store {
@@ -73,6 +79,7 @@ model Store {
   settings      StoreSettings?
   customers     Customer[] // ✅ Clientes de la tienda
   receivables   Receivable[] // ✅ Cuentas por cobrar
+  promotions    Promotion[] // ✅ Promociones de la tienda
 
   @@map("stores")
 }
@@ -123,6 +130,7 @@ model ProductMaster {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   storeProducts StoreProduct[]
+  promotions    Promotion[] // ✅ Promociones del producto
 
   @@index([barcode])
   @@index([name])
@@ -251,6 +259,11 @@ model SaleItem {
   discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
   totalLine      Decimal       @default(0) @map("total_line") @db.Decimal(10, 2)
 
+  // Promociones (Módulo 14.1) - Snapshot
+  promotionType     PromotionType? @map("promotion_type")
+  promotionName     String?        @map("promotion_name")
+  promotionDiscount Decimal        @default(0) @map("promotion_discount") @db.Decimal(10, 2)
+
   sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
 
@@ -367,4 +380,41 @@ model ReceivablePayment {
   @@index([shiftId])
   @@index([storeId, createdAt])
   @@map("receivable_payments")
+}
+
+// Promociones (2x1, pack price, happy hour, fechas especiales)
+model Promotion {
+  id        String        @id @default(cuid())
+  storeId   String        @map("store_id")
+  type      PromotionType
+  name      String
+  active    Boolean       @default(true)
+
+  // Producto objetivo
+  productId String? @map("product_id")
+
+  // Reglas de cantidad
+  minQty Int? @map("min_qty")
+
+  // Pack price
+  packPrice Decimal? @map("pack_price") @db.Decimal(10, 2)
+
+  // Happy hour
+  happyStart DateTime? @map("happy_start")
+  happyEnd   DateTime? @map("happy_end")
+  happyPrice Decimal?  @map("happy_price") @db.Decimal(10, 2)
+
+  // Vigencia general (fechas especiales)
+  startsAt DateTime? @map("starts_at")
+  endsAt   DateTime? @map("ends_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store   Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product ProductMaster? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, active])
+  @@index([productId])
+  @@map("promotions")
 }

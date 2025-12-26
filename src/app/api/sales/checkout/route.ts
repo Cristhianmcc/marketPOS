@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { Prisma } from '@prisma/client';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
+import { applyBestPromotion, type Promotion } from '@/lib/promotions';
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -135,11 +136,49 @@ async function executeCheckout(
       }
     }
 
-    // 2. Validar y calcular descuentos por ítem
+    // 2. Obtener promociones activas de la tienda
+    const promotions = await tx.promotion.findMany({
+      where: {
+        storeId: session.storeId,
+        active: true,
+      },
+    });
+
+    // Convertir a formato usado por applyBestPromotion
+    const promoList: Promotion[] = promotions.map((p) => ({
+      id: p.id,
+      type: p.type,
+      name: p.name,
+      active: p.active,
+      productId: p.productId,
+      minQty: p.minQty,
+      packPrice: p.packPrice ? Number(p.packPrice) : null,
+      happyStart: p.happyStart,
+      happyEnd: p.happyEnd,
+      happyPrice: p.happyPrice ? Number(p.happyPrice) : null,
+      startsAt: p.startsAt,
+      endsAt: p.endsAt,
+    }));
+
+    // 3. Validar y calcular descuentos por ítem (con promociones)
+    // 3. Validar y calcular descuentos por ítem (con promociones)
     const itemsWithDiscounts = items.map((item) => {
       const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
       const subtotalItem = item.quantity * item.unitPrice;
       
+      // PASO 1: Aplicar promoción automática (si existe)
+      const appliedPromo = applyBestPromotion(
+        sp.product.id,
+        item.quantity,
+        item.unitPrice,
+        subtotalItem,
+        promoList
+      );
+      
+      const promotionDiscount = appliedPromo?.promotionDiscount ?? 0;
+      const subtotalAfterPromo = subtotalItem - promotionDiscount;
+      
+      // PASO 2: Aplicar descuento manual (si existe)
       let discountAmount = 0;
       
       if (item.discountType && item.discountValue !== undefined) {
@@ -161,34 +200,41 @@ async function executeCheckout(
               `${sp.product.name}: el descuento porcentual debe estar entre 0 y 100`
             );
           }
-          discountAmount = Math.round((subtotalItem * item.discountValue) / 100 * 100) / 100;
+          // Descuento manual se calcula sobre subtotal después de promoción
+          discountAmount = Math.round((subtotalAfterPromo * item.discountValue) / 100 * 100) / 100;
         } else if (item.discountType === 'AMOUNT') {
-          // Validar monto válido
-          if (item.discountValue <= 0 || item.discountValue > subtotalItem) {
+          // Validar monto válido (sobre subtotal después de promoción)
+          if (item.discountValue <= 0 || item.discountValue > subtotalAfterPromo) {
             throw new CheckoutError(
               'DISCOUNT_EXCEEDS_SUBTOTAL',
               409,
-              `${sp.product.name}: el descuento no puede ser mayor al subtotal del ítem (S/ ${subtotalItem.toFixed(2)})`
+              `${sp.product.name}: el descuento no puede ser mayor al subtotal después de promoción (S/ ${subtotalAfterPromo.toFixed(2)})`
             );
           }
           discountAmount = item.discountValue;
         }
       }
 
-      const totalLine = subtotalItem - discountAmount;
+      // PASO 3: Calcular totalLine = subtotal - promo - descuento manual
+      const totalLine = subtotalItem - promotionDiscount - discountAmount;
 
       return {
         ...item,
+        productId: sp.product.id, // ✅ Necesario para promociones
         subtotalItem,
+        promotionType: appliedPromo?.promotionType ?? null,
+        promotionName: appliedPromo?.promotionName ?? null,
+        promotionDiscount,
         discountAmount,
         totalLine,
       };
     });
 
-    // 3. Calcular totales
+    // 4. Calcular totales
     const subtotalBeforeDiscounts = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
+    const promotionsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.promotionDiscount, 0);
     const itemDiscountsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0);
-    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - itemDiscountsTotal;
+    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - itemDiscountsTotal;
     
     // Tax (usando lógica actual, puede ser 0)
     const tax = 0;
@@ -217,7 +263,7 @@ async function executeCheckout(
     // Total de descuentos (ítems + global) para guardar en discountTotal
     const totalDiscounts = itemDiscountsTotal + globalDiscount;
 
-    // 4. Calcular changeAmount si es efectivo
+    // 5. Calcular changeAmount si es efectivo
     let changeAmount: number | null = null;
     if (paymentMethod === 'CASH' && amountPaid !== undefined) {
       changeAmount = amountPaid - total;
@@ -288,6 +334,11 @@ async function executeCheckout(
             quantity: new Prisma.Decimal(item.quantity),
             unitPrice: new Prisma.Decimal(item.unitPrice),
             subtotal: new Prisma.Decimal(item.subtotalItem),
+            // Promociones (Módulo 14.1)
+            promotionType: item.promotionType,
+            promotionName: item.promotionName,
+            promotionDiscount: new Prisma.Decimal(item.promotionDiscount),
+            // Descuentos manuales (Módulo 14)
             discountType: item.discountType ?? null,
             discountValue: item.discountValue !== undefined ? new Prisma.Decimal(item.discountValue) : null,
             discountAmount: new Prisma.Decimal(item.discountAmount),

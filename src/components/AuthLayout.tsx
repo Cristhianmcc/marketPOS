@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, ShoppingCart, Package, BarChart3, DollarSign, FileText, Receipt } from 'lucide-react';
+import { LogOut, ShoppingCart, Package, BarChart3, DollarSign, FileText, Receipt, Tag } from 'lucide-react';
 
 interface User {
   id: string;
@@ -162,6 +162,20 @@ export default function AuthLayout({ children, storeName }: AuthLayoutProps) {
                   <BarChart3 className="w-4 h-4" />
                   Reportes
                 </Link>
+
+                {user.role === 'OWNER' && (
+                  <Link
+                    href="/promotions"
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      pathname?.startsWith('/promotions')
+                        ? 'bg-[#1F2A37] text-white border-b-2 border-[#16A34A]'
+                        : 'text-gray-300 hover:text-white hover:bg-[#1F2A37]'
+                    }`}
+                  >
+                    <Tag className="w-4 h-4" />
+                    Promociones
+                  </Link>
+                )}
               </div>
             </div>
           </nav>

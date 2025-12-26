@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
               productContent: true,
               quantity: true,
               subtotal: true,
+              promotionDiscount: true,
             },
           },
         },
@@ -94,15 +95,17 @@ export async function GET(request: NextRequest) {
     // Calculate summary
     const totalSales = sales.reduce((sum, s) => sum + Number(s.total), 0);
     
-    // Calcular descuentos: suma de discountTotal (global) + descuentos de items
-    const totalDiscounts = sales.reduce((sum, s) => {
-      const globalDiscount = Number(s.discountTotal) || 0;
-      const itemDiscounts = s.items.reduce((itemSum, item) => {
-        // Para ventas antiguas sin descuentos, subtotal incluye el precio total
-        // Para ventas nuevas, la diferencia entre subtotal y lo que pagó es el descuento
-        return itemSum;
+    // Calcular promociones totales
+    const totalPromotions = sales.reduce((sum, s) => {
+      const itemPromotions = s.items.reduce((itemSum, item) => {
+        return itemSum + Number(item.promotionDiscount || 0);
       }, 0);
-      return sum + globalDiscount;
+      return sum + itemPromotions;
+    }, 0);
+    
+    // Calcular descuentos: discountTotal de la venta
+    const totalDiscounts = sales.reduce((sum, s) => {
+      return sum + Number(s.discountTotal || 0);
     }, 0);
     
     const ticketCount = sales.length;
@@ -154,6 +157,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       summary: {
         totalSales,
+        totalPromotions,
         totalDiscounts,
         ticketCount,
         averageTicket,

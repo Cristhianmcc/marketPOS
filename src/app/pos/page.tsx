@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, Tag, Package as PackageIcon, Clock, Milk } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 import { toast, Toaster } from 'sonner';
 import { formatMoney } from '@/lib/money';
@@ -29,6 +29,10 @@ interface CartItem {
   quantity: number;
   discountType?: 'PERCENT' | 'AMOUNT';
   discountValue?: number;
+  // Promociones automáticas
+  promotionType?: 'TWO_FOR_ONE' | 'PACK_PRICE' | 'HAPPY_HOUR' | null;
+  promotionName?: string | null;
+  promotionDiscount?: number;
 }
 
 interface Customer {
@@ -165,7 +169,46 @@ export default function POSPage() {
     performSearch();
   };
 
-  const addToCart = (sp: StoreProduct) => {
+  // Verificar y aplicar promoción automática
+  const checkAndApplyPromotion = async (item: CartItem): Promise<CartItem> => {
+    try {
+      const res = await fetch('/api/promotions/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: item.storeProduct.product.id,
+          quantity: item.quantity,
+          unitPrice: item.storeProduct.price,
+        }),
+      });
+
+      if (!res.ok) return item;
+
+      const data = await res.json();
+      
+      if (data.promotion) {
+        return {
+          ...item,
+          promotionType: data.promotion.promotionType,
+          promotionName: data.promotion.promotionName,
+          promotionDiscount: data.promotion.promotionDiscount,
+        };
+      }
+
+      // Sin promoción
+      return {
+        ...item,
+        promotionType: null,
+        promotionName: null,
+        promotionDiscount: 0,
+      };
+    } catch (error) {
+      console.error('Error checking promotion:', error);
+      return item;
+    }
+  };
+
+  const addToCart = async (sp: StoreProduct) => {
     // Validar stock antes de agregar
     if (sp.stock !== null && sp.stock <= 0) {
       toast.error(`${sp.product.name}: sin stock disponible`);
@@ -175,10 +218,17 @@ export default function POSPage() {
     const existing = cart.find((item) => item.storeProduct.id === sp.id);
     
     if (existing) {
-      updateQuantity(sp.id, existing.quantity + 1);
+      await updateQuantity(sp.id, existing.quantity + 1);
     } else {
-      setCart([...cart, { storeProduct: sp, quantity: 1 }]);
-      toast.success(`${sp.product.name} agregado al carrito`);
+      const newItem: CartItem = { storeProduct: sp, quantity: 1 };
+      const itemWithPromo = await checkAndApplyPromotion(newItem);
+      setCart([...cart, itemWithPromo]);
+      
+      if (itemWithPromo.promotionName) {
+        toast.success(`${sp.product.name} agregado con promoción: ${itemWithPromo.promotionName}`);
+      } else {
+        toast.success(`${sp.product.name} agregado al carrito`);
+      }
       
       // Advertencia si el stock es bajo
       if (sp.stock !== null && sp.stock <= 5) {
@@ -187,7 +237,7 @@ export default function POSPage() {
     }
   };
 
-  const updateQuantity = (storeProductId: string, newQuantity: number) => {
+  const updateQuantity = async (storeProductId: string, newQuantity: number) => {
     const item = cart.find((i) => i.storeProduct.id === storeProductId);
     if (!item) return;
 
@@ -215,8 +265,12 @@ export default function POSPage() {
       }
     }
 
-    setCart(cart.map((i) =>
-      i.storeProduct.id === storeProductId ? { ...i, quantity: newQuantity } : i
+    // Recalcular promoción con nueva cantidad
+    const updatedItem = { ...item, quantity: newQuantity };
+    const itemWithPromo = await checkAndApplyPromotion(updatedItem);
+    
+    setCart(prev => prev.map((i) => 
+      i.storeProduct.id === storeProductId ? itemWithPromo : i
     ));
   };
 
@@ -237,13 +291,19 @@ export default function POSPage() {
     return item.quantity * item.storeProduct.price;
   };
 
+  const calculateItemPromotion = (item: CartItem) => {
+    return item.promotionDiscount ?? 0;
+  };
+
   const calculateItemDiscount = (item: CartItem) => {
     if (!item.discountType || !item.discountValue) return 0;
     
     const subtotal = calculateItemSubtotal(item);
+    const promotion = calculateItemPromotion(item);
+    const subtotalAfterPromo = subtotal - promotion;
     
     if (item.discountType === 'PERCENT') {
-      return Math.round((subtotal * item.discountValue) / 100 * 100) / 100;
+      return Math.round((subtotalAfterPromo * item.discountValue) / 100 * 100) / 100;
     } else {
       return item.discountValue;
     }
@@ -251,12 +311,17 @@ export default function POSPage() {
 
   const calculateItemTotal = (item: CartItem) => {
     const subtotal = calculateItemSubtotal(item);
+    const promotion = calculateItemPromotion(item);
     const discount = calculateItemDiscount(item);
-    return subtotal - discount;
+    return subtotal - promotion - discount;
   };
 
   const getSubtotalBeforeDiscounts = () => {
     return cart.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
+  };
+
+  const getTotalPromotions = () => {
+    return cart.reduce((sum, item) => sum + calculateItemPromotion(item), 0);
   };
 
   const getTotalItemDiscounts = () => {
@@ -759,6 +824,32 @@ export default function POSPage() {
                               </div>
                             </div>
 
+                            {/* Promoción automática */}
+                            {item.promotionName && (
+                              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                                <div className="flex justify-between items-center text-xs">
+                                  <div className="flex items-center gap-1 text-blue-700 font-medium">
+                                    {(() => {
+                                      const name = (item.promotionName || '').toLowerCase();
+                                      if (name.includes('bebida') || name.includes('coca') || name.includes('cerveza') || name.includes('pilsen') || name.includes('vino')) {
+                                        return <Milk className="w-3.5 h-3.5" />;
+                                      } else if (item.promotionType === 'PACK_PRICE') {
+                                        return <PackageIcon className="w-3.5 h-3.5" />;
+                                      } else if (item.promotionType === 'HAPPY_HOUR') {
+                                        return <Clock className="w-3.5 h-3.5" />;
+                                      } else {
+                                        return <Tag className="w-3.5 h-3.5" />;
+                                      }
+                                    })()}
+                                    {item.promotionName}
+                                  </div>
+                                  <div className="text-blue-900 font-semibold">
+                                    -S/ {(item.promotionDiscount ?? 0).toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Descuento del ítem */}
                             {item.discountType && item.discountValue ? (
                               <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
@@ -799,6 +890,14 @@ export default function POSPage() {
                           <span>Subtotal</span>
                           <span>S/ {getSubtotalBeforeDiscounts().toFixed(2)}</span>
                         </div>
+                        
+                        {/* Promociones */}
+                        {getTotalPromotions() > 0 && (
+                          <div className="flex justify-between text-sm text-blue-600">
+                            <span>Promociones</span>
+                            <span>-S/ {getTotalPromotions().toFixed(2)}</span>
+                          </div>
+                        )}
                         
                         {/* Descuentos por ítem */}
                         {getTotalItemDiscounts() > 0 && (

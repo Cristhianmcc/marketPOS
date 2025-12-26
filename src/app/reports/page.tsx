@@ -18,6 +18,7 @@ type Tab = 'resumen' | 'diario' | 'turnos' | 'productos' | 'exportar';
 interface SummaryData {
   summary: {
     totalSales: number;
+    totalPromotions: number;
     totalDiscounts: number;
     ticketCount: number;
     averageTicket: number;
@@ -288,7 +289,7 @@ export default function ReportsPage() {
           {summaryData && (
             <div>
               {/* Cards principales */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-medium text-gray-700">
@@ -298,6 +299,18 @@ export default function ReportsPage() {
                   </div>
                   <p className="text-3xl font-bold text-gray-900">
                     {formatMoney(summaryData.summary.totalSales)}
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-blue-700">
+                      Promociones
+                    </h3>
+                    <Award className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <p className="text-3xl font-bold text-blue-900">
+                    -{formatMoney(summaryData.summary.totalPromotions)}
                   </p>
                 </div>
 

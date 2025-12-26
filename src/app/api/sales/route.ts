@@ -78,7 +78,19 @@ export async function GET(request: NextRequest) {
       take: 100, // Limit to last 100 sales
     });
 
-    return NextResponse.json({ sales });
+    // Calculate promotionsTotal for each sale
+    const salesWithPromotions = sales.map(sale => {
+      const promotionsTotal = sale.items.reduce((sum, item) => {
+        return sum + (item.promotionDiscount ? Number(item.promotionDiscount) : 0);
+      }, 0);
+
+      return {
+        ...sale,
+        promotionsTotal,
+      };
+    });
+
+    return NextResponse.json({ sales: salesWithPromotions });
   } catch (error) {
     console.error('Error fetching sales:', error);
     return NextResponse.json(

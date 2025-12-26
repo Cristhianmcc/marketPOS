@@ -13,6 +13,7 @@ interface Sale {
   subtotal: number;
   tax: number;
   discountTotal: number;
+  promotionsTotal?: number;
   total: number;
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
   createdAt: string;
@@ -268,6 +269,9 @@ export default function SalesPage() {
                       Fecha
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Promociones
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Descuentos
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -303,6 +307,13 @@ export default function SalesPage() {
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right text-blue-600">
+                        {sale.promotionsTotal && sale.promotionsTotal > 0 ? (
+                          <span>-{formatMoney(sale.promotionsTotal)}</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-right text-orange-600">
                         {sale.discountTotal > 0 ? (
