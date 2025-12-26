@@ -4,7 +4,7 @@ import { prisma } from '@/infra/db/prisma';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -16,10 +16,11 @@ export async function PATCH(
     }
 
     const { active } = await request.json();
+    const { id } = await params;
 
-    const promotion = await prisma.promotion.update({
+    const promotion = await prisma.promotion.update(
       where: {
-        id: params.id,
+        id,
         storeId: session.storeId,
       },
       data: {
@@ -39,7 +40,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -50,9 +51,11 @@ export async function DELETE(
       );
     }
 
+    const { id } = await params;
+
     await prisma.promotion.delete({
       where: {
-        id: params.id,
+        id,
         storeId: session.storeId,
       },
     });
