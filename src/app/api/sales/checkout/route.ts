@@ -10,6 +10,7 @@ import {
   type CouponError,
 } from '@/lib/coupons';
 import { computeCategoryPromoDiscount } from '@/lib/categoryPromotions'; // ✅ Módulo 14.2-B
+import { computeVolumePackDiscount, getActiveVolumePromotion } from '@/lib/volumePromotions'; // ✅ Módulo 14.2-C1
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -199,9 +200,33 @@ async function executeCheckout(
       const categoryPromoDiscount = categoryPromoResult?.discountAmount ?? 0;
       const categoryPromoName = categoryPromoResult?.promoSnapshot.name ?? null;
       const categoryPromoType = categoryPromoResult?.promoSnapshot.type ?? null;
-      const subtotalAfterAutoPromos = subtotalAfterProductPromo - categoryPromoDiscount;
+      const subtotalAfterCategoryPromo = subtotalAfterProductPromo - categoryPromoDiscount;
       
-      // PASO 3: Aplicar descuento manual (si existe)
+      // PASO 3: Aplicar promoción automática por VOLUMEN (Módulo 14.2-C1)
+      // ⚠️ SOLO si NO hay promoción de producto (prioridad: producto > categoría > volumen)
+      let volumePromoDiscount = 0;
+      let volumePromoName: string | null = null;
+      let volumePromoQty: number | null = null;
+      
+      if (promotionDiscount === 0) {
+        // Solo evaluar promo por volumen si NO hay promo de producto
+        const volumePromotion = await getActiveVolumePromotion(tx, session.storeId, sp.product.id);
+        const volumePromoResult = computeVolumePackDiscount({
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotalAfterCategoryPromo,
+          volumePromotion,
+          unitType: sp.product.unitType,
+        });
+        
+        volumePromoDiscount = volumePromoResult?.discountAmount ?? 0;
+        volumePromoName = volumePromoResult?.snapshot.volumePromoName ?? null;
+        volumePromoQty = volumePromoResult?.snapshot.volumePromoQty ?? null;
+      }
+      
+      const subtotalAfterAutoPromos = subtotalAfterCategoryPromo - volumePromoDiscount;
+      
+      // PASO 4: Aplicar descuento manual (si existe)
       let discountAmount = 0;
       
       if (item.discountType && item.discountValue !== undefined) {
@@ -238,8 +263,8 @@ async function executeCheckout(
         }
       }
 
-      // PASO 4: Calcular totalLine = subtotal - promo producto - promo categoría - descuento manual
-      const totalLine = subtotalItem - promotionDiscount - categoryPromoDiscount - discountAmount;
+      // PASO 5: Calcular totalLine = subtotal - promo producto - promo categoría - promo volumen - descuento manual
+      const totalLine = subtotalItem - promotionDiscount - categoryPromoDiscount - volumePromoDiscount - discountAmount;
 
       return {
         ...item,
@@ -251,6 +276,9 @@ async function executeCheckout(
         categoryPromoName,
         categoryPromoType,
         categoryPromoDiscount,
+        volumePromoName,
+        volumePromoQty,
+        volumePromoDiscount,
         discountAmount,
         totalLine,
       };
@@ -260,8 +288,9 @@ async function executeCheckout(
     const subtotalBeforeDiscounts = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
     const promotionsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.promotionDiscount, 0);
     const categoryPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.categoryPromoDiscount, 0);
+    const volumePromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.volumePromoDiscount, 0); // ✅ Módulo 14.2-C1
     const itemDiscountsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0);
-    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - categoryPromosTotal - itemDiscountsTotal;
+    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - categoryPromosTotal - volumePromosTotal - itemDiscountsTotal;
     
     // Tax (usando lógica actual, puede ser 0)
     const tax = 0;
@@ -505,6 +534,10 @@ async function executeCheckout(
             categoryPromoName: item.categoryPromoName,
             categoryPromoType: item.categoryPromoType,
             categoryPromoDiscount: new Prisma.Decimal(item.categoryPromoDiscount),
+            // Promociones por volumen (Módulo 14.2-C1)
+            volumePromoName: item.volumePromoName,
+            volumePromoQty: item.volumePromoQty,
+            volumePromoDiscount: new Prisma.Decimal(item.volumePromoDiscount),
             // Descuentos manuales (Módulo 14)
             discountType: item.discountType ?? null,
             discountValue: item.discountValue !== undefined ? new Prisma.Decimal(item.discountValue) : null,

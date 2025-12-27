@@ -204,6 +204,20 @@ export default function AuthLayout({ children, storeName }: AuthLayoutProps) {
                     Promos Categoría
                   </Link>
                 )}
+
+                {user.role === 'OWNER' && (
+                  <Link
+                    href="/volume-promotions"
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      pathname?.startsWith('/volume-promotions')
+                        ? 'bg-[#1F2A37] text-white border-b-2 border-[#EA580C]'
+                        : 'text-gray-300 hover:text-white hover:bg-[#1F2A37]'
+                    }`}
+                  >
+                    <Tag className="w-4 h-4" />
+                    Promos Pack
+                  </Link>
+                )}
               </div>
             </div>
           </nav>

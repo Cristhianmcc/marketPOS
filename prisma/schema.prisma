@@ -63,6 +63,10 @@ enum CouponType {
   AMOUNT
 }
 
+enum VolumePromoType {
+  FIXED_PRICE
+}
+
 //// MODELS
 
 model Store {
@@ -87,6 +91,7 @@ model Store {
   promotions         Promotion[] // ✅ Promociones de la tienda
   coupons            Coupon[] // ✅ Cupones de la tienda
   categoryPromotions CategoryPromotion[] // ✅ Promociones por categoría (14.2-B)
+  volumePromotions   VolumePromotion[] // ✅ Promociones por volumen (14.2-C1)
 
   @@map("stores")
 }
@@ -138,6 +143,7 @@ model ProductMaster {
 
   storeProducts StoreProduct[]
   promotions    Promotion[] // ✅ Promociones del producto
+  volumePromotions VolumePromotion[] // ✅ Promociones por volumen del producto
 
   @@index([barcode])
   @@index([name])
@@ -282,6 +288,11 @@ model SaleItem {
   categoryPromoName     String?       @map("category_promo_name")
   categoryPromoType     DiscountType? @map("category_promo_type")
   categoryPromoDiscount Decimal       @default(0) @map("category_promo_discount") @db.Decimal(10, 2)
+
+  // Promociones por Volumen (Módulo 14.2-C1) - Snapshot
+  volumePromoName     String? @map("volume_promo_name")
+  volumePromoQty      Int?    @map("volume_promo_qty")
+  volumePromoDiscount Decimal @default(0) @map("volume_promo_discount") @db.Decimal(10, 2)
 
   sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
@@ -485,3 +496,29 @@ model CategoryPromotion {
   @@index([storeId, category])
   @@map("category_promotions")
 }
+
+// Promociones por Volumen / Pack Fijo (Módulo 14.2-C1)
+model VolumePromotion {
+  id          String           @id @default(cuid())
+  storeId     String           @map("store_id")
+  name        String
+  productId   String           @map("product_id")
+  type        VolumePromoType
+  requiredQty Int              @map("required_qty") // Ej: 3
+  packPrice   Decimal          @db.Decimal(10, 2) // Ej: 5.00
+
+  startsAt DateTime? @map("starts_at")
+  endsAt   DateTime? @map("ends_at")
+  active   Boolean   @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product ProductMaster @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, active])
+  @@index([storeId, productId])
+  @@map("volume_promotions")
+}
+

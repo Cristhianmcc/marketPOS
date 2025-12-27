@@ -20,6 +20,10 @@ interface SaleItem {
   categoryPromoName: string | null;
   categoryPromoType: 'PERCENT' | 'AMOUNT' | null;
   categoryPromoDiscount: number;
+  // Promociones por volumen (Módulo 14.2-C1)
+  volumePromoName: string | null;
+  volumePromoQty: number | null;
+  volumePromoDiscount: number;
   discountType: 'PERCENT' | 'AMOUNT' | null;
   discountValue: number | null;
   discountAmount: number;
@@ -259,6 +263,15 @@ export default function ReceiptPage() {
                     <span>-{formatMoney(item.categoryPromoDiscount)}</span>
                   </div>
                 )}
+                {/* Promoción por volumen (Módulo 14.2-C1) */}
+                {item.volumePromoDiscount > 0 && (
+                  <div className="item-discount">
+                    <span>
+                      PACK {item.volumePromoQty}x: {item.volumePromoName}
+                    </span>
+                    <span>-{formatMoney(item.volumePromoDiscount)}</span>
+                  </div>
+                )}
                 {/* Descuento del ítem */}
                 {item.discountAmount > 0 && (
                   <>
@@ -273,7 +286,7 @@ export default function ReceiptPage() {
                   </>
                 )}
                 {/* Total línea si hay promoción o descuento */}
-                {(item.promotionDiscount > 0 || item.categoryPromoDiscount > 0 || item.discountAmount > 0) && (
+                {(item.promotionDiscount > 0 || item.categoryPromoDiscount > 0 || item.volumePromoDiscount > 0 || item.discountAmount > 0) && (
                   <div className="item-total">
                     <span>Total línea:</span>
                     <span>{formatMoney(item.totalLine)}</span>

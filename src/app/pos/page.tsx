@@ -37,6 +37,10 @@ interface CartItem {
   categoryPromoName?: string | null;
   categoryPromoType?: 'PERCENT' | 'AMOUNT' | null;
   categoryPromoDiscount?: number;
+  // Promociones por volumen (Módulo 14.2-C1)
+  volumePromoName?: string | null;
+  volumePromoQty?: number | null;
+  volumePromoDiscount?: number;
 }
 
 interface Customer {
@@ -272,6 +276,64 @@ export default function POSPage() {
     }
   };
 
+  // ✅ Verificar y aplicar promoción por volumen (Módulo 14.2-C1)
+  const checkAndApplyVolumePromotion = async (item: CartItem): Promise<CartItem> => {
+    try {
+      // ⚠️ NO aplicar si ya hay promoción de producto (prioridad: producto > categoría > volumen)
+      const productPromoDiscount = item.promotionDiscount ?? 0;
+      if (productPromoDiscount > 0) {
+        // Si hay promo de producto, NO evaluar promo por volumen
+        return {
+          ...item,
+          volumePromoName: null,
+          volumePromoQty: null,
+          volumePromoDiscount: 0,
+        };
+      }
+      
+      // Calcular subtotal después de promos automáticas previas
+      const subtotal = item.quantity * item.storeProduct.price;
+      const categoryPromoDiscount = item.categoryPromoDiscount ?? 0;
+      const subtotalAfterCategoryPromo = subtotal - productPromoDiscount - categoryPromoDiscount;
+
+      const res = await fetch('/api/volume-promotions/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: item.storeProduct.product.id,
+          quantity: item.quantity,
+          unitPrice: item.storeProduct.price,
+          unitType: item.storeProduct.product.unitType,
+          subtotalAfterCategoryPromo,
+        }),
+      });
+
+      if (!res.ok) return item;
+
+      const data = await res.json();
+      
+      if (data.volumePromotion) {
+        return {
+          ...item,
+          volumePromoName: data.volumePromotion.volumePromoName,
+          volumePromoQty: data.volumePromotion.volumePromoQty,
+          volumePromoDiscount: data.volumePromotion.volumePromoDiscount,
+        };
+      }
+
+      // Sin promoción por volumen
+      return {
+        ...item,
+        volumePromoName: null,
+        volumePromoQty: null,
+        volumePromoDiscount: 0,
+      };
+    } catch (error) {
+      console.error('Error checking volume promotion:', error);
+      return item;
+    }
+  };
+
   const addToCart = async (sp: StoreProduct) => {
     // Validar stock antes de agregar
     if (sp.stock !== null && sp.stock <= 0) {
@@ -292,6 +354,9 @@ export default function POSPage() {
       // ✅ Aplicar promoción por categoría (después de promo de producto)
       itemWithPromo = await checkAndApplyCategoryPromotion(itemWithPromo);
       
+      // ✅ Aplicar promoción por volumen (después de promo de categoría)
+      itemWithPromo = await checkAndApplyVolumePromotion(itemWithPromo);
+      
       setCart([...cart, itemWithPromo]);
       
       // Toast con info de promociones
@@ -301,6 +366,9 @@ export default function POSPage() {
       }
       if (itemWithPromo.categoryPromoName) {
         messages.push(`Cat: ${itemWithPromo.categoryPromoName}`);
+      }
+      if (itemWithPromo.volumePromoName) {
+        messages.push(`Pack: ${itemWithPromo.volumePromoName}`);
       }
       
       if (messages.length > 0) {
@@ -353,6 +421,9 @@ export default function POSPage() {
     // ✅ Recalcular promo por categoría (después de promo de producto)
     itemWithPromo = await checkAndApplyCategoryPromotion(itemWithPromo);
     
+    // ✅ Recalcular promo por volumen (después de promo de categoría)
+    itemWithPromo = await checkAndApplyVolumePromotion(itemWithPromo);
+    
     setCart(prev => prev.map((i) => 
       i.storeProduct.id === storeProductId ? itemWithPromo : i
     ));
@@ -391,8 +462,9 @@ export default function POSPage() {
     const subtotal = calculateItemSubtotal(item);
     const productPromotion = calculateItemPromotion(item);
     const categoryPromotion = calculateItemCategoryPromo(item);
-    // Base para descuento manual = subtotal - promo producto - promo categoría
-    const subtotalAfterPromos = subtotal - productPromotion - categoryPromotion;
+    const volumePromotion = item.volumePromoDiscount ?? 0;
+    // Base para descuento manual = subtotal - promo producto - promo categoría - promo volumen
+    const subtotalAfterPromos = subtotal - productPromotion - categoryPromotion - volumePromotion;
     
     if (item.discountType === 'PERCENT') {
       return Math.round((subtotalAfterPromos * item.discountValue) / 100 * 100) / 100;
@@ -405,8 +477,9 @@ export default function POSPage() {
     const subtotal = calculateItemSubtotal(item);
     const productPromotion = calculateItemPromotion(item);
     const categoryPromotion = calculateItemCategoryPromo(item);
+    const volumePromotion = item.volumePromoDiscount ?? 0;
     const manualDiscount = calculateItemDiscount(item);
-    return subtotal - productPromotion - categoryPromotion - manualDiscount;
+    return subtotal - productPromotion - categoryPromotion - volumePromotion - manualDiscount;
   };
 
   const getSubtotalBeforeDiscounts = () => {
@@ -419,6 +492,10 @@ export default function POSPage() {
 
   const getTotalCategoryPromotions = () => {
     return cart.reduce((sum, item) => sum + (item.categoryPromoDiscount ?? 0), 0);
+  };
+
+  const getTotalVolumePromotions = () => {
+    return cart.reduce((sum, item) => sum + (item.volumePromoDiscount ?? 0), 0);
   };
 
   const getTotalItemDiscounts = () => {
@@ -1029,6 +1106,21 @@ export default function POSPage() {
                               </div>
                             )}
 
+                            {/* Promoción por volumen (Módulo 14.2-C1) */}
+                            {item.volumePromoName && item.volumePromoDiscount > 0 && (
+                              <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                                <div className="flex justify-between items-center text-xs">
+                                  <div className="flex items-center gap-1 text-orange-700 font-medium">
+                                    <Tag className="w-3.5 h-3.5" />
+                                    PACK {item.volumePromoQty}x: {item.volumePromoName}
+                                  </div>
+                                  <div className="text-orange-900 font-semibold">
+                                    -S/ {(item.volumePromoDiscount ?? 0).toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Descuento del ítem */}
                             {item.discountType && item.discountValue ? (
                               <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
@@ -1083,6 +1175,14 @@ export default function POSPage() {
                           <div className="flex justify-between text-sm text-purple-600">
                             <span>Promos Categoría</span>
                             <span>-S/ {getTotalCategoryPromotions().toFixed(2)}</span>
+                          </div>
+                        )}
+                        
+                        {/* Promociones por volumen (Módulo 14.2-C1) */}
+                        {getTotalVolumePromotions() > 0 && (
+                          <div className="flex justify-between text-sm text-orange-600">
+                            <span>Promos Pack</span>
+                            <span>-S/ {getTotalVolumePromotions().toFixed(2)}</span>
                           </div>
                         )}
                         

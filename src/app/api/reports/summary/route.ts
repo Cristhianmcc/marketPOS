@@ -129,6 +129,22 @@ export async function GET(request: NextRequest) {
         categoryPromoDiscount: true,
       },
     }).then(result => Number(result._sum.categoryPromoDiscount || 0));
+
+    // ✅ Calcular promos volumen totales (Módulo 14.2-C1)
+    const totalVolumePromotions = await prisma.saleItem.aggregate({
+      where: {
+        sale: {
+          storeId: session.storeId,
+          createdAt: {
+            gte: fromDate,
+            lt: toDate,
+          },
+        },
+      },
+      _sum: {
+        volumePromoDiscount: true,
+      },
+    }).then(result => Number(result._sum.volumePromoDiscount || 0));
     
     const ticketCount = sales.length;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
@@ -183,6 +199,7 @@ export async function GET(request: NextRequest) {
         totalDiscounts,
         totalCoupons, // ✅ Cupones (Módulo 14.2-A)
         totalCategoryPromotions, // ✅ Promos Categoría (Módulo 14.2-B)
+        totalVolumePromotions, // ✅ Promos Volumen (Módulo 14.2-C1)
         ticketCount,
         averageTicket,
         totalFiado,
