@@ -33,6 +33,10 @@ interface CartItem {
   promotionType?: 'TWO_FOR_ONE' | 'PACK_PRICE' | 'HAPPY_HOUR' | null;
   promotionName?: string | null;
   promotionDiscount?: number;
+  // Promociones por categoría (Módulo 14.2-B)
+  categoryPromoName?: string | null;
+  categoryPromoType?: 'PERCENT' | 'AMOUNT' | null;
+  categoryPromoDiscount?: number;
 }
 
 interface Customer {
@@ -75,6 +79,11 @@ export default function POSPage() {
   const [discountType, setDiscountType] = useState<'PERCENT' | 'AMOUNT'>('PERCENT');
   const [discountValue, setDiscountValue] = useState('');
   const [globalDiscount, setGlobalDiscount] = useState(0);
+  
+  // Estados para modal de descuento global
+  const [showGlobalDiscountModal, setShowGlobalDiscountModal] = useState(false);
+  const [globalDiscountType, setGlobalDiscountType] = useState<'PERCENT' | 'AMOUNT'>('PERCENT');
+  const [globalDiscountValue, setGlobalDiscountValue] = useState('');
 
   // Estados para cupones (Módulo 14.2-A)
   const [couponCode, setCouponCode] = useState('');
@@ -218,6 +227,51 @@ export default function POSPage() {
     }
   };
 
+  // ✅ Verificar y aplicar promoción por categoría (Módulo 14.2-B)
+  const checkAndApplyCategoryPromotion = async (item: CartItem): Promise<CartItem> => {
+    try {
+      // Calcular subtotal después de promo de producto
+      const subtotal = item.quantity * item.storeProduct.price;
+      const productPromoDiscount = item.promotionDiscount ?? 0;
+      const subtotalAfterProductPromo = subtotal - productPromoDiscount;
+
+      const res = await fetch('/api/category-promotions/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productCategory: item.storeProduct.product.category,
+          quantity: item.quantity,
+          unitPrice: item.storeProduct.price,
+          subtotalAfterProductPromo,
+        }),
+      });
+
+      if (!res.ok) return item;
+
+      const data = await res.json();
+      
+      if (data.categoryPromotion) {
+        return {
+          ...item,
+          categoryPromoName: data.categoryPromotion.categoryPromoName,
+          categoryPromoType: data.categoryPromotion.categoryPromoType,
+          categoryPromoDiscount: data.categoryPromotion.categoryPromoDiscount,
+        };
+      }
+
+      // Sin promoción por categoría
+      return {
+        ...item,
+        categoryPromoName: null,
+        categoryPromoType: null,
+        categoryPromoDiscount: 0,
+      };
+    } catch (error) {
+      console.error('Error checking category promotion:', error);
+      return item;
+    }
+  };
+
   const addToCart = async (sp: StoreProduct) => {
     // Validar stock antes de agregar
     if (sp.stock !== null && sp.stock <= 0) {
@@ -231,11 +285,26 @@ export default function POSPage() {
       await updateQuantity(sp.id, existing.quantity + 1);
     } else {
       const newItem: CartItem = { storeProduct: sp, quantity: 1 };
-      const itemWithPromo = await checkAndApplyPromotion(newItem);
+      
+      // ✅ Aplicar promoción de producto
+      let itemWithPromo = await checkAndApplyPromotion(newItem);
+      
+      // ✅ Aplicar promoción por categoría (después de promo de producto)
+      itemWithPromo = await checkAndApplyCategoryPromotion(itemWithPromo);
+      
       setCart([...cart, itemWithPromo]);
       
+      // Toast con info de promociones
+      const messages = [];
       if (itemWithPromo.promotionName) {
-        toast.success(`${sp.product.name} agregado con promoción: ${itemWithPromo.promotionName}`);
+        messages.push(`Promo: ${itemWithPromo.promotionName}`);
+      }
+      if (itemWithPromo.categoryPromoName) {
+        messages.push(`Cat: ${itemWithPromo.categoryPromoName}`);
+      }
+      
+      if (messages.length > 0) {
+        toast.success(`${sp.product.name} agregado con ${messages.join(' + ')}`);
       } else {
         toast.success(`${sp.product.name} agregado al carrito`);
       }
@@ -275,9 +344,14 @@ export default function POSPage() {
       }
     }
 
-    // Recalcular promoción con nueva cantidad
+    // Recalcular promociones con nueva cantidad
     const updatedItem = { ...item, quantity: newQuantity };
-    const itemWithPromo = await checkAndApplyPromotion(updatedItem);
+    
+    // ✅ Recalcular promo de producto
+    let itemWithPromo = await checkAndApplyPromotion(updatedItem);
+    
+    // ✅ Recalcular promo por categoría (después de promo de producto)
+    itemWithPromo = await checkAndApplyCategoryPromotion(itemWithPromo);
     
     setCart(prev => prev.map((i) => 
       i.storeProduct.id === storeProductId ? itemWithPromo : i
@@ -307,15 +381,21 @@ export default function POSPage() {
     return item.promotionDiscount ?? 0;
   };
 
+  const calculateItemCategoryPromo = (item: CartItem) => {
+    return item.categoryPromoDiscount ?? 0;
+  };
+
   const calculateItemDiscount = (item: CartItem) => {
     if (!item.discountType || !item.discountValue) return 0;
     
     const subtotal = calculateItemSubtotal(item);
-    const promotion = calculateItemPromotion(item);
-    const subtotalAfterPromo = subtotal - promotion;
+    const productPromotion = calculateItemPromotion(item);
+    const categoryPromotion = calculateItemCategoryPromo(item);
+    // Base para descuento manual = subtotal - promo producto - promo categoría
+    const subtotalAfterPromos = subtotal - productPromotion - categoryPromotion;
     
     if (item.discountType === 'PERCENT') {
-      return Math.round((subtotalAfterPromo * item.discountValue) / 100 * 100) / 100;
+      return Math.round((subtotalAfterPromos * item.discountValue) / 100 * 100) / 100;
     } else {
       return item.discountValue;
     }
@@ -323,9 +403,10 @@ export default function POSPage() {
 
   const calculateItemTotal = (item: CartItem) => {
     const subtotal = calculateItemSubtotal(item);
-    const promotion = calculateItemPromotion(item);
-    const discount = calculateItemDiscount(item);
-    return subtotal - promotion - discount;
+    const productPromotion = calculateItemPromotion(item);
+    const categoryPromotion = calculateItemCategoryPromo(item);
+    const manualDiscount = calculateItemDiscount(item);
+    return subtotal - productPromotion - categoryPromotion - manualDiscount;
   };
 
   const getSubtotalBeforeDiscounts = () => {
@@ -334,6 +415,10 @@ export default function POSPage() {
 
   const getTotalPromotions = () => {
     return cart.reduce((sum, item) => sum + calculateItemPromotion(item), 0);
+  };
+
+  const getTotalCategoryPromotions = () => {
+    return cart.reduce((sum, item) => sum + (item.categoryPromoDiscount ?? 0), 0);
   };
 
   const getTotalItemDiscounts = () => {
@@ -562,7 +647,11 @@ export default function POSPage() {
         toast.error('Ingresa un monto válido');
         return;
       }
-      if (paid < total) {
+      // ✅ Redondear ambos valores para evitar problemas de precisión decimal
+      const totalRounded = Math.round(total * 100) / 100;
+      const paidRounded = Math.round(paid * 100) / 100;
+      
+      if (paidRounded < totalRounded) {
         toast.error('El monto pagado es menor al total');
         return;
       }
@@ -925,6 +1014,21 @@ export default function POSPage() {
                               </div>
                             )}
 
+                            {/* Promoción por categoría (Módulo 14.2-B) */}
+                            {item.categoryPromoName && (
+                              <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded">
+                                <div className="flex justify-between items-center text-xs">
+                                  <div className="flex items-center gap-1 text-purple-700 font-medium">
+                                    <Tag className="w-3.5 h-3.5" />
+                                    CAT: {item.categoryPromoName}
+                                  </div>
+                                  <div className="text-purple-900 font-semibold">
+                                    -S/ {(item.categoryPromoDiscount ?? 0).toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Descuento del ítem */}
                             {item.discountType && item.discountValue ? (
                               <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
@@ -974,6 +1078,14 @@ export default function POSPage() {
                           </div>
                         )}
                         
+                        {/* Promociones por categoría (Módulo 14.2-B) */}
+                        {getTotalCategoryPromotions() > 0 && (
+                          <div className="flex justify-between text-sm text-purple-600">
+                            <span>Promos Categoría</span>
+                            <span>-S/ {getTotalCategoryPromotions().toFixed(2)}</span>
+                          </div>
+                        )}
+                        
                         {/* Descuentos por ítem */}
                         {getTotalItemDiscounts() > 0 && (
                           <div className="flex justify-between text-sm text-orange-600">
@@ -1006,18 +1118,8 @@ export default function POSPage() {
                                 toast.error('No hay monto disponible para descuento global');
                                 return;
                               }
-                              const value = prompt(`Descuento global (máx S/ ${maxDiscount.toFixed(2)}):`);
-                              if (value) {
-                                const discount = parseFloat(value);
-                                if (isNaN(discount) || discount <= 0) {
-                                  toast.error('Ingresa un valor válido');
-                                } else if (discount > maxDiscount) {
-                                  toast.error('El descuento excede el total disponible');
-                                } else {
-                                  setGlobalDiscount(discount);
-                                  toast.success('Descuento global aplicado');
-                                }
-                              }
+                              setGlobalDiscountValue('');
+                              setShowGlobalDiscountModal(true);
                             }}
                             className="w-full py-1.5 text-xs border border-dashed border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
                           >
@@ -1180,7 +1282,11 @@ export default function POSPage() {
                   </div>
                 )}
 
-                {amountPaid && parseFloat(amountPaid) < getCartTotal() && parseFloat(amountPaid) > 0 && (
+                {amountPaid && (() => {
+                  const totalRounded = Math.round(getCartTotal() * 100) / 100;
+                  const paidRounded = Math.round(parseFloat(amountPaid) * 100) / 100;
+                  return paidRounded < totalRounded && paidRounded > 0;
+                })() && (
                   <div className="mt-3 text-sm text-red-600">
                     Monto insuficiente
                   </div>
@@ -1612,6 +1718,156 @@ export default function POSPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de Descuento Global */}
+      {showGlobalDiscountModal && (() => {
+        const maxDiscount = getSubtotalBeforeDiscounts() - getTotalItemDiscounts();
+        
+        const handleApplyGlobalDiscount = () => {
+          const value = parseFloat(globalDiscountValue);
+          if (isNaN(value) || value <= 0) {
+            toast.error('Ingresa un valor válido');
+            return;
+          }
+          
+          let discount: number;
+          if (globalDiscountType === 'PERCENT') {
+            if (value > 100) {
+              toast.error('El porcentaje no puede ser mayor a 100%');
+              return;
+            }
+            discount = (maxDiscount * value) / 100;
+          } else {
+            discount = value;
+          }
+          
+          if (discount > maxDiscount) {
+            toast.error('El descuento excede el total disponible');
+            return;
+          }
+          
+          setGlobalDiscount(discount);
+          setShowGlobalDiscountModal(false);
+          setGlobalDiscountValue('');
+          toast.success('Descuento global aplicado');
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    Descuento Global
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowGlobalDiscountModal(false);
+                      setGlobalDiscountValue('');
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="space-y-4">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <p className="text-sm text-orange-800">
+                      <span className="font-medium">Máximo disponible:</span> S/ {maxDiscount.toFixed(2)}
+                    </p>
+                  </div>
+
+                  {/* Tipo de descuento */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tipo de descuento
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setGlobalDiscountType('PERCENT');
+                          setGlobalDiscountValue('');
+                        }}
+                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                          globalDiscountType === 'PERCENT'
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Porcentaje (%)
+                      </button>
+                      <button
+                        onClick={() => {
+                          setGlobalDiscountType('AMOUNT');
+                          setGlobalDiscountValue('');
+                        }}
+                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                          globalDiscountType === 'AMOUNT'
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Monto fijo (S/)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Input de valor */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {globalDiscountType === 'PERCENT' ? 'Porcentaje (0-100%)' : 'Monto del descuento (S/)'}
+                    </label>
+                    <input
+                      type="number"
+                      value={globalDiscountValue}
+                      onChange={(e) => setGlobalDiscountValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleApplyGlobalDiscount();
+                        }
+                      }}
+                      placeholder="0.00"
+                      step={globalDiscountType === 'PERCENT' ? '1' : '0.01'}
+                      min="0"
+                      max={globalDiscountType === 'PERCENT' ? 100 : maxDiscount}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg"
+                      autoFocus
+                    />
+                  </div>
+
+                  <p className="text-xs text-gray-500">
+                    Este descuento se aplicará al total de la venta después de los descuentos por ítem.
+                  </p>
+                </div>
+
+                {/* Botones */}
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowGlobalDiscountModal(false);
+                      setGlobalDiscountValue('');
+                    }}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleApplyGlobalDiscount}
+                    className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </AuthLayout>
   );
 }

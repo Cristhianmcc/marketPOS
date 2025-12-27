@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Download } from 'lucide-react';
+import AuthLayout from '@/components/AuthLayout';
 
 interface Receivable {
   id: string;
@@ -134,27 +135,30 @@ export default function ReceivablesPage() {
 
   if (loading && receivables.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-500">Cargando...</div>
-      </div>
+      <AuthLayout storeName="Cuentas por Cobrar">
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-gray-500">Cargando...</div>
+        </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Cuentas por Cobrar</h1>
-          <p className="text-gray-600 mt-1">Gestión de ventas FIADO y pagos</p>
+    <AuthLayout storeName="Cuentas por Cobrar">
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Cuentas por Cobrar</h1>
+            <p className="text-gray-600 text-sm mt-1">Gestión de ventas FIADO y pagos</p>
+          </div>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Exportar CSV
+          </button>
         </div>
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          Exportar CSV
-        </button>
-      </div>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b">
@@ -442,6 +446,7 @@ export default function ReceivablesPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AuthLayout>
   );
 }

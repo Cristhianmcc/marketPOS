@@ -113,6 +113,22 @@ export async function GET(request: NextRequest) {
     const totalCoupons = sales.reduce((sum, s) => {
       return sum + Number(s.couponDiscount || 0);
     }, 0);
+
+    // ✅ Calcular promos categoría totales (Módulo 14.2-B)
+    const totalCategoryPromotions = await prisma.saleItem.aggregate({
+      where: {
+        sale: {
+          storeId: session.storeId,
+          createdAt: {
+            gte: fromDate,
+            lt: toDate,
+          },
+        },
+      },
+      _sum: {
+        categoryPromoDiscount: true,
+      },
+    }).then(result => Number(result._sum.categoryPromoDiscount || 0));
     
     const ticketCount = sales.length;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
@@ -166,6 +182,7 @@ export async function GET(request: NextRequest) {
         totalPromotions,
         totalDiscounts,
         totalCoupons, // ✅ Cupones (Módulo 14.2-A)
+        totalCategoryPromotions, // ✅ Promos Categoría (Módulo 14.2-B)
         ticketCount,
         averageTicket,
         totalFiado,

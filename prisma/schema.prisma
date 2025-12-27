@@ -84,8 +84,9 @@ model Store {
   settings      StoreSettings?
   customers     Customer[] // ✅ Clientes de la tienda
   receivables   Receivable[] // ✅ Cuentas por cobrar
-  promotions    Promotion[] // ✅ Promociones de la tienda
-  coupons       Coupon[] // ✅ Cupones de la tienda
+  promotions         Promotion[] // ✅ Promociones de la tienda
+  coupons            Coupon[] // ✅ Cupones de la tienda
+  categoryPromotions CategoryPromotion[] // ✅ Promociones por categoría (14.2-B)
 
   @@map("stores")
 }
@@ -277,6 +278,11 @@ model SaleItem {
   promotionName     String?        @map("promotion_name")
   promotionDiscount Decimal        @default(0) @map("promotion_discount") @db.Decimal(10, 2)
 
+  // Promociones por Categoría (Módulo 14.2-B) - Snapshot
+  categoryPromoName     String?       @map("category_promo_name")
+  categoryPromoType     DiscountType? @map("category_promo_type")
+  categoryPromoDiscount Decimal       @default(0) @map("category_promo_discount") @db.Decimal(10, 2)
+
   sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
 
@@ -453,4 +459,29 @@ model Coupon {
   @@unique([storeId, code])
   @@index([storeId, active])
   @@map("coupons")
+}
+
+// Promociones por Categoría (Módulo 14.2-B)
+model CategoryPromotion {
+  id       String       @id @default(cuid())
+  storeId  String       @map("store_id")
+  name     String
+  category String // coincide con ProductMaster.category (case-insensitive)
+  type     DiscountType // PERCENT | AMOUNT
+  value    Decimal      @db.Decimal(10, 2) // 10 (%) o 1.00 (S/)
+
+  startsAt DateTime? @map("starts_at")
+  endsAt   DateTime? @map("ends_at")
+  active   Boolean   @default(true)
+
+  maxDiscountPerItem Decimal? @map("max_discount_per_item") @db.Decimal(10, 2) // opcional: tope por item
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, active])
+  @@index([storeId, category])
+  @@map("category_promotions")
 }

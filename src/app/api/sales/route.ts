@@ -45,12 +45,12 @@ export async function GET(request: NextRequest) {
     if (from || to) {
       where.createdAt = {};
       if (from) {
-        where.createdAt.gte = new Date(from);
+        // Parse date in Peru timezone (UTC-5)
+        where.createdAt.gte = new Date(from + 'T00:00:00.000-05:00');
       }
       if (to) {
-        const toDate = new Date(to);
-        toDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = toDate;
+        // Parse date in Peru timezone (UTC-5)
+        where.createdAt.lte = new Date(to + 'T23:59:59.999-05:00');
       }
     }
 
@@ -78,15 +78,20 @@ export async function GET(request: NextRequest) {
       take: 100, // Limit to last 100 sales
     });
 
-    // Calculate promotionsTotal for each sale
+    // Calculate promotionsTotal and categoryPromotionsTotal for each sale
     const salesWithPromotions = sales.map(sale => {
       const promotionsTotal = sale.items.reduce((sum, item) => {
         return sum + (item.promotionDiscount ? Number(item.promotionDiscount) : 0);
       }, 0);
 
+      const categoryPromotionsTotal = sale.items.reduce((sum, item) => {
+        return sum + (item.categoryPromoDiscount ? Number(item.categoryPromoDiscount) : 0);
+      }, 0);
+
       return {
         ...sale,
         promotionsTotal,
+        categoryPromotionsTotal,
       };
     });
 

@@ -9,6 +9,7 @@ import {
   validateAndComputeCouponDiscount,
   type CouponError,
 } from '@/lib/coupons';
+import { computeCategoryPromoDiscount } from '@/lib/categoryPromotions'; // ✅ Módulo 14.2-B
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -168,12 +169,12 @@ async function executeCheckout(
     }));
 
     // 3. Validar y calcular descuentos por ítem (con promociones)
-    // 3. Validar y calcular descuentos por ítem (con promociones)
-    const itemsWithDiscounts = items.map((item) => {
+    // Orden: 1) Promo producto → 2) Promo categoría → 3) Descuento manual
+    const itemsWithDiscounts = await Promise.all(items.map(async (item) => {
       const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
       const subtotalItem = item.quantity * item.unitPrice;
       
-      // PASO 1: Aplicar promoción automática (si existe)
+      // PASO 1: Aplicar promoción automática por PRODUCTO (si existe)
       const appliedPromo = applyBestPromotion(
         sp.product.id,
         item.quantity,
@@ -183,9 +184,24 @@ async function executeCheckout(
       );
       
       const promotionDiscount = appliedPromo?.promotionDiscount ?? 0;
-      const subtotalAfterPromo = subtotalItem - promotionDiscount;
+      const subtotalAfterProductPromo = subtotalItem - promotionDiscount;
       
-      // PASO 2: Aplicar descuento manual (si existe)
+      // PASO 2: Aplicar promoción automática por CATEGORÍA (Módulo 14.2-B)
+      const categoryPromoResult = await computeCategoryPromoDiscount({
+        storeId: session.storeId,
+        productCategory: sp.product.category,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotalAfterProductPromo,
+        nowLocalLima: new Date(),
+      });
+      
+      const categoryPromoDiscount = categoryPromoResult?.discountAmount ?? 0;
+      const categoryPromoName = categoryPromoResult?.promoSnapshot.name ?? null;
+      const categoryPromoType = categoryPromoResult?.promoSnapshot.type ?? null;
+      const subtotalAfterAutoPromos = subtotalAfterProductPromo - categoryPromoDiscount;
+      
+      // PASO 3: Aplicar descuento manual (si existe)
       let discountAmount = 0;
       
       if (item.discountType && item.discountValue !== undefined) {
@@ -207,41 +223,45 @@ async function executeCheckout(
               `${sp.product.name}: el descuento porcentual debe estar entre 0 y 100`
             );
           }
-          // Descuento manual se calcula sobre subtotal después de promoción
-          discountAmount = Math.round((subtotalAfterPromo * item.discountValue) / 100 * 100) / 100;
+          // Descuento manual se calcula sobre subtotal después de promos automáticas
+          discountAmount = Math.round((subtotalAfterAutoPromos * item.discountValue) / 100 * 100) / 100;
         } else if (item.discountType === 'AMOUNT') {
-          // Validar monto válido (sobre subtotal después de promoción)
-          if (item.discountValue <= 0 || item.discountValue > subtotalAfterPromo) {
+          // Validar monto válido (sobre subtotal después de promos automáticas)
+          if (item.discountValue <= 0 || item.discountValue > subtotalAfterAutoPromos) {
             throw new CheckoutError(
               'DISCOUNT_EXCEEDS_SUBTOTAL',
               409,
-              `${sp.product.name}: el descuento no puede ser mayor al subtotal después de promoción (S/ ${subtotalAfterPromo.toFixed(2)})`
+              `${sp.product.name}: el descuento no puede ser mayor al subtotal después de promociones (S/ ${subtotalAfterAutoPromos.toFixed(2)})`
             );
           }
           discountAmount = item.discountValue;
         }
       }
 
-      // PASO 3: Calcular totalLine = subtotal - promo - descuento manual
-      const totalLine = subtotalItem - promotionDiscount - discountAmount;
+      // PASO 4: Calcular totalLine = subtotal - promo producto - promo categoría - descuento manual
+      const totalLine = subtotalItem - promotionDiscount - categoryPromoDiscount - discountAmount;
 
       return {
         ...item,
-        productId: sp.product.id, // ✅ Necesario para promociones
+        productId: sp.product.id,
         subtotalItem,
         promotionType: appliedPromo?.promotionType ?? null,
         promotionName: appliedPromo?.promotionName ?? null,
         promotionDiscount,
+        categoryPromoName,
+        categoryPromoType,
+        categoryPromoDiscount,
         discountAmount,
         totalLine,
       };
-    });
+    }));
 
     // 4. Calcular totales
     const subtotalBeforeDiscounts = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
     const promotionsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.promotionDiscount, 0);
+    const categoryPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.categoryPromoDiscount, 0);
     const itemDiscountsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0);
-    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - itemDiscountsTotal;
+    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - categoryPromosTotal - itemDiscountsTotal;
     
     // Tax (usando lógica actual, puede ser 0)
     const tax = 0;
@@ -371,10 +391,39 @@ async function executeCheckout(
     // Total FINAL (después de cupón)
     const total = totalBeforeCoupon - couponDiscount;
 
-    // 5. Calcular changeAmount si es efectivo
+    // 5. Validar y calcular changeAmount si es efectivo
     let changeAmount: number | null = null;
     if (paymentMethod === 'CASH' && amountPaid !== undefined) {
-      changeAmount = amountPaid - total;
+      // ✅ Validar que el monto pagado es suficiente
+      // Redondear ambos valores a 2 decimales para evitar problemas de precisión
+      const totalRounded = Math.round(total * 100) / 100;
+      const amountPaidRounded = Math.round(amountPaid * 100) / 100;
+      
+      // 🔍 DEBUG: Log de valores para debug
+      console.log('💰 CASH Payment Validation:', {
+        totalBeforeCoupon: totalBeforeCoupon.toFixed(2),
+        couponDiscount: couponDiscount.toFixed(2),
+        totalCalculated: total.toFixed(4),
+        totalRounded: totalRounded.toFixed(2),
+        amountPaid: amountPaid.toFixed(2),
+        amountPaidRounded: amountPaidRounded.toFixed(2),
+        difference: (totalRounded - amountPaidRounded).toFixed(4),
+        isInsufficient: amountPaidRounded < totalRounded,
+      });
+      
+      if (amountPaidRounded < totalRounded) {
+        throw new CheckoutError(
+          'AMOUNT_INSUFFICIENT',
+          409,
+          'El monto pagado es menor al total de la venta',
+          { 
+            total: totalRounded.toFixed(2), 
+            amountPaid: amountPaidRounded.toFixed(2), 
+            missing: (totalRounded - amountPaidRounded).toFixed(2) 
+          }
+        );
+      }
+      changeAmount = amountPaidRounded - totalRounded;
     }
 
     // 3b. Para FIADO: amountPaid y changeAmount deben ser null
@@ -448,10 +497,14 @@ async function executeCheckout(
             quantity: new Prisma.Decimal(item.quantity),
             unitPrice: new Prisma.Decimal(item.unitPrice),
             subtotal: new Prisma.Decimal(item.subtotalItem),
-            // Promociones (Módulo 14.1)
+            // Promociones por producto (Módulo 14.1)
             promotionType: item.promotionType,
             promotionName: item.promotionName,
             promotionDiscount: new Prisma.Decimal(item.promotionDiscount),
+            // Promociones por categoría (Módulo 14.2-B)
+            categoryPromoName: item.categoryPromoName,
+            categoryPromoType: item.categoryPromoType,
+            categoryPromoDiscount: new Prisma.Decimal(item.categoryPromoDiscount),
             // Descuentos manuales (Módulo 14)
             discountType: item.discountType ?? null,
             discountValue: item.discountValue !== undefined ? new Prisma.Decimal(item.discountValue) : null,
@@ -567,38 +620,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(error, { status: 400 });
       }
 
-      // Módulo 14.2-A: Si hay cupón, NO validar monto aquí
-      // El frontend ya validó y calculó el total correcto
-      // La validación completa se hace en executeCheckout dentro de la transacción
-      if (!couponCode) {
-        // Solo validar monto si NO hay cupón
-        const itemsSubtotal = items.reduce((sum, item) => {
-          const subtotalItem = item.quantity * item.unitPrice;
-          let discountAmount = 0;
-          
-          if (item.discountType && item.discountValue) {
-            if (item.discountType === 'PERCENT') {
-              discountAmount = Math.round((subtotalItem * item.discountValue) / 100 * 100) / 100;
-            } else if (item.discountType === 'AMOUNT') {
-              discountAmount = item.discountValue;
-            }
-          }
-          
-          return sum + (subtotalItem - discountAmount);
-        }, 0);
-        
-        const globalDiscount = discountTotal ?? 0;
-        const total = itemsSubtotal - globalDiscount;
-
-        if (amountPaid < total) {
-          const error: ErrorResponse = {
-            code: 'AMOUNT_INSUFFICIENT',
-            message: 'El monto pagado es menor al total',
-            details: { total, amountPaid, missing: total - amountPaid },
-          };
-          return NextResponse.json(error, { status: 409 });
-        }
-      }
+      // ✅ VALIDACIÓN COMPLETA SE HACE EN executeCheckout() después de calcular:
+      // - Promociones de producto (2x1, pack, happy hour)
+      // - Promociones de categoría (Módulo 14.2-B)
+      // - Descuentos manuales por ítem
+      // - Descuento global
+      // - Cupones (Módulo 14.2-A)
+      // No validamos amountPaid aquí para evitar errores 409 por cálculos incompletos
     } else if (paymentMethod === 'FIADO') {
       // Para FIADO, validar customerId
       if (!customerId || typeof customerId !== 'string') {

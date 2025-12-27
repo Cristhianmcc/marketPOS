@@ -75,6 +75,9 @@ export async function GET(request: NextRequest) {
       'Promo Tipo',
       'Promo Nombre',
       'Promo Monto',
+      'Cat Promo Nombre',
+      'Cat Promo Tipo',
+      'Cat Promo Monto',
       'Desc. Tipo',
       'Desc. Valor',
       'Desc. Monto',
@@ -86,6 +89,9 @@ export async function GET(request: NextRequest) {
       const promoTypeLabel = item.promotionType === 'TWO_FOR_ONE' ? '2x1' :
                              item.promotionType === 'PACK_PRICE' ? 'Pack' :
                              item.promotionType === 'HAPPY_HOUR' ? 'Happy Hour' : '-';
+      
+      const categoryPromoTypeLabel = item.categoryPromoType === 'PERCENT' ? 'Porcentaje' :
+                                     item.categoryPromoType === 'AMOUNT' ? 'Monto' : '-';
       
       const discountTypeLabel = item.discountType === 'PERCENT' ? 'Porcentaje' : 
                                 item.discountType === 'AMOUNT' ? 'Monto' : '-';
@@ -107,6 +113,9 @@ export async function GET(request: NextRequest) {
         escapeCSV(promoTypeLabel),
         escapeCSV(item.promotionName || '-'),
         escapeCSV(Number(item.promotionDiscount).toFixed(2)),
+        escapeCSV(item.categoryPromoName || '-'),
+        escapeCSV(categoryPromoTypeLabel),
+        escapeCSV(Number(item.categoryPromoDiscount || 0).toFixed(2)),
         escapeCSV(discountTypeLabel),
         escapeCSV(discountValueLabel),
         escapeCSV(Number(item.discountAmount).toFixed(2)),

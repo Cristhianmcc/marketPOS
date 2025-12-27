@@ -14,6 +14,7 @@ interface Sale {
   tax: number;
   discountTotal: number;
   promotionsTotal?: number;
+  categoryPromotionsTotal?: number;
   couponCode?: string | null;
   couponDiscount?: number;
   total: number;
@@ -261,37 +262,56 @@ export default function SalesPage() {
                 No se encontraron ventas
               </div>
             ) : (
-              <table className="w-full">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col style={{width: '6%'}} /> {/* N° Ticket */}
+                  <col style={{width: '10%'}} /> {/* Fecha */}
+                  <col style={{width: '8%'}} /> {/* Promociones */}
+                  <col style={{width: '8%'}} /> {/* Cat. Promos */}
+                  <col style={{width: '8%'}} /> {/* Descuentos */}
+                  <col style={{width: '10%'}} /> {/* Cupón */}
+                  <col style={{width: '8%'}} /> {/* Total */}
+                  <col style={{width: '7%'}} /> {/* Pago */}
+                  <col style={{width: '10%'}} /> {/* Cajero */}
+                  <col style={{width: '7%'}} /> {/* Estado */}
+                  <col style={{width: '18%'}} /> {/* Acciones */}
+                </colgroup>
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       N° Ticket
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Fecha
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Promociones
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Promos
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Descuentos
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      <div className="flex flex-col items-end">
+                        <span>Cat.</span>
+                        <span>Promos</span>
+                      </div>
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Desc.
+                    </th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Cupón
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Total
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Pago
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Cajero
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                       Estado
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                       Acciones
                     </th>
                   </tr>
@@ -301,10 +321,10 @@ export default function SalesPage() {
                     const isAnulada = sale.total === 0 && sale.subtotal === 0;
                     return (
                     <tr key={sale.id} className={`hover:bg-gray-50 ${isAnulada ? 'bg-red-50' : ''}`}>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      <td className="px-3 py-3 text-sm font-medium text-gray-900">
                         {sale.saleNumber}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-3 py-3 text-xs text-gray-600">
                         {new Date(sale.createdAt).toLocaleString('es-PE', {
                           day: '2-digit',
                           month: '2-digit',
@@ -313,21 +333,28 @@ export default function SalesPage() {
                           minute: '2-digit',
                         })}
                       </td>
-                      <td className="px-6 py-4 text-sm text-right text-blue-600">
+                      <td className="px-3 py-3 text-xs text-right text-blue-600">
                         {sale.promotionsTotal && sale.promotionsTotal > 0 ? (
                           <span>-{formatMoney(sale.promotionsTotal)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-right text-orange-600">
+                      <td className="px-3 py-3 text-xs text-right text-purple-600 font-medium">
+                        {sale.categoryPromotionsTotal && sale.categoryPromotionsTotal > 0 ? (
+                          <span>-{formatMoney(sale.categoryPromotionsTotal)}</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-right text-orange-600">
                         {sale.discountTotal > 0 ? (
                           <span>-{formatMoney(sale.discountTotal)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-right">
+                      <td className="px-3 py-3 text-xs text-right">
                         {sale.couponCode && sale.couponDiscount && sale.couponDiscount > 0 ? (
                           <div className="flex flex-col items-end">
                             <span className="text-green-700 font-medium">-{formatMoney(sale.couponDiscount)}</span>
@@ -337,20 +364,20 @@ export default function SalesPage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-right font-medium text-gray-900">
+                      <td className="px-3 py-3 text-sm text-right font-medium text-gray-900">
                         {isAnulada ? (
                           <span className="text-red-600 line-through">S/ 0.00</span>
                         ) : (
                           formatMoney(sale.total)
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-3 py-3 text-xs text-gray-600">
                         {getPaymentMethodLabel(sale.paymentMethod)}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-3 py-3 text-xs text-gray-600 truncate">
                         {sale.user.name}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-3 py-3 text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
                           isAnulada
                             ? 'bg-red-100 text-red-800'
@@ -359,20 +386,20 @@ export default function SalesPage() {
                           {isAnulada ? 'ANULADA' : 'ACTIVA'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex gap-2 justify-center">
+                      <td className="px-3 py-3">
+                        <div className="flex gap-1.5 justify-center">
                           <button
                             onClick={() => router.push(`/receipt/${sale.id}`)}
-                            className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs"
                           >
-                            <Printer className="w-4 h-4" />
+                            <Printer className="w-3.5 h-3.5" />
                             Ver
                           </button>
                           {canCancelSale(sale) && (
                             <button
                               onClick={() => handleCancelClick(sale)}
                               disabled={cancelling === sale.id}
-                              className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 transition-colors text-sm"
+                              className="px-2.5 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 transition-colors text-xs whitespace-nowrap"
                             >
                               {cancelling === sale.id ? 'Anulando...' : 'Anular'}
                             </button>

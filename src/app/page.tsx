@@ -93,6 +93,14 @@ export default async function HomePage() {
               </Link>
 
               <Link
+                href="/category-promotions"
+                className="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 hover:border-purple-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-purple-900 mb-2">🏷️ Promos Categoría</h2>
+                <p className="text-purple-700">Descuentos automáticos por categoría</p>
+              </Link>
+
+              <Link
                 href="/settings"
                 className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 hover:border-blue-300 transition-colors"
               >

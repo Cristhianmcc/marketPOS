@@ -190,6 +190,20 @@ export default function AuthLayout({ children, storeName }: AuthLayoutProps) {
                     Cupones
                   </Link>
                 )}
+
+                {user.role === 'OWNER' && (
+                  <Link
+                    href="/category-promotions"
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                      pathname?.startsWith('/category-promotions')
+                        ? 'bg-[#1F2A37] text-white border-b-2 border-[#9333EA]'
+                        : 'text-gray-300 hover:text-white hover:bg-[#1F2A37]'
+                    }`}
+                  >
+                    <Tag className="w-4 h-4" />
+                    Promos Categoría
+                  </Link>
+                )}
               </div>
             </div>
           </nav>
