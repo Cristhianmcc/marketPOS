@@ -1107,7 +1107,7 @@ export default function POSPage() {
                             )}
 
                             {/* Promoción por volumen (Módulo 14.2-C1) */}
-                            {item.volumePromoName && item.volumePromoDiscount > 0 && (
+                            {item.volumePromoName && (item.volumePromoDiscount ?? 0) > 0 && (
                               <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
                                 <div className="flex justify-between items-center text-xs">
                                   <div className="flex items-center gap-1 text-orange-700 font-medium">
