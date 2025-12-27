@@ -574,7 +574,7 @@ export default function CategoryPromotionsPage() {
                   
                   <div>
                     <span className="text-sm text-gray-500">Categoría:</span>
-                    <p className="font-medium text-gray-900">{promoToDelete.categoryName}</p>
+                    <p className="font-medium text-gray-900">{promoToDelete.category}</p>
                   </div>
                   
                   <div>
