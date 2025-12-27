@@ -580,7 +580,7 @@ export default function CategoryPromotionsPage() {
                   <div>
                     <span className="text-sm text-gray-500">Descuento:</span>
                     <p className="font-medium text-gray-900">
-                      {promoToDelete.type === 'PERCENTAGE' 
+                      {promoToDelete.type === 'PERCENT' 
                         ? `${Number(promoToDelete.value).toFixed(0)}%`
                         : `S/ ${Number(promoToDelete.value).toFixed(2)}`}
                     </p>
