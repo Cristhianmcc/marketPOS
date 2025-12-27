@@ -5,7 +5,7 @@ import { prisma } from '@/infra/db/prisma';
 // PATCH - Actualizar estado activo de promoción
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -13,7 +13,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { active } = body;
 
@@ -53,7 +53,7 @@ export async function PATCH(
 // DELETE - Eliminar promoción
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getSession();
@@ -61,7 +61,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Verificar que la promoción existe y pertenece a la tienda
     const existingPromo = await prisma.volumePromotion.findUnique({
