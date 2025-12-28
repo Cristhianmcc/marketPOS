@@ -372,10 +372,10 @@ export async function POST(request: NextRequest) {
     logAudit({
       storeId: result.newStore.id,
       userId: session.userId,
-      action: 'RESTORE_SUCCESS',
-      entityType: 'STORE',
+      action: 'RESTORE_EXECUTED',
+      entityType: 'RESTORE',
       entityId: result.newStore.id,
-      severity: isLegacyBackup ? 'WARN' : 'INFO',
+      severity: 'WARN',
       meta: {
         storeName: result.newStore.name,
         backupDate: metadata.createdAt,

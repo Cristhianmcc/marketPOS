@@ -139,6 +139,14 @@ export default async function HomePage() {
                 <h2 className="text-xl font-bold text-red-900 mb-2">🛡️ Límites Operativos</h2>
                 <p className="text-red-700">Configurar límites de operación</p>
               </Link>
+
+              <Link
+                href="/admin/audit"
+                className="bg-gray-50 border-2 border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-gray-900 mb-2">📋 Auditoría</h2>
+                <p className="text-gray-700">Historial de operaciones críticas</p>
+              </Link>
             </>
           )}
 

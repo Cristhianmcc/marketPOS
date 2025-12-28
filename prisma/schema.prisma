@@ -585,6 +585,7 @@ enum AuditEntityType {
   USER
   PRODUCT
   RESTORE
+  SYSTEM
 }
 
 model AuditLog {
@@ -607,6 +608,7 @@ model AuditLog {
   user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   
   @@index([storeId, createdAt])
+  @@index([userId])
   @@index([action])
   @@index([severity])
   @@index([entityType, entityId])

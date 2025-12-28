@@ -176,24 +176,25 @@ export async function POST(
 
     // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
     const { ip, userAgent } = getRequestMetadata(request);
-    logAudit({
+    
+    await logAudit({
       storeId: session.storeId,
       userId: session.userId,
-      action: 'SALE_CANCELLED',
+      action: 'SALE_VOIDED',
       entityType: 'SALE',
       entityId: result.id,
       severity: 'WARN',
       meta: {
         saleNumber: sale.saleNumber,
-        cancelledBy: session.userId,
-        originalTotal: sale.total,
+        voidedBy: session.userId,
+        originalTotal: sale.total.toNumber(),
         wasFiado: sale.paymentMethod === 'FIADO',
         hadCoupon: !!sale.couponCode,
         itemsCount: sale.items.length,
       },
       ip,
       userAgent,
-    }).catch(e => console.error('Audit log failed (non-blocking):', e));
+    });
 
     // ✅ MÓDULO 15: Si era FIADO, log adicional de receivable cancelado (fire-and-forget)
     if (sale.paymentMethod === 'FIADO') {

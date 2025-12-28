@@ -130,8 +130,8 @@ export async function PUT(request: NextRequest) {
     logAudit({
       storeId,
       userId: session.userId,
-      action: 'LIMIT_UPDATED',
-      entityType: 'STORE',
+      action: 'LIMITS_UPDATED',
+      entityType: 'SYSTEM',
       entityId: storeId,
       severity: 'WARN',
       meta: {

@@ -133,7 +133,7 @@ export async function PUT(request: NextRequest) {
       storeId,
       userId: session.userId,
       action: enabled ? 'FEATURE_ENABLED' : 'FEATURE_DISABLED',
-      entityType: 'STORE',
+      entityType: 'SYSTEM',
       entityId: storeId,
       severity: 'INFO',
       meta: {
