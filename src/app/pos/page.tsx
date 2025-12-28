@@ -55,6 +55,14 @@ interface Customer {
   totalBalance: number;
 }
 
+interface OperationalLimits {
+  maxDiscountPercent: number | null;
+  maxManualDiscountAmount: number | null;
+  maxSaleTotal: number | null;
+  maxItemsPerSale: number | null;
+  maxReceivableBalance: number | null;
+}
+
 export default function POSPage() {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<StoreProduct[]>([]);
@@ -81,6 +89,7 @@ export default function POSPage() {
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [operationalLimits, setOperationalLimits] = useState<OperationalLimits | null>(null);
 
   // Estados para descuentos
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -108,6 +117,7 @@ export default function POSPage() {
   useEffect(() => {
     fetchCurrentShift();
     checkSuperAdmin();
+    fetchOperationalLimits();
   }, []);
 
   const checkSuperAdmin = async () => {
@@ -119,6 +129,18 @@ export default function POSPage() {
       }
     } catch (error) {
       console.error('Error checking superadmin:', error);
+    }
+  };
+
+  const fetchOperationalLimits = async () => {
+    try {
+      const res = await fetch('/api/admin/operational-limits');
+      if (res.ok) {
+        const data = await res.json();
+        setOperationalLimits(data.limits);
+      }
+    } catch (error) {
+      console.error('Error fetching operational limits:', error);
     }
   };
 
@@ -419,6 +441,16 @@ export default function POSPage() {
     if (existing) {
       await updateQuantity(sp.id, existing.quantity + 1);
     } else {
+      // ✅ Validar límite de items por venta
+      if (operationalLimits?.maxItemsPerSale !== null && 
+          operationalLimits?.maxItemsPerSale !== undefined) {
+        const currentTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+        if (currentTotalItems >= operationalLimits.maxItemsPerSale) {
+          toast.error(`No puedes agregar más items. Límite máximo: ${operationalLimits.maxItemsPerSale} items por venta`);
+          return;
+        }
+      }
+      
       const newItem: CartItem = { storeProduct: sp, quantity: 1 };
       
       // ✅ Aplicar promoción de producto
@@ -473,6 +505,19 @@ export default function POSPage() {
     if (newQuantity <= 0) {
       removeFromCart(storeProductId);
       return;
+    }
+    
+    // ✅ Validar límite de items por venta (al aumentar cantidad)
+    if (operationalLimits?.maxItemsPerSale !== null && 
+        operationalLimits?.maxItemsPerSale !== undefined) {
+      const currentTotalItems = cart.reduce((sum, i) => 
+        i.storeProduct.id === storeProductId ? sum : sum + i.quantity, 0);
+      const newTotalItems = currentTotalItems + newQuantity;
+      
+      if (newTotalItems > operationalLimits.maxItemsPerSale) {
+        toast.error(`No puedes agregar más items. Límite máximo: ${operationalLimits.maxItemsPerSale} items por venta`);
+        return;
+      }
     }
 
     // Validar stock disponible (incluyendo stock negativo o cero)
@@ -702,10 +747,46 @@ export default function POSPage() {
         toast.error('El porcentaje no puede ser mayor a 100%');
         return;
       }
+      
+      // ✅ Validar límite operativo
+      if (operationalLimits?.maxDiscountPercent !== null && 
+          operationalLimits?.maxDiscountPercent !== undefined) {
+        if (value > operationalLimits.maxDiscountPercent) {
+          toast.error(`El descuento porcentual (${value}%) excede el límite permitido (${operationalLimits.maxDiscountPercent}%)`);
+          return;
+        }
+      }
     } else if (discountType === 'AMOUNT') {
       if (value > subtotal) {
         toast.error('El descuento no puede ser mayor al subtotal del ítem');
         return;
+      }
+      
+      // ✅ Validar límite de descuento manual total (AMOUNT)
+      if (operationalLimits?.maxManualDiscountAmount !== null && 
+          operationalLimits?.maxManualDiscountAmount !== undefined) {
+        // Calcular descuentos manuales actuales (excluyendo el ítem que estamos editando)
+        const currentManualDiscounts = cart.reduce((sum, i) => {
+          if (i.storeProduct.id === discountItemId) return sum; // Excluir ítem actual
+          if (!i.discountType || !i.discountValue) return sum;
+          
+          if (i.discountType === 'AMOUNT') {
+            return sum + i.discountValue;
+          } else if (i.discountType === 'PERCENT') {
+            const itemSubtotal = calculateItemSubtotal(i);
+            return sum + Math.round((itemSubtotal * i.discountValue) / 100 * 100) / 100;
+          }
+          return sum;
+        }, 0);
+        
+        const totalManualDiscounts = currentManualDiscounts + globalDiscount + value;
+        
+        if (totalManualDiscounts > operationalLimits.maxManualDiscountAmount) {
+          toast.error(
+            `Descuentos manuales totales (S/ ${totalManualDiscounts.toFixed(2)}) excederían el límite permitido (S/ ${operationalLimits.maxManualDiscountAmount.toFixed(2)})`
+          );
+          return;
+        }
       }
     }
 
@@ -1380,6 +1461,35 @@ export default function POSPage() {
                           <span>Total</span>
                           <span>S/ {getCartTotal().toFixed(2)}</span>
                         </div>
+                        
+                        {/* ✅ Alertas de límites operativos */}
+                        {operationalLimits && (
+                          <div className="mt-3 space-y-2">
+                            {/* Límite de total de venta */}
+                            {operationalLimits.maxSaleTotal !== null && 
+                             getCartTotal() > operationalLimits.maxSaleTotal && (
+                              <div className="bg-red-50 border border-red-200 rounded-md p-2 text-sm text-red-800">
+                                ⚠️ Total excede límite: S/ {operationalLimits.maxSaleTotal.toFixed(2)}
+                              </div>
+                            )}
+                            
+                            {/* Límite de descuento manual total */}
+                            {operationalLimits.maxManualDiscountAmount !== null && 
+                             getTotalItemDiscounts() + globalDiscount > operationalLimits.maxManualDiscountAmount && (
+                              <div className="bg-red-50 border border-red-200 rounded-md p-2 text-sm text-red-800">
+                                ⚠️ Descuentos exceden límite: S/ {operationalLimits.maxManualDiscountAmount.toFixed(2)}
+                              </div>
+                            )}
+                            
+                            {/* Límite de items */}
+                            {operationalLimits.maxItemsPerSale !== null && 
+                             getTotalItems() > operationalLimits.maxItemsPerSale && (
+                              <div className="bg-red-50 border border-red-200 rounded-md p-2 text-sm text-red-800">
+                                ⚠️ Items exceden límite: {operationalLimits.maxItemsPerSale}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <button
@@ -1693,6 +1803,20 @@ export default function POSPage() {
                     <button
                       key={customer.id}
                       onClick={() => {
+                        // ✅ Validar límite de balance de FIADO
+                        if (operationalLimits?.maxReceivableBalance !== null && 
+                            operationalLimits?.maxReceivableBalance !== undefined) {
+                          const saleTotal = getCartTotal();
+                          const newBalance = customer.totalBalance + saleTotal;
+                          
+                          if (newBalance > operationalLimits.maxReceivableBalance) {
+                            toast.error(
+                              `No se puede procesar. Balance resultante (S/ ${newBalance.toFixed(2)}) excedería el límite permitido (S/ ${operationalLimits.maxReceivableBalance.toFixed(2)})`
+                            );
+                            return;
+                          }
+                        }
+                        
                         setSelectedCustomer(customer);
                         setShowCustomerModal(false);
                       }}
@@ -1949,6 +2073,21 @@ export default function POSPage() {
           if (discount > maxDiscount) {
             toast.error('El descuento excede el total disponible');
             return;
+          }
+          
+          // ✅ Validar límite de descuento manual total
+          if (operationalLimits?.maxManualDiscountAmount !== null && 
+              operationalLimits?.maxManualDiscountAmount !== undefined) {
+            // Calcular descuentos manuales de items
+            const itemDiscounts = getTotalItemDiscounts();
+            const totalManualDiscounts = itemDiscounts + discount;
+            
+            if (totalManualDiscounts > operationalLimits.maxManualDiscountAmount) {
+              toast.error(
+                `Descuentos manuales totales (S/ ${totalManualDiscounts.toFixed(2)}) excederían el límite permitido (S/ ${operationalLimits.maxManualDiscountAmount.toFixed(2)})`
+              );
+              return;
+            }
           }
           
           setGlobalDiscount(discount);

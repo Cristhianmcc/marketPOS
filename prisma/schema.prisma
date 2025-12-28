@@ -99,6 +99,7 @@ model Store {
   nthPromotions      NthPromotion[] // ✅ Promociones n-ésimo con descuento (14.2-C2)
   auditLogs          AuditLog[] // ✅ MÓDULO 15: Auditoría
   featureFlags       FeatureFlag[] // ✅ MÓDULO 15: Feature Flags (Fase 2)
+  operationalLimit   OperationalLimit? // ✅ MÓDULO 15: Límites Operativos (Fase 3)
 
   @@map("stores")
 }
@@ -636,4 +637,29 @@ model FeatureFlag {
   @@unique([storeId, key]) // Una flag por tienda
   @@index([storeId])
   @@map("feature_flags")
+}
+
+//// MÓDULO 15 — FASE 3: LÍMITES OPERATIVOS
+
+model OperationalLimit {
+  id        String   @id @default(cuid())
+  storeId   String   @unique @map("store_id")
+  
+  // Límites de descuentos
+  maxDiscountPercent      Decimal? @map("max_discount_percent") @db.Decimal(5, 2)
+  maxManualDiscountAmount Decimal? @map("max_manual_discount_amount") @db.Decimal(10, 2)
+  
+  // Límites de ventas
+  maxSaleTotal            Decimal? @map("max_sale_total") @db.Decimal(10, 2)
+  maxItemsPerSale         Int?     @map("max_items_per_sale")
+  
+  // Límites de cuentas por cobrar
+  maxReceivableBalance    Decimal? @map("max_receivable_balance") @db.Decimal(10, 2)
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  @@map("operational_limits")
 }

@@ -131,6 +131,14 @@ export default async function HomePage() {
                 <h2 className="text-xl font-bold text-indigo-900 mb-2">🎚️ Funcionalidades</h2>
                 <p className="text-indigo-700">Activar/desactivar funciones</p>
               </Link>
+
+              <Link
+                href="/settings/limits"
+                className="bg-red-50 border-2 border-red-200 rounded-lg p-6 hover:border-red-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-red-900 mb-2">🛡️ Límites Operativos</h2>
+                <p className="text-red-700">Configurar límites de operación</p>
+              </Link>
             </>
           )}
 

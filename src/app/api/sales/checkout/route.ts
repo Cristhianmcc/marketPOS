@@ -14,6 +14,14 @@ import { computeVolumePackDiscount, getActiveVolumePromotion } from '@/lib/volum
 import { computeNthPromoDiscount, getActiveNthPromotion } from '@/lib/nthPromotions'; // ✅ Módulo 14.2-C2
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 import { requireFeature, isFeatureEnabled, FeatureDisabledError } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
+import { 
+  validateItemsCount,
+  validateDiscountPercent,
+  validateManualDiscountAmount,
+  validateSaleTotal,
+  validateReceivableBalance,
+  LimitExceededError
+} from '@/lib/operationalLimits'; // ✅ MÓDULO 15 - FASE 3: Límites Operativos
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -488,6 +496,33 @@ async function executeCheckout(
     // Total FINAL (después de cupón y descuento global)
     const total = totalAfterCoupon - globalDiscount;
 
+    // ✅ MÓDULO 15 - FASE 3: VALIDAR LÍMITES OPERATIVOS
+    // Las validaciones se hacen ANTES de ejecutar la transacción
+    
+    // 1) Validar cantidad de ítems
+    await validateItemsCount(session.storeId, items.length);
+    
+    // 2) Validar descuentos manuales porcentuales
+    for (const item of items) {
+      if (item.discountType === 'PERCENT' && item.discountValue) {
+        await validateDiscountPercent(session.storeId, item.discountValue);
+      }
+    }
+    
+    // 3) Validar montos de descuentos manuales
+    const totalManualDiscounts = itemDiscountsTotal + globalDiscount;
+    if (totalManualDiscounts > 0) {
+      await validateManualDiscountAmount(session.storeId, totalManualDiscounts);
+    }
+    
+    // 4) Validar total de la venta
+    await validateSaleTotal(session.storeId, total);
+    
+    // 5) Validar balance de cuentas por cobrar (solo para FIADO)
+    if (paymentMethod === 'FIADO' && customerId) {
+      await validateReceivableBalance(session.storeId, customerId, total);
+    }
+
     // 5. Validar y calcular changeAmount si es efectivo
     let changeAmount: number | null = null;
     if (paymentMethod === 'CASH' && amountPaid !== undefined) {
@@ -931,7 +966,15 @@ export async function POST(req: NextRequest) {
       };
       return NextResponse.json(errorResponse, { status: error.statusCode });
     }
-
+    // ✅ MÓDULO 15 - FASE 3: Error de límites operativos
+    if (error instanceof LimitExceededError) {
+      const errorResponse: ErrorResponse = {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      };
+      return NextResponse.json(errorResponse, { status: error.statusCode });
+    }
     // ✅ MÓDULO 15: Errores de Feature Flags
     if (error instanceof FeatureDisabledError) {
       const errorResponse: ErrorResponse = {

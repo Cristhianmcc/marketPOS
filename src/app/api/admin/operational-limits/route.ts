@@ -1,19 +1,23 @@
-// app/api/admin/feature-flags/route.ts
-// ✅ MÓDULO 15 - FASE 2: Feature Flags API
-// GET: Listar flags de una tienda
-// PUT: Actualizar un flag
+// app/api/admin/operational-limits/route.ts
+// ✅ MÓDULO 15 - FASE 3: API para gestionar límites operativos
+// GET: Obtener límites de una tienda
+// PUT: Actualizar límites de una tienda
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
-import { getAllFeatureFlags, setFeatureFlag } from '@/lib/featureFlags';
-import { FeatureFlagKey } from '@prisma/client';
+import { 
+  getOperationalLimits, 
+  setOperationalLimits,
+  type OperationalLimits 
+} from '@/lib/operationalLimits';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog';
 
 /**
- * GET /api/admin/feature-flags?storeId=xxx
- * Obtener todas las flags de una tienda
- * OWNER puede ver sus flags, SUPERADMIN puede ver cualquier tienda
+ * GET /api/admin/operational-limits?storeId=xxx
+ * Obtener límites operativos de una tienda
+ * OWNER: solo sus límites
+ * SUPERADMIN: cualquier tienda
  */
 export async function GET(request: NextRequest) {
   try {
@@ -34,10 +38,8 @@ export async function GET(request: NextRequest) {
     let targetStoreId: string;
     
     if (isSuper) {
-      // SUPERADMIN puede ver cualquier tienda si pasa storeId, o su propia tienda por defecto
       targetStoreId = requestedStoreId || session.storeId;
     } else {
-      // OWNER: si pasa storeId, debe ser el suyo; si no pasa, usar el suyo
       if (requestedStoreId && requestedStoreId !== session.storeId) {
         return NextResponse.json(
           { code: 'FORBIDDEN', message: 'No autorizado para ver otra tienda' },
@@ -54,22 +56,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const flags = await getAllFeatureFlags(targetStoreId);
+    const limits = await getOperationalLimits(targetStoreId);
 
-    return NextResponse.json({ flags });
+    return NextResponse.json({ limits });
   } catch (error) {
-    console.error('Error getting feature flags:', error);
+    console.error('Error getting operational limits:', error);
     return NextResponse.json(
-      { code: 'SERVER_ERROR', message: 'Error al obtener flags' },
+      { code: 'SERVER_ERROR', message: 'Error al obtener límites' },
       { status: 500 }
     );
   }
 }
 
 /**
- * PUT /api/admin/feature-flags
- * Actualizar un flag de una tienda
- * OWNER puede actualizar sus flags, SUPERADMIN puede actualizar cualquier tienda
+ * PUT /api/admin/operational-limits
+ * Actualizar límites operativos de una tienda
+ * OWNER: solo sus límites
+ * SUPERADMIN: cualquier tienda
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -82,7 +85,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    let { storeId, key, enabled } = body;
+    let { storeId, limits } = body;
 
     const isSuper = isSuperAdmin(session.email);
 
@@ -99,17 +102,9 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    if (!key || typeof enabled !== 'boolean') {
+    if (!limits || typeof limits !== 'object') {
       return NextResponse.json(
-        { code: 'INVALID_INPUT', message: 'key y enabled son requeridos' },
-        { status: 400 }
-      );
-    }
-
-    // Verificar que el key es válido
-    if (!Object.values(FeatureFlagKey).includes(key as FeatureFlagKey)) {
-      return NextResponse.json(
-        { code: 'INVALID_KEY', message: 'Flag key inválido' },
+        { code: 'INVALID_INPUT', message: 'limits es requerido y debe ser un objeto' },
         { status: 400 }
       );
     }
@@ -124,32 +119,43 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Actualizar flag
-    const flag = await setFeatureFlag(storeId, key as FeatureFlagKey, enabled);
+    // Obtener valores anteriores para auditoría
+    const previousLimits = await getOperationalLimits(storeId);
 
-    // ✅ AUDITORÍA: Log de cambio de flag
+    // Actualizar límites
+    const updatedLimits = await setOperationalLimits(storeId, limits);
+
+    // ✅ AUDITORÍA: Log de cambio de límites
     const { ip, userAgent } = getRequestMetadata(request);
     logAudit({
       storeId,
       userId: session.userId,
-      action: enabled ? 'FEATURE_ENABLED' : 'FEATURE_DISABLED',
+      action: 'LIMIT_UPDATED',
       entityType: 'STORE',
       entityId: storeId,
-      severity: 'INFO',
+      severity: 'WARN',
       meta: {
-        flagKey: key,
-        enabled,
-        changedBy: session.email,
+        previousValues: previousLimits,
+        newValues: limits,
+        updatedBy: session.email,
       },
       ip,
       userAgent,
     }).catch(e => console.error('Audit log failed (non-blocking):', e));
 
-    return NextResponse.json({ flag });
+    return NextResponse.json({ 
+      limits: {
+        maxDiscountPercent: updatedLimits.maxDiscountPercent ? Number(updatedLimits.maxDiscountPercent) : null,
+        maxManualDiscountAmount: updatedLimits.maxManualDiscountAmount ? Number(updatedLimits.maxManualDiscountAmount) : null,
+        maxSaleTotal: updatedLimits.maxSaleTotal ? Number(updatedLimits.maxSaleTotal) : null,
+        maxItemsPerSale: updatedLimits.maxItemsPerSale,
+        maxReceivableBalance: updatedLimits.maxReceivableBalance ? Number(updatedLimits.maxReceivableBalance) : null,
+      }
+    });
   } catch (error) {
-    console.error('Error updating feature flag:', error);
+    console.error('Error updating operational limits:', error);
     return NextResponse.json(
-      { code: 'SERVER_ERROR', message: 'Error al actualizar flag' },
+      { code: 'SERVER_ERROR', message: 'Error al actualizar límites' },
       { status: 500 }
     );
   }
