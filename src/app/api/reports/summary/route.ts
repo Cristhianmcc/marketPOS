@@ -159,8 +159,8 @@ export async function GET(request: NextRequest) {
       },
       _sum: {
         nthPromoDiscount: true,
-      },
-    }).then(result => Number(result._sum.nthPromoDiscount || 0));
+      } as any,
+    }).then(result => Number((result._sum as any)?.nthPromoDiscount || 0));
     
     const ticketCount = sales.length;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;

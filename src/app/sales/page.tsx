@@ -15,6 +15,8 @@ interface Sale {
   discountTotal: number;
   promotionsTotal?: number;
   categoryPromotionsTotal?: number;
+  volumePromotionsTotal?: number; // ✅ Módulo 14.2-C1: Promociones por volumen
+  nthPromotionsTotal?: number; // ✅ Módulo 14.2-C2: Promociones n-ésimo
   couponCode?: string | null;
   couponDiscount?: number;
   total: number;
