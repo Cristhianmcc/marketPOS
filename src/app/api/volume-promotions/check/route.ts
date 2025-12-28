@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getActiveVolumePromotion, computeVolumePackDiscount } from '@/lib/volumePromotions';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
+import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
 /**
  * POST /api/volume-promotions/check
@@ -22,6 +23,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ 
         error: 'Faltan campos requeridos: productId, quantity, unitPrice, unitType, subtotalAfterCategoryPromo' 
       }, { status: 400 });
+    }
+
+    // ✅ MÓDULO 15: Verificar si las promociones por volumen están habilitadas
+    const enableVolumePromos = await isFeatureEnabled(session.storeId, 'ENABLE_VOLUME_PROMOS' as any);
+    if (!enableVolumePromos) {
+      // Si las promociones por volumen están deshabilitadas, retornar null
+      return NextResponse.json({
+        volumePromotion: null,
+      });
     }
 
     // Buscar promoción activa

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { computeNthPromoDiscount } from '@/lib/nthPromotions';
+import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
 /**
  * API para verificar si aplica promoción N-ésimo a un producto
@@ -29,6 +30,15 @@ export async function POST(req: NextRequest) {
         { error: 'Faltan campos requeridos' },
         { status: 400 }
       );
+    }
+
+    // ✅ MÓDULO 15: Verificar si las promociones n-ésimo están habilitadas
+    const enableNthPromos = await isFeatureEnabled(session.storeId, 'ENABLE_NTH_PROMOS' as any);
+    if (!enableNthPromos) {
+      // Si las promociones n-ésimo están deshabilitadas, retornar null
+      return NextResponse.json({
+        nthPromotion: null,
+      });
     }
 
     // Buscar promoción n-ésimo activa para el producto

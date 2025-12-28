@@ -98,6 +98,7 @@ model Store {
   volumePromotions   VolumePromotion[] // ✅ Promociones por volumen (14.2-C1)
   nthPromotions      NthPromotion[] // ✅ Promociones n-ésimo con descuento (14.2-C2)
   auditLogs          AuditLog[] // ✅ MÓDULO 15: Auditoría
+  featureFlags       FeatureFlag[] // ✅ MÓDULO 15: Feature Flags (Fase 2)
 
   @@map("stores")
 }
@@ -609,4 +610,30 @@ model AuditLog {
   @@index([severity])
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+//// MÓDULO 15 — FEATURE FLAGS (Fase 2)
+
+enum FeatureFlagKey {
+  ALLOW_FIADO
+  ALLOW_COUPONS
+  ENABLE_PROMOTIONS
+  ENABLE_VOLUME_PROMOS
+  ENABLE_NTH_PROMOS
+  ENABLE_CATEGORY_PROMOS
+}
+
+model FeatureFlag {
+  id        String         @id @default(cuid())
+  storeId   String         @map("store_id")
+  key       FeatureFlagKey
+  enabled   Boolean        @default(false) // ✅ Default seguro
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  @@unique([storeId, key]) // Una flag por tienda
+  @@index([storeId])
+  @@map("feature_flags")
 }

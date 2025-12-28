@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { applyBestPromotion, type Promotion } from '@/lib/promotions';
+import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +21,15 @@ export async function POST(request: NextRequest) {
         { code: 'INVALID_REQUEST', message: 'productId, quantity y unitPrice son requeridos' },
         { status: 400 }
       );
+    }
+
+    // ✅ MÓDULO 15: Verificar si las promociones están habilitadas
+    const enablePromotions = await isFeatureEnabled(session.storeId, 'ENABLE_PROMOTIONS' as any);
+    if (!enablePromotions) {
+      // Si las promociones están deshabilitadas, retornar null (sin promoción)
+      return NextResponse.json({
+        promotion: null,
+      });
     }
 
     // Obtener promociones activas

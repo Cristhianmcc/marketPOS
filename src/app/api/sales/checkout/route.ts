@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
-import { Prisma } from '@prisma/client';
+import { Prisma, FeatureFlagKey } from '@prisma/client';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 import { applyBestPromotion, type Promotion } from '@/lib/promotions';
 import {
@@ -13,6 +13,7 @@ import { computeCategoryPromoDiscount } from '@/lib/categoryPromotions'; // ✅ 
 import { computeVolumePackDiscount, getActiveVolumePromotion } from '@/lib/volumePromotions'; // ✅ Módulo 14.2-C1
 import { computeNthPromoDiscount, getActiveNthPromotion } from '@/lib/nthPromotions'; // ✅ Módulo 14.2-C2
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
+import { requireFeature, isFeatureEnabled, FeatureDisabledError } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -148,12 +149,15 @@ async function executeCheckout(
     }
 
     // 2. Obtener promociones activas de la tienda
-    const promotions = await tx.promotion.findMany({
+    // ✅ MÓDULO 15: Feature Flag ENABLE_PROMOTIONS
+    const enablePromotions = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_PROMOTIONS);
+    
+    const promotions = enablePromotions ? await tx.promotion.findMany({
       where: {
         storeId: session.storeId,
         active: true,
       },
-    });
+    }) : [];
 
     // Convertir a formato usado por applyBestPromotion
     const promoList: Promotion[] = promotions.map((p) => ({
@@ -190,14 +194,17 @@ async function executeCheckout(
       const subtotalAfterProductPromo = subtotalItem - promotionDiscount;
       
       // PASO 2: Aplicar promoción automática por CATEGORÍA (Módulo 14.2-B)
-      const categoryPromoResult = await computeCategoryPromoDiscount({
+      // ✅ MÓDULO 15: Feature Flag ENABLE_CATEGORY_PROMOS
+      const enableCategoryPromos = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_CATEGORY_PROMOS);
+      
+      const categoryPromoResult = enableCategoryPromos ? await computeCategoryPromoDiscount({
         storeId: session.storeId,
         productCategory: sp.product.category,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         subtotalAfterProductPromo,
         nowLocalLima: new Date(),
-      });
+      }) : null;
       
       const categoryPromoDiscount = categoryPromoResult?.discountAmount ?? 0;
       const categoryPromoName = categoryPromoResult?.promoSnapshot.name ?? null;
@@ -216,24 +223,28 @@ async function executeCheckout(
       let nthPromoPercent: number | null = null;
       
       if (promotionDiscount === 0) {
+        // ✅ MÓDULO 15: Feature Flags para promociones de volumen y N-ésimo
+        const enableVolumePromos = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_VOLUME_PROMOS);
+        const enableNthPromos = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_NTH_PROMOS);
+        
         // Calcular AMBAS promos candidatas (sin aplicar aún)
-        const volumePromotion = await getActiveVolumePromotion(tx, session.storeId, sp.product.id);
-        const volumePromoResult = computeVolumePackDiscount({
+        const volumePromotion = enableVolumePromos ? await getActiveVolumePromotion(tx, session.storeId, sp.product.id) : null;
+        const volumePromoResult = enableVolumePromos ? computeVolumePackDiscount({
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           subtotalAfterCategoryPromo,
           volumePromotion,
           unitType: sp.product.unitType,
-        });
+        }) : null;
         
-        const nthPromotion = await getActiveNthPromotion(tx, session.storeId, sp.product.id);
-        const nthPromoResult = computeNthPromoDiscount({
+        const nthPromotion = enableNthPromos ? await getActiveNthPromotion(tx, session.storeId, sp.product.id) : null;
+        const nthPromoResult = enableNthPromos ? computeNthPromoDiscount({
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           baseAfterPreviousPromos: subtotalAfterCategoryPromo, // Evaluar sobre la misma base
           nthPromotion,
           unitType: sp.product.unitType,
-        });
+        }) : null;
         
         const volumeDiscount = volumePromoResult?.discountAmount ?? 0;
         const nthDiscount = nthPromoResult?.discountAmount ?? 0;
@@ -359,6 +370,9 @@ async function executeCheckout(
     } | null = null;
 
     if (couponCode) {
+      // ✅ MÓDULO 15: Feature Flag ALLOW_COUPONS
+      await requireFeature(session.storeId, FeatureFlagKey.ALLOW_COUPONS);
+      
       const normalizedCouponCode = normalizeCouponCode(couponCode);
 
       if (!normalizedCouponCode) {
@@ -513,6 +527,9 @@ async function executeCheckout(
 
     // 3b. Para FIADO: amountPaid y changeAmount deben ser null
     if (paymentMethod === 'FIADO') {
+      // ✅ MÓDULO 15: Feature Flag ALLOW_FIADO
+      await requireFeature(session.storeId, FeatureFlagKey.ALLOW_FIADO);
+      
       if (!customerId) {
         throw new CheckoutError('CUSTOMER_REQUIRED', 400, 'Debes seleccionar un cliente para ventas FIADO');
       }
@@ -911,6 +928,16 @@ export async function POST(req: NextRequest) {
         code: error.code,
         message: error.message,
         details: error.details,
+      };
+      return NextResponse.json(errorResponse, { status: error.statusCode });
+    }
+
+    // ✅ MÓDULO 15: Errores de Feature Flags
+    if (error instanceof FeatureDisabledError) {
+      const errorResponse: ErrorResponse = {
+        code: error.code,
+        message: error.message,
+        details: { flagKey: error.flagKey },
       };
       return NextResponse.json(errorResponse, { status: error.statusCode });
     }

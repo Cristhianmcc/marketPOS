@@ -123,6 +123,14 @@ export default async function HomePage() {
                 <h2 className="text-xl font-bold text-blue-900 mb-2">⚙️ Configuración</h2>
                 <p className="text-blue-700">Ajustes de la tienda</p>
               </Link>
+
+              <Link
+                href="/admin/feature-flags"
+                className="bg-indigo-50 border-2 border-indigo-200 rounded-lg p-6 hover:border-indigo-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-indigo-900 mb-2">🎚️ Funcionalidades</h2>
+                <p className="text-indigo-700">Activar/desactivar funciones</p>
+              </Link>
             </>
           )}
 

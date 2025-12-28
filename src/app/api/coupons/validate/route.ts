@@ -9,6 +9,7 @@ import {
   validateAndComputeCouponDiscount,
   CouponError,
 } from "@/lib/coupons";
+import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -19,6 +20,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { code, totalBeforeCoupon } = body;
+
+    // ✅ MÓDULO 15: Verificar si los cupones están habilitados
+    const allowCoupons = await isFeatureEnabled(session.storeId, 'ALLOW_COUPONS' as any);
+    if (!allowCoupons) {
+      return NextResponse.json(
+        {
+          code: "FEATURE_DISABLED",
+          message: "Los cupones de descuento están deshabilitados para esta tienda",
+        },
+        { status: 403 }
+      );
+    }
 
     // Validaciones básicas
     if (!code || totalBeforeCoupon === undefined || totalBeforeCoupon === null) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { computeCategoryPromoDiscount } from '@/lib/categoryPromotions';
+import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
 /**
  * POST /api/category-promotions/check
@@ -28,6 +29,15 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // ✅ MÓDULO 15: Verificar si las promociones por categoría están habilitadas
+    const enableCategoryPromos = await isFeatureEnabled(session.storeId, 'ENABLE_CATEGORY_PROMOS' as any);
+    if (!enableCategoryPromos) {
+      // Si las promociones por categoría están deshabilitadas, retornar null
+      return NextResponse.json({
+        categoryPromotion: null,
+      });
     }
 
     // Calcular promoción por categoría
