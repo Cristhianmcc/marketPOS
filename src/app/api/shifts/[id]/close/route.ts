@@ -6,6 +6,7 @@ import { getIronSession } from 'iron-session';
 import { SessionData, sessionOptions } from '@/lib/session';
 import { cookies } from 'next/headers';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
+import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -85,9 +86,52 @@ export async function POST(
       difference
     );
 
+    // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
+    const { ip, userAgent } = getRequestMetadata(request);
+    logAudit({
+      storeId: session.storeId,
+      userId: session.userId,
+      action: 'SHIFT_CLOSED',
+      entityType: 'SHIFT',
+      entityId: closedShift.id,
+      severity: difference !== 0 ? 'WARN' : 'INFO',
+      meta: {
+        openingCash: shift.openingCash,
+        closingCash: body.closingCash,
+        expectedCash,
+        difference,
+        cashSales,
+        hasDifference: difference !== 0,
+      },
+      ip,
+      userAgent,
+    }).catch(e => console.error('Audit log failed (non-blocking):', e));
+
     return NextResponse.json({ shift: closedShift });
   } catch (error) {
     console.error('Error closing shift:', error);
+    
+    // ✅ MÓDULO 15: Log de fallo (fire-and-forget)
+    try {
+      const { id: shiftId } = await params;
+      const { ip, userAgent } = getRequestMetadata(request);
+      const sessionData = await getIronSession<SessionData>(await cookies(), sessionOptions);
+      
+      logAudit({
+        storeId: sessionData.storeId || undefined,
+        userId: sessionData.userId || undefined,
+        action: 'SHIFT_CLOSE_FAILED',
+        entityType: 'SHIFT',
+        entityId: shiftId,
+        severity: 'ERROR',
+        meta: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        ip,
+        userAgent,
+      }).catch(e => console.error('Audit log failed (non-blocking):', e));
+    } catch {}
+    
     return NextResponse.json(
       { code: 'INTERNAL_ERROR', message: 'Error al cerrar turno' },
       { status: 500 }

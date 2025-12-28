@@ -264,54 +264,59 @@ export default function SalesPage() {
             ) : (
               <table className="w-full table-fixed">
                 <colgroup>
-                  <col style={{width: '6%'}} /> {/* N° Ticket */}
-                  <col style={{width: '10%'}} /> {/* Fecha */}
-                  <col style={{width: '8%'}} /> {/* Promociones */}
-                  <col style={{width: '8%'}} /> {/* Cat. Promos */}
-                  <col style={{width: '8%'}} /> {/* Descuentos */}
-                  <col style={{width: '10%'}} /> {/* Cupón */}
-                  <col style={{width: '8%'}} /> {/* Total */}
-                  <col style={{width: '7%'}} /> {/* Pago */}
-                  <col style={{width: '10%'}} /> {/* Cajero */}
-                  <col style={{width: '7%'}} /> {/* Estado */}
-                  <col style={{width: '18%'}} /> {/* Acciones */}
+                  <col style={{width: '5%'}} /> {/* N° Ticket */}
+                  <col style={{width: '9%'}} /> {/* Fecha */}
+                  <col style={{width: '6%'}} /> {/* Promociones */}
+                  <col style={{width: '6%'}} /> {/* Cat. Promos */}
+                  <col style={{width: '6%'}} /> {/* Pack */}
+                  <col style={{width: '6%'}} /> {/* N-ésimo */}
+                  <col style={{width: '6%'}} /> {/* Descuentos */}
+                  <col style={{width: '8%'}} /> {/* Cupón */}
+                  <col style={{width: '7%'}} /> {/* Total */}
+                  <col style={{width: '6%'}} /> {/* Pago */}
+                  <col style={{width: '9%'}} /> {/* Cajero */}
+                  <col style={{width: '6%'}} /> {/* Estado */}
+                  <col style={{width: '20%'}} /> {/* Acciones */}
                 </colgroup>
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      N° Ticket
+                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      N°
                     </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Fecha
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Promos
+                    <th className="px-2 py-3 text-right text-xs font-medium text-blue-600 uppercase">
+                      2x1
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      <div className="flex flex-col items-end">
-                        <span>Cat.</span>
-                        <span>Promos</span>
-                      </div>
+                    <th className="px-2 py-3 text-right text-xs font-medium text-purple-600 uppercase">
+                      Categ
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-right text-xs font-medium text-orange-600 uppercase">
+                      Volumen
+                    </th>
+                    <th className="px-2 py-3 text-right text-xs font-medium text-yellow-600 uppercase">
+                      Lleva+
+                    </th>
+                    <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Desc.
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-right text-xs font-medium text-green-600 uppercase">
                       Cupón
                     </th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-right text-xs font-medium text-gray-700 uppercase">
                       Total
                     </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Pago
                     </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Cajero
                     </th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                       Estado
                     </th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                       Acciones
                     </th>
                   </tr>
@@ -321,40 +326,54 @@ export default function SalesPage() {
                     const isAnulada = sale.total === 0 && sale.subtotal === 0;
                     return (
                     <tr key={sale.id} className={`hover:bg-gray-50 ${isAnulada ? 'bg-red-50' : ''}`}>
-                      <td className="px-3 py-3 text-sm font-medium text-gray-900">
+                      <td className="px-2 py-3 text-sm font-medium text-gray-900">
                         {sale.saleNumber}
                       </td>
-                      <td className="px-3 py-3 text-xs text-gray-600">
+                      <td className="px-2 py-3 text-xs text-gray-600">
                         {new Date(sale.createdAt).toLocaleString('es-PE', {
                           day: '2-digit',
                           month: '2-digit',
                           year: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit',
-                        })}
+                        }).replace(',', '')}
                       </td>
-                      <td className="px-3 py-3 text-xs text-right text-blue-600">
+                      <td className="px-2 py-3 text-xs text-right text-blue-600">
                         {sale.promotionsTotal && sale.promotionsTotal > 0 ? (
                           <span>-{formatMoney(sale.promotionsTotal)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-xs text-right text-purple-600 font-medium">
+                      <td className="px-2 py-3 text-xs text-right text-purple-600 font-medium">
                         {sale.categoryPromotionsTotal && sale.categoryPromotionsTotal > 0 ? (
                           <span>-{formatMoney(sale.categoryPromotionsTotal)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-xs text-right text-orange-600">
+                      <td className="px-2 py-3 text-xs text-right text-orange-600 font-medium">
+                        {sale.volumePromotionsTotal && sale.volumePromotionsTotal > 0 ? (
+                          <span>-{formatMoney(sale.volumePromotionsTotal)}</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-3 text-xs text-right text-yellow-600 font-medium">
+                        {sale.nthPromotionsTotal && sale.nthPromotionsTotal > 0 ? (
+                          <span>-{formatMoney(sale.nthPromotionsTotal)}</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-3 text-xs text-right text-gray-600">
                         {sale.discountTotal > 0 ? (
                           <span>-{formatMoney(sale.discountTotal)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-xs text-right">
+                      <td className="px-2 py-3 text-xs text-right">
                         {sale.couponCode && sale.couponDiscount && sale.couponDiscount > 0 ? (
                           <div className="flex flex-col items-end">
                             <span className="text-green-700 font-medium">-{formatMoney(sale.couponDiscount)}</span>
@@ -364,20 +383,20 @@ export default function SalesPage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-sm text-right font-medium text-gray-900">
+                      <td className="px-2 py-3 text-sm text-right font-semibold text-gray-900">
                         {isAnulada ? (
                           <span className="text-red-600 line-through">S/ 0.00</span>
                         ) : (
                           formatMoney(sale.total)
                         )}
                       </td>
-                      <td className="px-3 py-3 text-xs text-gray-600">
+                      <td className="px-2 py-3 text-xs text-gray-600">
                         {getPaymentMethodLabel(sale.paymentMethod)}
                       </td>
-                      <td className="px-3 py-3 text-xs text-gray-600 truncate">
+                      <td className="px-2 py-3 text-xs text-gray-600 truncate">
                         {sale.user.name}
                       </td>
-                      <td className="px-3 py-3 text-center">
+                      <td className="px-2 py-3 text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${
                           isAnulada
                             ? 'bg-red-100 text-red-800'

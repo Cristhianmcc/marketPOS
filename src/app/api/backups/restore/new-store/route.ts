@@ -4,6 +4,7 @@ import { prisma } from '@/infra/db/prisma';
 import { hash } from 'bcryptjs';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
+import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 
 function isSuperAdmin(email: string): boolean {
   const superadminEmails = process.env.SUPERADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
@@ -366,6 +367,28 @@ export async function POST(request: NextRequest) {
       return { newStore, newOwner, tempPassword };
     });
 
+    // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
+    const { ip, userAgent } = getRequestMetadata(request);
+    logAudit({
+      storeId: result.newStore.id,
+      userId: session.userId,
+      action: 'RESTORE_SUCCESS',
+      entityType: 'STORE',
+      entityId: result.newStore.id,
+      severity: isLegacyBackup ? 'WARN' : 'INFO',
+      meta: {
+        storeName: result.newStore.name,
+        backupDate: metadata.createdAt,
+        isLegacy: isLegacyBackup,
+        allowedLegacy: allowLegacy,
+        productsCount: backupData.products?.length || 0,
+        salesCount: backupData.sales?.length || 0,
+        restoredBy: session.email,
+      },
+      ip,
+      userAgent,
+    }).catch(e => console.error('Audit log failed (non-blocking):', e));
+
     return NextResponse.json({
       success: true,
       message: 'Tienda restaurada exitosamente como ARCHIVED',
@@ -386,6 +409,27 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error restoring backup:', error);
+    
+    // ✅ MÓDULO 15: Log de fallo (fire-and-forget)
+    try {
+      const { ip, userAgent } = getRequestMetadata(request);
+      const sessionData = await getSession();
+      
+      logAudit({
+        storeId: undefined,
+        userId: sessionData?.userId,
+        action: 'RESTORE_FAILED',
+        entityType: 'STORE',
+        severity: 'ERROR',
+        meta: {
+          error: error.message || 'Unknown error',
+          restoredBy: sessionData?.email,
+        },
+        ip,
+        userAgent,
+      }).catch(e => console.error('Audit log failed (non-blocking):', e));
+    } catch {}
+    
     return NextResponse.json(
       { code: 'SERVER_ERROR', message: 'Error al restaurar backup', details: error.message },
       { status: 500 }

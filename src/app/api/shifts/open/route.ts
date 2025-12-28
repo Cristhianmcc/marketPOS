@@ -6,6 +6,7 @@ import { getIronSession } from 'iron-session';
 import { SessionData, sessionOptions } from '@/lib/session';
 import { cookies } from 'next/headers';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
+import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -55,9 +56,46 @@ export async function POST(request: Request) {
       openingCash: body.openingCash,
     });
 
+    // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
+    const { ip, userAgent } = getRequestMetadata(request);
+    logAudit({
+      storeId: session.storeId,
+      userId: session.userId,
+      action: 'SHIFT_OPENED',
+      entityType: 'SHIFT',
+      entityId: shift.id,
+      severity: 'INFO',
+      meta: {
+        openingCash: body.openingCash,
+        shiftNumber: shift.id,
+      },
+      ip,
+      userAgent,
+    }).catch(e => console.error('Audit log failed (non-blocking):', e));
+
     return NextResponse.json({ shift }, { status: 201 });
   } catch (error) {
     console.error('Error opening shift:', error);
+    
+    // ✅ MÓDULO 15: Log de fallo (fire-and-forget)
+    try {
+      const { ip, userAgent } = getRequestMetadata(request);
+      const sessionData = await getIronSession<SessionData>(await cookies(), sessionOptions);
+      
+      logAudit({
+        storeId: sessionData.storeId || undefined,
+        userId: sessionData.userId || undefined,
+        action: 'SHIFT_OPEN_FAILED',
+        entityType: 'SHIFT',
+        severity: 'ERROR',
+        meta: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        ip,
+        userAgent,
+      }).catch(e => console.error('Audit log failed (non-blocking):', e));
+    } catch {}
+    
     return NextResponse.json(
       { code: 'INTERNAL_ERROR', message: 'Error al abrir turno' },
       { status: 500 }

@@ -101,6 +101,22 @@ export default async function HomePage() {
               </Link>
 
               <Link
+                href="/volume-promotions"
+                className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 hover:border-orange-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-orange-900 mb-2">📦 Promos Pack</h2>
+                <p className="text-orange-700">Promociones por volumen (3x S/5)</p>
+              </Link>
+
+              <Link
+                href="/nth-promotions"
+                className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 hover:border-yellow-400 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-yellow-900 mb-2">🎯 Promos N-ésimo</h2>
+                <p className="text-yellow-700">2do al 50%, 3ro gratis, etc.</p>
+              </Link>
+
+              <Link
                 href="/settings"
                 className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 hover:border-blue-300 transition-colors"
               >

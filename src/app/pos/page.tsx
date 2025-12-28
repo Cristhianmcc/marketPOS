@@ -41,6 +41,11 @@ interface CartItem {
   volumePromoName?: string | null;
   volumePromoQty?: number | null;
   volumePromoDiscount?: number;
+  // Promociones n-ésimo con descuento (Módulo 14.2-C2)
+  nthPromoName?: string | null;
+  nthPromoQty?: number | null;
+  nthPromoPercent?: number | null;
+  nthPromoDiscount?: number;
 }
 
 interface Customer {
@@ -276,27 +281,32 @@ export default function POSPage() {
     }
   };
 
-  // ✅ Verificar y aplicar promoción por volumen (Módulo 14.2-C1)
-  const checkAndApplyVolumePromotion = async (item: CartItem): Promise<CartItem> => {
+  // ✅ Verificar y aplicar MEJOR promoción: VOLUMEN vs N-ÉSIMO (anti-stacking)
+  // Solo se aplica UNA de estas dos (la que dé mayor descuento)
+  const checkAndApplyBestExclusivePromo = async (item: CartItem): Promise<CartItem> => {
     try {
-      // ⚠️ NO aplicar si ya hay promoción de producto (prioridad: producto > categoría > volumen)
+      // ⚠️ NO aplicar si ya hay promoción de producto
       const productPromoDiscount = item.promotionDiscount ?? 0;
       if (productPromoDiscount > 0) {
-        // Si hay promo de producto, NO evaluar promo por volumen
         return {
           ...item,
           volumePromoName: null,
           volumePromoQty: null,
           volumePromoDiscount: 0,
+          nthPromoName: null,
+          nthPromoQty: null,
+          nthPromoPercent: null,
+          nthPromoDiscount: 0,
         };
       }
       
-      // Calcular subtotal después de promos automáticas previas
+      // Calcular base después de categoría
       const subtotal = item.quantity * item.storeProduct.price;
       const categoryPromoDiscount = item.categoryPromoDiscount ?? 0;
-      const subtotalAfterCategoryPromo = subtotal - productPromoDiscount - categoryPromoDiscount;
+      const baseAfterCategoryPromo = subtotal - productPromoDiscount - categoryPromoDiscount;
 
-      const res = await fetch('/api/volume-promotions/check', {
+      // Calcular VOLUMEN
+      const volumeRes = await fetch('/api/volume-promotions/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -304,32 +314,95 @@ export default function POSPage() {
           quantity: item.quantity,
           unitPrice: item.storeProduct.price,
           unitType: item.storeProduct.product.unitType,
-          subtotalAfterCategoryPromo,
+          subtotalAfterCategoryPromo: baseAfterCategoryPromo,
         }),
       });
 
-      if (!res.ok) return item;
+      // Calcular NTH
+      const nthRes = await fetch('/api/nth-promotions/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: item.storeProduct.product.id,
+          quantity: item.quantity,
+          unitPrice: item.storeProduct.price,
+          unitType: item.storeProduct.product.unitType,
+          baseAfterPreviousPromos: baseAfterCategoryPromo,
+        }),
+      });
 
-      const data = await res.json();
-      
-      if (data.volumePromotion) {
+      const volumeData = volumeRes.ok ? await volumeRes.json() : null;
+      const nthData = nthRes.ok ? await nthRes.json() : null;
+
+      const volumeDiscount = volumeData?.volumePromotion?.volumePromoDiscount ?? 0;
+      const nthDiscount = nthData?.nthPromotion?.nthPromoDiscount ?? 0;
+
+      // REGLA ANTI-STACKING: aplicar SOLO la de mayor descuento
+      if (volumeDiscount > 0 && nthDiscount > 0) {
+        if (volumeDiscount >= nthDiscount) {
+          // VOLUMEN gana
+          return {
+            ...item,
+            volumePromoName: volumeData.volumePromotion.volumePromoName,
+            volumePromoQty: volumeData.volumePromotion.volumePromoQty,
+            volumePromoDiscount: volumeDiscount,
+            nthPromoName: null,
+            nthPromoQty: null,
+            nthPromoPercent: null,
+            nthPromoDiscount: 0,
+          };
+        } else {
+          // NTH gana
+          return {
+            ...item,
+            volumePromoName: null,
+            volumePromoQty: null,
+            volumePromoDiscount: 0,
+            nthPromoName: nthData.nthPromotion.nthPromoName,
+            nthPromoQty: nthData.nthPromotion.nthPromoQty,
+            nthPromoPercent: nthData.nthPromotion.nthPromoPercent,
+            nthPromoDiscount: nthDiscount,
+          };
+        }
+      } else if (volumeDiscount > 0) {
+        // Solo VOLUMEN
         return {
           ...item,
-          volumePromoName: data.volumePromotion.volumePromoName,
-          volumePromoQty: data.volumePromotion.volumePromoQty,
-          volumePromoDiscount: data.volumePromotion.volumePromoDiscount,
+          volumePromoName: volumeData.volumePromotion.volumePromoName,
+          volumePromoQty: volumeData.volumePromotion.volumePromoQty,
+          volumePromoDiscount: volumeDiscount,
+          nthPromoName: null,
+          nthPromoQty: null,
+          nthPromoPercent: null,
+          nthPromoDiscount: 0,
+        };
+      } else if (nthDiscount > 0) {
+        // Solo NTH
+        return {
+          ...item,
+          volumePromoName: null,
+          volumePromoQty: null,
+          volumePromoDiscount: 0,
+          nthPromoName: nthData.nthPromotion.nthPromoName,
+          nthPromoQty: nthData.nthPromotion.nthPromoQty,
+          nthPromoPercent: nthData.nthPromotion.nthPromoPercent,
+          nthPromoDiscount: nthDiscount,
         };
       }
 
-      // Sin promoción por volumen
+      // Ninguna promo
       return {
         ...item,
         volumePromoName: null,
         volumePromoQty: null,
         volumePromoDiscount: 0,
+        nthPromoName: null,
+        nthPromoQty: null,
+        nthPromoPercent: null,
+        nthPromoDiscount: 0,
       };
     } catch (error) {
-      console.error('Error checking volume promotion:', error);
+      console.error('Error checking exclusive promos:', error);
       return item;
     }
   };
@@ -354,8 +427,8 @@ export default function POSPage() {
       // ✅ Aplicar promoción por categoría (después de promo de producto)
       itemWithPromo = await checkAndApplyCategoryPromotion(itemWithPromo);
       
-      // ✅ Aplicar promoción por volumen (después de promo de categoría)
-      itemWithPromo = await checkAndApplyVolumePromotion(itemWithPromo);
+      // ✅ Aplicar MEJOR promo exclusiva: VOLUMEN o N-ÉSIMO (anti-stacking)
+      itemWithPromo = await checkAndApplyBestExclusivePromo(itemWithPromo);
       
       setCart([...cart, itemWithPromo]);
       
@@ -369,6 +442,9 @@ export default function POSPage() {
       }
       if (itemWithPromo.volumePromoName) {
         messages.push(`Pack: ${itemWithPromo.volumePromoName}`);
+      }
+      if (itemWithPromo.nthPromoName) {
+        messages.push(`Nth: ${itemWithPromo.nthPromoName}`);
       }
       
       if (messages.length > 0) {
@@ -421,8 +497,8 @@ export default function POSPage() {
     // ✅ Recalcular promo por categoría (después de promo de producto)
     itemWithPromo = await checkAndApplyCategoryPromotion(itemWithPromo);
     
-    // ✅ Recalcular promo por volumen (después de promo de categoría)
-    itemWithPromo = await checkAndApplyVolumePromotion(itemWithPromo);
+    // ✅ Recalcular MEJOR promo exclusiva: VOLUMEN o N-ÉSIMO (anti-stacking)
+    itemWithPromo = await checkAndApplyBestExclusivePromo(itemWithPromo);
     
     setCart(prev => prev.map((i) => 
       i.storeProduct.id === storeProductId ? itemWithPromo : i
@@ -463,8 +539,9 @@ export default function POSPage() {
     const productPromotion = calculateItemPromotion(item);
     const categoryPromotion = calculateItemCategoryPromo(item);
     const volumePromotion = item.volumePromoDiscount ?? 0;
-    // Base para descuento manual = subtotal - promo producto - promo categoría - promo volumen
-    const subtotalAfterPromos = subtotal - productPromotion - categoryPromotion - volumePromotion;
+    const nthPromotion = item.nthPromoDiscount ?? 0;
+    // Base para descuento manual = subtotal - promo producto - promo categoría - promo volumen - nth promo
+    const subtotalAfterPromos = subtotal - productPromotion - categoryPromotion - volumePromotion - nthPromotion;
     
     if (item.discountType === 'PERCENT') {
       return Math.round((subtotalAfterPromos * item.discountValue) / 100 * 100) / 100;
@@ -478,8 +555,9 @@ export default function POSPage() {
     const productPromotion = calculateItemPromotion(item);
     const categoryPromotion = calculateItemCategoryPromo(item);
     const volumePromotion = item.volumePromoDiscount ?? 0;
+    const nthPromotion = item.nthPromoDiscount ?? 0;
     const manualDiscount = calculateItemDiscount(item);
-    return subtotal - productPromotion - categoryPromotion - volumePromotion - manualDiscount;
+    return subtotal - productPromotion - categoryPromotion - volumePromotion - nthPromotion - manualDiscount;
   };
 
   const getSubtotalBeforeDiscounts = () => {
@@ -496,6 +574,10 @@ export default function POSPage() {
 
   const getTotalVolumePromotions = () => {
     return cart.reduce((sum, item) => sum + (item.volumePromoDiscount ?? 0), 0);
+  };
+
+  const getTotalNthPromotions = () => {
+    return cart.reduce((sum, item) => sum + (item.nthPromoDiscount ?? 0), 0);
   };
 
   const getTotalItemDiscounts = () => {
@@ -1121,6 +1203,21 @@ export default function POSPage() {
                               </div>
                             )}
 
+                            {/* Promoción n-ésimo (Módulo 14.2-C2) */}
+                            {item.nthPromoName && (item.nthPromoDiscount ?? 0) > 0 && (
+                              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded">
+                                <div className="flex justify-between items-center text-xs">
+                                  <div className="flex items-center gap-1 text-yellow-700 font-medium">
+                                    <Tag className="w-3.5 h-3.5" />
+                                    {item.nthPromoQty}° al {item.nthPromoPercent}%: {item.nthPromoName}
+                                  </div>
+                                  <div className="text-yellow-900 font-semibold">
+                                    -S/ {(item.nthPromoDiscount ?? 0).toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* Descuento del ítem */}
                             {item.discountType && item.discountValue ? (
                               <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
@@ -1183,6 +1280,14 @@ export default function POSPage() {
                           <div className="flex justify-between text-sm text-orange-600">
                             <span>Promos Pack</span>
                             <span>-S/ {getTotalVolumePromotions().toFixed(2)}</span>
+                          </div>
+                        )}
+                        
+                        {/* Promociones n-ésimo (Módulo 14.2-C2) */}
+                        {getTotalNthPromotions() > 0 && (
+                          <div className="flex justify-between text-sm text-yellow-600">
+                            <span>Promos N-ésimo</span>
+                            <span>-S/ {getTotalNthPromotions().toFixed(2)}</span>
                           </div>
                         )}
                         

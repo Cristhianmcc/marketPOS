@@ -88,10 +88,20 @@ export async function GET(request: NextRequest) {
         return sum + (item.categoryPromoDiscount ? Number(item.categoryPromoDiscount) : 0);
       }, 0);
 
+      const volumePromotionsTotal = sale.items.reduce((sum, item) => {
+        return sum + (item.volumePromoDiscount ? Number(item.volumePromoDiscount) : 0);
+      }, 0);
+
+      const nthPromotionsTotal = sale.items.reduce((sum, item) => {
+        return sum + (item.nthPromoDiscount ? Number(item.nthPromoDiscount) : 0);
+      }, 0);
+
       return {
         ...sale,
         promotionsTotal,
         categoryPromotionsTotal,
+        volumePromotionsTotal,
+        nthPromotionsTotal,
       };
     });
 

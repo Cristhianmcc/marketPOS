@@ -11,6 +11,8 @@ import {
 } from '@/lib/coupons';
 import { computeCategoryPromoDiscount } from '@/lib/categoryPromotions'; // ✅ Módulo 14.2-B
 import { computeVolumePackDiscount, getActiveVolumePromotion } from '@/lib/volumePromotions'; // ✅ Módulo 14.2-C1
+import { computeNthPromoDiscount, getActiveNthPromotion } from '@/lib/nthPromotions'; // ✅ Módulo 14.2-C2
+import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -170,7 +172,7 @@ async function executeCheckout(
     }));
 
     // 3. Validar y calcular descuentos por ítem (con promociones)
-    // Orden: 1) Promo producto → 2) Promo categoría → 3) Descuento manual
+    // Orden: 1) Promo producto → 2) Promo categoría → 3) Volumen pack → 4) N-ésimo → 5) Descuento manual
     const itemsWithDiscounts = await Promise.all(items.map(async (item) => {
       const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
       const subtotalItem = item.quantity * item.unitPrice;
@@ -202,14 +204,19 @@ async function executeCheckout(
       const categoryPromoType = categoryPromoResult?.promoSnapshot.type ?? null;
       const subtotalAfterCategoryPromo = subtotalAfterProductPromo - categoryPromoDiscount;
       
-      // PASO 3: Aplicar promoción automática por VOLUMEN (Módulo 14.2-C1)
-      // ⚠️ SOLO si NO hay promoción de producto (prioridad: producto > categoría > volumen)
+      // PASO 3 & 4: REGLA ANTI-STACKING (PACK/VOLUMEN vs N-ÉSIMO)
+      // ⚠️ Solo si NO hay promo de producto
+      // Si hay ambas promos elegibles (volumen Y nth), aplicar SOLO la de MAYOR descuento
       let volumePromoDiscount = 0;
       let volumePromoName: string | null = null;
       let volumePromoQty: number | null = null;
+      let nthPromoDiscount = 0;
+      let nthPromoName: string | null = null;
+      let nthPromoQty: number | null = null;
+      let nthPromoPercent: number | null = null;
       
       if (promotionDiscount === 0) {
-        // Solo evaluar promo por volumen si NO hay promo de producto
+        // Calcular AMBAS promos candidatas (sin aplicar aún)
         const volumePromotion = await getActiveVolumePromotion(tx, session.storeId, sp.product.id);
         const volumePromoResult = computeVolumePackDiscount({
           quantity: item.quantity,
@@ -219,14 +226,52 @@ async function executeCheckout(
           unitType: sp.product.unitType,
         });
         
-        volumePromoDiscount = volumePromoResult?.discountAmount ?? 0;
-        volumePromoName = volumePromoResult?.snapshot.volumePromoName ?? null;
-        volumePromoQty = volumePromoResult?.snapshot.volumePromoQty ?? null;
+        const nthPromotion = await getActiveNthPromotion(tx, session.storeId, sp.product.id);
+        const nthPromoResult = computeNthPromoDiscount({
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          baseAfterPreviousPromos: subtotalAfterCategoryPromo, // Evaluar sobre la misma base
+          nthPromotion,
+          unitType: sp.product.unitType,
+        });
+        
+        const volumeDiscount = volumePromoResult?.discountAmount ?? 0;
+        const nthDiscount = nthPromoResult?.discountAmount ?? 0;
+        
+        // REGLA: Aplicar SOLO la de MAYOR descuento (anti-stacking)
+        if (volumeDiscount > 0 && nthDiscount > 0) {
+          // Ambas elegibles → elegir la mayor
+          if (volumeDiscount >= nthDiscount) {
+            // PACK/VOLUMEN gana
+            volumePromoDiscount = volumeDiscount;
+            volumePromoName = volumePromoResult!.snapshot.volumePromoName;
+            volumePromoQty = volumePromoResult!.snapshot.volumePromoQty;
+            // Nth queda en 0 (suprimida)
+          } else {
+            // N-ÉSIMO gana
+            nthPromoDiscount = nthDiscount;
+            nthPromoName = nthPromoResult!.snapshot.nthPromoName;
+            nthPromoQty = nthPromoResult!.snapshot.nthPromoQty;
+            nthPromoPercent = nthPromoResult!.snapshot.nthPromoPercent ? Number(nthPromoResult!.snapshot.nthPromoPercent) : null;
+            // Volumen queda en 0 (suprimida)
+          }
+        } else if (volumeDiscount > 0) {
+          // Solo volumen elegible
+          volumePromoDiscount = volumeDiscount;
+          volumePromoName = volumePromoResult!.snapshot.volumePromoName;
+          volumePromoQty = volumePromoResult!.snapshot.volumePromoQty;
+        } else if (nthDiscount > 0) {
+          // Solo nth elegible
+          nthPromoDiscount = nthDiscount;
+          nthPromoName = nthPromoResult!.snapshot.nthPromoName;
+          nthPromoQty = nthPromoResult!.snapshot.nthPromoQty;
+          nthPromoPercent = nthPromoResult!.snapshot.nthPromoPercent ? Number(nthPromoResult!.snapshot.nthPromoPercent) : null;
+        }
       }
       
-      const subtotalAfterAutoPromos = subtotalAfterCategoryPromo - volumePromoDiscount;
+      const subtotalAfterAutoPromos = subtotalAfterCategoryPromo - volumePromoDiscount - nthPromoDiscount;
       
-      // PASO 4: Aplicar descuento manual (si existe)
+      // PASO 5: Aplicar descuento manual (si existe)
       let discountAmount = 0;
       
       if (item.discountType && item.discountValue !== undefined) {
@@ -239,19 +284,17 @@ async function executeCheckout(
           );
         }
 
+        // Calcular según tipo
         if (item.discountType === 'PERCENT') {
-          // Validar porcentaje válido
           if (item.discountValue <= 0 || item.discountValue > 100) {
             throw new CheckoutError(
-              'INVALID_DISCOUNT',
+              'INVALID_DISCOUNT_PERCENT',
               400,
-              `${sp.product.name}: el descuento porcentual debe estar entre 0 y 100`
+              `${sp.product.name}: descuento porcentual debe estar entre 1 y 100`
             );
           }
-          // Descuento manual se calcula sobre subtotal después de promos automáticas
           discountAmount = Math.round((subtotalAfterAutoPromos * item.discountValue) / 100 * 100) / 100;
         } else if (item.discountType === 'AMOUNT') {
-          // Validar monto válido (sobre subtotal después de promos automáticas)
           if (item.discountValue <= 0 || item.discountValue > subtotalAfterAutoPromos) {
             throw new CheckoutError(
               'DISCOUNT_EXCEEDS_SUBTOTAL',
@@ -261,10 +304,13 @@ async function executeCheckout(
           }
           discountAmount = item.discountValue;
         }
+
+        // Clamp: nunca negativo, nunca mayor al subtotal restante
+        discountAmount = Math.max(0, Math.min(discountAmount, subtotalAfterAutoPromos));
       }
 
-      // PASO 5: Calcular totalLine = subtotal - promo producto - promo categoría - promo volumen - descuento manual
-      const totalLine = subtotalItem - promotionDiscount - categoryPromoDiscount - volumePromoDiscount - discountAmount;
+      // PASO 6: Calcular totalLine = subtotal - promo producto - promo categoría - promo volumen - nth promo - descuento manual
+      const totalLine = subtotalItem - promotionDiscount - categoryPromoDiscount - volumePromoDiscount - nthPromoDiscount - discountAmount;
 
       return {
         ...item,
@@ -279,6 +325,10 @@ async function executeCheckout(
         volumePromoName,
         volumePromoQty,
         volumePromoDiscount,
+        nthPromoName,
+        nthPromoQty,
+        nthPromoPercent,
+        nthPromoDiscount,
         discountAmount,
         totalLine,
       };
@@ -289,38 +339,18 @@ async function executeCheckout(
     const promotionsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.promotionDiscount, 0);
     const categoryPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.categoryPromoDiscount, 0);
     const volumePromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.volumePromoDiscount, 0); // ✅ Módulo 14.2-C1
+    const nthPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.nthPromoDiscount, 0); // ✅ Módulo 14.2-C2
     const itemDiscountsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0);
-    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - categoryPromosTotal - volumePromosTotal - itemDiscountsTotal;
+    const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - categoryPromosTotal - volumePromosTotal - nthPromosTotal - itemDiscountsTotal;
     
     // Tax (usando lógica actual, puede ser 0)
     const tax = 0;
     
     const totalBeforeGlobalDiscount = subtotalAfterItemDiscounts + tax;
     
-    // Validar descuento global
-    const globalDiscount = discountTotal ?? 0;
-    if (globalDiscount < 0) {
-      throw new CheckoutError(
-        'INVALID_DISCOUNT',
-        400,
-        'El descuento global no puede ser negativo'
-      );
-    }
-    if (globalDiscount > totalBeforeGlobalDiscount) {
-      throw new CheckoutError(
-        'DISCOUNT_EXCEEDS_TOTAL',
-        409,
-        `El descuento global no puede ser mayor al total (S/ ${totalBeforeGlobalDiscount.toFixed(2)})`
-      );
-    }
-    
-    // Total después de descuento global (ANTES de cupón)
-    const totalBeforeCoupon = totalBeforeGlobalDiscount - globalDiscount;
-    
-    // Total de descuentos (ítems + global) para guardar en discountTotal
-    const totalDiscounts = itemDiscountsTotal + globalDiscount;
-
     // ✅ 4.5. CUPÓN (Módulo 14.2-A)
+    // IMPORTANTE: El cupón se valida ANTES del descuento global
+    // para evitar que el descuento global invalide un cupón ya aplicado
     let couponDiscount = 0;
     let couponSnapshot: {
       couponCode: string;
@@ -367,11 +397,11 @@ async function executeCheckout(
       // Hora actual Lima (UTC-5)
       const nowLocalLima = new Date(Date.now() - 5 * 60 * 60 * 1000);
 
-      // Validar y calcular descuento
+      // Validar y calcular descuento sobre el total ANTES del descuento global
       try {
         const result = validateAndComputeCouponDiscount(
           coupon,
-          totalBeforeCoupon,
+          totalBeforeGlobalDiscount, // ✅ Validar sobre total ANTES de descuento global
           nowLocalLima
         );
 
@@ -417,8 +447,32 @@ async function executeCheckout(
       }
     }
 
-    // Total FINAL (después de cupón)
-    const total = totalBeforeCoupon - couponDiscount;
+    // 4.6. Validar y aplicar descuento global (DESPUÉS de cupón)
+    const globalDiscount = discountTotal ?? 0;
+    if (globalDiscount < 0) {
+      throw new CheckoutError(
+        'INVALID_DISCOUNT',
+        400,
+        'El descuento global no puede ser negativo'
+      );
+    }
+    
+    // El descuento global se aplica sobre el subtotal después de cupón
+    const totalAfterCoupon = totalBeforeGlobalDiscount - couponDiscount;
+    
+    if (globalDiscount > totalAfterCoupon) {
+      throw new CheckoutError(
+        'DISCOUNT_EXCEEDS_TOTAL',
+        409,
+        `El descuento global no puede ser mayor al total (S/ ${totalAfterCoupon.toFixed(2)})`
+      );
+    }
+    
+    // Total de descuentos (ítems + global) para guardar en discountTotal
+    const totalDiscounts = itemDiscountsTotal + globalDiscount;
+
+    // Total FINAL (después de cupón y descuento global)
+    const total = totalAfterCoupon - globalDiscount;
 
     // 5. Validar y calcular changeAmount si es efectivo
     let changeAmount: number | null = null;
@@ -430,8 +484,10 @@ async function executeCheckout(
       
       // 🔍 DEBUG: Log de valores para debug
       console.log('💰 CASH Payment Validation:', {
-        totalBeforeCoupon: totalBeforeCoupon.toFixed(2),
+        totalBeforeGlobalDiscount: totalBeforeGlobalDiscount.toFixed(2),
         couponDiscount: couponDiscount.toFixed(2),
+        totalAfterCoupon: totalAfterCoupon.toFixed(2),
+        globalDiscount: globalDiscount.toFixed(2),
         totalCalculated: total.toFixed(4),
         totalRounded: totalRounded.toFixed(2),
         amountPaid: amountPaid.toFixed(2),
@@ -488,7 +544,7 @@ async function executeCheckout(
       discountTotal: new Prisma.Decimal(totalDiscounts),
       totalBeforeDiscount: new Prisma.Decimal(totalBeforeGlobalDiscount),
       // ✅ Cupón (Módulo 14.2-A)
-      totalBeforeCoupon: new Prisma.Decimal(totalBeforeCoupon),
+      totalBeforeCoupon: new Prisma.Decimal(totalBeforeGlobalDiscount),
       couponCode: couponSnapshot?.couponCode ?? null,
       couponType: couponSnapshot?.couponType ?? null,
       couponValue: couponSnapshot?.couponValue ? new Prisma.Decimal(couponSnapshot.couponValue) : null,
@@ -538,6 +594,11 @@ async function executeCheckout(
             volumePromoName: item.volumePromoName,
             volumePromoQty: item.volumePromoQty,
             volumePromoDiscount: new Prisma.Decimal(item.volumePromoDiscount),
+            // Promociones n-ésimo (Módulo 14.2-C2)
+            nthPromoName: item.nthPromoName,
+            nthPromoQty: item.nthPromoQty,
+            nthPromoPercent: item.nthPromoPercent !== null ? new Prisma.Decimal(item.nthPromoPercent) : null,
+            nthPromoDiscount: new Prisma.Decimal(item.nthPromoDiscount),
             // Descuentos manuales (Módulo 14)
             discountType: item.discountType ?? null,
             discountValue: item.discountValue !== undefined ? new Prisma.Decimal(item.discountValue) : null,
@@ -760,6 +821,51 @@ export async function POST(req: NextRequest) {
       throw new Error('Checkout failed after retries');
     }
 
+    // ✅ MÓDULO 15: Auditoría de checkout exitoso (fire-and-forget)
+    const { ip, userAgent } = getRequestMetadata(req);
+    logAudit({
+      storeId: session.storeId,
+      userId: session.userId,
+      action: 'SALE_CHECKOUT_SUCCESS',
+      entityType: 'SALE',
+      entityId: result.sale.id,
+      severity: 'INFO',
+      meta: {
+        saleNumber: result.sale.saleNumber,
+        total: result.sale.total.toNumber(),
+        paymentMethod: result.sale.paymentMethod,
+        hasPromotion: result.saleItems.some(i => i.promotionDiscount > 0),
+        hasCoupon: !!result.sale.couponCode,
+      },
+      ip,
+      userAgent,
+    }).catch(err => {
+      // Silently fail - no afectar la respuesta
+      console.error('[AuditLog] Failed to log SALE_CHECKOUT_SUCCESS:', err);
+    });
+
+    // ✅ MÓDULO 15: Si es FIADO, log adicional de receivable creado (fire-and-forget)
+    if (result.receivable) {
+      logAudit({
+        storeId: session.storeId,
+        userId: session.userId,
+        action: 'RECEIVABLE_CREATED',
+        entityType: 'RECEIVABLE',
+        entityId: result.receivable.id,
+        severity: 'INFO',
+        meta: {
+          saleNumber: result.sale.saleNumber,
+          customerId: result.receivable.customerId,
+          amount: result.receivable.originalAmount.toNumber(),
+          balance: result.receivable.balance.toNumber(),
+        },
+        ip,
+        userAgent,
+      }).catch(err => {
+        console.error('[AuditLog] Failed to log RECEIVABLE_CREATED:', err);
+      });
+    }
+
     return NextResponse.json(
       {
         success: true,
@@ -772,6 +878,32 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('Checkout error:', error);
+
+    // ✅ MÓDULO 15: Auditoría de checkout fallido (fire-and-forget)
+    try {
+      const { ip, userAgent } = getRequestMetadata(req);
+      const sessionData = await getSession();
+      const errorStage = error instanceof CheckoutError ? 'validation' : 
+                         error.code === 'P2002' ? 'transaction' : 'unknown';
+      
+      logAudit({
+        storeId: sessionData?.storeId,
+        userId: sessionData?.userId,
+        action: 'SALE_CHECKOUT_FAILED',
+        entityType: 'SALE',
+        entityId: null,
+        severity: 'ERROR',
+        meta: {
+          errorCode: error.code || error.name || 'UNKNOWN',
+          message: error.message,
+          stage: errorStage,
+        },
+        ip,
+        userAgent,
+      }).catch(auditErr => {
+        console.error('[AuditLog] Failed to log SALE_CHECKOUT_FAILED:', auditErr);
+      });
+    } catch {}
 
     // Errores personalizados
     if (error instanceof CheckoutError) {

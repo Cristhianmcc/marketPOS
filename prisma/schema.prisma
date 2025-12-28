@@ -67,6 +67,10 @@ enum VolumePromoType {
   FIXED_PRICE
 }
 
+enum NthPromoType {
+  NTH_PERCENT   // 2do al 50%, 3ro al 100%, etc.
+}
+
 //// MODELS
 
 model Store {
@@ -92,6 +96,8 @@ model Store {
   coupons            Coupon[] // ✅ Cupones de la tienda
   categoryPromotions CategoryPromotion[] // ✅ Promociones por categoría (14.2-B)
   volumePromotions   VolumePromotion[] // ✅ Promociones por volumen (14.2-C1)
+  nthPromotions      NthPromotion[] // ✅ Promociones n-ésimo con descuento (14.2-C2)
+  auditLogs          AuditLog[] // ✅ MÓDULO 15: Auditoría
 
   @@map("stores")
 }
@@ -122,6 +128,9 @@ model User {
   // Receivables created
   receivablesCreated Receivable[]        @relation("ReceivableCreatedBy")
   receivablePayments ReceivablePayment[] @relation("PaymentCreatedBy")
+  
+  // MÓDULO 15: Auditoría
+  auditLogs AuditLog[]
 
   @@index([storeId])
   @@map("users")
@@ -143,6 +152,7 @@ model ProductMaster {
 
   storeProducts StoreProduct[]
   promotions    Promotion[] // ✅ Promociones del producto
+  nthPromotions NthPromotion[] // ✅ Promociones n-ésimo con descuento del producto
   volumePromotions VolumePromotion[] // ✅ Promociones por volumen del producto
 
   @@index([barcode])
@@ -293,7 +303,13 @@ model SaleItem {
   volumePromoName     String? @map("volume_promo_name")
   volumePromoQty      Int?    @map("volume_promo_qty")
   volumePromoDiscount Decimal @default(0) @map("volume_promo_discount") @db.Decimal(10, 2)
+// Promociones N-ésimo con Descuento (Módulo 14.2-C2) - Snapshot
+  nthPromoName     String?  @map("nth_promo_name")
+  nthPromoQty      Int?     @map("nth_promo_qty")
+  nthPromoPercent  Decimal? @map("nth_promo_percent") @db.Decimal(5, 2)
+  nthPromoDiscount Decimal  @default(0) @map("nth_promo_discount") @db.Decimal(10, 2)
 
+  
   sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
 
@@ -522,3 +538,75 @@ model VolumePromotion {
   @@map("volume_promotions")
 }
 
+// Promociones N-ésimo con Descuento (Módulo 14.2-C2)
+model NthPromotion {
+  id          String       @id @default(cuid())
+  storeId     String       @map("store_id")
+  name        String
+  productId   String       @map("product_id")
+  
+  type        NthPromoType
+  nthQty      Int          @map("nth_qty") // N (2 = segundo, 3 = tercero)
+  percentOff  Decimal      @map("percent_off") @db.Decimal(5, 2) // 50.00, 100.00, etc.
+  
+  startsAt    DateTime?    @map("starts_at")
+  endsAt      DateTime?    @map("ends_at")
+  active      Boolean      @default(true)
+  
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  
+  store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product ProductMaster @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@index([storeId, active])
+  @@index([storeId, productId])
+  @@map("nth_promotions")
+}
+
+//// MÓDULO 15 — AUDITORÍA
+
+enum AuditSeverity {
+  INFO
+  WARN
+  ERROR
+}
+
+enum AuditEntityType {
+  SALE
+  SHIFT
+  COUPON
+  PROMOTION
+  STORE
+  CUSTOMER
+  RECEIVABLE
+  USER
+  PRODUCT
+  RESTORE
+}
+
+model AuditLog {
+  id         String           @id @default(cuid())
+  createdAt  DateTime         @default(now()) @map("created_at")
+  
+  storeId    String?          @map("store_id") // nullable para acciones SUPERADMIN globales
+  userId     String?          @map("user_id") // nullable si es sistema
+  
+  action     String // SALE_CHECKOUT_SUCCESS, SHIFT_OPENED, etc.
+  entityType AuditEntityType  @map("entity_type")
+  entityId   String?          @map("entity_id") // nullable
+  severity   AuditSeverity    @default(INFO)
+  
+  meta       Json? // Datos adicionales sin info sensible
+  ip         String? // IP del request
+  userAgent  String?          @map("user_agent") // User-Agent del request
+  
+  store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([storeId, createdAt])
+  @@index([action])
+  @@index([severity])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

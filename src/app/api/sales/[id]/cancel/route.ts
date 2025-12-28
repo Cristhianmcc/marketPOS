@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
+import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 
 export async function POST(
   request: NextRequest,
@@ -124,14 +125,22 @@ export async function POST(
       }
 
       // 3. Si es venta FIADO, cancelar receivable
+      let cancelledReceivable = null;
       if (sale.paymentMethod === 'FIADO') {
-        await tx.receivable.updateMany({
+        const receivableResult = await tx.receivable.updateMany({
           where: { saleId },
           data: {
             status: 'CANCELLED',
             balance: 0,
           },
         });
+        
+        // Obtener receivable para auditoría
+        if (receivableResult.count > 0) {
+          cancelledReceivable = await tx.receivable.findFirst({
+            where: { saleId },
+          });
+        }
       }
 
       // 3. Por cada item: revertir stock + crear movement inverso
@@ -165,6 +174,54 @@ export async function POST(
       return cancelledSale;
     });
 
+    // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
+    const { ip, userAgent } = getRequestMetadata(request);
+    logAudit({
+      storeId: session.storeId,
+      userId: session.userId,
+      action: 'SALE_CANCELLED',
+      entityType: 'SALE',
+      entityId: result.id,
+      severity: 'WARN',
+      meta: {
+        saleNumber: sale.saleNumber,
+        cancelledBy: session.userId,
+        originalTotal: sale.total,
+        wasFiado: sale.paymentMethod === 'FIADO',
+        hadCoupon: !!sale.couponCode,
+        itemsCount: sale.items.length,
+      },
+      ip,
+      userAgent,
+    }).catch(e => console.error('Audit log failed (non-blocking):', e));
+
+    // ✅ MÓDULO 15: Si era FIADO, log adicional de receivable cancelado (fire-and-forget)
+    if (sale.paymentMethod === 'FIADO') {
+      const cancelledReceivable = await prisma.receivable.findFirst({
+        where: { saleId },
+      });
+      
+      if (cancelledReceivable) {
+        logAudit({
+          storeId: session.storeId,
+          userId: session.userId,
+          action: 'RECEIVABLE_CANCELLED',
+          entityType: 'RECEIVABLE',
+          entityId: cancelledReceivable.id,
+          severity: 'WARN',
+          meta: {
+            saleNumber: sale.saleNumber,
+            customerId: cancelledReceivable.customerId,
+            originalAmount: cancelledReceivable.originalAmount.toNumber(),
+            wasBalance: cancelledReceivable.balance.toNumber(),
+            reason: 'Sale cancelled',
+          },
+          ip,
+          userAgent,
+        }).catch(e => console.error('Audit log failed (non-blocking):', e));
+      }
+    }
+
     return NextResponse.json({
       success: true,
       saleId: result.id,
@@ -172,6 +229,28 @@ export async function POST(
     });
   } catch (error) {
     console.error('Error cancelling sale:', error);
+    
+    // ✅ MÓDULO 15: Log de fallo (fire-and-forget)
+    try {
+      const { id: errorSaleId } = await params;
+      const { ip, userAgent } = getRequestMetadata(request);
+      const sessionData = await getSession();
+      
+      logAudit({
+        storeId: sessionData?.storeId,
+        userId: sessionData?.userId,
+        action: 'SALE_CANCEL_FAILED',
+        entityType: 'SALE',
+        entityId: errorSaleId,
+        severity: 'ERROR',
+        meta: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        ip,
+        userAgent,
+      }).catch(e => console.error('Audit log failed (non-blocking):', e));
+    } catch {}
+    
     return NextResponse.json(
       { code: 'INTERNAL_ERROR', message: 'Error al anular venta' },
       { status: 500 }

@@ -24,6 +24,7 @@ interface SummaryData {
     totalCoupons: number; // ✅ Cupones (Módulo 14.2-A)
     totalCategoryPromotions: number; // ✅ Promos Categoría (Módulo 14.2-B)
     totalVolumePromotions: number; // ✅ Promos Volumen (Módulo 14.2-C1)
+    totalNthPromotions: number; // ✅ Promos N-ésimo (Módulo 14.2-C2)
     ticketCount: number;
     averageTicket: number;
     totalFiado: number;
@@ -366,6 +367,19 @@ export default function ReportsPage() {
                   </div>
                   <p className="text-3xl font-bold text-orange-900">
                     -{formatMoney(summaryData.summary.totalVolumePromotions || 0)}
+                  </p>
+                </div>
+
+                {/* ✅ Promos N-ésimo (Módulo 14.2-C2) */}
+                <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-yellow-700">
+                      Promos N-ésimo
+                    </h3>
+                    <Tag className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <p className="text-3xl font-bold text-yellow-900">
+                    -{formatMoney(summaryData.summary.totalNthPromotions || 0)}
                   </p>
                 </div>
 

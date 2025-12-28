@@ -81,6 +81,10 @@ export async function GET(request: NextRequest) {
       'Vol Promo Nombre', // ✅ Módulo 14.2-C1
       'Vol Promo Qty',
       'Vol Promo Monto',
+      'Nth Promo Nombre', // ✅ Módulo 14.2-C2
+      'Nth Promo N',
+      'Nth Promo %',
+      'Nth Promo Monto',
       'Desc. Tipo',
       'Desc. Valor',
       'Desc. Monto',
@@ -123,6 +127,11 @@ export async function GET(request: NextRequest) {
         escapeCSV(item.volumePromoName || '-'),
         escapeCSV(item.volumePromoQty !== null ? item.volumePromoQty.toString() : '-'),
         escapeCSV(Number(item.volumePromoDiscount || 0).toFixed(2)),
+        // ✅ Promoción n-ésimo (Módulo 14.2-C2)
+        escapeCSV(item.nthPromoName || '-'),
+        escapeCSV(item.nthPromoQty !== null ? item.nthPromoQty.toString() : '-'),
+        escapeCSV(item.nthPromoPercent !== null ? Number(item.nthPromoPercent).toFixed(2) : '-'),
+        escapeCSV(Number(item.nthPromoDiscount || 0).toFixed(2)),
         escapeCSV(discountTypeLabel),
         escapeCSV(discountValueLabel),
         escapeCSV(Number(item.discountAmount).toFixed(2)),

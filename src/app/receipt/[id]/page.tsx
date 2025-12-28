@@ -24,6 +24,11 @@ interface SaleItem {
   volumePromoName: string | null;
   volumePromoQty: number | null;
   volumePromoDiscount: number;
+  // Promociones n-ésimo (Módulo 14.2-C2)
+  nthPromoName: string | null;
+  nthPromoQty: number | null;
+  nthPromoPercent: number | null;
+  nthPromoDiscount: number;
   discountType: 'PERCENT' | 'AMOUNT' | null;
   discountValue: number | null;
   discountAmount: number;
@@ -272,12 +277,21 @@ export default function ReceiptPage() {
                     <span>-{formatMoney(item.volumePromoDiscount)}</span>
                   </div>
                 )}
+                {/* Promoción n-ésimo (Módulo 14.2-C2) */}
+                {item.nthPromoDiscount > 0 && item.nthPromoName && (
+                  <div className="item-discount">
+                    <span>
+                      {item.nthPromoQty}° al {item.nthPromoPercent}%: {item.nthPromoName}
+                    </span>
+                    <span>-{formatMoney(item.nthPromoDiscount)}</span>
+                  </div>
+                )}
                 {/* Descuento del ítem */}
                 {item.discountAmount > 0 && (
                   <>
                     <div className="item-discount">
                       <span>
-                        Desc: {item.discountType === 'PERCENT' 
+                        Desc: {item.discountType === 'PERCENT'
                           ? `${item.discountValue}%` 
                           : formatMoney(item.discountValue!)}
                       </span>
@@ -286,7 +300,7 @@ export default function ReceiptPage() {
                   </>
                 )}
                 {/* Total línea si hay promoción o descuento */}
-                {(item.promotionDiscount > 0 || item.categoryPromoDiscount > 0 || item.volumePromoDiscount > 0 || item.discountAmount > 0) && (
+                {(item.promotionDiscount > 0 || item.categoryPromoDiscount > 0 || item.volumePromoDiscount > 0 || item.nthPromoDiscount > 0 || item.discountAmount > 0) && (
                   <div className="item-total">
                     <span>Total línea:</span>
                     <span>{formatMoney(item.totalLine)}</span>

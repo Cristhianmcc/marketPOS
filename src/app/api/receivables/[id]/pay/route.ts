@@ -6,6 +6,7 @@ import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { Prisma } from '@prisma/client';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
+import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -121,6 +122,28 @@ export async function POST(
       return { payment, updatedReceivable, receivable };
     });
 
+    // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
+    const { ip, userAgent } = getRequestMetadata(request);
+    logAudit({
+      storeId: session.storeId,
+      userId: session.userId,
+      action: 'RECEIVABLE_PAID',
+      entityType: 'RECEIVABLE',
+      entityId: result.updatedReceivable.id,
+      severity: result.updatedReceivable.status === 'PAID' ? 'INFO' : 'WARN',
+      meta: {
+        customerId: result.receivable.customerId,
+        customerName: result.receivable.customer.name,
+        saleNumber: result.receivable.sale.saleNumber,
+        paymentAmount: amount,
+        paymentMethod: method,
+        remainingBalance: Number(result.updatedReceivable.balance),
+        isPaidInFull: result.updatedReceivable.status === 'PAID',
+      },
+      ip,
+      userAgent,
+    }).catch(e => console.error('Audit log failed (non-blocking):', e));
+
     return NextResponse.json({
       success: true,
       payment: {
@@ -139,6 +162,28 @@ export async function POST(
     });
   } catch (error: any) {
     console.error('Error processing payment:', error);
+
+    // ✅ MÓDULO 15: Log de fallo (fire-and-forget)
+    try {
+      const { id: receivableId } = await params;
+      const { ip, userAgent } = getRequestMetadata(request);
+      const sessionData = await getSession();
+      
+      logAudit({
+        storeId: sessionData?.storeId,
+        userId: sessionData?.userId,
+        action: 'RECEIVABLE_PAYMENT_FAILED',
+        entityType: 'RECEIVABLE',
+        entityId: receivableId,
+        severity: 'ERROR',
+        meta: {
+          error: error.message || 'Unknown error',
+          errorCode: ['RECEIVABLE_NOT_FOUND', 'RECEIVABLE_CANCELLED', 'RECEIVABLE_ALREADY_PAID', 'OVERPAYMENT'].includes(error.message) ? error.message : 'INTERNAL_ERROR',
+        },
+        ip,
+        userAgent,
+      }).catch(e => console.error('Audit log failed (non-blocking):', e));
+    } catch {}
 
     // Errores específicos
     if (error.message === 'RECEIVABLE_NOT_FOUND') {
