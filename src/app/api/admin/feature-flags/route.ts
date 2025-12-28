@@ -93,15 +93,22 @@ export async function PUT(request: NextRequest) {
 
     const isSuper = isSuperAdmin(session.email);
 
-    // Si no hay storeId y es OWNER, usar su tienda
-    if (!storeId && !isSuper) {
+    // Si no hay storeId en el body, usar el de la sesión
+    if (!storeId) {
       storeId = session.storeId;
     }
 
     // Validaciones
-    if (!storeId || !key || typeof enabled !== 'boolean') {
+    if (!storeId) {
       return NextResponse.json(
-        { code: 'INVALID_INPUT', message: 'storeId, key y enabled son requeridos' },
+        { code: 'INVALID_STORE', message: 'storeId no disponible en la sesión' },
+        { status: 400 }
+      );
+    }
+
+    if (!key || typeof enabled !== 'boolean') {
+      return NextResponse.json(
+        { code: 'INVALID_INPUT', message: 'key y enabled son requeridos' },
         { status: 400 }
       );
     }
