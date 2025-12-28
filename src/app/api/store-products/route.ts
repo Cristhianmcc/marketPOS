@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    console.log('Store-products POST body:', body);
     
     const validation = ConfigureStoreProductSchema.safeParse(body);
 
