@@ -3,12 +3,23 @@ import type { NextRequest } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { SessionData } from './lib/session';
 import { prisma } from './infra/db/prisma';
+import { getStoreOperationalStatus } from './lib/subscriptionStatus';
 
 const protectedRoutes = ['/pos', '/inventory', '/admin', '/settings'];
 const authRoutes = ['/login'];
 
 // Rutas que se bloquean si la tienda está ARCHIVED
-const operationalRoutes = ['/pos', '/inventory', '/sales', '/shifts', '/customers', '/receivables'];
+const operationalRoutes = ['/pos', '/inventory', '/sales', '/shifts', '/customers', '/receivables', '/promotions', '/coupons'];
+
+// Rutas que SIEMPRE están permitidas aunque esté bloqueada por billing
+const alwaysAllowedRoutes = [
+  '/settings/billing',
+  '/settings/backups',
+  '/billing-blocked',
+  '/store-archived',
+  '/login',
+  '/admin',
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -60,6 +71,26 @@ export async function middleware(request: NextRequest) {
     } catch (error) {
       console.error('Error checking store status:', error);
       // Continue on error to avoid blocking legitimate access
+    }
+  }
+
+  // MÓDULO 16: Check billing/subscription status
+  // Bloquear operaciones si la suscripción está SUSPENDED o CANCELLED
+  const isAllowedRoute = alwaysAllowedRoutes.some((route) => pathname.startsWith(route));
+  
+  if (isLoggedIn && isOperationalRoute && !isAllowedRoute && session.storeId && session.role !== 'SUPERADMIN') {
+    try {
+      const billingStatus = await getStoreOperationalStatus(session.storeId);
+      
+      if (!billingStatus.canOperate) {
+        // Redirigir a página de bloqueo por billing
+        const blockedUrl = new URL('/billing-blocked', request.url);
+        blockedUrl.searchParams.set('reason', billingStatus.blockingReason || 'UNKNOWN');
+        return NextResponse.redirect(blockedUrl);
+      }
+    } catch (error) {
+      console.error('Error checking billing status:', error);
+      // En caso de error, permitir acceso para no bloquear operaciones críticas
     }
   }
 

@@ -71,6 +71,21 @@ enum NthPromoType {
   NTH_PERCENT   // 2do al 50%, 3ro al 100%, etc.
 }
 
+enum PlanCode {
+  DEMO
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
 //// MODELS
 
 model Store {
@@ -100,6 +115,8 @@ model Store {
   auditLogs          AuditLog[] // ✅ MÓDULO 15: Auditoría
   featureFlags       FeatureFlag[] // ✅ MÓDULO 15: Feature Flags (Fase 2)
   operationalLimit   OperationalLimit? // ✅ MÓDULO 15: Límites Operativos (Fase 3)
+  subscription       Subscription? // ✅ MÓDULO 16: Licencia y Suscripción
+  payments           Payment[] // ✅ MÓDULO 16: Historial de pagos
 
   @@map("stores")
 }
@@ -586,6 +603,8 @@ enum AuditEntityType {
   PRODUCT
   RESTORE
   SYSTEM
+  SUBSCRIPTION  // MÓDULO 16
+  PAYMENT       // MÓDULO 16
 }
 
 model AuditLog {
@@ -664,4 +683,69 @@ model OperationalLimit {
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
   
   @@map("operational_limits")
+}
+
+//// MÓDULO 16 — LICENCIAS + SUSCRIPCIONES (SaaS)
+
+model Subscription {
+  id        String              @id @default(cuid())
+  storeId   String              @unique @map("store_id")
+  
+  // Plan y estado
+  planCode  PlanCode            @map("plan_code")
+  status    SubscriptionStatus  @default(TRIAL)
+  
+  // Fechas críticas
+  startAt             DateTime  @default(now()) @map("start_at")
+  trialEndsAt         DateTime? @map("trial_ends_at")
+  currentPeriodStart  DateTime  @map("current_period_start")
+  currentPeriodEnd    DateTime  @map("current_period_end")
+  graceEndsAt         DateTime? @map("grace_ends_at")
+  suspendedAt         DateTime? @map("suspended_at")
+  cancelledAt         DateTime? @map("cancelled_at")
+  
+  // Precio congelado para esta tienda
+  priceAmount   Decimal @map("price_amount") @db.Decimal(10, 2)
+  priceCurrency String  @default("PEN") @map("price_currency")
+  billingCycle  String  @default("MONTHLY") @map("billing_cycle") // MONTHLY | YEARLY
+  
+  // Notas internas (soporte)
+  notes String?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  payments Payment[]
+  
+  @@index([storeId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id             String   @id @default(cuid())
+  storeId        String   @map("store_id")
+  subscriptionId String   @map("subscription_id")
+  
+  // Monto del pago
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("PEN")
+  
+  // Registro del pago
+  paidAt    DateTime @map("paid_at")
+  method    String // YAPE | PLIN | TRANSFER | CARD | etc
+  reference String? // Número de operación
+  status    String  @default("CONFIRMED") // CONFIRMED | REJECTED | PENDING
+  
+  // Auditoría: quién registró el pago
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  
+  @@index([storeId])
+  @@index([subscriptionId])
+  @@map("payments")
 }

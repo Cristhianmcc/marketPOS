@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(ownerPassword, 10);
 
-    // Crear Store + Settings + Owner en transacción
+    // Crear Store + Settings + Owner en transacción (SIN suscripción automática)
     const result = await prisma.$transaction(async (tx) => {
       // 1. Crear Store
       const store = await tx.store.create({
@@ -137,6 +137,9 @@ export async function POST(request: NextRequest) {
           active: true,
         },
       });
+
+      // NOTA: NO se crea suscripción automáticamente.
+      // El SUPERADMIN decide si asignar DEMO (y por cuánto tiempo) o un plan pagado.
 
       return { store, owner };
     });

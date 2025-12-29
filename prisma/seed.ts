@@ -211,6 +211,9 @@ async function main() {
   });
   console.log('✅ Store settings created');
 
+  // NOTA: NO se crea suscripción automáticamente en seed.
+  // Para desarrollo/testing, asigna planes manualmente desde /admin/billing
+
   console.log('🎉 Seed completed successfully!');
 }
 

@@ -76,3 +76,21 @@ export async function getCurrentUser(): Promise<SessionData | null> {
     isLoggedIn: session.isLoggedIn,
   };
 }
+
+/**
+ * Get session or throw error if not authenticated (MÓDULO 16)
+ */
+export async function getSessionOrThrow(): Promise<SessionData> {
+  const session = await getSession();
+  if (!session.isLoggedIn) {
+    throw new Error('UNAUTHORIZED');
+  }
+  return {
+    userId: session.userId,
+    storeId: session.storeId,
+    email: session.email,
+    name: session.name,
+    role: session.role,
+    isLoggedIn: session.isLoggedIn,
+  };
+}

@@ -152,13 +152,23 @@ export default async function HomePage() {
 
           {/* SuperAdmin */}
           {isSuperAdminUser && (
-            <Link
-              href="/admin/stores"
-              className="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 hover:border-purple-300 transition-colors"
-            >
-              <h2 className="text-xl font-bold text-purple-900 mb-2">🏪 Tiendas</h2>
-              <p className="text-purple-700">Administrar tiendas (SuperAdmin)</p>
-            </Link>
+            <>
+              <Link
+                href="/admin/stores"
+                className="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 hover:border-purple-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-purple-900 mb-2">🏪 Tiendas</h2>
+                <p className="text-purple-700">Administrar tiendas (SuperAdmin)</p>
+              </Link>
+
+              <Link
+                href="/admin/billing"
+                className="bg-emerald-50 border-2 border-emerald-200 rounded-lg p-6 hover:border-emerald-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-emerald-900 mb-2">💳 Licencias SaaS</h2>
+                <p className="text-emerald-700">Gestionar suscripciones y pagos</p>
+              </Link>
+            </>
           )}
         </div>
 

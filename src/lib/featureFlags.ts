@@ -162,3 +162,73 @@ export async function setFeatureFlag(
 export function clearFlagCache() {
   flagCache.clear();
 }
+
+/**
+ * ✅ MÓDULO 16: Sincroniza los feature flags de una tienda según su plan de suscripción
+ * Esta función lee las capacidades del plan actual y actualiza TODOS los feature flags
+ * para que coincidan con lo que el plan permite.
+ * 
+ * @param storeId - ID de la tienda
+ * @returns Array de flags actualizados
+ * 
+ * Casos de uso:
+ * - Al crear una suscripción DEMO → Activa TODAS las features
+ * - Al cambiar de STARTER → PRO → Activa promociones, fiado, cupones
+ * - Al cambiar de PRO → STARTER → Desactiva features avanzadas
+ * - Al expirar trial → Mantiene features del plan pagado elegido
+ */
+export async function syncFeatureFlagsFromPlan(storeId: string) {
+  try {
+    // 1. Obtener suscripción actual de la tienda
+    const subscription = await prisma.subscription.findUnique({
+      where: { storeId },
+      select: { planCode: true },
+    });
+
+    if (!subscription) {
+      console.warn(`[FeatureFlags] No subscription found for store ${storeId}, skipping sync`);
+      return [];
+    }
+
+    const { planCode } = subscription;
+    
+    // 2. Importar capacidades del plan (evita imports circulares)
+    const { PLAN_CAPABILITIES } = await import('./planCapabilities');
+    const planCapabilities = PLAN_CAPABILITIES[planCode];
+
+    if (!planCapabilities) {
+      console.error(`[FeatureFlags] Unknown plan code: ${planCode}`);
+      return [];
+    }
+
+    // 3. Mapear feature flags a las keys de FeatureFlagKey enum
+    // Solo incluimos los flags que existen en el enum de Prisma
+    const featureFlagMapping: Partial<Record<string, FeatureFlagKey>> = {
+      'ALLOW_FIADO': FeatureFlagKey.ALLOW_FIADO,
+      'ALLOW_COUPONS': FeatureFlagKey.ALLOW_COUPONS,
+      'ENABLE_PROMOTIONS': FeatureFlagKey.ENABLE_PROMOTIONS,
+      'ENABLE_CATEGORY_PROMOS': FeatureFlagKey.ENABLE_CATEGORY_PROMOS,
+      'ENABLE_VOLUME_PROMOS': FeatureFlagKey.ENABLE_VOLUME_PROMOS,
+      'ENABLE_NTH_PROMOS': FeatureFlagKey.ENABLE_NTH_PROMOS,
+      // ENABLE_ADVANCED_REPORTS y ENABLE_MULTI_BRANCH no están en el enum (futuro)
+    };
+
+    // 4. Actualizar cada feature flag según el plan
+    const updatedFlags = [];
+    for (const [capabilityKey, flagKey] of Object.entries(featureFlagMapping)) {
+      if (!flagKey) continue; // Skip undefined flags
+      
+      const shouldBeEnabled = planCapabilities[capabilityKey] ?? false;
+      
+      const flag = await setFeatureFlag(storeId, flagKey, shouldBeEnabled);
+      updatedFlags.push(flag);
+    }
+
+    console.log(`[FeatureFlags] ✅ Synced ${updatedFlags.length} flags for store ${storeId} with plan ${planCode}`);
+    return updatedFlags;
+
+  } catch (error) {
+    console.error(`[FeatureFlags] Error syncing flags for store ${storeId}:`, error);
+    throw error;
+  }
+}
