@@ -10,7 +10,7 @@ import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { storeId: string } }
+  { params }: { params: Promise<{ storeId: string }> }
 ) {
   try {
     const session = await getSessionOrThrow();
@@ -20,7 +20,7 @@ export async function POST(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const storeId = params.storeId;
+    const { storeId } = await params;
     const body = await request.json();
 
     const {
@@ -132,7 +132,7 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { storeId: string } }
+  { params }: { params: Promise<{ storeId: string }> }
 ) {
   try {
     const session = await getSessionOrThrow();
@@ -142,7 +142,7 @@ export async function GET(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const storeId = params.storeId;
+    const { storeId } = await params;
 
     const payments = await prisma.payment.findMany({
       where: { storeId },

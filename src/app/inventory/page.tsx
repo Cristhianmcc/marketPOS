@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
+import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import { Plus, Search, Edit, TrendingUp, Power } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
 import { EditPriceModal } from '@/components/inventory/EditPriceModal';
@@ -119,6 +120,7 @@ export default function InventoryPage() {
 
   return (
     <AuthLayout storeName="Inventario">
+      <OnboardingBanner />
       <Toaster position="top-right" richColors />
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto">

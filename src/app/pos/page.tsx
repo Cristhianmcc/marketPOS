@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, Tag, Package as PackageIcon, Clock, Milk } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
+import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import { toast, Toaster } from 'sonner';
 import { formatMoney } from '@/lib/money';
 import { Shift } from '@/domain/types';
@@ -991,6 +992,7 @@ export default function POSPage() {
 
   return (
     <AuthLayout storeName="Punto de Venta">
+      <OnboardingBanner />
       <Toaster position="top-right" richColors />
       {/* Botón flotante para SUPERADMIN */}
       {isSuperAdmin && (

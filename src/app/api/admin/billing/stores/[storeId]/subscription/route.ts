@@ -11,7 +11,7 @@ import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { storeId: string } }
+  { params }: { params: Promise<{ storeId: string }> }
 ) {
   try {
     const session = await getSessionOrThrow();
@@ -21,7 +21,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const storeId = params.storeId;
+    const { storeId } = await params;
     const body = await request.json();
 
     const {

@@ -368,8 +368,20 @@ model StoreSettings {
   id      String @id @default(cuid())
   storeId String @unique @map("store_id")
 
-  ticketFooter String? @map("ticket_footer") @db.Text
-  taxRate      Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  // Configuración de ticket
+  ticketFooter      String? @map("ticket_footer") @db.Text
+  ticketHeaderLine1 String? @map("ticket_header_line1") @db.VarChar(100) // ej: "Bodega X"
+  ticketHeaderLine2 String? @map("ticket_header_line2") @db.VarChar(100) // ej: "RUC: ..."
+  taxRate           Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+
+  // ✅ MÓDULO 16.2: Onboarding
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at")
+  onboardingStep        Int       @default(0) @map("onboarding_step") // 0-6
+  onboardingDismissedAt DateTime? @map("onboarding_dismissed_at")
+  defaultPaymentMethod  PaymentMethod @default(CASH) @map("default_payment_method")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
