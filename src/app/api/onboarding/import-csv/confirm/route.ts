@@ -68,43 +68,59 @@ export async function POST(request: NextRequest) {
             continue;
           }
 
-          // Si no tiene barcode, generar internalSku
-          let barcode = product.barcode;
-          if (!barcode) {
-            // Generar SKU único: STORE_{timestamp}_{random}
-            barcode = `SKU_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          // Generar internalSku único
+          const internalSku = product.barcode || `SKU_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+          // Buscar si ya existe un ProductMaster con este barcode/SKU
+          let productMaster;
+          if (product.barcode) {
+            productMaster = await tx.productMaster.findUnique({
+              where: { barcode: product.barcode },
+            });
           }
 
-          // Verificar si el barcode ya existe
-          const existing = await tx.storeProduct.findUnique({
+          // Si no existe, crear ProductMaster
+          if (!productMaster) {
+            productMaster = await tx.productMaster.create({
+              data: {
+                barcode: product.barcode || null,
+                internalSku,
+                name: product.name,
+                brand: product.brand || null,
+                content: product.content || null,
+                category: product.category || 'Otros',
+                unitType: product.unitType,
+              },
+            });
+          }
+
+          // Verificar si ya existe StoreProduct para esta tienda
+          const existingStoreProduct = await tx.storeProduct.findUnique({
             where: {
-              storeId_barcode: {
+              storeId_productId: {
                 storeId: session.storeId,
-                barcode,
+                productId: productMaster.id,
               },
             },
           });
 
-          if (existing) {
+          if (existingStoreProduct) {
             skipped++;
-            errors.push(`Fila ${imported + skipped + 1}: Barcode ${barcode} ya existe`);
+            errors.push(`Fila ${imported + skipped + 1}: Producto ${product.name} ya existe en tu tienda`);
             continue;
           }
 
-          // Crear producto
+          // Crear StoreProduct (precio y stock por tienda)
+          const isActive = product.price ? product.price > 0 : false;
+          
           await tx.storeProduct.create({
             data: {
               storeId: session.storeId,
-              barcode,
-              name: product.name,
-              brand: product.brand,
-              content: product.content,
-              category: product.category || 'Otros',
-              unitType: product.unitType,
+              productId: productMaster.id,
               price: product.price ? new Prisma.Decimal(product.price) : new Prisma.Decimal(0),
               stock: product.stock ? new Prisma.Decimal(product.stock) : new Prisma.Decimal(0),
-              minStock: product.minStock || null,
-              isActive: product.price && product.price > 0, // Solo activo si tiene precio
+              minStock: product.minStock ? new Prisma.Decimal(product.minStock) : null,
+              active: isActive,
             },
           });
 
