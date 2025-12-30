@@ -140,7 +140,7 @@ export async function POST() {
       await tx.auditLog.create({
         data: {
           store: { connect: { id: user.storeId } },
-          ...(user.id && { user: { connect: { id: user.id } } }),
+          ...(user.userId && { user: { connect: { id: user.userId } } }),
           action: 'DEMO_RESET',
           entityType: 'STORE',
           entityId: user.storeId,

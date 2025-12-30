@@ -135,7 +135,7 @@ export default function QuickSellAdminPage() {
 
   if (loading) {
     return (
-      <AuthLayout requiredRole="OWNER">
+      <AuthLayout>
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="w-8 h-8 animate-spin text-green-600" />
         </div>
@@ -144,7 +144,7 @@ export default function QuickSellAdminPage() {
   }
 
   return (
-    <AuthLayout requiredRole="OWNER">
+    <AuthLayout>
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-6xl mx-auto space-y-6">
           {/* Header */}
