@@ -95,6 +95,7 @@ model Store {
   address    String?
   phone      String?
   status     StoreStatus @default(ACTIVE)
+  isDemoStore Boolean    @default(false) @map("is_demo_store") // ✅ MÓDULO 17.4: Demo Mode
   archivedAt DateTime?   @map("archived_at")
   createdAt  DateTime    @default(now()) @map("created_at")
   updatedAt  DateTime    @updatedAt @map("updated_at")
@@ -228,7 +229,9 @@ model Shift {
   expectedCash Decimal? @map("expected_cash") @db.Decimal(10, 2)
   difference   Decimal? @db.Decimal(10, 2)
 
-  notes     String?
+  notes  String?
+  isDemo Boolean @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -274,6 +277,8 @@ model Sale {
   changeAmount  Decimal?      @map("change_amount") @db.Decimal(10, 2) // vuelto
 
   printedAt DateTime? @map("printed_at")
+
+  isDemo Boolean @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -355,6 +360,7 @@ model Movement {
 
   notes       String?
   createdById String? @map("created_by")
+  isDemo      Boolean @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -400,10 +406,11 @@ model Customer {
   id      String  @id @default(cuid())
   storeId String  @map("store_id")
   name    String
-  phone   String?
-  dni     String?
-  notes   String?
-  active  Boolean @default(true)
+  phone  String?
+  dni    String?
+  notes  String?
+  active Boolean @default(true)
+  isDemo Boolean @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -426,6 +433,7 @@ model Receivable {
   balance        Decimal          @db.Decimal(10, 2) // Saldo pendiente
   status         ReceivableStatus @default(OPEN)
   createdById    String           @map("created_by")
+  isDemo         Boolean          @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -489,6 +497,7 @@ model Promotion {
   // Vigencia general (fechas especiales)
   startsAt DateTime? @map("starts_at")
   endsAt   DateTime? @map("ends_at")
+  isDemo   Boolean   @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -511,11 +520,12 @@ model Coupon {
   minTotal  Decimal?   @map("min_total") @db.Decimal(10, 2) // mínimo de compra
   startsAt  DateTime?  @map("starts_at")
   endsAt    DateTime?  @map("ends_at")
-  maxUses   Int?       @map("max_uses") // null = ilimitado
-  usesCount Int        @default(0) @map("uses_count")
-  active    Boolean    @default(true)
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  maxUses   Int?     @map("max_uses") // null = ilimitado
+  usesCount Int      @default(0) @map("uses_count")
+  active    Boolean  @default(true)
+  isDemo    Boolean  @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
@@ -536,6 +546,7 @@ model CategoryPromotion {
   startsAt DateTime? @map("starts_at")
   endsAt   DateTime? @map("ends_at")
   active   Boolean   @default(true)
+  isDemo   Boolean   @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
   maxDiscountPerItem Decimal? @map("max_discount_per_item") @db.Decimal(10, 2) // opcional: tope por item
 
@@ -562,6 +573,7 @@ model VolumePromotion {
   startsAt DateTime? @map("starts_at")
   endsAt   DateTime? @map("ends_at")
   active   Boolean   @default(true)
+  isDemo   Boolean   @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -585,12 +597,13 @@ model NthPromotion {
   nthQty      Int          @map("nth_qty") // N (2 = segundo, 3 = tercero)
   percentOff  Decimal      @map("percent_off") @db.Decimal(5, 2) // 50.00, 100.00, etc.
   
-  startsAt    DateTime?    @map("starts_at")
-  endsAt      DateTime?    @map("ends_at")
-  active      Boolean      @default(true)
+  startsAt DateTime? @map("starts_at")
+  endsAt   DateTime? @map("ends_at")
+  active   Boolean   @default(true)
+  isDemo   Boolean   @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
   
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
   
   store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product ProductMaster @relation(fields: [productId], references: [id], onDelete: Cascade)

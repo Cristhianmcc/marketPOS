@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, Tag, Package as PackageIcon, Clock, Milk } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, AlertTriangle, Tag, Package as PackageIcon, Clock, Milk } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import QuickSellGrid from '@/components/pos/QuickSellGrid';
+import CartPanel from '@/components/pos/CartPanel';
+import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import { toast, Toaster } from 'sonner';
 import { usePosShortcuts } from '@/hooks/usePosShortcuts';
+import { usePosHotkeys } from '@/hooks/usePosHotkeys';
 import { formatMoney } from '@/lib/money';
 import { Shift } from '@/domain/types';
 
@@ -94,6 +97,9 @@ export default function POSPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [operationalLimits, setOperationalLimits] = useState<OperationalLimits | null>(null);
 
+  // ✅ MÓDULO 17.4: Estado de Demo Mode
+  const [isDemoStore, setIsDemoStore] = useState(false);
+
   // Estados para descuentos
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
@@ -119,6 +125,9 @@ export default function POSPage() {
   // ✅ MÓDULO 17.1: Refs para atajos de teclado
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCartItemIndex, setSelectedCartItemIndex] = useState<number>(0);
+
+  // ✅ MÓDULO 17.3: Estado para drawer móvil
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   // ✅ MÓDULO 17.1: Handlers para atajos de teclado
   const shortcutHandlers = {
@@ -194,12 +203,49 @@ export default function POSPage() {
     hasOpenShift: !!currentShift,
   });
 
+  // ✅ MÓDULO 17.3: Activar hotkeys (desktop only)
+  usePosHotkeys({
+    onFocusSearch: () => searchInputRef.current?.focus(),
+    onFinalizeSale: () => {
+      if (cart.length > 0 && currentShift) {
+        handleCheckout();
+      }
+    },
+    onClearCart: () => {
+      if (cart.length > 0) {
+        clearCart();
+      }
+    },
+    onEscape: () => {
+      setShowPaymentModal(false);
+      setShowCustomerModal(false);
+      setShowDiscountModal(false);
+      setShowGlobalDiscountModal(false);
+      setShowCreateCustomerModal(false);
+      setMobileCartOpen(false);
+    },
+    enabled: true,
+  });
+
   // Cargar turno actual al montar
   useEffect(() => {
     fetchCurrentShift();
     checkSuperAdmin();
     fetchOperationalLimits();
+    checkDemoMode(); // ✅ MÓDULO 17.4: Verificar demo mode
   }, []);
+
+  const checkDemoMode = async () => {
+    try {
+      const res = await fetch('/api/store');
+      if (res.ok) {
+        const data = await res.json();
+        setIsDemoStore(data.store?.isDemoStore || false);
+      }
+    } catch (error) {
+      console.error('Error checking demo mode:', error);
+    }
+  };
 
   const checkSuperAdmin = async () => {
     try {
@@ -1178,17 +1224,34 @@ export default function POSPage() {
               </p>
             </div>
           )}
+
+          {/* ✅ MÓDULO 17.4: Badge DEMO MODE */}
+          {isDemoStore && (
+            <div className="mb-6 bg-yellow-100 border-2 border-yellow-500 rounded-lg p-4 flex items-center justify-center gap-3 shadow-lg">
+              <AlertTriangle className="w-6 h-6 text-yellow-700" />
+              <div className="text-center">
+                <p className="text-xl font-extrabold text-yellow-900 tracking-wider">
+                  DEMO MODE ACTIVO
+                </p>
+                <p className="text-sm text-yellow-700 font-medium mt-1">
+                  Datos ficticios para demostración
+                </p>
+              </div>
+              <AlertTriangle className="w-6 h-6 text-yellow-700" />
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Columna Izquierda: Búsqueda y Productos */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Search */}
+              {/* Search - Optimizado para táctil */}
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 {/* ✅ MÓDULO 17.1: Hints de atajos */}
-                <div className="mb-3 flex items-center gap-3 text-xs text-gray-500">
-                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F1</span>
+                <div className="mb-3 hidden lg:flex items-center gap-3 text-xs text-gray-500">
+                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F2</span>
                   <span>Buscar</span>
-                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">Enter</span>
-                  <span>Agregar primer resultado</span>
+                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">Ctrl+Enter</span>
+                  <span>Finalizar</span>
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
@@ -1201,13 +1264,14 @@ export default function POSPage() {
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      className="w-full h-12 pl-10 pr-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                      className="w-full h-12 md:h-14 pl-10 pr-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A] text-base md:text-sm"
+                      style={{ fontSize: '16px' }}
                     />
                   </div>
                   <button
                     onClick={handleSearch}
                     disabled={loading}
-                    className="h-12 px-6 bg-[#16A34A] text-white rounded-md font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="h-12 md:h-14 px-4 md:px-6 bg-[#16A34A] text-white rounded-md font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
                   >
                     {loading ? 'Buscando...' : 'Buscar'}
                   </button>
@@ -1294,395 +1358,70 @@ export default function POSPage() {
               )}
             </div>
 
-            {/* Columna Derecha: Carrito */}
-            <div className="lg:col-span-1">
-              <div className="bg-white border border-gray-200 rounded-lg sticky top-4">
-                <div className="px-4 py-3 bg-[#1F2A37] text-white rounded-t-lg flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ShoppingCart className="w-5 h-5" />
-                    <h3 className="font-medium">Carrito</h3>
-                  </div>
-                  {cart.length > 0 && (
-                    <button
-                      onClick={clearCart}
-                      className="text-sm hover:text-red-300 transition-colors"
-                    >
-                      Limpiar
-                    </button>
-                  )}
-                </div>
-
-                {/* ✅ MÓDULO 17.1: Hints de atajos del carrito */}
-                {cart.length > 0 && (
-                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                    <span className="px-2 py-1 bg-white rounded border border-gray-200 font-mono">+/-</span>
-                    <span>Cantidad</span>
-                    <span className="px-2 py-1 bg-white rounded border border-gray-200 font-mono">Del</span>
-                    <span>Eliminar</span>
-                  </div>
-                )}
-
-                <div className="p-4">
-                  {cart.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <ShoppingCart className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                      <p className="text-sm">Carrito vacío</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {cart.map((item) => {
-                          const subtotal = calculateItemSubtotal(item);
-                          const discount = calculateItemDiscount(item);
-                          const itemTotal = calculateItemTotal(item);
-                          
-                          return (
-                          <div
-                            key={item.storeProduct.id}
-                            className="border border-gray-200 rounded-lg p-3"
-                          >
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex-1">
-                                <div className="text-sm font-medium text-[#1F2A37]">
-                                  {item.storeProduct.product.name}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                  S/ {item.storeProduct.price.toFixed(2)} {item.storeProduct.product.unitType === 'UNIT' ? 'c/u' : '/kg'}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => removeFromCart(item.storeProduct.id)}
-                                className="text-red-600 hover:text-red-700 p-1"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() =>
-                                    updateQuantity(
-                                      item.storeProduct.id,
-                                      item.quantity - (item.storeProduct.product.unitType === 'UNIT' ? 1 : 0.5)
-                                    )
-                                  }
-                                  className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
-                                >
-                                  <Minus className="w-3 h-3" />
-                                </button>
-                                <input
-                                  type="number"
-                                  value={item.quantity}
-                                  onChange={(e) =>
-                                    updateQuantity(item.storeProduct.id, parseFloat(e.target.value))
-                                  }
-                                  step={item.storeProduct.product.unitType === 'UNIT' ? '1' : '0.1'}
-                                  min="0.1"
-                                  className="w-16 h-7 text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#16A34A] text-sm"
-                                />
-                                <button
-                                  onClick={() =>
-                                    updateQuantity(
-                                      item.storeProduct.id,
-                                      item.quantity + (item.storeProduct.product.unitType === 'UNIT' ? 1 : 0.5)
-                                    )
-                                  }
-                                  className="w-7 h-7 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                </button>
-                              </div>
-                              <div className="text-sm font-semibold text-[#1F2A37]">
-                                S/ {subtotal.toFixed(2)}
-                              </div>
-                            </div>
-
-                            {/* Promoción automática */}
-                            {item.promotionName && (
-                              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                                <div className="flex justify-between items-center text-xs">
-                                  <div className="flex items-center gap-1 text-blue-700 font-medium">
-                                    {(() => {
-                                      const name = (item.promotionName || '').toLowerCase();
-                                      if (name.includes('bebida') || name.includes('coca') || name.includes('cerveza') || name.includes('pilsen') || name.includes('vino')) {
-                                        return <Milk className="w-3.5 h-3.5" />;
-                                      } else if (item.promotionType === 'PACK_PRICE') {
-                                        return <PackageIcon className="w-3.5 h-3.5" />;
-                                      } else if (item.promotionType === 'HAPPY_HOUR') {
-                                        return <Clock className="w-3.5 h-3.5" />;
-                                      } else {
-                                        return <Tag className="w-3.5 h-3.5" />;
-                                      }
-                                    })()}
-                                    {item.promotionName}
-                                  </div>
-                                  <div className="text-blue-900 font-semibold">
-                                    -S/ {(item.promotionDiscount ?? 0).toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Promoción por categoría (Módulo 14.2-B) */}
-                            {item.categoryPromoName && (
-                              <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded">
-                                <div className="flex justify-between items-center text-xs">
-                                  <div className="flex items-center gap-1 text-purple-700 font-medium">
-                                    <Tag className="w-3.5 h-3.5" />
-                                    CAT: {item.categoryPromoName}
-                                  </div>
-                                  <div className="text-purple-900 font-semibold">
-                                    -S/ {(item.categoryPromoDiscount ?? 0).toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Promoción por volumen (Módulo 14.2-C1) */}
-                            {item.volumePromoName && (item.volumePromoDiscount ?? 0) > 0 && (
-                              <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                                <div className="flex justify-between items-center text-xs">
-                                  <div className="flex items-center gap-1 text-orange-700 font-medium">
-                                    <Tag className="w-3.5 h-3.5" />
-                                    PACK {item.volumePromoQty}x: {item.volumePromoName}
-                                  </div>
-                                  <div className="text-orange-900 font-semibold">
-                                    -S/ {(item.volumePromoDiscount ?? 0).toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Promoción n-ésimo (Módulo 14.2-C2) */}
-                            {item.nthPromoName && (item.nthPromoDiscount ?? 0) > 0 && (
-                              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded">
-                                <div className="flex justify-between items-center text-xs">
-                                  <div className="flex items-center gap-1 text-yellow-700 font-medium">
-                                    <Tag className="w-3.5 h-3.5" />
-                                    {item.nthPromoQty}° al {item.nthPromoPercent}%: {item.nthPromoName}
-                                  </div>
-                                  <div className="text-yellow-900 font-semibold">
-                                    -S/ {(item.nthPromoDiscount ?? 0).toFixed(2)}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Descuento del ítem */}
-                            {item.discountType && item.discountValue ? (
-                              <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded">
-                                <div className="flex justify-between items-center text-xs">
-                                  <div className="text-orange-700">
-                                    Desc: {item.discountType === 'PERCENT' ? `${item.discountValue}%` : `S/ ${item.discountValue.toFixed(2)}`}
-                                    {' '}(-S/ {discount.toFixed(2)})
-                                  </div>
-                                  <button
-                                    onClick={() => handleRemoveItemDiscount(item.storeProduct.id)}
-                                    className="text-orange-600 hover:text-orange-700"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                                <div className="text-xs font-semibold text-orange-900 mt-1">
-                                  Total: S/ {itemTotal.toFixed(2)}
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => handleOpenDiscountModal(item.storeProduct.id)}
-                                className="mt-2 w-full py-1.5 text-xs border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
-                              >
-                                + Aplicar Descuento
-                              </button>
-                            )}
-                          </div>
-                        )})}
-                      </div>
-
-                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
-                        <div className="flex justify-between text-sm text-gray-600">
-                          <span>Items</span>
-                          <span>{getTotalItems()}</span>
-                        </div>
-                        <div className="flex justify-between text-sm text-gray-600">
-                          <span>Subtotal</span>
-                          <span>S/ {getSubtotalBeforeDiscounts().toFixed(2)}</span>
-                        </div>
-                        
-                        {/* Promociones */}
-                        {getTotalPromotions() > 0 && (
-                          <div className="flex justify-between text-sm text-blue-600">
-                            <span>Promociones</span>
-                            <span>-S/ {getTotalPromotions().toFixed(2)}</span>
-                          </div>
-                        )}
-                        
-                        {/* Promociones por categoría (Módulo 14.2-B) */}
-                        {getTotalCategoryPromotions() > 0 && (
-                          <div className="flex justify-between text-sm text-purple-600">
-                            <span>Promos Categoría</span>
-                            <span>-S/ {getTotalCategoryPromotions().toFixed(2)}</span>
-                          </div>
-                        )}
-                        
-                        {/* Promociones por volumen (Módulo 14.2-C1) */}
-                        {getTotalVolumePromotions() > 0 && (
-                          <div className="flex justify-between text-sm text-orange-600">
-                            <span>Promos Pack</span>
-                            <span>-S/ {getTotalVolumePromotions().toFixed(2)}</span>
-                          </div>
-                        )}
-                        
-                        {/* Promociones n-ésimo (Módulo 14.2-C2) */}
-                        {getTotalNthPromotions() > 0 && (
-                          <div className="flex justify-between text-sm text-yellow-600">
-                            <span>Promos N-ésimo</span>
-                            <span>-S/ {getTotalNthPromotions().toFixed(2)}</span>
-                          </div>
-                        )}
-                        
-                        {/* Descuentos por ítem */}
-                        {getTotalItemDiscounts() > 0 && (
-                          <div className="flex justify-between text-sm text-orange-600">
-                            <span>Desc. ítems</span>
-                            <span>-S/ {getTotalItemDiscounts().toFixed(2)}</span>
-                          </div>
-                        )}
-
-                        {/* Descuento global */}
-                        {globalDiscount > 0 ? (
-                          <div className="p-2 bg-orange-50 border border-orange-200 rounded">
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-orange-700">Desc. global</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-orange-700 font-medium">-S/ {globalDiscount.toFixed(2)}</span>
-                                <button
-                                  onClick={() => setGlobalDiscount(0)}
-                                  className="text-orange-600 hover:text-orange-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              const maxDiscount = getSubtotalBeforeDiscounts() - getTotalItemDiscounts();
-                              if (maxDiscount <= 0) {
-                                toast.error('No hay monto disponible para descuento global');
-                                return;
-                              }
-                              setGlobalDiscountValue('');
-                              setShowGlobalDiscountModal(true);
-                            }}
-                            className="w-full py-1.5 text-xs border border-dashed border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
-                          >
-                            + Descuento Global
-                          </button>
-                        )}
-
-                        {/* ✅ Cupón (Módulo 14.2-A) */}
-                        {appliedCoupon ? (
-                          <div className="p-2 bg-green-50 border border-green-200 rounded">
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-green-700">Cupón {appliedCoupon.code}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-green-700 font-medium">-S/ {appliedCoupon.discount.toFixed(2)}</span>
-                                <button
-                                  onClick={handleRemoveCoupon}
-                                  className="text-green-600 hover:text-green-700"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={couponCode}
-                                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleApplyCoupon();
-                                  }
-                                }}
-                                placeholder="Código de cupón"
-                                className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded"
-                                disabled={validatingCoupon}
-                              />
-                              <button
-                                onClick={handleApplyCoupon}
-                                disabled={validatingCoupon || !couponCode.trim()}
-                                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {validatingCoupon ? 'Validando...' : 'Aplicar'}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex justify-between text-lg font-bold text-[#1F2A37] pt-2 border-t">
-                          <span>Total</span>
-                          <span>S/ {getCartTotal().toFixed(2)}</span>
-                        </div>
-                        
-                        {/* ✅ Alertas de límites operativos */}
-                        {operationalLimits && (
-                          <div className="mt-3 space-y-2">
-                            {/* Límite de total de venta */}
-                            {operationalLimits.maxSaleTotal !== null && 
-                             getCartTotal() > operationalLimits.maxSaleTotal && (
-                              <div className="bg-red-50 border border-red-200 rounded-md p-2 text-sm text-red-800">
-                                ⚠️ Total excede límite: S/ {operationalLimits.maxSaleTotal.toFixed(2)}
-                              </div>
-                            )}
-                            
-                            {/* Límite de descuento manual total */}
-                            {operationalLimits.maxManualDiscountAmount !== null && 
-                             getTotalItemDiscounts() + globalDiscount > operationalLimits.maxManualDiscountAmount && (
-                              <div className="bg-red-50 border border-red-200 rounded-md p-2 text-sm text-red-800">
-                                ⚠️ Descuentos exceden límite: S/ {operationalLimits.maxManualDiscountAmount.toFixed(2)}
-                              </div>
-                            )}
-                            
-                            {/* Límite de items */}
-                            {operationalLimits.maxItemsPerSale !== null && 
-                             getTotalItems() > operationalLimits.maxItemsPerSale && (
-                              <div className="bg-red-50 border border-red-200 rounded-md p-2 text-sm text-red-800">
-                                ⚠️ Items exceden límite: {operationalLimits.maxItemsPerSale}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* ✅ MÓDULO 17.1: Hint de finalizar venta */}
-                      {currentShift && cart.length > 0 && (
-                        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-500">
-                          <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F4</span>
-                          <span>Finalizar venta</span>
-                        </div>
-                      )}
-
-                      <button
-                        onClick={handleCheckout}
-                        disabled={processing || !currentShift}
-                        className="w-full mt-4 h-12 bg-[#16A34A] text-white rounded-md font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {processing ? 'Procesando...' : !currentShift ? 'Abrir turno para vender' : 'Finalizar Venta'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
+            {/* Columna Derecha: Carrito Desktop/Tablet */}
+            <div className="lg:col-span-1 h-full">
+              <CartPanel
+                cart={cart}
+                onUpdateQuantity={(id, delta) => {
+                  const item = cart.find(i => i.storeProduct.id === id);
+                  if (item) {
+                    updateQuantity(id, item.quantity + delta);
+                  }
+                }}
+                onRemoveItem={removeFromCart}
+                onClearCart={clearCart}
+                onApplyDiscount={handleOpenDiscountModal}
+                onFinalizeSale={handleCheckout}
+                appliedCoupon={appliedCoupon ? { code: appliedCoupon.code, discount: appliedCoupon.discount } : null}
+                onRemoveCoupon={handleRemoveCoupon}
+                processing={processing}
+              />
             </div>
           </div>
+
+          {/* ✅ MÓDULO 17.3: Botón flotante mobile para abrir carrito */}
+          {cart.length > 0 && (
+            <button
+              onClick={() => setMobileCartOpen(true)}
+              className="md:hidden fixed bottom-6 right-6 z-30 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-semibold transition-all active:scale-95"
+            >
+              <ShoppingCart className="w-6 h-6" />
+              <span>Carrito ({cart.length})</span>
+              <span className="text-emerald-100">• {formatMoney(getCartTotal())}</span>
+            </button>
+          )}
+
+          {/* ✅ MÓDULO 17.3: Mobile Cart Drawer */}
+          <MobileCartDrawer
+            isOpen={mobileCartOpen}
+            onClose={() => setMobileCartOpen(false)}
+            cart={cart}
+            onUpdateQuantity={(id, delta) => {
+              const item = cart.find(i => i.storeProduct.id === id);
+              if (item) {
+                updateQuantity(id, item.quantity + delta);
+              }
+            }}
+            onRemoveItem={removeFromCart}
+            onClearCart={() => {
+              clearCart();
+              setMobileCartOpen(false);
+            }}
+            onApplyDiscount={(id) => {
+              handleOpenDiscountModal(id);
+              setMobileCartOpen(false);
+            }}
+            onFinalizeSale={() => {
+              setMobileCartOpen(false);
+              handleCheckout();
+            }}
+            appliedCoupon={appliedCoupon ? { code: appliedCoupon.code, discount: appliedCoupon.discount } : null}
+            onRemoveCoupon={() => {
+              handleRemoveCoupon();
+              setMobileCartOpen(false);
+            }}
+            processing={processing}
+          />
         </div>
       </main>
 

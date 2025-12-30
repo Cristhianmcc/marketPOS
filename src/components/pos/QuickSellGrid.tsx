@@ -89,8 +89,8 @@ export default function QuickSellGrid({ onAddProduct, disabled = false }: QuickS
         </span>
       </div>
 
-      {/* ✅ Grid de productos */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {/* ✅ Grid de productos - Responsive con botones grandes táctiles */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
         {products.map((product) => {
           const isOutOfStock = product.stock !== null && product.stock <= 0;
           const isLowStock = product.stock !== null && product.stock > 0 && product.stock <= 5;
@@ -102,17 +102,17 @@ export default function QuickSellGrid({ onAddProduct, disabled = false }: QuickS
               onClick={() => !isDisabled && onAddProduct(product.id)}
               disabled={isDisabled}
               className={`
-                relative flex flex-col items-center gap-2 p-3 rounded-lg border-2 
-                transition-all duration-150
+                relative flex flex-col items-center gap-2 p-3 md:p-4 rounded-lg border-2 
+                transition-all duration-150 min-h-[120px] md:min-h-[140px]
                 ${
                   isDisabled
                     ? 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-60'
-                    : 'bg-white border-gray-300 hover:border-green-500 hover:shadow-md active:scale-95 cursor-pointer'
+                    : 'bg-white border-gray-300 hover:border-green-500 hover:shadow-md active:scale-95 cursor-pointer touch-manipulation'
                 }
               `}
             >
-              {/* ✅ Imagen o Inicial */}
-              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center overflow-hidden">
+              {/* ✅ Imagen o Inicial - Tamaño táctil */}
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-lg bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center overflow-hidden">
                 {product.imageUrl ? (
                   <img
                     src={product.imageUrl}
@@ -120,7 +120,7 @@ export default function QuickSellGrid({ onAddProduct, disabled = false }: QuickS
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-xl font-bold text-green-700">
+                  <span className="text-2xl md:text-3xl font-bold text-green-700">
                     {product.name.charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -128,34 +128,34 @@ export default function QuickSellGrid({ onAddProduct, disabled = false }: QuickS
 
               {/* ✅ Nombre del producto (truncado) */}
               <div className="w-full text-center">
-                <p className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">
+                <p className="text-sm md:text-base font-medium text-gray-900 line-clamp-2 leading-tight">
                   {product.name}
                 </p>
               </div>
 
-              {/* ✅ Precio */}
-              <div className="text-lg font-bold text-green-600">
+              {/* ✅ Precio - Tamaño táctil */}
+              <div className="text-base md:text-lg font-bold text-green-600">
                 S/ {Number(product.price).toFixed(2)}
               </div>
 
               {/* ✅ Badge de stock bajo */}
               {isLowStock && !isOutOfStock && (
-                <div className="absolute top-1 right-1 bg-yellow-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                <div className="absolute top-1 right-1 bg-yellow-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
                   {product.stock}
                 </div>
               )}
 
               {/* ✅ Badge sin stock */}
               {isOutOfStock && (
-                <div className="absolute top-1 right-1 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                <div className="absolute top-1 right-1 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
                   Sin stock
                 </div>
               )}
 
               {/* ✅ Icono de agregar */}
               {!isDisabled && (
-                <div className="absolute bottom-1 right-1 bg-green-500 text-white rounded-full p-1">
-                  <ShoppingCart className="w-3 h-3" />
+                <div className="absolute bottom-1 right-1 bg-green-500 text-white rounded-full p-1.5">
+                  <ShoppingCart className="w-4 h-4" />
                 </div>
               )}
             </button>

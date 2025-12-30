@@ -75,7 +75,14 @@ async function executeCheckout(
   couponCode?: string // ✅ Módulo 14.2-A: cupón
 ): Promise<{ sale: any; saleItems: any[]; receivable?: any }> {
   return await prisma.$transaction(async (tx) => {
-    // 1. Validar stock disponible y tipos
+    // 1. Verificar si la tienda está en Demo Mode
+    const store = await tx.store.findUnique({
+      where: { id: session.storeId },
+      select: { isDemoStore: true }
+    });
+    const isDemoMode = store?.isDemoStore ?? false;
+
+    // 2. Validar stock disponible y tipos
     const storeProducts = await tx.storeProduct.findMany({
       where: {
         id: { in: items.map((i) => i.storeProductId) },
@@ -581,19 +588,40 @@ async function executeCheckout(
     }
 
     // 4. Obtener el siguiente número de venta
-    const lastSale = await tx.sale.findFirst({
-      where: { storeId: session.storeId },
-      orderBy: { saleNumber: 'desc' },
-      select: { saleNumber: true },
-    });
-
-    const nextSaleNumber = (lastSale?.saleNumber ?? 0) + 1;
+    let nextSaleNumber: number;
+    
+    if (isDemoMode) {
+      // Si está en Demo Mode: usar rango 99991+
+      const lastDemoSale = await tx.sale.findFirst({
+        where: {
+          storeId: session.storeId,
+          isDemo: true,
+          saleNumber: { gte: 99991 } // Buscar en rango demo
+        },
+        orderBy: { saleNumber: 'desc' },
+        select: { saleNumber: true },
+      });
+      nextSaleNumber = (lastDemoSale?.saleNumber ?? 99990) + 1;
+    } else {
+      // Si NO está en Demo Mode: usar contador normal (< 90000)
+      const lastSale = await tx.sale.findFirst({
+        where: { 
+          storeId: session.storeId,
+          isDemo: false, // ✅ Excluir ventas demo del contador
+          saleNumber: { lt: 90000 } // ✅ Excluir rango reservado para demos (90000+)
+        },
+        orderBy: { saleNumber: 'desc' },
+        select: { saleNumber: true },
+      });
+      nextSaleNumber = (lastSale?.saleNumber ?? 0) + 1;
+    }
 
     // 5. Crear Sale con descuentos y cupón
     const saleData: any = {
       storeId: session.storeId,
       userId: session.userId,
       saleNumber: nextSaleNumber,
+      isDemo: isDemoMode, // ✅ Marcar como demo si está en Demo Mode
       subtotal: new Prisma.Decimal(subtotalBeforeDiscounts),
       tax: new Prisma.Decimal(tax),
       discountTotal: new Prisma.Decimal(totalDiscounts),
@@ -677,6 +705,7 @@ async function executeCheckout(
             total: new Prisma.Decimal(item.subtotalItem), // Usa subtotal sin descuento para movements
             notes: `Venta #${nextSaleNumber}`,
             createdById: session.userId,
+            isDemo: isDemoMode, // ✅ Marcar movement como demo si está en Demo Mode
           },
         });
       })

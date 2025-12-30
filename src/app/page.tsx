@@ -184,6 +184,15 @@ export default async function HomePage() {
                 <h2 className="text-xl font-bold text-emerald-900 mb-2">💳 Licencias SaaS</h2>
                 <p className="text-emerald-700">Gestionar suscripciones y pagos</p>
               </Link>
+
+              {/* ✅ MÓDULO 17.4: Demo Mode */}
+              <Link
+                href="/admin/demo"
+                className="bg-orange-50 border-2 border-orange-400 rounded-lg p-6 hover:border-orange-500 transition-colors shadow-lg hover:shadow-xl"
+              >
+                <h2 className="text-xl font-bold text-orange-900 mb-2">Demo Mode</h2>
+                <p className="text-orange-700 font-medium">Activar/resetear datos de demostración</p>
+              </Link>
             </>
           )}
         </div>

@@ -18,9 +18,18 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from'); // Date from
     const to = searchParams.get('to'); // Date to
 
+    // Verificar si la tienda está en Demo Mode
+    const store = await prisma.store.findUnique({
+      where: { id: session.storeId },
+      select: { isDemoStore: true }
+    });
+    const isDemoMode = store?.isDemoStore ?? false;
+
     // Build where clause
     const where: any = {
       storeId: session.storeId,
+      // ✅ Si NO está en demo mode, excluir ventas demo
+      ...(isDemoMode ? {} : { isDemo: false })
     };
 
     // Filter by shift
