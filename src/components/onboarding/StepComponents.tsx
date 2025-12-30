@@ -454,93 +454,114 @@ export function Step5Content(props: Step5Props) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Receipt className="w-8 h-8 text-orange-600" />
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Preview del ticket</h2>
-          <p className="text-gray-600 text-sm">Así se verá el ticket de tus ventas</p>
+    <>
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #ticket-preview, #ticket-preview * {
+            visibility: visible;
+          }
+          #ticket-preview {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 80mm;
+            margin: 0;
+            padding: 0;
+          }
+        }
+      `}</style>
+      
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Receipt className="w-8 h-8 text-orange-600" />
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Preview del ticket</h2>
+            <p className="text-gray-600 text-sm">Así se verá el ticket de tus ventas</p>
+          </div>
         </div>
-      </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="font-medium text-gray-900 mb-3">Vista previa</h3>
-          <div className="border rounded-lg p-6 bg-white font-mono text-sm max-w-xs mx-auto">
-            <div className="text-center mb-4">
-              <p className="font-bold">{props.ticketHeader1 || props.storeName || 'MI BODEGA'}</p>
-              {props.ticketHeader2 && <p className="text-xs">{props.ticketHeader2}</p>}
-            </div>
-            
-            <div className="border-t border-dashed my-3"></div>
-            
-            <div className="space-y-1 text-xs">
-              <div className="flex justify-between">
-                <span>Coca Cola 1.5L</span>
-                <span>S/ 5.00</span>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-medium text-gray-900 mb-3">Vista previa</h3>
+            <div id="ticket-preview" className="border rounded-lg p-6 bg-white font-mono text-sm max-w-xs mx-auto">
+              <div className="text-center mb-4">
+                <p className="font-bold">{props.ticketHeader1 || props.storeName || 'MI BODEGA'}</p>
+                {props.ticketHeader2 && <p className="text-xs">{props.ticketHeader2}</p>}
               </div>
-              <div className="flex justify-between">
-                <span>Pan Frances</span>
-                <span>S/ 0.30</span>
+              
+              <div className="border-t border-dashed my-3"></div>
+              
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span>Coca Cola 1.5L</span>
+                  <span>S/ 5.00</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pan Frances</span>
+                  <span>S/ 0.30</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Azucar 1kg</span>
+                  <span>S/ 4.50</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Azucar 1kg</span>
-                <span>S/ 4.50</span>
+              
+              <div className="border-t border-dashed my-3"></div>
+              
+              <div className="flex justify-between font-bold">
+                <span>TOTAL:</span>
+                <span>S/ 9.80</span>
+              </div>
+              
+              <div className="text-center mt-4 text-xs">
+                <p>¡Gracias por su compra!</p>
+                <p className="text-[10px] text-gray-500 mt-2">
+                  {new Date().toLocaleString('es-PE')}
+                </p>
               </div>
             </div>
-            
-            <div className="border-t border-dashed my-3"></div>
-            
-            <div className="flex justify-between font-bold">
-              <span>TOTAL:</span>
-              <span>S/ 9.80</span>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium text-gray-900 mb-3">Configuración</h3>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Formato:</span>
+                  <span className="font-medium">80mm (térmico)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Codificación:</span>
+                  <span className="font-medium">UTF-8</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Fuente:</span>
+                  <span className="font-medium">Monospace 12pt</span>
+                </div>
+              </div>
             </div>
-            
-            <div className="text-center mt-4 text-xs">
-              <p>¡Gracias por su compra!</p>
-              <p className="text-[10px] text-gray-500 mt-2">
-                {new Date().toLocaleString('es-PE')}
+
+            <button
+              onClick={handleTestPrint}
+              className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium flex items-center justify-center gap-2"
+            >
+              <Receipt className="w-5 h-5" />
+              Imprimir ticket de prueba
+            </button>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                💡 Asegúrate de que tu impresora térmica esté configurada para 80mm de ancho.
+                Puedes cambiar el encabezado después en Configuración.
               </p>
             </div>
           </div>
         </div>
-
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-medium text-gray-900 mb-3">Configuración</h3>
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Formato:</span>
-                <span className="font-medium">80mm (térmico)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Codificación:</span>
-                <span className="font-medium">UTF-8</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Fuente:</span>
-                <span className="font-medium">Monospace 12pt</span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleTestPrint}
-            className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium flex items-center justify-center gap-2"
-          >
-            <Receipt className="w-5 h-5" />
-            Imprimir ticket de prueba
-          </button>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-800">
-              💡 Asegúrate de que tu impresora térmica esté configurada para 80mm de ancho.
-              Puedes cambiar el encabezado después en Configuración.
-            </p>
-          </div>
-        </div>
       </div>
-    </div>
+    </>
   );
 }
 

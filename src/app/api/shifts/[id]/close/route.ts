@@ -7,6 +7,7 @@ import { SessionData, sessionOptions } from '@/lib/session';
 import { cookies } from 'next/headers';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
+import { checkRateLimit } from '@/lib/rateLimit'; // ✅ MÓDULO 16.1: Rate Limiting
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -26,6 +27,34 @@ export async function POST(
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
+      );
+    }
+
+    // ✅ MÓDULO 16.1: Rate Limiting
+    const rateLimitResult = checkRateLimit('shift-close', session.userId);
+    if (!rateLimitResult.allowed) {
+      // Auditoría de rate limit
+      const { ip, userAgent } = getRequestMetadata(request);
+      logAudit({
+        storeId: session.storeId,
+        userId: session.userId,
+        action: 'RATE_LIMIT_EXCEEDED',
+        entityType: 'SHIFT',
+        severity: 'WARN',
+        meta: {
+          endpoint: 'shift-close',
+          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
+        },
+        ip,
+        userAgent,
+      }).catch(() => {});
+
+      return NextResponse.json(
+        {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Demasiadas solicitudes. Intenta nuevamente en unos segundos.',
+        },
+        { status: 429 }
       );
     }
 

@@ -22,6 +22,9 @@ import {
   validateReceivableBalance,
   LimitExceededError
 } from '@/lib/operationalLimits'; // ✅ MÓDULO 15 - FASE 3: Límites Operativos
+import { checkRateLimit } from '@/lib/rateLimit'; // ✅ MÓDULO 16.1: Rate Limiting
+import { getIdempotentResult, saveIdempotentResult } from '@/lib/idempotency'; // ✅ MÓDULO 16.1: Idempotency
+import { acquireCheckoutLock, releaseCheckoutLock } from '@/lib/checkoutLock'; // ✅ MÓDULO 16.1: Checkout Lock
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -714,6 +717,9 @@ async function executeCheckout(
 }
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  let lockAcquired = false;
+  
   try {
     const session = await getSession();
     if (!session) {
@@ -722,6 +728,118 @@ export async function POST(req: NextRequest) {
         message: 'No autenticado',
       };
       return NextResponse.json(error, { status: 401 });
+    }
+
+    // ✅ MÓDULO 16.1: Rate Limiting
+    const rateLimitResult = checkRateLimit('checkout', session.userId);
+    if (!rateLimitResult.allowed) {
+      // Auditoría de rate limit
+      const { ip, userAgent } = getRequestMetadata(req);
+      logAudit({
+        storeId: session.storeId,
+        userId: session.userId,
+        action: 'RATE_LIMIT_EXCEEDED',
+        entityType: 'SALE',
+        severity: 'WARN',
+        meta: {
+          endpoint: 'checkout',
+          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
+        },
+        ip,
+        userAgent,
+      }).catch(() => {});
+
+      const error: ErrorResponse = {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Demasiadas solicitudes. Intenta nuevamente en unos segundos.',
+        details: {
+          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
+        },
+      };
+      return NextResponse.json(error, { status: 429 });
+    }
+
+    // ✅ MÓDULO 16.1: Idempotency - Verificar si es un replay
+    const idempotencyKey = req.headers.get('idempotency-key');
+    if (idempotencyKey) {
+      const cachedResult = getIdempotentResult(idempotencyKey);
+      if (cachedResult) {
+        // Replay detectado - devolver resultado anterior
+        const { ip, userAgent } = getRequestMetadata(req);
+        logAudit({
+          storeId: session.storeId,
+          userId: session.userId,
+          action: 'CHECKOUT_REPLAY',
+          entityType: 'SALE',
+          entityId: cachedResult.saleId,
+          severity: 'INFO',
+          meta: {
+            idempotencyKey,
+            saleNumber: cachedResult.saleNumber,
+          },
+          ip,
+          userAgent,
+        }).catch(() => {});
+
+        return NextResponse.json({
+          ...cachedResult,
+          code: 'IDEMPOTENT_REPLAY',
+        }, { status: 200 });
+      }
+    }
+
+    // ✅ MÓDULO 16.1: Lock de checkout - Evitar checkouts simultáneos
+    lockAcquired = acquireCheckoutLock(session.storeId, session.userId);
+    if (!lockAcquired) {
+      // Auditoría de lock
+      const { ip, userAgent } = getRequestMetadata(req);
+      logAudit({
+        storeId: session.storeId,
+        userId: session.userId,
+        action: 'CHECKOUT_LOCKED',
+        entityType: 'SALE',
+        severity: 'WARN',
+        meta: {
+          reason: 'Checkout already in progress',
+        },
+        ip,
+        userAgent,
+      }).catch(() => {});
+
+      const error: ErrorResponse = {
+        code: 'CHECKOUT_IN_PROGRESS',
+        message: 'Ya tienes una venta en proceso. Espera a que termine.',
+      };
+      return NextResponse.json(error, { status: 409 });
+    }
+
+    // ✅ MÓDULO 16.1: Validaciones defensivas extra
+    // Verificar que la tienda está activa
+    const store = await prisma.store.findUnique({
+      where: { id: session.storeId },
+      select: { status: true },
+    });
+
+    if (!store || store.status !== 'ACTIVE') {
+      const error: ErrorResponse = {
+        code: 'STORE_INACTIVE',
+        message: 'La tienda no está activa',
+      };
+      return NextResponse.json(error, { status: 403 });
+    }
+
+    // Verificar que el usuario está activo
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { active: true },
+    });
+
+    if (!user || !user.active) {
+      const error: ErrorResponse = {
+        code: 'USER_INACTIVE',
+        message: 'El usuario no está activo',
+      };
+      return NextResponse.json(error, { status: 403 });
     }
 
     // Verificar que el usuario puede vender (OWNER o CASHIER)
@@ -828,6 +946,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ✅ MÓDULO 16.1: Timeout protection - Verificar si ya pasó demasiado tiempo
+    const elapsed = Date.now() - startTime;
+    if (elapsed > 3000) {
+      // Auditoría de timeout
+      const { ip, userAgent } = getRequestMetadata(req);
+      logAudit({
+        storeId: session.storeId,
+        userId: session.userId,
+        action: 'CHECKOUT_TIMEOUT',
+        entityType: 'SALE',
+        severity: 'ERROR',
+        meta: {
+          elapsedMs: elapsed,
+        },
+        ip,
+        userAgent,
+      }).catch(() => {});
+
+      const error: ErrorResponse = {
+        code: 'CHECKOUT_TIMEOUT',
+        message: 'La operación tardó demasiado. Intenta nuevamente.',
+      };
+      return NextResponse.json(error, { status: 500 });
+    }
+
     // Ejecutar checkout con reintentos en caso de colisión de saleNumber
     const MAX_RETRIES = 3;
     let result;
@@ -872,6 +1015,22 @@ export async function POST(req: NextRequest) {
     if (!result) {
       throw new Error('Checkout failed after retries');
     }
+
+    // ✅ MÓDULO 16.1: Guardar resultado para idempotency
+    if (idempotencyKey) {
+      const idempotentResult = {
+        success: true,
+        saleId: result.sale.id,
+        saleNumber: result.sale.saleNumber,
+        total: result.sale.total.toNumber(),
+        itemCount: result.saleItems.length,
+      };
+      saveIdempotentResult(idempotencyKey, idempotentResult);
+    }
+
+    // ✅ MÓDULO 16.1: Liberar lock
+    releaseCheckoutLock(session.storeId, session.userId);
+    lockAcquired = false;
 
     // ✅ MÓDULO 15: Auditoría de checkout exitoso (fire-and-forget)
     const { ip, userAgent } = getRequestMetadata(req);
@@ -930,6 +1089,18 @@ export async function POST(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('Checkout error:', error);
+
+    // ✅ MÓDULO 16.1: Liberar lock en caso de error
+    if (lockAcquired) {
+      try {
+        const sessionData = await getSession();
+        if (sessionData) {
+          releaseCheckoutLock(sessionData.storeId, sessionData.userId);
+        }
+      } catch {
+        // Ignorar error al liberar lock
+      }
+    }
 
     // ✅ MÓDULO 15: Auditoría de checkout fallido (fire-and-forget)
     try {

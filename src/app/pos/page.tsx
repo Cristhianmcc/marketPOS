@@ -560,6 +560,7 @@ export default function POSPage() {
     setGlobalDiscount(0);
     setAppliedCoupon(null); // ✅ Limpiar cupón
     setCouponCode('');
+    setProcessing(false); // ✅ MÓDULO 16.1: Reactivar botón después de venta exitosa
   };
 
   const getTotalItems = () => {
@@ -909,10 +910,14 @@ export default function POSPage() {
       }
     }
 
+    // ✅ MÓDULO 16.1: Prevención de doble submit - deshabilitar botón inmediatamente
     setProcessing(true);
     setShowPaymentModal(false);
 
     try {
+      // ✅ MÓDULO 16.1: Generar idempotency key único
+      const idempotencyKey = `checkout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       const checkoutData: any = {
         items: cart.map((item) => ({
           storeProductId: item.storeProduct.id,
@@ -938,11 +943,35 @@ export default function POSPage() {
 
       const res = await fetch('/api/sales/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey, // ✅ MÓDULO 16.1: Header de idempotencia
+        },
         body: JSON.stringify(checkoutData),
       });
 
       const data = await res.json();
+
+      // ✅ MÓDULO 16.1: Manejar códigos específicos de hardening
+      if (res.status === 429) {
+        // Rate limit exceeded
+        toast.error('Demasiadas solicitudes', {
+          description: 'Espera unos segundos antes de intentar nuevamente',
+          duration: 5000,
+        });
+        setProcessing(false);
+        return;
+      }
+
+      if (res.status === 409 && data.code === 'CHECKOUT_IN_PROGRESS') {
+        // Checkout lock
+        toast.error('Operación en proceso', {
+          description: 'Ya tienes una venta en proceso. Espera a que termine.',
+          duration: 5000,
+        });
+        setProcessing(false);
+        return;
+      }
 
       if (!res.ok) {
         // Mostrar mensaje de error con detalles si es conflicto de stock
@@ -964,14 +993,22 @@ export default function POSPage() {
         return;
       }
 
-      // Mensaje diferente para FIADO
-      if (paymentMethod === 'FIADO') {
-        toast.success(`¡Venta FIADO registrada!`, {
-          description: `Cliente: ${selectedCustomer!.name} - Total: S/ ${data.total.toFixed(2)}`,
+      // ✅ Manejar respuesta idempotente (replay)
+      if (data.code === 'IDEMPOTENT_REPLAY') {
+        toast.warning('Venta ya procesada', {
+          description: `Esta venta ya fue registrada (Total: S/ ${data.total.toFixed(2)})`,
           duration: 5000,
         });
       } else {
-        toast.success(`¡Venta completada! Total: S/ ${data.total.toFixed(2)}`);
+        // Mensaje diferente para FIADO
+        if (paymentMethod === 'FIADO') {
+          toast.success(`¡Venta FIADO registrada!`, {
+            description: `Cliente: ${selectedCustomer!.name} - Total: S/ ${data.total.toFixed(2)}`,
+            duration: 5000,
+          });
+        } else {
+          toast.success(`¡Venta completada! Total: S/ ${data.total.toFixed(2)}`);
+        }
       }
       
       // Show sale complete modal
@@ -985,8 +1022,9 @@ export default function POSPage() {
     } catch (error) {
       console.error('Checkout error:', error);
       toast.error('Error de conexión');
+      setProcessing(false); // ✅ Reactivar botón solo en error de conexión
     } finally {
-      setProcessing(false);
+      // ✅ MÓDULO 16.1: No reactivar el botón aquí - solo en clearCart
     }
   };
 
