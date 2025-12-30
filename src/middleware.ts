@@ -4,6 +4,7 @@ import { getIronSession } from 'iron-session';
 import { SessionData } from './lib/session';
 import { prisma } from './infra/db/prisma';
 import { getStoreOperationalStatus } from './lib/subscriptionStatus';
+import { isSuperAdmin } from './lib/superadmin';
 
 const protectedRoutes = ['/pos', '/inventory', '/admin', '/settings'];
 const authRoutes = ['/login'];
@@ -78,7 +79,7 @@ export async function middleware(request: NextRequest) {
   // Bloquear operaciones si la suscripción está SUSPENDED o CANCELLED
   const isAllowedRoute = alwaysAllowedRoutes.some((route) => pathname.startsWith(route));
   
-  if (isLoggedIn && isOperationalRoute && !isAllowedRoute && session.storeId && session.role !== 'SUPERADMIN') {
+  if (isLoggedIn && isOperationalRoute && !isAllowedRoute && session.storeId && !isSuperAdmin(session.email)) {
     try {
       const billingStatus = await getStoreOperationalStatus(session.storeId);
       
