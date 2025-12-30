@@ -21,6 +21,7 @@ interface Product {
   internalSku: string;
   unitType: 'UNIT' | 'KG';
   isGlobal: boolean; // ✅ MÓDULO 18.1
+  imageUrl: string | null; // ✅ Imagen del producto
 }
 
 interface StoreProduct {
