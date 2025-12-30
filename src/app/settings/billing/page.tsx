@@ -44,7 +44,7 @@ export default function BillingPage() {
     );
   }
 
-  if (!billing || !billing.hasSubscription) {
+  if (!billing || !billing.hasSubscription || !billing.subscription) {
     return (
       <div className="p-8">
         <h1 className="text-2xl font-bold mb-6">Licencia y Facturación</h1>
