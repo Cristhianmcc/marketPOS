@@ -16,8 +16,8 @@
     "db:reset": "prisma migrate reset --force"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@prisma/client": "^5.22.0",
-    "@types/adm-zip": "^0.5.7",
     "@types/archiver": "^7.0.0",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^22",
@@ -47,6 +47,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/bcryptjs": "^2.4.6",
     "prettier": "^3.4.2",
     "tsx": "^4.19.2"

@@ -16,6 +16,16 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get('category') || undefined;
     const lowStock = searchParams.get('lowStock') === 'true';
     const active = searchParams.get('active');
+    const productId = searchParams.get('productId') || undefined;
+
+    // ✅ MÓDULO 17.2: Si hay productId, buscar directamente
+    if (productId) {
+      const product = await storeProductRepo.findByStoreAndProduct(user.storeId, productId);
+      if (!product) {
+        return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
+      }
+      return NextResponse.json([product]); // Devolver array para mantener consistencia
+    }
 
     const filters = {
       query,

@@ -166,6 +166,11 @@ model ProductMaster {
   category    String   @default("Otros")
   unitType    UnitType @map("unit_type") // ✅ unitType pertenece al producto
   imageUrl    String?  @map("image_url")
+  
+  // ✅ MÓDULO 17.2: Quick Sell POS
+  isQuickSell     Boolean @default(false) @map("is_quick_sell")
+  quickSellOrder  Int?    @map("quick_sell_order")
+  
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

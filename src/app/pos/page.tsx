@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, Tag, Package as PackageIcon, Clock, Milk } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
+import QuickSellGrid from '@/components/pos/QuickSellGrid';
 import { toast, Toaster } from 'sonner';
+import { usePosShortcuts } from '@/hooks/usePosShortcuts';
 import { formatMoney } from '@/lib/money';
 import { Shift } from '@/domain/types';
 
@@ -113,6 +115,84 @@ export default function POSPage() {
     value: number;
   } | null>(null);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
+
+  // ✅ MÓDULO 17.1: Refs para atajos de teclado
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [selectedCartItemIndex, setSelectedCartItemIndex] = useState<number>(0);
+
+  // ✅ MÓDULO 17.1: Handlers para atajos de teclado
+  const shortcutHandlers = {
+    focusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    addFirstSearchResult: () => {
+      if (products.length > 0) {
+        addToCart(products[0]);
+        setProducts([]);
+        setQuery('');
+      }
+    },
+    incrementSelectedItem: () => {
+      if (cart.length > 0 && cart[selectedCartItemIndex]) {
+        const item = cart[selectedCartItemIndex];
+        updateQuantity(item.storeProduct.id, item.quantity + 1);
+      }
+    },
+    decrementSelectedItem: () => {
+      if (cart.length > 0 && cart[selectedCartItemIndex]) {
+        const item = cart[selectedCartItemIndex];
+        updateQuantity(item.storeProduct.id, Math.max(0, item.quantity - 1));
+      }
+    },
+    removeSelectedItem: () => {
+      if (cart.length > 0 && cart[selectedCartItemIndex]) {
+        const item = cart[selectedCartItemIndex];
+        removeFromCart(item.storeProduct.id);
+        // Ajustar índice si es necesario
+        if (selectedCartItemIndex >= cart.length - 1) {
+          setSelectedCartItemIndex(Math.max(0, cart.length - 2));
+        }
+      }
+    },
+    focusCart: () => {
+      // Seleccionar el primer ítem del carrito
+      if (cart.length > 0) {
+        setSelectedCartItemIndex(0);
+        toast.info(`Ítem seleccionado: ${cart[0].storeProduct.product.name}`);
+      }
+    },
+    openCheckout: () => {
+      if (cart.length > 0 && currentShift) {
+        handleCheckout();
+      }
+    },
+    closeModal: () => {
+      setShowPaymentModal(false);
+      setShowCustomerModal(false);
+      setShowDiscountModal(false);
+      setShowGlobalDiscountModal(false);
+      setShowCreateCustomerModal(false);
+    },
+    selectCash: () => {
+      setPaymentMethod('CASH');
+    },
+    selectYape: () => {
+      setPaymentMethod('YAPE');
+    },
+    selectPlin: () => {
+      setPaymentMethod('PLIN');
+    },
+    selectCard: () => {
+      setPaymentMethod('CARD');
+    },
+  };
+
+  // ✅ MÓDULO 17.1: Activar atajos de teclado
+  usePosShortcuts(shortcutHandlers, {
+    enabled: true,
+    isCheckoutModalOpen: showPaymentModal,
+    hasOpenShift: !!currentShift,
+  });
 
   // Cargar turno actual al montar
   useEffect(() => {
@@ -427,6 +507,29 @@ export default function POSPage() {
     } catch (error) {
       console.error('Error checking exclusive promos:', error);
       return item;
+    }
+  };
+
+  // ✅ MÓDULO 17.2: Handler para agregar desde Quick Sell
+  const handleAddFromQuickSell = async (productId: string) => {
+    // Buscar el producto en los productos actuales o hacer fetch
+    const existing = products.find(p => p.product.id === productId);
+    if (existing) {
+      await addToCart(existing);
+      return;
+    }
+
+    // Si no está en productos actuales, hacer fetch individual
+    try {
+      const response = await fetch(`/api/inventory?productId=${productId}`);
+      if (!response.ok) throw new Error('Error al cargar producto');
+      
+      const data = await response.json();
+      if (data.length > 0) {
+        await addToCart(data[0]);
+      }
+    } catch (error) {
+      toast.error('Error al agregar producto');
     }
   };
 
@@ -1080,10 +1183,19 @@ export default function POSPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Search */}
               <div className="bg-white border border-gray-200 rounded-lg p-4">
+                {/* ✅ MÓDULO 17.1: Hints de atajos */}
+                <div className="mb-3 flex items-center gap-3 text-xs text-gray-500">
+                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F1</span>
+                  <span>Buscar</span>
+                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">Enter</span>
+                  <span>Agregar primer resultado</span>
+                </div>
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
+                      ref={searchInputRef}
+                      id="product-search"
                       type="text"
                       placeholder="Buscar producto por nombre, código..."
                       value={query}
@@ -1101,6 +1213,14 @@ export default function POSPage() {
                   </button>
                 </div>
               </div>
+
+              {/* ✅ MÓDULO 17.2: Quick Sell Grid */}
+              {currentShift && (
+                <QuickSellGrid 
+                  onAddProduct={handleAddFromQuickSell}
+                  disabled={!currentShift}
+                />
+              )}
 
               {/* Results */}
               {products.length > 0 && (
@@ -1191,6 +1311,16 @@ export default function POSPage() {
                     </button>
                   )}
                 </div>
+
+                {/* ✅ MÓDULO 17.1: Hints de atajos del carrito */}
+                {cart.length > 0 && (
+                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                    <span className="px-2 py-1 bg-white rounded border border-gray-200 font-mono">+/-</span>
+                    <span>Cantidad</span>
+                    <span className="px-2 py-1 bg-white rounded border border-gray-200 font-mono">Del</span>
+                    <span>Eliminar</span>
+                  </div>
+                )}
 
                 <div className="p-4">
                   {cart.length === 0 ? (
@@ -1532,6 +1662,14 @@ export default function POSPage() {
                         )}
                       </div>
 
+                      {/* ✅ MÓDULO 17.1: Hint de finalizar venta */}
+                      {currentShift && cart.length > 0 && (
+                        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-500">
+                          <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F4</span>
+                          <span>Finalizar venta</span>
+                        </div>
+                      )}
+
                       <button
                         onClick={handleCheckout}
                         disabled={processing || !currentShift}
@@ -1575,6 +1713,17 @@ export default function POSPage() {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Selecciona el método
               </label>
+              {/* ✅ MÓDULO 17.1: Hints de métodos de pago */}
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F5</span>
+                <span>Efectivo</span>
+                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F6</span>
+                <span>Yape</span>
+                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F7</span>
+                <span>Plin</span>
+                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F8</span>
+                <span>Tarjeta</span>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { value: 'CASH', label: 'Efectivo' },

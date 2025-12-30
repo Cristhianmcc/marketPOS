@@ -117,6 +117,14 @@ export default async function HomePage() {
               </Link>
 
               <Link
+                href="/admin/quick-sell"
+                className="bg-teal-50 border-2 border-teal-200 rounded-lg p-6 hover:border-teal-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-teal-900 mb-2">⚡ Productos Rápidos</h2>
+                <p className="text-teal-700">Configurar botones rápidos en POS</p>
+              </Link>
+
+              <Link
                 href="/settings"
                 className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 hover:border-blue-300 transition-colors"
               >
@@ -146,6 +154,14 @@ export default async function HomePage() {
               >
                 <h2 className="text-xl font-bold text-gray-900 mb-2">📋 Auditoría</h2>
                 <p className="text-gray-700">Historial de operaciones críticas</p>
+              </Link>
+
+              <Link
+                href="/admin/system"
+                className="bg-green-50 border-2 border-green-200 rounded-lg p-6 hover:border-green-300 transition-colors"
+              >
+                <h2 className="text-xl font-bold text-green-900 mb-2">🔍 Observabilidad</h2>
+                <p className="text-green-700">Estado del sistema y diagnóstico</p>
               </Link>
             </>
           )}

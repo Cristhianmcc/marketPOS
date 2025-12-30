@@ -2,25 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { SessionData } from './lib/session';
-import { prisma } from './infra/db/prisma';
-import { getStoreOperationalStatus } from './lib/subscriptionStatus';
-import { isSuperAdmin } from './lib/superadmin';
 
 const protectedRoutes = ['/pos', '/inventory', '/admin', '/settings'];
 const authRoutes = ['/login'];
-
-// Rutas que se bloquean si la tienda está ARCHIVED
-const operationalRoutes = ['/pos', '/inventory', '/sales', '/shifts', '/customers', '/receivables', '/promotions', '/coupons'];
-
-// Rutas que SIEMPRE están permitidas aunque esté bloqueada por billing
-const alwaysAllowedRoutes = [
-  '/settings/billing',
-  '/settings/backups',
-  '/billing-blocked',
-  '/store-archived',
-  '/login',
-  '/admin',
-];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -54,46 +38,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // Check if accessing operational route with ARCHIVED store
-  const isOperationalRoute = operationalRoutes.some((route) => pathname.startsWith(route));
-  if (isLoggedIn && isOperationalRoute && session.storeId) {
-    try {
-      const store = await prisma.store.findUnique({
-        where: { id: session.storeId },
-        select: { status: true, name: true },
-      });
-
-      if (store && store.status === 'ARCHIVED') {
-        // Redirect to blocked page or show error
-        const blockedUrl = new URL('/store-archived', request.url);
-        blockedUrl.searchParams.set('storeName', store.name);
-        return NextResponse.redirect(blockedUrl);
-      }
-    } catch (error) {
-      console.error('Error checking store status:', error);
-      // Continue on error to avoid blocking legitimate access
-    }
-  }
-
-  // MÓDULO 16: Check billing/subscription status
-  // Bloquear operaciones si la suscripción está SUSPENDED o CANCELLED
-  const isAllowedRoute = alwaysAllowedRoutes.some((route) => pathname.startsWith(route));
-  
-  if (isLoggedIn && isOperationalRoute && !isAllowedRoute && session.storeId && !isSuperAdmin(session.email)) {
-    try {
-      const billingStatus = await getStoreOperationalStatus(session.storeId);
-      
-      if (!billingStatus.canOperate) {
-        // Redirigir a página de bloqueo por billing
-        const blockedUrl = new URL('/billing-blocked', request.url);
-        blockedUrl.searchParams.set('reason', billingStatus.blockingReason || 'UNKNOWN');
-        return NextResponse.redirect(blockedUrl);
-      }
-    } catch (error) {
-      console.error('Error checking billing status:', error);
-      // En caso de error, permitir acceso para no bloquear operaciones críticas
-    }
-  }
+  // ✅ NOTA: Verificaciones de ARCHIVED store y billing se hacen en cada página/componente
+  // No se puede usar Prisma aquí porque el middleware corre en Edge Runtime
 
   return response;
 }
