@@ -1,0 +1,1352 @@
+[
+  {
+    "name": "Inca Kola 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/389597-512-512/20019710.jpg"
+  },
+  {
+    "name": "Inca Kola 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/389594-512-512/20019704.jpg"
+  },
+  {
+    "name": "Inca Kola 300ml",
+    "brand": "Coca-Cola",
+    "content": "300 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Coca Cola 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603768-512-512/20019656.jpg"
+  },
+  {
+    "name": "Coca Cola 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603726-512-512/20019654.jpg"
+  },
+  {
+    "name": "Coca Cola 300ml",
+    "brand": "Coca-Cola",
+    "content": "300 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Sprite 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109002563"
+  },
+  {
+    "name": "Sprite 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109002556"
+  },
+  {
+    "name": "Fanta 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109003270"
+  },
+  {
+    "name": "Fanta 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109003263"
+  },
+  {
+    "name": "Agua San Luis 600ml",
+    "brand": "San Luis",
+    "content": "600 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750885000413"
+  },
+  {
+    "name": "Agua San Luis 2.5L",
+    "brand": "San Luis",
+    "content": "2.5 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750885000420"
+  },
+  {
+    "name": "Agua Cielo 625ml",
+    "brand": "Cielo",
+    "content": "625 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109005434"
+  },
+  {
+    "name": "Agua Cielo 2.5L",
+    "brand": "Cielo",
+    "content": "2.5 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109005441"
+  },
+  {
+    "name": "Agua San Mateo 625ml",
+    "brand": "San Mateo",
+    "content": "625 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271001229"
+  },
+  {
+    "name": "Cerveza Pilsen Callao 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750182002936"
+  },
+  {
+    "name": "Cerveza Cristal 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750182001229"
+  },
+  {
+    "name": "Cerveza Cusqueña Dorada 330ml",
+    "brand": "Backus",
+    "content": "330 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750182003636"
+  },
+  {
+    "name": "Cerveza Cusqueña Negra 330ml",
+    "brand": "Backus",
+    "content": "330 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750182003643"
+  },
+  {
+    "name": "Chicha Morada AJE 500ml",
+    "brand": "AJE",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271030229"
+  },
+  {
+    "name": "Kola Real 500ml",
+    "brand": "AJE",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271001564"
+  },
+  {
+    "name": "Kola Real 1L",
+    "brand": "AJE",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271001571"
+  },
+  {
+    "name": "Frugos Durazno 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109007148"
+  },
+  {
+    "name": "Frugos Naranja 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109007131"
+  },
+  {
+    "name": "Pulp Naranja 300ml",
+    "brand": "AJE",
+    "content": "300 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271003728"
+  },
+  {
+    "name": "Pulp Durazno 300ml",
+    "brand": "AJE",
+    "content": "300 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271003735"
+  },
+  {
+    "name": "Gloria Leche Entera 1L",
+    "brand": "Gloria",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750155400050"
+  },
+  {
+    "name": "Gloria Leche Evaporada 410g",
+    "brand": "Gloria",
+    "content": "410 g",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750155400104"
+  },
+  {
+    "name": "Gloria Leche Light 1L",
+    "brand": "Gloria",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750155400067"
+  },
+  {
+    "name": "Laive Leche Entera 1L",
+    "brand": "Laive",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750106500015"
+  },
+  {
+    "name": "Laive Yogurt Fresa 1L",
+    "brand": "Laive",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750106500329"
+  },
+  {
+    "name": "Laive Yogurt Durazno 1L",
+    "brand": "Laive",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750106500336"
+  },
+  {
+    "name": "Pura Vida Yogurt Fresa 1L",
+    "brand": "Pura Vida",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750155000416"
+  },
+  {
+    "name": "Gloria Yomost Fresa 135ml",
+    "brand": "Gloria",
+    "content": "135 ml",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750155400203"
+  },
+  {
+    "name": "Laive Queso Fresco 250g",
+    "brand": "Laive",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750106500701"
+  },
+  {
+    "name": "Gloria Mantequilla 200g",
+    "brand": "Gloria",
+    "content": "200 g",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7750155400500"
+  },
+  {
+    "name": "Pan Bimbo Blanco",
+    "brand": "Bimbo",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Panadería",
+    "barcode": "7750109080014"
+  },
+  {
+    "name": "Pan Bimbo Integral",
+    "brand": "Bimbo",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Panadería",
+    "barcode": "7750109080021"
+  },
+  {
+    "name": "Pan Bimbo Hot Dog",
+    "brand": "Bimbo",
+    "content": "8 unid",
+    "unitType": "UNIT",
+    "category": "Panadería",
+    "barcode": "7750109080038"
+  },
+  {
+    "name": "Galletas Soda Field 42g",
+    "brand": "Field",
+    "content": "42 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020012"
+  },
+  {
+    "name": "Galletas Oreo 36g",
+    "brand": "Oreo",
+    "content": "36 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7622210607164"
+  },
+  {
+    "name": "Galletas Ritz 42g",
+    "brand": "Ritz",
+    "content": "42 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7622210701480"
+  },
+  {
+    "name": "Galletas Morochas 30g",
+    "brand": "Nabisco",
+    "content": "30 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7622210608154"
+  },
+  {
+    "name": "Galletas Casino 100g",
+    "brand": "Nestlé",
+    "content": "100 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7501059206007"
+  },
+  {
+    "name": "Papas Lays Clásicas 180g",
+    "brand": "Lays",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020135"
+  },
+  {
+    "name": "Papas Lays Jamón 180g",
+    "brand": "Lays",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020142"
+  },
+  {
+    "name": "Papas Lays Limon 180g",
+    "brand": "Lays",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020159"
+  },
+  {
+    "name": "Cheetos 180g",
+    "brand": "Cheetos",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020166"
+  },
+  {
+    "name": "Doritos Nacho 180g",
+    "brand": "Doritos",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020173"
+  },
+  {
+    "name": "Sublime Chocolate 30g",
+    "brand": "Nestlé",
+    "content": "30 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "7501059218314"
+  },
+  {
+    "name": "Sublime Blanco 30g",
+    "brand": "Nestlé",
+    "content": "30 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "7501059218321"
+  },
+  {
+    "name": "Triángulo Chocolate 15g",
+    "brand": "Nestlé",
+    "content": "15 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "7501059218338"
+  },
+  {
+    "name": "Princesa Chocolate 30g",
+    "brand": "Nestlé",
+    "content": "30 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "7501059218345"
+  },
+  {
+    "name": "Snickers 50g",
+    "brand": "Mars",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "5000159407229"
+  },
+  {
+    "name": "Kit Kat 45g",
+    "brand": "Nestlé",
+    "content": "45 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "7501059218352"
+  },
+  {
+    "name": "Milky Way 58g",
+    "brand": "Mars",
+    "content": "58 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "5000159407236"
+  },
+  {
+    "name": "Twix 50g",
+    "brand": "Mars",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "5000159407243"
+  },
+  {
+    "name": "M&M's 45g",
+    "brand": "Mars",
+    "content": "45 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "5000159407250"
+  },
+  {
+    "name": "Chupete Tuinies",
+    "brand": "Ambrosoli",
+    "content": "1 unid",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "7750885010139"
+  },
+  {
+    "name": "Gomitas Mogul 50g",
+    "brand": "Mogul",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "barcode": "7790140306130"
+  },
+  {
+    "name": "Arroz Paisana 750g",
+    "brand": "Paisana",
+    "content": "750 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750182020015"
+  },
+  {
+    "name": "Arroz Costeño 750g",
+    "brand": "Costeño",
+    "content": "750 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750183000229"
+  },
+  {
+    "name": "Fideos Don Vittorio 250g",
+    "brand": "Don Vittorio",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000024"
+  },
+  {
+    "name": "Fideos Lavaggi 250g",
+    "brand": "Lavaggi",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000031"
+  },
+  {
+    "name": "Aceite Primor 1L",
+    "brand": "Primor",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000048"
+  },
+  {
+    "name": "Aceite Cocinero 1L",
+    "brand": "Cocinero",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000055"
+  },
+  {
+    "name": "Aceite Ideal 1L",
+    "brand": "Ideal",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000062"
+  },
+  {
+    "name": "Sal Emsal 1kg",
+    "brand": "Emsal",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000079"
+  },
+  {
+    "name": "Azúcar Rubia Cartavio 1kg",
+    "brand": "Cartavio",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000086"
+  },
+  {
+    "name": "Azúcar Blanca Cartavio 1kg",
+    "brand": "Cartavio",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000093"
+  },
+  {
+    "name": "Atún Florida en Aceite 170g",
+    "brand": "Florida",
+    "content": "170 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000109"
+  },
+  {
+    "name": "Atún Florida en Agua 170g",
+    "brand": "Florida",
+    "content": "170 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000116"
+  },
+  {
+    "name": "Atún Gloria en Aceite 170g",
+    "brand": "Gloria",
+    "content": "170 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750155400800"
+  },
+  {
+    "name": "Menestras Lentejas 500g",
+    "brand": "La Pradera",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000123"
+  },
+  {
+    "name": "Menestras Frejol 500g",
+    "brand": "La Pradera",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000130"
+  },
+  {
+    "name": "Menestras Garbanzos 500g",
+    "brand": "La Pradera",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000147"
+  },
+  {
+    "name": "Avena Quaker 170g",
+    "brand": "Quaker",
+    "content": "170 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000154"
+  },
+  {
+    "name": "Harina Blanca Flores 1kg",
+    "brand": "Nicolini",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000161"
+  },
+  {
+    "name": "Mayonesa Alacena 100g",
+    "brand": "Alacena",
+    "content": "100 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000178"
+  },
+  {
+    "name": "Ketchup Libby's 200g",
+    "brand": "Libby's",
+    "content": "200 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000185"
+  },
+  {
+    "name": "Mostaza Alacena 200g",
+    "brand": "Alacena",
+    "content": "200 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000192"
+  },
+  {
+    "name": "Ají Tari 85g",
+    "brand": "Tari",
+    "content": "85 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000208"
+  },
+  {
+    "name": "Vinagre Blanco 500ml",
+    "brand": "Bells",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000215"
+  },
+  {
+    "name": "Café Nescafé Clásico 50g",
+    "brand": "Nescafé",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7501059218369"
+  },
+  {
+    "name": "Café Altomayo Instantáneo 50g",
+    "brand": "Altomayo",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750885000222"
+  },
+  {
+    "name": "Té Herbi Manzanilla 25 sobres",
+    "brand": "Herbi",
+    "content": "25 sobres",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750885000239"
+  },
+  {
+    "name": "Té Herbi Anís 25 sobres",
+    "brand": "Herbi",
+    "content": "25 sobres",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750885000246"
+  },
+  {
+    "name": "Detergente Ariel 360g",
+    "brand": "Ariel",
+    "content": "360 g",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7500435100120"
+  },
+  {
+    "name": "Detergente Bolivar 360g",
+    "brand": "Bolivar",
+    "content": "360 g",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000253"
+  },
+  {
+    "name": "Detergente Marsella 360g",
+    "brand": "Marsella",
+    "content": "360 g",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000260"
+  },
+  {
+    "name": "Jabón Bolívar Barra 200g",
+    "brand": "Bolivar",
+    "content": "200 g",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000277"
+  },
+  {
+    "name": "Jabón Marsella Barra 200g",
+    "brand": "Marsella",
+    "content": "200 g",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000284"
+  },
+  {
+    "name": "Lejía Clorox 1L",
+    "brand": "Clorox",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000291"
+  },
+  {
+    "name": "Lavavajilla Ayudín 360ml",
+    "brand": "Ayudín",
+    "content": "360 ml",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000307"
+  },
+  {
+    "name": "Lavavajilla Sapolio 360ml",
+    "brand": "Sapolio",
+    "content": "360 ml",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000314"
+  },
+  {
+    "name": "Suavizante Suavitel 900ml",
+    "brand": "Suavitel",
+    "content": "900 ml",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7500435100137"
+  },
+  {
+    "name": "Papel Higiénico Elite 4 rollos",
+    "brand": "Elite",
+    "content": "4 rollos",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000321"
+  },
+  {
+    "name": "Papel Higiénico Suave 4 rollos",
+    "brand": "Suave",
+    "content": "4 rollos",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000338"
+  },
+  {
+    "name": "Papel Toalla Nova 2 rollos",
+    "brand": "Nova",
+    "content": "2 rollos",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000345"
+  },
+  {
+    "name": "Servilletas Elite 50 unid",
+    "brand": "Elite",
+    "content": "50 unid",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000352"
+  },
+  {
+    "name": "Pañuelos Elite 10 paquetes",
+    "brand": "Elite",
+    "content": "10 paquetes",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000369"
+  },
+  {
+    "name": "Esponja Scotch Brite",
+    "brand": "3M",
+    "content": "1 unid",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "barcode": "7750885000376"
+  },
+  {
+    "name": "Champú Sedal 340ml",
+    "brand": "Sedal",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7791293020013"
+  },
+  {
+    "name": "Champú Pantene 340ml",
+    "brand": "Pantene",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7500435100144"
+  },
+  {
+    "name": "Champú H&S 340ml",
+    "brand": "Head & Shoulders",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7500435100151"
+  },
+  {
+    "name": "Acondicionador Sedal 340ml",
+    "brand": "Sedal",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7791293020020"
+  },
+  {
+    "name": "Jabón Dove 90g",
+    "brand": "Dove",
+    "content": "90 g",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7791293020037"
+  },
+  {
+    "name": "Jabón Palmolive 90g",
+    "brand": "Palmolive",
+    "content": "90 g",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000383"
+  },
+  {
+    "name": "Jabón Camay 90g",
+    "brand": "Camay",
+    "content": "90 g",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7500435100168"
+  },
+  {
+    "name": "Pasta Dental Colgate 75ml",
+    "brand": "Colgate",
+    "content": "75 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000390"
+  },
+  {
+    "name": "Pasta Dental Dento 75ml",
+    "brand": "Dento",
+    "content": "75 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000406"
+  },
+  {
+    "name": "Cepillo Dental Colgate Suave",
+    "brand": "Colgate",
+    "content": "1 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000437"
+  },
+  {
+    "name": "Desodorante Rexona Men 50ml",
+    "brand": "Rexona",
+    "content": "50 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7791293020044"
+  },
+  {
+    "name": "Desodorante Rexona Women 50ml",
+    "brand": "Rexona",
+    "content": "50 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7791293020051"
+  },
+  {
+    "name": "Desodorante Speed Stick 50ml",
+    "brand": "Speed Stick",
+    "content": "50 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000444"
+  },
+  {
+    "name": "Pañales Babysec G 40 unid",
+    "brand": "Babysec",
+    "content": "40 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000451"
+  },
+  {
+    "name": "Pañales Huggies G 40 unid",
+    "brand": "Huggies",
+    "content": "40 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000468"
+  },
+  {
+    "name": "Toallas Higiénicas Nosotras 10 unid",
+    "brand": "Nosotras",
+    "content": "10 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000475"
+  },
+  {
+    "name": "Toallas Higiénicas Always 10 unid",
+    "brand": "Always",
+    "content": "10 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7500435100175"
+  },
+  {
+    "name": "Gillette Prestobarba 3 unid",
+    "brand": "Gillette",
+    "content": "3 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "barcode": "7750885000482"
+  },
+  {
+    "name": "Energizante Red Bull 250ml",
+    "brand": "Red Bull",
+    "content": "250 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "9002490100018"
+  },
+  {
+    "name": "Energizante Volt 310ml",
+    "brand": "Volt",
+    "content": "310 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109020180"
+  },
+  {
+    "name": "Energizante Monster 473ml",
+    "brand": "Monster",
+    "content": "473 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "5060517880019"
+  },
+  {
+    "name": "Gatorade Naranja 500ml",
+    "brand": "Gatorade",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109020197"
+  },
+  {
+    "name": "Gatorade Uva 500ml",
+    "brand": "Gatorade",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109020203"
+  },
+  {
+    "name": "Sporade Naranja 500ml",
+    "brand": "Sporade",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271030236"
+  },
+  {
+    "name": "Cifrut Naranja 200ml",
+    "brand": "Cifrut",
+    "content": "200 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271030243"
+  },
+  {
+    "name": "Cifrut Durazno 200ml",
+    "brand": "Cifrut",
+    "content": "200 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271030250"
+  },
+  {
+    "name": "Cifrut Piña 200ml",
+    "brand": "Cifrut",
+    "content": "200 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7751271030267"
+  },
+  {
+    "name": "Tampico Citrus 1L",
+    "brand": "Tampico",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750109020210"
+  },
+  {
+    "name": "Pringles Original 124g",
+    "brand": "Pringles",
+    "content": "124 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "5053990101788"
+  },
+  {
+    "name": "Pringles Crema y Cebolla 124g",
+    "brand": "Pringles",
+    "content": "124 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "5053990101795"
+  },
+  {
+    "name": "Karinto 50g",
+    "brand": "Karinto",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020227"
+  },
+  {
+    "name": "Chifles 50g",
+    "brand": "Inka Chips",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020234"
+  },
+  {
+    "name": "Maní Salado 50g",
+    "brand": "Karinto",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020241"
+  },
+  {
+    "name": "Pasas 50g",
+    "brand": "Valle Verde",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020258"
+  },
+  {
+    "name": "Mix Frutos Secos 50g",
+    "brand": "Valle Verde",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "barcode": "7750109020265"
+  },
+  {
+    "name": "Gelatina Universal Fresa 120g",
+    "brand": "Universal",
+    "content": "120 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000499"
+  },
+  {
+    "name": "Gelatina Universal Piña 120g",
+    "brand": "Universal",
+    "content": "120 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000505"
+  },
+  {
+    "name": "Flan Universal Vainilla 120g",
+    "brand": "Universal",
+    "content": "120 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000512"
+  },
+  {
+    "name": "Mazamorra Universal Morada 150g",
+    "brand": "Universal",
+    "content": "150 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000529"
+  },
+  {
+    "name": "Leche Condensada Nestlé 393g",
+    "brand": "Nestlé",
+    "content": "393 g",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7501059218376"
+  },
+  {
+    "name": "Manjar Blanco Nestlé 393g",
+    "brand": "Nestlé",
+    "content": "393 g",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7501059218383"
+  },
+  {
+    "name": "Crema de Leche Nestlé 300g",
+    "brand": "Nestlé",
+    "content": "300 g",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "barcode": "7501059218390"
+  },
+  {
+    "name": "Hot Dog Braedt 250g",
+    "brand": "Braedt",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Embutidos",
+    "barcode": "7750885000536"
+  },
+  {
+    "name": "Hot Dog San Fernando 250g",
+    "brand": "San Fernando",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Embutidos",
+    "barcode": "7750885000543"
+  },
+  {
+    "name": "Jamón Braedt 250g",
+    "brand": "Braedt",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Embutidos",
+    "barcode": "7750885000550"
+  },
+  {
+    "name": "Jamón San Fernando 250g",
+    "brand": "San Fernando",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Embutidos",
+    "barcode": "7750885000567"
+  },
+  {
+    "name": "Salchicha Braedt 250g",
+    "brand": "Braedt",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Embutidos",
+    "barcode": "7750885000574"
+  },
+  {
+    "name": "Huevos Docena",
+    "brand": "San Fernando",
+    "content": "12 unid",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "barcode": "7750885000581"
+  },
+  {
+    "name": "Cerveza Pilsen Trujillo 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750182002943"
+  },
+  {
+    "name": "Cerveza Barena 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750182002950"
+  },
+  {
+    "name": "Ron Cartavio 750ml",
+    "brand": "Cartavio",
+    "content": "750 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750885000598"
+  },
+  {
+    "name": "Pisco Tacama 750ml",
+    "brand": "Tacama",
+    "content": "750 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750885000604"
+  },
+  {
+    "name": "Pisco Cuatro Gallos 750ml",
+    "brand": "Cuatro Gallos",
+    "content": "750 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750885000611"
+  },
+  {
+    "name": "Vino Tabernero Tinto 750ml",
+    "brand": "Tabernero",
+    "content": "750 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750885000628"
+  },
+  {
+    "name": "Vino Tacama Tinto 750ml",
+    "brand": "Tacama",
+    "content": "750 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "barcode": "7750885000635"
+  },
+  {
+    "name": "Malta Maltin Power 310ml",
+    "brand": "Backus",
+    "content": "310 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750182002967"
+  },
+  {
+    "name": "Malta Viva Backus 310ml",
+    "brand": "Backus",
+    "content": "310 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "barcode": "7750182002974"
+  },
+  {
+    "name": "Pilas Duracell AA 2 unid",
+    "brand": "Duracell",
+    "content": "2 unid",
+    "unitType": "UNIT",
+    "category": "Varios",
+    "barcode": "5000394019157"
+  },
+  {
+    "name": "Pilas Duracell AAA 2 unid",
+    "brand": "Duracell",
+    "content": "2 unid",
+    "unitType": "UNIT",
+    "category": "Varios",
+    "barcode": "5000394019164"
+  },
+  {
+    "name": "Fósforos Fiat Lux",
+    "brand": "Fiat Lux",
+    "content": "1 caja",
+    "unitType": "UNIT",
+    "category": "Varios",
+    "barcode": "7750885000642"
+  },
+  {
+    "name": "Vela Blanca",
+    "brand": "Varios",
+    "content": "1 unid",
+    "unitType": "UNIT",
+    "category": "Varios",
+    "barcode": "7750885000659"
+  },
+  {
+    "name": "Paracetamol 500mg 10 tabletas",
+    "brand": "Genérico",
+    "content": "10 tabletas",
+    "unitType": "UNIT",
+    "category": "Farmacia",
+    "barcode": "7750885000666"
+  },
+  {
+    "name": "Ibuprofeno 400mg 10 tabletas",
+    "brand": "Genérico",
+    "content": "10 tabletas",
+    "unitType": "UNIT",
+    "category": "Farmacia",
+    "barcode": "7750885000673"
+  },
+  {
+    "name": "Alcohol 70% 250ml",
+    "brand": "Varios",
+    "content": "250 ml",
+    "unitType": "UNIT",
+    "category": "Farmacia",
+    "barcode": "7750885000680"
+  },
+  {
+    "name": "Agua Oxigenada 120ml",
+    "brand": "Varios",
+    "content": "120 ml",
+    "unitType": "UNIT",
+    "category": "Farmacia",
+    "barcode": "7750885000697"
+  },
+  {
+    "name": "Curitas x 10 unid",
+    "brand": "Band-Aid",
+    "content": "10 unid",
+    "unitType": "UNIT",
+    "category": "Farmacia",
+    "barcode": "7750885000703"
+  },
+  {
+    "name": "Mascarilla Descartable x 5",
+    "brand": "Varios",
+    "content": "5 unid",
+    "unitType": "UNIT",
+    "category": "Farmacia",
+    "barcode": "7750885000710"
+  }
+]

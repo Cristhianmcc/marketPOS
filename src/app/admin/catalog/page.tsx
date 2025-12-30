@@ -310,6 +310,7 @@ export default function CatalogPage() {
             product={importModal.product}
             onClose={() => setImportModal({ open: false })}
             onSuccess={handleImportSuccess}
+            currentUser={user}
           />
         )}
       </div>

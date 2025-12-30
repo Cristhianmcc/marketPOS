@@ -20,6 +20,17 @@ interface ProductSuggestion {
   matchType: 'exact_barcode' | 'name_contains';
 }
 
+// ✅ MÓDULO 18.2: Interface para sugerencias fuzzy
+interface FuzzySuggestion {
+  id: string;
+  name: string;
+  brand: string | null;
+  content: string | null;
+  barcode: string | null;
+  category: string;
+  similarity: number;
+}
+
 export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProductModalProps) {
   const [tab, setTab] = useState<'with-code' | 'without-code'>('with-code');
   const [loading, setLoading] = useState(false);
@@ -27,6 +38,8 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
   const [error, setError] = useState('');
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [fuzzySuggestions, setFuzzySuggestions] = useState<FuzzySuggestion[]>([]); // ✅ MÓDULO 18.2
+  const [loadingFuzzy, setLoadingFuzzy] = useState(false); // ✅ MÓDULO 18.2
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -90,6 +103,31 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     return () => clearTimeout(timeoutId);
   }, [formData.barcode, tab]);
 
+  // ✅ MÓDULO 18.2: Buscar sugerencias fuzzy cuando cambia el nombre (sin barcode)
+  useEffect(() => {
+    const checkFuzzy = async () => {
+      if (tab === 'without-code' && formData.name && formData.name.length >= 3) {
+        try {
+          setLoadingFuzzy(true);
+          const res = await fetch(`/api/products/suggest-fuzzy?q=${encodeURIComponent(formData.name)}&limit=5`);
+          if (res.ok) {
+            const data = await res.json();
+            setFuzzySuggestions(data || []);
+          }
+        } catch (err) {
+          console.error('Error checking fuzzy:', err);
+        } finally {
+          setLoadingFuzzy(false);
+        }
+      } else {
+        setFuzzySuggestions([]);
+      }
+    };
+
+    const timeoutId = setTimeout(checkFuzzy, 700); // Debounce más largo para fuzzy
+    return () => clearTimeout(timeoutId);
+  }, [formData.name, tab]);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -130,6 +168,65 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       setError(err instanceof Error ? err.message : 'Error al subir imagen');
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  // ✅ MÓDULO 18.2: Usar producto sugerido fuzzy
+  const handleUseFuzzySuggestion = async (suggestion: FuzzySuggestion) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      // Verificar si el producto ya existe en la tienda
+      const checkRes = await fetch(`/api/store-products?productId=${suggestion.id}`);
+      const checkData = await checkRes.json();
+
+      if (checkData.exists) {
+        setError('Este producto ya existe en tu tienda');
+        setLoading(false);
+        return;
+      }
+
+      // Validar precio
+      const price = parseFloat(formData.price);
+      if (isNaN(price) || price <= 0) {
+        setError('Debes ingresar un precio de venta para tu tienda');
+        setLoading(false);
+        return;
+      }
+
+      // Crear StoreProduct
+      const stock = formData.stock && formData.stock.trim() !== '' ? parseFloat(formData.stock) : null;
+      const minStock = formData.minStock && formData.minStock.trim() !== '' ? parseFloat(formData.minStock) : null;
+
+      const storeProductPayload = {
+        productId: suggestion.id,
+        price,
+        stock,
+        minStock,
+        active: true,
+      };
+
+      const storeRes = await fetch('/api/store-products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(storeProductPayload),
+      });
+
+      if (!storeRes.ok) {
+        const storeData = await storeRes.json();
+        setError(storeData.error || 'Error al configurar producto en tienda');
+        setLoading(false);
+        return;
+      }
+
+      onSuccess();
+      onClose();
+      resetForm();
+    } catch (err) {
+      console.error('Error using fuzzy suggestion:', err);
+      setError('Error de conexión');
+      setLoading(false);
     }
   };
 
@@ -281,6 +378,8 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     setError('');
     setSuggestions([]);
     setShowDuplicateWarning(false);
+    setFuzzySuggestions([]); // ✅ MÓDULO 18.2
+    setLoadingFuzzy(false); // ✅ MÓDULO 18.2
   };
 
   if (!isOpen) return null;
@@ -335,6 +434,60 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
               placeholder="Ej: Arroz Extra"
             />
           </div>
+
+          {/* ✅ MÓDULO 18.2: Mostrar sugerencias fuzzy (sin barcode) */}
+          {tab === 'without-code' && formData.name.length >= 3 && (
+            <div>
+              {loadingFuzzy ? (
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+                    <span className="text-sm text-gray-600">Buscando coincidencias...</span>
+                  </div>
+                </div>
+              ) : fuzzySuggestions.length > 0 ? (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-md">
+                  <p className="text-sm font-medium text-purple-900 mb-2">
+                    💡 Productos similares encontrados en el catálogo:
+                  </p>
+                  <div className="space-y-2">
+                    {fuzzySuggestions.map((sug) => (
+                      <div
+                        key={sug.id}
+                        className="p-2 bg-white border border-purple-200 rounded-md hover:border-purple-400 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {sug.name}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5">
+                              {sug.brand && <span>🏷️ {sug.brand}</span>}
+                              {sug.content && <span>📦 {sug.content}</span>}
+                              <span className="text-purple-600 font-medium">
+                                {Math.round(sug.similarity * 100)}% similar
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleUseFuzzySuggestion(sug)}
+                            disabled={loading}
+                            className="flex-shrink-0 px-3 py-1 text-xs font-medium bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                          >
+                            Usar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-purple-700 mt-2">
+                    O continúa creando uno nuevo si ninguno coincide
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {tab === 'with-code' && (
             <>

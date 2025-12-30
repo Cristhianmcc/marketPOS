@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Package } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -15,28 +15,69 @@ interface ProductMaster {
   imageUrl: string | null;
 }
 
+interface Store {
+  id: string;
+  name: string;
+}
+
 interface ImportProductModalProps {
   product: ProductMaster;
   onClose: () => void;
   onSuccess: () => void;
+  currentUser?: any;
 }
 
 export function ImportProductModal({
   product,
   onClose,
   onSuccess,
+  currentUser,
 }: ImportProductModalProps) {
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
   const [minStock, setMinStock] = useState('');
   const [active, setActive] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [loadingStores, setLoadingStores] = useState(false);
+
+  // Si el usuario es SUPERADMIN, cargar lista de tiendas
+  useEffect(() => {
+    // Verificar si es SUPERADMIN por el flag que viene del backend
+    if (currentUser?.isSuperAdmin) {
+      loadStores();
+    } else if (currentUser?.storeId) {
+      setSelectedStoreId(currentUser.storeId);
+    }
+  }, [currentUser]);
+
+  const loadStores = async () => {
+    setLoadingStores(true);
+    try {
+      const res = await fetch('/api/stores');
+      if (res.ok) {
+        const data = await res.json();
+        setStores(data.stores || []);
+      }
+    } catch (error) {
+      console.error('Error loading stores:', error);
+    } finally {
+      setLoadingStores(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!price || parseFloat(price) <= 0) {
       toast.error('El precio debe ser mayor a 0');
+      return;
+    }
+
+    // SUPERADMIN debe seleccionar tienda
+    if (currentUser?.isSuperAdmin && !selectedStoreId) {
+      toast.error('Selecciona una tienda');
       return;
     }
 
@@ -48,6 +89,11 @@ export function ImportProductModal({
         price: parseFloat(price),
         active,
       };
+
+      // Si es SUPERADMIN, agregar storeId al body
+      if (currentUser?.isSuperAdmin && selectedStoreId) {
+        body.targetStoreId = selectedStoreId;
+      }
 
       // Solo agregar stock si el producto es de tipo UNIT
       if (product.unitType === 'UNIT') {
@@ -102,6 +148,32 @@ export function ImportProductModal({
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-6">
+          {/* Selector de Tienda (solo SUPERADMIN) */}
+          {currentUser?.isSuperAdmin && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tienda de Destino *
+              </label>
+              {loadingStores ? (
+                <p className="text-sm text-gray-500">Cargando tiendas...</p>
+              ) : (
+                <select
+                  value={selectedStoreId}
+                  onChange={(e) => setSelectedStoreId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Selecciona una tienda</option>
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* Producto Info */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center gap-3">

@@ -1298,7 +1298,7 @@ export default function POSPage() {
             </div>
           )}
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[calc(100vh-200px)]">
             {/* Columna Izquierda: Búsqueda y Productos */}
             <div className="lg:col-span-2 space-y-6">
               {/* Search - Optimizado para táctil */}
@@ -1337,8 +1337,8 @@ export default function POSPage() {
                 </div>
               </div>
 
-              {/* ✅ MÓDULO 17.2: Quick Sell Grid */}
-              {currentShift && (
+              {/* ✅ MÓDULO 17.2: Quick Sell Grid - Oculto cuando hay búsqueda activa */}
+              {currentShift && !query.trim() && (
                 <QuickSellGrid 
                   onAddProduct={handleAddFromQuickSell}
                   disabled={!currentShift}

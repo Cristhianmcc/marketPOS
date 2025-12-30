@@ -116,7 +116,7 @@ export default function CartPanel({
   const total = Math.max(0, subtotal - totalDiscounts - couponDiscount);
 
   return (
-    <div className="hidden md:flex md:flex-col h-full bg-white border-l">
+    <div className="hidden md:flex md:flex-col h-[calc(100vh-120px)] bg-white border-l border-gray-200 rounded-lg shadow-sm">
       {/* Header fijo */}
       <div className="flex items-center justify-between p-4 border-b bg-white shrink-0">
         <div className="flex items-center gap-2">

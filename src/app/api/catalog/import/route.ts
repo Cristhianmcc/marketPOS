@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { logAudit } from '@/lib/auditLog';
+import { isSuperAdmin } from '@/lib/superadmin';
 import { z } from 'zod';
 
 const ImportProductSchema = z.object({
@@ -42,7 +43,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { productMasterId, price, stock, minStock, active } = validation.data;
+    const { productMasterId, price, stock, minStock, active, targetStoreId } = body;
+
+    // Determinar la tienda destino: si es SUPERADMIN y pasa targetStoreId, usar esa; sino, usar su propia tienda
+    let destinationStoreId = user.storeId;
+
+    if (targetStoreId) {
+      const isSuperAdminCheck = await isSuperAdmin(user.email);
+      if (!isSuperAdminCheck) {
+        return NextResponse.json(
+          { error: 'No tienes permisos para importar a otras tiendas' },
+          { status: 403 }
+        );
+      }
+      // Verificar que la tienda existe
+      const targetStore = await prisma.store.findUnique({
+        where: { id: targetStoreId },
+      });
+      if (!targetStore) {
+        return NextResponse.json(
+          { error: 'Tienda destino no encontrada' },
+          { status: 404 }
+        );
+      }
+      destinationStoreId = targetStoreId;
+    }
 
     // Verificar que el producto existe y es global
     const productMaster = await prisma.productMaster.findUnique({
@@ -63,11 +88,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verificar si ya existe en la tienda
+    // Verificar si ya existe en la tienda destino
     const existing = await prisma.storeProduct.findUnique({
       where: {
         storeId_productId: {
-          storeId: user.storeId,
+          storeId: destinationStoreId,
           productId: productMasterId,
         },
       },
@@ -75,15 +100,15 @@ export async function POST(req: NextRequest) {
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Este producto ya está importado en tu tienda' },
+        { error: 'Este producto ya está importado en la tienda destino' },
         { status: 409 }
       );
     }
 
-    // Crear StoreProduct
+    // Crear StoreProduct en la tienda destino
     const storeProduct = await prisma.storeProduct.create({
       data: {
-        storeId: user.storeId,
+        storeId: destinationStoreId,
         productId: productMasterId,
         price,
         stock: stock ?? null,
@@ -97,7 +122,7 @@ export async function POST(req: NextRequest) {
 
     // Audit log
     await logAudit({
-      storeId: user.storeId,
+      storeId: destinationStoreId,
       userId: user.userId,
       action: 'CATALOG_IMPORT_SUCCESS',
       entityType: 'CATALOG',

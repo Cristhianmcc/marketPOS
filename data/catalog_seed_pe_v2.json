@@ -1,0 +1,401 @@
+[
+  {
+    "name": "Inca Kola 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/389597-512-512/20019710.jpg"
+  },
+  {
+    "name": "Inca Kola 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/389594-512-512/20019704.jpg"
+  },
+  {
+    "name": "Coca Cola 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603768-512-512/20019656.jpg"
+  },
+  {
+    "name": "Coca Cola 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603726-512-512/20019654.jpg"
+  },
+  {
+    "name": "Sprite 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603813-512-512/20019667.jpg"
+  },
+  {
+    "name": "Fanta 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603857-512-512/20019672.jpg"
+  },
+  {
+    "name": "Agua San Luis 625ml",
+    "brand": "San Luis",
+    "content": "625 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/28965322-512-512/20030027.jpg"
+  },
+  {
+    "name": "Agua Cielo 625ml",
+    "brand": "Cielo",
+    "content": "625 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603621-512-512/20019619.jpg"
+  },
+  {
+    "name": "Cerveza Pilsen Callao 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956463-512-512/20019476.jpg"
+  },
+  {
+    "name": "Cerveza Cristal 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956450-512-512/20019458.jpg"
+  },
+  {
+    "name": "Cerveza Cusqueña 330ml",
+    "brand": "Backus",
+    "content": "330 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956454-512-512/20019460.jpg"
+  },
+  {
+    "name": "Gloria Leche Entera 1L",
+    "brand": "Gloria",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603389-512-512/20112923.jpg"
+  },
+  {
+    "name": "Gloria Leche Evaporada 410g",
+    "brand": "Gloria",
+    "content": "410 g",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603395-512-512/20112930.jpg"
+  },
+  {
+    "name": "Laive Yogurt Fresa 1L",
+    "brand": "Laive",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/28965350-512-512/20113003.jpg"
+  },
+  {
+    "name": "Pan Bimbo Blanco 500g",
+    "brand": "Bimbo",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Panadería",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956638-512-512/20116001.jpg"
+  },
+  {
+    "name": "Pan Bimbo Integral 500g",
+    "brand": "Bimbo",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Panadería",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956639-512-512/20116002.jpg"
+  },
+  {
+    "name": "Galletas Soda Field 42g",
+    "brand": "Field",
+    "content": "42 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956684-512-512/20133901.jpg"
+  },
+  {
+    "name": "Galletas Oreo 36g",
+    "brand": "Oreo",
+    "content": "36 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956671-512-512/20133805.jpg"
+  },
+  {
+    "name": "Papas Lays Clásicas 180g",
+    "brand": "Lays",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956760-512-512/20135011.jpg"
+  },
+  {
+    "name": "Papas Lays Jamón 180g",
+    "brand": "Lays",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956763-512-512/20135014.jpg"
+  },
+  {
+    "name": "Cheetos 180g",
+    "brand": "Cheetos",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956749-512-512/20134906.jpg"
+  },
+  {
+    "name": "Doritos Nacho 180g",
+    "brand": "Doritos",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956752-512-512/20134908.jpg"
+  },
+  {
+    "name": "Sublime Chocolate 30g",
+    "brand": "Nestlé",
+    "content": "30 g",
+    "unitType": "UNIT",
+    "category": "Dulces",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956798-512-512/20136302.jpg"
+  },
+  {
+    "name": "Arroz Paisana 1kg",
+    "brand": "Paisana",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956836-512-512/20138401.jpg"
+  },
+  {
+    "name": "Arroz Costeño 1kg",
+    "brand": "Costeño",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956829-512-512/20138301.jpg"
+  },
+  {
+    "name": "Fideos Don Vittorio 250g",
+    "brand": "Don Vittorio",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956846-512-512/20139101.jpg"
+  },
+  {
+    "name": "Aceite Primor 1L",
+    "brand": "Primor",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/28965379-512-512/20138701.jpg"
+  },
+  {
+    "name": "Aceite Ideal 1L",
+    "brand": "Ideal",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956858-512-512/20138601.jpg"
+  },
+  {
+    "name": "Sal Emsal 1kg",
+    "brand": "Emsal",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956880-512-512/20141001.jpg"
+  },
+  {
+    "name": "Azúcar Blanca 1kg",
+    "brand": "Cartavio",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956819-512-512/20137901.jpg"
+  },
+  {
+    "name": "Atún en Aceite 170g",
+    "brand": "Florida",
+    "content": "170 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956910-512-512/20142301.jpg"
+  },
+  {
+    "name": "Mayonesa Alacena 100g",
+    "brand": "Alacena",
+    "content": "100 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956924-512-512/20143101.jpg"
+  },
+  {
+    "name": "Ketchup Libby's 200g",
+    "brand": "Libby's",
+    "content": "200 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956929-512-512/20143201.jpg"
+  },
+  {
+    "name": "Café Nescafé Clásico 50g",
+    "brand": "Nescafé",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27956948-512-512/20144201.jpg"
+  },
+  {
+    "name": "Detergente Ariel 360g",
+    "brand": "Ariel",
+    "content": "360 g",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957012-512-512/20145901.jpg"
+  },
+  {
+    "name": "Detergente Bolivar 360g",
+    "brand": "Bolivar",
+    "content": "360 g",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957018-512-512/20145801.jpg"
+  },
+  {
+    "name": "Lejía Clorox 1L",
+    "brand": "Clorox",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957054-512-512/20146701.jpg"
+  },
+  {
+    "name": "Lavavajilla Ayudín 360ml",
+    "brand": "Ayudín",
+    "content": "360 ml",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957040-512-512/20146401.jpg"
+  },
+  {
+    "name": "Papel Higiénico Elite 4 rollos",
+    "brand": "Elite",
+    "content": "4 rollos",
+    "unitType": "UNIT",
+    "category": "Limpieza",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957086-512-512/20148101.jpg"
+  },
+  {
+    "name": "Champú Sedal 340ml",
+    "brand": "Sedal",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957108-512-512/20148801.jpg"
+  },
+  {
+    "name": "Champú Pantene 340ml",
+    "brand": "Pantene",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957103-512-512/20148701.jpg"
+  },
+  {
+    "name": "Jabón Dove 90g",
+    "brand": "Dove",
+    "content": "90 g",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957128-512-512/20149401.jpg"
+  },
+  {
+    "name": "Pasta Dental Colgate 75ml",
+    "brand": "Colgate",
+    "content": "75 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957148-512-512/20149901.jpg"
+  },
+  {
+    "name": "Desodorante Rexona 50ml",
+    "brand": "Rexona",
+    "content": "50 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957119-512-512/20149101.jpg"
+  },
+  {
+    "name": "Pañales Huggies G 40 unid",
+    "brand": "Huggies",
+    "content": "40 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957165-512-512/20150301.jpg"
+  },
+  {
+    "name": "Energizante Red Bull 250ml",
+    "brand": "Red Bull",
+    "content": "250 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603902-512-512/20019802.jpg"
+  },
+  {
+    "name": "Gatorade Naranja 500ml",
+    "brand": "Gatorade",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27603646-512-512/20019628.jpg"
+  },
+  {
+    "name": "Huevos Docena",
+    "brand": "San Fernando",
+    "content": "12 unid",
+    "unitType": "UNIT",
+    "category": "Abarrotes",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/28965435-512-512/20114201.jpg"
+  },
+  {
+    "name": "Pilas AA x 2",
+    "brand": "Duracell",
+    "content": "2 unid",
+    "unitType": "UNIT",
+    "category": "Varios",
+    "imageUrl": "https://plazavea.vteximg.com.br/arquivos/ids/27957206-512-512/20151501.jpg"
+  },
+  {
+    "name": "Paracetamol 500mg x 10",
+    "brand": "Genérico",
+    "content": "10 tabletas",
+    "unitType": "UNIT",
+    "category": "Farmacia"
+  }
+]

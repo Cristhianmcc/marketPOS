@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
+import { isSuperAdmin } from '@/lib/superadmin';
 
 export async function GET() {
   try {
@@ -19,6 +20,7 @@ export async function GET() {
         name: user.name,
         role: user.role,
         storeId: user.storeId,
+        isSuperAdmin: isSuperAdmin(user.email),
       },
     });
   } catch (error) {

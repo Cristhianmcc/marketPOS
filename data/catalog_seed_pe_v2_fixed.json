@@ -1,0 +1,345 @@
+[
+  {
+    "name": "Inca Kola 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Inca Kola 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Coca Cola 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Coca Cola 500ml",
+    "brand": "Coca-Cola",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Sprite 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Fanta 1L",
+    "brand": "Coca-Cola",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Agua San Luis 625ml",
+    "brand": "San Luis",
+    "content": "625 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Agua Cielo 625ml",
+    "brand": "Cielo",
+    "content": "625 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Cerveza Pilsen Callao 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas"
+  },
+  {
+    "name": "Cerveza Cristal 630ml",
+    "brand": "Backus",
+    "content": "630 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas"
+  },
+  {
+    "name": "Cerveza Cusqueña 330ml",
+    "brand": "Backus",
+    "content": "330 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas Alcohólicas"
+  },
+  {
+    "name": "Gloria Leche Entera 1L",
+    "brand": "Gloria",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos"
+  },
+  {
+    "name": "Gloria Leche Evaporada 410g",
+    "brand": "Gloria",
+    "content": "410 g",
+    "unitType": "UNIT",
+    "category": "Lácteos"
+  },
+  {
+    "name": "Laive Yogurt Fresa 1L",
+    "brand": "Laive",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Lácteos"
+  },
+  {
+    "name": "Pan Bimbo Blanco 500g",
+    "brand": "Bimbo",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Panadería"
+  },
+  {
+    "name": "Pan Bimbo Integral 500g",
+    "brand": "Bimbo",
+    "content": "500 g",
+    "unitType": "UNIT",
+    "category": "Panadería"
+  },
+  {
+    "name": "Galletas Soda Field 42g",
+    "brand": "Field",
+    "content": "42 g",
+    "unitType": "UNIT",
+    "category": "Snacks"
+  },
+  {
+    "name": "Galletas Oreo 36g",
+    "brand": "Oreo",
+    "content": "36 g",
+    "unitType": "UNIT",
+    "category": "Snacks"
+  },
+  {
+    "name": "Papas Lays Clásicas 180g",
+    "brand": "Lays",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks"
+  },
+  {
+    "name": "Papas Lays Jamón 180g",
+    "brand": "Lays",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks"
+  },
+  {
+    "name": "Cheetos 180g",
+    "brand": "Cheetos",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks"
+  },
+  {
+    "name": "Doritos Nacho 180g",
+    "brand": "Doritos",
+    "content": "180 g",
+    "unitType": "UNIT",
+    "category": "Snacks"
+  },
+  {
+    "name": "Sublime Chocolate 30g",
+    "brand": "Nestlé",
+    "content": "30 g",
+    "unitType": "UNIT",
+    "category": "Dulces"
+  },
+  {
+    "name": "Arroz Paisana 1kg",
+    "brand": "Paisana",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Arroz Costeño 1kg",
+    "brand": "Costeño",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Fideos Don Vittorio 250g",
+    "brand": "Don Vittorio",
+    "content": "250 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Aceite Primor 1L",
+    "brand": "Primor",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Aceite Ideal 1L",
+    "brand": "Ideal",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Sal Emsal 1kg",
+    "brand": "Emsal",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Azúcar Blanca 1kg",
+    "brand": "Cartavio",
+    "content": "1 kg",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Atún en Aceite 170g",
+    "brand": "Florida",
+    "content": "170 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Mayonesa Alacena 100g",
+    "brand": "Alacena",
+    "content": "100 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Ketchup Libby's 200g",
+    "brand": "Libby's",
+    "content": "200 g",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Café Nescafé Clásico 50g",
+    "brand": "Nescafé",
+    "content": "50 g",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Detergente Ariel 360g",
+    "brand": "Ariel",
+    "content": "360 g",
+    "unitType": "UNIT",
+    "category": "Limpieza"
+  },
+  {
+    "name": "Detergente Bolivar 360g",
+    "brand": "Bolivar",
+    "content": "360 g",
+    "unitType": "UNIT",
+    "category": "Limpieza"
+  },
+  {
+    "name": "Lejía Clorox 1L",
+    "brand": "Clorox",
+    "content": "1 L",
+    "unitType": "UNIT",
+    "category": "Limpieza"
+  },
+  {
+    "name": "Lavavajilla Ayudín 360ml",
+    "brand": "Ayudín",
+    "content": "360 ml",
+    "unitType": "UNIT",
+    "category": "Limpieza"
+  },
+  {
+    "name": "Papel Higiénico Elite 4 rollos",
+    "brand": "Elite",
+    "content": "4 rollos",
+    "unitType": "UNIT",
+    "category": "Limpieza"
+  },
+  {
+    "name": "Champú Sedal 340ml",
+    "brand": "Sedal",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal"
+  },
+  {
+    "name": "Champú Pantene 340ml",
+    "brand": "Pantene",
+    "content": "340 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal"
+  },
+  {
+    "name": "Jabón Dove 90g",
+    "brand": "Dove",
+    "content": "90 g",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal"
+  },
+  {
+    "name": "Pasta Dental Colgate 75ml",
+    "brand": "Colgate",
+    "content": "75 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal"
+  },
+  {
+    "name": "Desodorante Rexona 50ml",
+    "brand": "Rexona",
+    "content": "50 ml",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal"
+  },
+  {
+    "name": "Pañales Huggies G 40 unid",
+    "brand": "Huggies",
+    "content": "40 unid",
+    "unitType": "UNIT",
+    "category": "Cuidado Personal"
+  },
+  {
+    "name": "Energizante Red Bull 250ml",
+    "brand": "Red Bull",
+    "content": "250 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Gatorade Naranja 500ml",
+    "brand": "Gatorade",
+    "content": "500 ml",
+    "unitType": "UNIT",
+    "category": "Bebidas"
+  },
+  {
+    "name": "Huevos Docena",
+    "brand": "San Fernando",
+    "content": "12 unid",
+    "unitType": "UNIT",
+    "category": "Abarrotes"
+  },
+  {
+    "name": "Pilas AA x 2",
+    "brand": "Duracell",
+    "content": "2 unid",
+    "unitType": "UNIT",
+    "category": "Varios"
+  }
+]

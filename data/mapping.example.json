@@ -1,0 +1,36 @@
+[
+  {
+    "filename": "inca-kola-1l.jpg",
+    "productName": "Inca Kola 1L",
+    "brand": "Coca-Cola"
+  },
+  {
+    "filename": "inca-kola-500ml.jpg",
+    "productName": "Inca Kola 500ml",
+    "brand": "Coca-Cola"
+  },
+  {
+    "filename": "coca-cola-1l.jpg",
+    "productName": "Coca Cola 1L",
+    "brand": "Coca-Cola"
+  },
+  {
+    "filename": "coca-cola-500ml.jpg",
+    "productName": "Coca Cola 500ml",
+    "brand": "Coca-Cola"
+  },
+  {
+    "filename": "leche-gloria-entera-1l.jpg",
+    "productName": "Leche Gloria Entera 1L",
+    "brand": "Gloria"
+  },
+  {
+    "filename": "yogurt-gloria-fresa-1l.jpg",
+    "productName": "Yogurt Gloria Fresa 1L",
+    "brand": "Gloria"
+  },
+  {
+    "filename": "arroz-paisana-1kg.jpg",
+    "productName": "Arroz Paisana 1kg"
+  }
+]

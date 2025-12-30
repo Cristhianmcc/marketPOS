@@ -182,6 +182,11 @@ model ProductMaster {
   approvedAt       DateTime? @map("approved_at") // opcional: aprobación por SUPERADMIN
   approvedById     String?  @map("approved_by_id") // opcional
   
+  // ✅ MÓDULO 18.2: Normalización para fuzzy matching y dedupe asistido
+  normalizedName String?    @map("normalized_name") // nombre normalizado (lowercase, sin tildes)
+  fingerprint    String?    @map("fingerprint")     // hash único: normalizedName|brand|content
+  mergedIntoId   String?    @map("merged_into_id")  // si fue unificado en otro producto
+  
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -199,6 +204,8 @@ model ProductMaster {
   @@index([internalSku])
   @@index([isGlobal])
   @@index([createdByStoreId])
+  @@index([normalizedName])
+  @@index([fingerprint])
   @@map("products_master")
 }
 

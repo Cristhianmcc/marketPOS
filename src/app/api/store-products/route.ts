@@ -5,6 +5,36 @@ import { PrismaStoreProductRepository } from '@/infra/db/repositories/PrismaStor
 
 const storeProductRepo = new PrismaStoreProductRepository();
 
+// ✅ MÓDULO 18.2: Check if product exists in store
+export async function GET(req: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const productId = searchParams.get('productId');
+
+    if (!productId) {
+      return NextResponse.json({ error: 'productId requerido' }, { status: 400 });
+    }
+
+    const existing = await storeProductRepo.findByStoreAndProduct(
+      user.storeId,
+      productId
+    );
+
+    return NextResponse.json({ exists: !!existing });
+  } catch (error) {
+    console.error('Error checking store product:', error);
+    return NextResponse.json(
+      { error: 'Error al verificar producto' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();

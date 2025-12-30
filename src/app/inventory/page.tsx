@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
-import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2 } from 'lucide-react';
+import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
 import { EditPriceModal } from '@/components/inventory/EditPriceModal';
 import { StockMovementModal } from '@/components/inventory/StockMovementModal';
@@ -310,16 +310,29 @@ export default function InventoryPage() {
                       return (
                         <tr key={sp.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
-                            <div>
-                              <div className="text-sm font-medium text-[#1F2A37]">
-                                {sp.product.name}
-                              </div>
-                              {sp.product.brand && (
-                                <div className="text-xs text-gray-500">
-                                  {sp.product.brand}
-                                  {sp.product.content && ` • ${sp.product.content}`}
+                            <div className="flex items-center gap-3">
+                              {sp.product.imageUrl ? (
+                                <img
+                                  src={sp.product.imageUrl}
+                                  alt={sp.product.name}
+                                  className="w-12 h-12 rounded object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                  <Package className="w-6 h-6 text-gray-400" />
                                 </div>
                               )}
+                              <div>
+                                <div className="text-sm font-medium text-[#1F2A37]">
+                                  {sp.product.name}
+                                </div>
+                                {sp.product.brand && (
+                                  <div className="text-xs text-gray-500">
+                                    {sp.product.brand}
+                                    {sp.product.content && ` • ${sp.product.content}`}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">{sp.product.category}</td>
