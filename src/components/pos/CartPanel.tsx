@@ -19,6 +19,7 @@ interface StoreProduct {
     unitType: 'UNIT' | 'KG';
     barcode: string | null;
     internalSku: string;
+    imageUrl?: string | null;
   };
 }
 
@@ -181,20 +182,36 @@ export default function CartPanel({
                 key={item.storeProduct.id}
                 className="bg-white border rounded-lg p-3 hover:shadow-md transition-shadow"
               >
-                {/* Nombre y precio */}
+                {/* Imagen y nombre */}
                 <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 pr-2">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight">
-                      {item.storeProduct.product.name}
-                    </h3>
-                    {item.storeProduct.product.brand && (
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {item.storeProduct.product.brand}
-                      </p>
+                  <div className="flex gap-2 flex-1">
+                    {/* Imagen del producto */}
+                    {item.storeProduct.product.imageUrl ? (
+                      <img
+                        src={item.storeProduct.product.imageUrl}
+                        alt={item.storeProduct.product.name}
+                        className="w-12 h-12 object-cover rounded border border-gray-200 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex items-center justify-center flex-shrink-0">
+                        <ShoppingCart className="w-5 h-5 text-gray-400" />
+                      </div>
                     )}
-                    <p className="text-xs text-emerald-600 font-medium mt-1">
-                      {formatMoney(Number(item.storeProduct.price))} × {item.quantity}
-                    </p>
+                    
+                    {/* Info del producto */}
+                    <div className="flex-1 min-w-0 pr-2">
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate">
+                        {item.storeProduct.product.name}
+                      </h3>
+                      {item.storeProduct.product.brand && (
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {item.storeProduct.product.brand}
+                        </p>
+                      )}
+                      <p className="text-xs text-emerald-600 font-medium mt-1">
+                        {formatMoney(Number(item.storeProduct.price))} × {item.quantity}
+                      </p>
+                    </div>
                   </div>
                   <button
                     onClick={() => onRemoveItem(item.storeProduct.id)}

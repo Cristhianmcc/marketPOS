@@ -11,6 +11,7 @@ export const CreateProductSchema = z.object({
     .regex(/^\d{8,14}$/, 'Código de barras debe ser numérico de 8-14 dígitos')
     .optional()
     .nullable(),
+  imageUrl: z.string().url('URL de imagen inválida').optional().nullable(),
 });
 
 export const ConfigureStoreProductSchema = z.object({

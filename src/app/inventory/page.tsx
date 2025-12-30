@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
-import { Plus, Search, Edit, TrendingUp, Power } from 'lucide-react';
+import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2 } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
 import { EditPriceModal } from '@/components/inventory/EditPriceModal';
 import { StockMovementModal } from '@/components/inventory/StockMovementModal';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast, Toaster } from 'sonner';
 
 interface Product {
@@ -19,6 +20,7 @@ interface Product {
   barcode: string | null;
   internalSku: string;
   unitType: 'UNIT' | 'KG';
+  isGlobal: boolean; // ✅ MÓDULO 18.1
 }
 
 interface StoreProduct {
@@ -47,6 +49,11 @@ export default function InventoryPage() {
   const [stockModal, setStockModal] = useState<{
     open: boolean;
     storeProduct?: StoreProduct;
+  }>({ open: false });
+  const [shareModal, setShareModal] = useState<{
+    open: boolean;
+    productId?: string;
+    productName?: string;
   }>({ open: false });
 
   useEffect(() => {
@@ -112,6 +119,35 @@ export default function InventoryPage() {
     }
   };
 
+  const handleShareToGlobal = async (productId: string, productName: string) => {
+    setShareModal({ open: true, productId, productName });
+  };
+
+  const confirmShareToGlobal = async () => {
+    const { productId, productName } = shareModal;
+    if (!productId) return;
+
+    try {
+      const res = await fetch('/api/catalog/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success('Producto compartido al catálogo global');
+        loadProducts();
+      } else {
+        toast.error(data.error || 'Error al compartir producto');
+      }
+    } catch (error) {
+      console.error('Error sharing product:', error);
+      toast.error('Error de conexión');
+    }
+  };
+
   const categories = Array.from(new Set(products.map((p) => p.product.category))).filter(
     Boolean
   );
@@ -132,6 +168,13 @@ export default function InventoryPage() {
             </div>
             {isOwner && (
               <div className="flex gap-2">
+                <button
+                  onClick={() => router.push('/admin/catalog')}
+                  className="h-10 px-4 border border-blue-300 bg-blue-50 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-2"
+                >
+                  <Globe className="w-4 h-4" />
+                  Catálogo Global
+                </button>
                 <button
                   onClick={() => router.push('/inventory/import')}
                   className="h-10 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
@@ -323,6 +366,20 @@ export default function InventoryPage() {
                           {isOwner && (
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-1">
+                                {!sp.product.isGlobal && (
+                                  <button
+                                    onClick={() => handleShareToGlobal(sp.product.id, sp.product.name)}
+                                    className="p-1 hover:bg-blue-50 rounded-md transition-colors"
+                                    title="Compartir al catálogo global"
+                                  >
+                                    <Share2 className="w-4 h-4 text-blue-600" />
+                                  </button>
+                                )}
+                                {sp.product.isGlobal && (
+                                  <div className="px-2 py-1 bg-blue-50 rounded-md" title="Ya compartido globalmente">
+                                    <Globe className="w-4 h-4 text-blue-600" />
+                                  </div>
+                                )}
                                 <button
                                   onClick={() => setEditPriceModal({ open: true, storeProduct: sp })}
                                   className="p-1 hover:bg-gray-100 rounded-md transition-colors"
@@ -395,6 +452,17 @@ export default function InventoryPage() {
           storeProduct={stockModal.storeProduct}
         />
       )}
+
+      <ConfirmModal
+        isOpen={shareModal.open}
+        onClose={() => setShareModal({ open: false })}
+        onConfirm={confirmShareToGlobal}
+        title="Compartir al Catálogo Global"
+        message={`¿Compartir "${shareModal.productName}" al catálogo global?\n\nOtras tiendas podrán importar este producto (solo info básica, no tu precio ni stock).`}
+        confirmText="Compartir"
+        cancelText="Cancelar"
+        confirmColor="blue"
+      />
     </AuthLayout>
   );
 }

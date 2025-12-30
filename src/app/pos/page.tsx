@@ -27,6 +27,7 @@ interface StoreProduct {
     unitType: 'UNIT' | 'KG';
     barcode: string | null;
     internalSku: string;
+    imageUrl?: string | null;
   };
 }
 
@@ -83,6 +84,8 @@ export default function POSPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO'>('CASH');
   const [amountPaid, setAmountPaid] = useState('');
+  const [barcodeBuffer, setBarcodeBuffer] = useState('');
+  const [lastKeyTime, setLastKeyTime] = useState(0);
   
   // Estados para FIADO
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -234,6 +237,60 @@ export default function POSPage() {
     fetchOperationalLimits();
     checkDemoMode(); // ✅ MÓDULO 17.4: Verificar demo mode
   }, []);
+
+  // ✅ MÓDULO 18.1: Listener para escaneo de código de barras con pistola
+  useEffect(() => {
+    const handleBarcodeScan = async (e: KeyboardEvent) => {
+      // Ignorar si está escribiendo en un input/textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Ignorar teclas especiales de navegación/modificadores
+      if (['Shift', 'Control', 'Alt', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        return;
+      }
+
+      if (e.key === 'Enter' && barcodeBuffer.length >= 8) {
+        // Buscar producto por código de barras
+        try {
+          const res = await fetch(`/api/store-products?barcode=${encodeURIComponent(barcodeBuffer)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.products && data.products.length > 0) {
+              addToCart(data.products[0]);
+              toast.success(`Producto escaneado: ${data.products[0].product.name}`);
+            } else {
+              toast.error(`Código no encontrado: ${barcodeBuffer}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error searching barcode:', error);
+          toast.error('Error al buscar producto');
+        }
+        setBarcodeBuffer('');
+        return;
+      }
+
+      // Acumular dígitos numéricos
+      if (/^\d$/.test(e.key)) {
+        const currentTime = Date.now();
+        
+        // Si pasan más de 100ms desde la última tecla, reiniciar buffer
+        if (currentTime - lastKeyTime > 100) {
+          setBarcodeBuffer(e.key);
+        } else {
+          setBarcodeBuffer(prev => prev + e.key);
+        }
+        
+        setLastKeyTime(currentTime);
+      }
+    };
+
+    window.addEventListener('keydown', handleBarcodeScan);
+    return () => window.removeEventListener('keydown', handleBarcodeScan);
+  }, [barcodeBuffer, lastKeyTime]);
 
   const checkDemoMode = async () => {
     try {
@@ -1253,6 +1310,8 @@ export default function POSPage() {
                   <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">Ctrl+Enter</span>
                   <span>Finalizar</span>
                 </div>
+                
+                {/* Campo de búsqueda normal */}
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -1298,9 +1357,22 @@ export default function POSPage() {
                     {products.map((sp) => (
                       <div
                         key={sp.id}
-                        className="p-4 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                        className="p-4 hover:bg-gray-50 transition-colors flex items-center gap-3"
                       >
-                        <div className="flex-1">
+                        {/* Imagen del producto */}
+                        {sp.product.imageUrl ? (
+                          <img
+                            src={sp.product.imageUrl}
+                            alt={sp.product.name}
+                            className="w-16 h-16 object-cover rounded border border-gray-200 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-gray-100 rounded border border-gray-200 flex items-center justify-center flex-shrink-0">
+                            <ShoppingCart className="w-6 h-6 text-gray-400" />
+                          </div>
+                        )}
+                        
+                        <div className="flex-1 min-w-0">
                           <div className="font-medium text-[#1F2A37]">
                             {sp.product.name}
                             {sp.product.brand && (

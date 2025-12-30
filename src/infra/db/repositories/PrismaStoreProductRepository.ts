@@ -31,6 +31,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         category: sp.product.category,
         unitType: sp.product.unitType as 'UNIT' | 'KG',
         imageUrl: sp.product.imageUrl,
+        isGlobal: sp.product.isGlobal, // ✅ MÓDULO 18.1
       },
     };
   }
@@ -86,6 +87,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         category: sp.product.category,
         unitType: sp.product.unitType as 'UNIT' | 'KG',
         imageUrl: sp.product.imageUrl,
+        isGlobal: sp.product.isGlobal, // ✅ MÓDULO 18.1
       },
     }));
 
@@ -129,6 +131,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         category: sp.product.category,
         unitType: sp.product.unitType as 'UNIT' | 'KG',
         imageUrl: sp.product.imageUrl,
+        isGlobal: sp.product.isGlobal, // ✅ MÓDULO 18.1
       },
     };
   }
@@ -164,6 +167,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         category: created.product.category,
         unitType: created.product.unitType as 'UNIT' | 'KG',
         imageUrl: created.product.imageUrl,
+        isGlobal: created.product.isGlobal,
       },
     };
   }
@@ -193,6 +197,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         category: updated.product.category,
         unitType: updated.product.unitType as 'UNIT' | 'KG',
         imageUrl: updated.product.imageUrl,
+        isGlobal: updated.product.isGlobal,
       },
     };
   }
@@ -222,6 +227,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         category: updated.product.category,
         unitType: updated.product.unitType as 'UNIT' | 'KG',
         imageUrl: updated.product.imageUrl,
+        isGlobal: updated.product.isGlobal,
       },
     };
   }
@@ -251,6 +257,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         category: updated.product.category,
         unitType: updated.product.unitType as 'UNIT' | 'KG',
         imageUrl: updated.product.imageUrl,
+        isGlobal: updated.product.isGlobal,
       },
     };
   }

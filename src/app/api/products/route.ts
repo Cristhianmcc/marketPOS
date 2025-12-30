@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       content: data.content || null,
       category: data.category,
       unitType: data.unitType,
-      imageUrl: null,
+      imageUrl: data.imageUrl || null,
     });
 
     return NextResponse.json({ product }, { status: 201 });

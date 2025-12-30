@@ -16,6 +16,7 @@ export interface Product {
   category: string;
   unitType: UnitType; // ✅ unitType ahora en Product
   imageUrl: string | null;
+  isGlobal?: boolean; // ✅ MÓDULO 18.1: Catálogo Global
 }
 
 export interface StoreProduct {

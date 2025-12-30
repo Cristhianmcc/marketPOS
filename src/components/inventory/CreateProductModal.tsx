@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, AlertTriangle, Upload, Loader2 } from 'lucide-react';
 
 interface CreateProductModalProps {
   isOpen: boolean;
@@ -9,10 +9,25 @@ interface CreateProductModalProps {
   onSuccess: () => void;
 }
 
+interface ProductSuggestion {
+  id: string;
+  name: string;
+  brand: string | null;
+  content: string | null;
+  barcode: string | null;
+  category: string;
+  alreadyInStore: boolean;
+  matchType: 'exact_barcode' | 'name_contains';
+}
+
 export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProductModalProps) {
   const [tab, setTab] = useState<'with-code' | 'without-code'>('with-code');
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -24,6 +39,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     price: '',
     stock: '',
     minStock: '',
+    imageUrl: '',
   });
 
   const categories = [
@@ -39,12 +55,138 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     'Otros',
   ];
 
+  // Autofocus en barcode cuando se abre el modal (para pistola escáner)
+  useEffect(() => {
+    if (isOpen && tab === 'with-code' && barcodeInputRef.current) {
+      setTimeout(() => {
+        barcodeInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen, tab]);
+
+  // ✅ MÓDULO 18.1: Buscar sugerencias cuando cambia el barcode
+  useEffect(() => {
+    const checkDuplicates = async () => {
+      if (tab === 'with-code' && formData.barcode && formData.barcode.length >= 8) {
+        try {
+          const res = await fetch(`/api/products/suggest?barcode=${encodeURIComponent(formData.barcode)}`);
+          if (res.ok) {
+            const data = await res.json();
+            setSuggestions(data.suggestions || []);
+            if (data.suggestions && data.suggestions.length > 0) {
+              setShowDuplicateWarning(true);
+            }
+          }
+        } catch (err) {
+          console.error('Error checking duplicates:', err);
+        }
+      } else {
+        setSuggestions([]);
+        setShowDuplicateWarning(false);
+      }
+    };
+
+    const timeoutId = setTimeout(checkDuplicates, 500); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [formData.barcode, tab]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de archivo
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+
+    // Validar tamaño (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('La imagen no debe superar 5MB');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      setError('');
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetch('/api/uploads/product-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al subir imagen');
+      }
+
+      const data = await res.json();
+      setFormData(prev => ({ ...prev, imageUrl: data.url }));
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      setError(err instanceof Error ? err.message : 'Error al subir imagen');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
+      // ✅ MÓDULO 18.1: Si hay duplicado por barcode, reutilizar ProductMaster
+      const barcodeSuggestion = suggestions.find(s => s.matchType === 'exact_barcode');
+      
+      if (barcodeSuggestion && !barcodeSuggestion.alreadyInStore) {
+        // Producto existe en catálogo pero no en esta tienda → importar
+        const price = parseFloat(formData.price);
+        if (isNaN(price) || price <= 0) {
+          setError('El precio debe ser mayor a 0');
+          setLoading(false);
+          return;
+        }
+
+        const stock = formData.stock && formData.stock.trim() !== '' ? parseFloat(formData.stock) : null;
+        const minStock = formData.minStock && formData.minStock.trim() !== '' ? parseFloat(formData.minStock) : null;
+
+        const storeProductPayload = {
+          productId: barcodeSuggestion.id,
+          price,
+          stock,
+          minStock,
+          active: true,
+        };
+
+        const storeRes = await fetch('/api/store-products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(storeProductPayload),
+        });
+
+        if (!storeRes.ok) {
+          const storeData = await storeRes.json();
+          setError(storeData.error || 'Error al configurar producto en tienda');
+          setLoading(false);
+          return;
+        }
+
+        onSuccess();
+        onClose();
+        resetForm();
+        return;
+      }
+
+      if (barcodeSuggestion && barcodeSuggestion.alreadyInStore) {
+        setError('Este producto ya existe en tu tienda');
+        setLoading(false);
+        return;
+      }
+
       // Validar precio
       const price = parseFloat(formData.price);
       if (isNaN(price) || price <= 0) {
@@ -71,6 +213,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
         barcode: tab === 'with-code' && formData.barcode ? formData.barcode : null,
         brand: formData.brand || null,
         content: formData.content || null,
+        imageUrl: formData.imageUrl || null,
       };
 
       const productRes = await fetch('/api/products', {
@@ -133,8 +276,11 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       price: '',
       stock: '',
       minStock: '',
+      imageUrl: '',
     });
     setError('');
+    setSuggestions([]);
+    setShowDuplicateWarning(false);
   };
 
   if (!isOpen) return null;
@@ -191,21 +337,98 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
           </div>
 
           {tab === 'with-code' && (
-            <div>
-              <label className="block text-sm font-medium text-[#1F2A37] mb-2">
-                Código de barras *
-              </label>
-              <input
-                type="text"
-                value={formData.barcode}
-                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                required={tab === 'with-code'}
-                pattern="[0-9]{8,14}"
-                className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
-                placeholder="8-14 dígitos numéricos"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                  Código de barras *
+                  <span className="text-xs text-gray-500 ml-2">(Puedes usar pistola escáner)</span>
+                </label>
+                <input
+                  ref={barcodeInputRef}
+                  type="text"
+                  value={formData.barcode}
+                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                  required={tab === 'with-code'}
+                  pattern="[0-9]{8,14}"
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                  placeholder="Escanea o escribe el código"
+                  autoComplete="off"
+                />
+              </div>
+
+              {/* ✅ MÓDULO 18.1: Mostrar advertencia de duplicado */}
+              {showDuplicateWarning && suggestions.length > 0 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 mb-1">
+                        Producto encontrado en el catálogo
+                      </p>
+                      {suggestions.map((sug) => (
+                        <div key={sug.id} className="text-sm text-blue-800 mb-2">
+                          <p className="font-medium">{sug.name}</p>
+                          {sug.brand && <p className="text-xs">{sug.brand}</p>}
+                          {sug.alreadyInStore ? (
+                            <p className="text-xs text-red-600 font-medium mt-1">
+                              ⚠️ Ya existe en tu tienda
+                            </p>
+                          ) : (
+                            <p className="text-xs text-green-600 font-medium mt-1">
+                              ✓ Se reutilizará este producto. Solo configura tu precio y stock.
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
+
+          {/* Campo de imagen del producto */}
+          <div>
+            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+              Imagen del producto
+            </label>
+            <div className="flex items-center gap-3">
+              {formData.imageUrl && (
+                <img
+                  src={formData.imageUrl}
+                  alt="Preview"
+                  className="w-16 h-16 object-cover rounded-md border border-gray-300"
+                />
+              )}
+              <label className="flex-1">
+                <div className="flex items-center justify-center gap-2 h-10 px-4 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
+                  {uploadingImage ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+                      <span className="text-sm text-gray-600">Subiendo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm text-gray-600">
+                        {formData.imageUrl ? 'Cambiar imagen' : 'Subir imagen'}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              JPG, PNG o WEBP. Máximo 5MB.
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-[#1F2A37] mb-2">

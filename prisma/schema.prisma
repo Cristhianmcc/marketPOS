@@ -118,6 +118,7 @@ model Store {
   operationalLimit   OperationalLimit? // ✅ MÓDULO 15: Límites Operativos (Fase 3)
   subscription       Subscription? // ✅ MÓDULO 16: Licencia y Suscripción
   payments           Payment[] // ✅ MÓDULO 16: Historial de pagos
+  productsCreated    ProductMaster[] @relation("ProductCreatedByStore") // ✅ MÓDULO 18.1: Productos creados por esta tienda
 
   @@map("stores")
 }
@@ -151,6 +152,9 @@ model User {
   
   // MÓDULO 15: Auditoría
   auditLogs AuditLog[]
+  
+  // ✅ MÓDULO 18.1: Productos aprobados por el usuario (opcional)
+  productsApproved ProductMaster[] @relation("ProductApprovedBy")
 
   @@index([storeId])
   @@map("users")
@@ -172,6 +176,12 @@ model ProductMaster {
   isQuickSell     Boolean @default(false) @map("is_quick_sell")
   quickSellOrder  Int?    @map("quick_sell_order")
   
+  // ✅ MÓDULO 18.1: Catálogo Global + Opt-In
+  isGlobal         Boolean  @default(false) @map("is_global") // visible en catálogo global
+  createdByStoreId String?  @map("created_by_store_id") // tienda que lo creó (auditoría)
+  approvedAt       DateTime? @map("approved_at") // opcional: aprobación por SUPERADMIN
+  approvedById     String?  @map("approved_by_id") // opcional
+  
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -179,10 +189,16 @@ model ProductMaster {
   promotions    Promotion[] // ✅ Promociones del producto
   nthPromotions NthPromotion[] // ✅ Promociones n-ésimo con descuento del producto
   volumePromotions VolumePromotion[] // ✅ Promociones por volumen del producto
+  
+  // ✅ MÓDULO 18.1: Relaciones de Catálogo Global
+  createdByStore Store? @relation("ProductCreatedByStore", fields: [createdByStoreId], references: [id], onDelete: SetNull)
+  approvedBy     User?  @relation("ProductApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
 
   @@index([barcode])
   @@index([name])
   @@index([internalSku])
+  @@index([isGlobal])
+  @@index([createdByStoreId])
   @@map("products_master")
 }
 
@@ -635,6 +651,7 @@ enum AuditEntityType {
   SYSTEM
   SUBSCRIPTION  // MÓDULO 16
   PAYMENT       // MÓDULO 16
+  CATALOG       // ✅ MÓDULO 18.1: Acciones del catálogo global
 }
 
 model AuditLog {
