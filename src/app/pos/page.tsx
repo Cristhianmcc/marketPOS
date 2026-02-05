@@ -7,6 +7,7 @@ import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import QuickSellGrid from '@/components/pos/QuickSellGrid';
 import CartPanel from '@/components/pos/CartPanel';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
+import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
 import { toast, Toaster } from 'sonner';
 import { usePosShortcuts } from '@/hooks/usePosShortcuts';
 import { usePosHotkeys } from '@/hooks/usePosHotkeys';
@@ -98,10 +99,38 @@ export default function POSPage() {
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // Función para reproducir sonido de beep tipo supermercado
+  const playBeep = () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // Beep positivo y agudo: frecuencia alta con pequeño slide hacia arriba (sonido de confirmación)
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(1400, audioContext.currentTime + 0.04);
+      oscillator.type = 'sine'; // Onda suave para sonido más agradable
+
+      // Envelope corto y suave
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.04);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.04);
+    } catch (error) {
+      // Silenciar errores de audio para no interrumpir la funcionalidad
+      console.warn('No se pudo reproducir el sonido:', error);
+    }
+  };
   const [operationalLimits, setOperationalLimits] = useState<OperationalLimits | null>(null);
 
   // ✅ MÓDULO 17.4: Estado de Demo Mode
-  const [isDemoStore, setIsDemoStore] = useState(false);
+  const [is_demo_store, setis_demo_store] = useState(false);
 
   // Estados para descuentos
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -115,6 +144,18 @@ export default function POSPage() {
   const [globalDiscountType, setGlobalDiscountType] = useState<'PERCENT' | 'AMOUNT'>('PERCENT');
   const [globalDiscountValue, setGlobalDiscountValue] = useState('');
 
+  // Estados para SUNAT (Módulo 18.5)
+  const [sunatData, setSunatData] = useState<{
+    enabled: boolean;
+    docType: 'BOLETA' | 'FACTURA' | null;
+    customerDocType: string;
+    customerDocNumber: string;
+    customerName: string;
+    customerAddress?: string;
+    customerEmail?: string;
+  } | null>(null);
+  const [userRole, setUserRole] = useState<'CASHIER' | 'OWNER' | 'SUPERADMIN'>('CASHIER');
+  
   // Estados para cupones (Módulo 14.2-A)
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<{
@@ -234,6 +275,7 @@ export default function POSPage() {
   useEffect(() => {
     fetchCurrentShift();
     checkSuperAdmin();
+    fetchUserRole(); // ✅ MÓDULO 18.5: Cargar rol
     fetchOperationalLimits();
     checkDemoMode(); // ✅ MÓDULO 17.4: Verificar demo mode
   }, []);
@@ -297,7 +339,7 @@ export default function POSPage() {
       const res = await fetch('/api/store');
       if (res.ok) {
         const data = await res.json();
-        setIsDemoStore(data.store?.isDemoStore || false);
+        setis_demo_store(data.store?.is_demo_store || false);
       }
     } catch (error) {
       console.error('Error checking demo mode:', error);
@@ -313,6 +355,19 @@ export default function POSPage() {
       }
     } catch (error) {
       console.error('Error checking superadmin:', error);
+    }
+  };
+
+  // ✅ MÓDULO 18.5: Cargar rol del usuario para permisos SUNAT
+  const fetchUserRole = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        setUserRole(data.user.role as 'CASHIER' | 'OWNER' | 'SUPERADMIN');
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
     }
   };
 
@@ -646,6 +701,8 @@ export default function POSPage() {
     const existing = cart.find((item) => item.storeProduct.id === sp.id);
     
     if (existing) {
+      // 🔊 Reproducir sonido al agregar más cantidad
+      playBeep();
       await updateQuantity(sp.id, existing.quantity + 1);
     } else {
       // ✅ Validar límite de items por venta
@@ -670,6 +727,9 @@ export default function POSPage() {
       itemWithPromo = await checkAndApplyBestExclusivePromo(itemWithPromo);
       
       setCart([...cart, itemWithPromo]);
+      
+      // 🔊 Reproducir sonido de beep tipo supermercado
+      playBeep();
       
       // Toast con info de promociones
       const messages = [];
@@ -1216,6 +1276,47 @@ export default function POSPage() {
           toast.success(`¡Venta completada! Total: S/ ${data.total.toFixed(2)}`);
         }
       }
+
+      // ✅ MÓDULO 18.5: Emitir comprobante SUNAT si está habilitado
+      // IMPORTANTE: Solo después de venta exitosa, NO bloquea checkout
+      if (sunatData && sunatData.enabled && sunatData.docType) {
+        try {
+          const sunatRes = await fetch('/api/sunat/emit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              saleId: data.saleId,
+              docType: sunatData.docType,
+              customerDocType: sunatData.customerDocType,
+              customerDocNumber: sunatData.customerDocNumber,
+              customerName: sunatData.customerName,
+              customerAddress: sunatData.customerAddress,
+              customerEmail: sunatData.customerEmail,
+            }),
+          });
+
+          const sunatResult = await sunatRes.json();
+
+          if (sunatRes.ok) {
+            toast.success(`Comprobante ${sunatData.docType} encolado para SUNAT`, {
+              description: `Número: ${sunatResult.document.fullNumber}`,
+              duration: 4000,
+            });
+          } else {
+            // Error al emitir comprobante - venta ya está guardada
+            toast.warning('Venta guardada, pero error al emitir comprobante', {
+              description: sunatResult.error || 'Puedes emitirlo desde el historial',
+              duration: 5000,
+            });
+          }
+        } catch (error) {
+          console.error('Error emitting SUNAT:', error);
+          toast.warning('Venta guardada, pero no se pudo emitir comprobante', {
+            description: 'Emite el comprobante desde el historial de ventas',
+            duration: 5000,
+          });
+        }
+      }
       
       // Show sale complete modal
       setCompletedSale({ id: data.saleId, total: data.total });
@@ -1225,6 +1326,7 @@ export default function POSPage() {
       setProducts([]);
       setQuery('');
       setSelectedCustomer(null);
+      setSunatData(null); // ✅ Limpiar datos SUNAT
     } catch (error) {
       console.error('Checkout error:', error);
       toast.error('Error de conexión');
@@ -1283,7 +1385,7 @@ export default function POSPage() {
           )}
 
           {/* ✅ MÓDULO 17.4: Badge DEMO MODE */}
-          {isDemoStore && (
+          {is_demo_store && (
             <div className="mb-6 bg-yellow-100 border-2 border-yellow-500 rounded-lg p-4 flex items-center justify-center gap-3 shadow-lg">
               <AlertTriangle className="w-6 h-6 text-yellow-700" />
               <div className="text-center">
@@ -1499,191 +1601,179 @@ export default function POSPage() {
 
       {/* Modal de Pago */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Método de Pago</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[95vh] flex flex-col">
+            {/* Header fijo */}
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
+              <h3 className="text-lg font-semibold text-gray-900">Método de Pago</h3>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Total */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <div className="text-sm text-gray-600 mb-1">Total a pagar</div>
-              <div className="text-3xl font-bold text-gray-900">
-                {formatMoney(getCartTotal())}
+            {/* Contenido con scroll */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Total */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+                <div className="text-xs text-green-700 mb-0.5">Total a pagar</div>
+                <div className="text-2xl font-bold text-green-800">
+                  {formatMoney(getCartTotal())}
+                </div>
               </div>
-            </div>
 
-            {/* Selector de método */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Selecciona el método
-              </label>
-              {/* ✅ MÓDULO 17.1: Hints de métodos de pago */}
-              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F5</span>
-                <span>Efectivo</span>
-                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F6</span>
-                <span>Yape</span>
-                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F7</span>
-                <span>Plin</span>
-                <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F8</span>
-                <span>Tarjeta</span>
+              {/* Selector de método - más compacto */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-700">Método</label>
+                  <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                    <span className="px-1.5 py-0.5 bg-gray-100 rounded font-mono">F5-F8</span>
+                    <span>atajos</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'CASH', label: 'Efectivo', icon: '💵' },
+                    { value: 'YAPE', label: 'Yape', icon: '📱' },
+                    { value: 'PLIN', label: 'Plin', icon: '📲' },
+                    { value: 'CARD', label: 'Tarjeta', icon: '💳' },
+                    { value: 'FIADO', label: 'Fiado', icon: '📝' },
+                  ].map((method) => (
+                    <button
+                      key={method.value}
+                      onClick={() => {
+                        setPaymentMethod(method.value as any);
+                        if (method.value !== 'CASH') {
+                          setAmountPaid('');
+                        }
+                        if (method.value === 'FIADO') {
+                          setSelectedCustomer(null);
+                        }
+                      }}
+                      disabled={!currentShift && method.value !== 'FIADO'}
+                      className={`py-2 px-2 rounded-lg border-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        paymentMethod === method.value
+                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-base">{method.icon}</span>
+                      <div className="text-xs mt-0.5">{method.label}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { value: 'CASH', label: 'Efectivo' },
-                  { value: 'YAPE', label: 'Yape' },
-                  { value: 'PLIN', label: 'Plin' },
-                  { value: 'CARD', label: 'Tarjeta' },
-                  { value: 'FIADO', label: 'Fiado' },
-                ].map((method) => (
-                  <button
-                    key={method.value}
-                    onClick={() => {
-                      setPaymentMethod(method.value as any);
-                      if (method.value !== 'CASH') {
-                        setAmountPaid('');
-                      }
-                      if (method.value === 'FIADO') {
-                        setSelectedCustomer(null);
-                      }
-                    }}
-                    disabled={!currentShift && method.value !== 'FIADO'}
-                    className={`py-3 px-4 rounded-lg border-2 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      paymentMethod === method.value
-                        ? 'border-blue-600 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    {method.label}
-                    {!currentShift && method.value !== 'FIADO' && (
-                      <div className="text-xs text-red-500 mt-1">Sin turno</div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
 
-            {/* Input para efectivo */}
-            {paymentMethod === 'CASH' && (
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pagó con (S/)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0.00"
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmPayment()}
-                />
-                
-                {/* Vuelto */}
-                {amountPaid && parseFloat(amountPaid) >= getCartTotal() && (
-                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="text-sm text-green-700 mb-1">Vuelto</div>
-                    <div className="text-2xl font-bold text-green-700">
-                      {formatMoney(parseFloat(amountPaid) - getCartTotal())}
+              {/* Input para efectivo - más compacto */}
+              {paymentMethod === 'CASH' && (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Pagó con (S/)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={amountPaid}
+                    onChange={(e) => setAmountPaid(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="0.00"
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmPayment()}
+                  />
+                  
+                  {/* Vuelto */}
+                  {amountPaid && parseFloat(amountPaid) >= getCartTotal() && (
+                    <div className="mt-2 p-2 bg-green-100 border border-green-300 rounded-lg flex items-center justify-between">
+                      <span className="text-sm text-green-700">Vuelto:</span>
+                      <span className="text-xl font-bold text-green-700">
+                        {formatMoney(parseFloat(amountPaid) - getCartTotal())}
+                      </span>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {amountPaid && (() => {
-                  const totalRounded = Math.round(getCartTotal() * 100) / 100;
-                  const paidRounded = Math.round(parseFloat(amountPaid) * 100) / 100;
-                  return paidRounded < totalRounded && paidRounded > 0;
-                })() && (
-                  <div className="mt-3 text-sm text-red-600">
-                    Monto insuficiente
-                  </div>
-                )}
-              </div>
-            )}
+                  {amountPaid && (() => {
+                    const totalRounded = Math.round(getCartTotal() * 100) / 100;
+                    const paidRounded = Math.round(parseFloat(amountPaid) * 100) / 100;
+                    return paidRounded < totalRounded && paidRounded > 0;
+                  })() && (
+                    <div className="mt-2 text-xs text-red-600">
+                      ⚠️ Monto insuficiente
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* Mensaje para otros métodos */}
-            {paymentMethod !== 'CASH' && paymentMethod !== 'FIADO' && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  Pago registrado como <strong>{paymentMethod}</strong>
-                </p>
-              </div>
-            )}
+              {/* Mensaje para otros métodos */}
+              {paymentMethod !== 'CASH' && paymentMethod !== 'FIADO' && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    ✓ Pago con <strong>{paymentMethod}</strong>
+                  </p>
+                </div>
+              )}
 
-            {/* Selector de cliente para FIADO */}
-            {paymentMethod === 'FIADO' && (
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cliente <span className="text-red-500">*</span>
-                </label>
-                {selectedCustomer ? (
-                  <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                    <div className="flex justify-between items-start">
+              {/* Selector de cliente para FIADO */}
+              {paymentMethod === 'FIADO' && (
+                <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Cliente <span className="text-red-500">*</span>
+                  </label>
+                  {selectedCustomer ? (
+                    <div className="flex justify-between items-center bg-white p-2 rounded border">
                       <div>
-                        <div className="font-medium text-gray-900">{selectedCustomer.name}</div>
-                        {selectedCustomer.phone && (
-                          <div className="text-sm text-gray-600 mt-1">{selectedCustomer.phone}</div>
-                        )}
+                        <div className="font-medium text-gray-900 text-sm">{selectedCustomer.name}</div>
                         {selectedCustomer.totalBalance > 0 && (
-                          <div className="text-sm text-red-600 mt-1">
-                            Deuda actual: S/ {selectedCustomer.totalBalance.toFixed(2)}
+                          <div className="text-xs text-red-600">
+                            Deuda: S/ {selectedCustomer.totalBalance.toFixed(2)}
                           </div>
                         )}
                       </div>
                       <button
                         onClick={() => setSelectedCustomer(null)}
-                        className="text-red-600 hover:text-red-700 text-sm"
+                        className="text-red-600 hover:text-red-700 text-xs"
                       >
                         Cambiar
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
+                  ) : (
                     <button
                       onClick={() => {
                         setCustomerSearch('');
                         setCustomers([]);
                         setShowCustomerModal(true);
                       }}
-                      className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                      className="w-full py-2 px-3 border-2 border-dashed border-orange-300 rounded-lg text-orange-600 hover:border-orange-400 text-sm"
                     >
                       + Seleccionar Cliente
                     </button>
-                  </div>
-                )}
-                
-                {/* Advertencia */}
-                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-xs text-yellow-800">
-                    ⚠️ Venta FIADO: Se registrará como cuenta por cobrar. El cliente deberá pagar posteriormente.
-                  </p>
+                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Botones */}
-            <div className="flex gap-3">
+              {/* ✅ MÓDULO 18.5: Selector de Comprobante SUNAT */}
+              <SunatComprobanteSelector
+                userRole={userRole}
+                paymentMethod={paymentMethod}
+                onChange={(data) => setSunatData(data)}
+              />
+            </div>
+
+            {/* Botones fijos en la parte inferior */}
+            <div className="flex gap-3 p-4 border-t flex-shrink-0 bg-gray-50">
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 text-sm"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmPayment}
                 disabled={processing}
-                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
-                {processing ? 'Procesando...' : 'Confirmar'}
+                {processing ? 'Procesando...' : '✓ Confirmar'}
               </button>
             </div>
           </div>

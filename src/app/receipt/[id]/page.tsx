@@ -72,6 +72,20 @@ interface Sale {
     address: string | null;
     phone: string | null;
   };
+  // ✅ MÓDULO 18.8: Comprobante electrónico
+  electronicDocuments?: Array<{
+    id: string;
+    docType: 'FACTURA' | 'BOLETA';
+    series: string;
+    number: number;
+    status: string;
+    sunatCode: string | null;
+    sunatMessage: string | null;
+    customerDocType: string | null;
+    customerDocNumber: string | null;
+    customerName: string | null;
+    createdAt: string;
+  }>;
 }
 
 export default function ReceiptPage() {
@@ -179,6 +193,40 @@ export default function ReceiptPage() {
             {sale.store.address && <div className="store-info">{sale.store.address}</div>}
             {sale.store.phone && <div className="store-info">Tel: {sale.store.phone}</div>}
           </div>
+
+          {/* ✅ MÓDULO 18.8: Mostrar comprobante electrónico */}
+          {sale.electronicDocuments && sale.electronicDocuments.length > 0 && (
+            <>
+              <div className="separator">================================</div>
+              <div className="comprobante-electronico">
+                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
+                  {sale.electronicDocuments[0].docType === 'FACTURA' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA'}
+                </div>
+                <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', margin: '4px 0' }}>
+                  {sale.electronicDocuments[0].series}-{String(sale.electronicDocuments[0].number).padStart(8, '0')}
+                </div>
+                {sale.electronicDocuments[0].customerName && (
+                  <div style={{ fontSize: '11px', marginTop: '4px' }}>
+                    <div>Cliente: {sale.electronicDocuments[0].customerName}</div>
+                    {sale.electronicDocuments[0].customerDocType && sale.electronicDocuments[0].customerDocNumber && (
+                      <div>{sale.electronicDocuments[0].customerDocType}: {sale.electronicDocuments[0].customerDocNumber}</div>
+                    )}
+                  </div>
+                )}
+                {sale.electronicDocuments[0].status === 'ACCEPTED' && (
+                  <div style={{ textAlign: 'center', fontSize: '10px', color: '#16a34a', marginTop: '4px' }}>
+                    ✓ ACEPTADO POR SUNAT
+                  </div>
+                )}
+                {sale.electronicDocuments[0].status === 'SIGNED' && (
+                  <div style={{ textAlign: 'center', fontSize: '10px', color: '#0284c7', marginTop: '4px' }}>
+                    Documento Firmado Digitalmente
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
           {/* Mostrar si está anulado */}
           {isAnulada && (
             <>
@@ -245,7 +293,7 @@ export default function ReceiptPage() {
                 <div className="item-line">
                   <span>
                     {item.unitType === 'KG' 
-                      ? `${item.quantity.toFixed(3)} kg` 
+                      ? `${Number(item.quantity).toFixed(3)} kg` 
                       : `${item.quantity} und`} x {formatMoney(item.unitPrice)}
                   </span>
                   <span>{formatMoney(item.subtotal)}</span>

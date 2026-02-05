@@ -61,14 +61,14 @@ export default function AdminStoresPage() {
     }
   }
 
-  async function handleArchiveStore(storeId: string) {
+  async function handleArchiveStore(store_id: string) {
     if (!confirm('¿Seguro que quieres archivar esta tienda? Los usuarios no podrán acceder a las operaciones.')) {
       return;
     }
 
-    setActioningStoreId(storeId);
+    setActioningStoreId(store_id);
     try {
-      const res = await fetch(`/api/admin/stores/${storeId}/archive`, {
+      const res = await fetch(`/api/admin/stores/${store_id}/archive`, {
         method: 'POST',
       });
 
@@ -88,14 +88,14 @@ export default function AdminStoresPage() {
     }
   }
 
-  async function handleReactivateStore(storeId: string) {
+  async function handleReactivateStore(store_id: string) {
     if (!confirm('¿Seguro que quieres reactivar esta tienda?')) {
       return;
     }
 
-    setActioningStoreId(storeId);
+    setActioningStoreId(store_id);
     try {
-      const res = await fetch(`/api/admin/stores/${storeId}/reactivate`, {
+      const res = await fetch(`/api/admin/stores/${store_id}/reactivate`, {
         method: 'POST',
       });
 

@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (strategy !== "MOVE_STORE_PRODUCTS_AND_DELETE_SOURCE") {
+    if (strategy !== "MOVE_storeProduct_AND_DELETE_SOURCE") {
       return NextResponse.json(
-        { error: "strategy debe ser MOVE_STORE_PRODUCTS_AND_DELETE_SOURCE" },
+        { error: "strategy debe ser MOVE_storeProduct_AND_DELETE_SOURCE" },
         { status: 400 }
       );
     }
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
       // 1) Mover StoreProducts
       for (const sp of sourceProduct.storeProducts) {
-        // Verificar si ya existe StoreProduct(storeId, targetProductId)
+        // Verificar si ya existe StoreProduct(store_id, targetProductId)
         const existingTarget = await tx.storeProduct.findUnique({
           where: {
             storeId_productId: {

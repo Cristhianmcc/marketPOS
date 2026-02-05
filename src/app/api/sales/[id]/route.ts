@@ -63,6 +63,26 @@ export async function GET(
             phone: true,
           },
         },
+        // ✅ MÓDULO 18.8: Incluir comprobante electrónico
+        electronicDocuments: {
+          select: {
+            id: true,
+            docType: true,
+            series: true,
+            number: true,
+            status: true,
+            sunatCode: true,
+            sunatMessage: true,
+            customerDocType: true,
+            customerDocNumber: true,
+            customerName: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1, // Solo el más reciente
+        },
       },
     });
 

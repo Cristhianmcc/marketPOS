@@ -211,6 +211,24 @@ async function main() {
   });
   console.log('✅ Store settings created');
 
+  // 6. ✅ MÓDULO 18.1: Create SUNAT settings (disabled by default)
+  await prisma.sunatSettings.create({
+    data: {
+      storeId: store.id,
+      env: 'BETA',
+      enabled: false,
+      defaultFacturaSeries: 'F001',
+      defaultBoletaSeries: 'B001',
+      defaultNcSeries: 'FC01',
+      defaultNdSeries: 'FD01',
+      nextFacturaNumber: 1,
+      nextBoletaNumber: 1,
+      nextNcNumber: 1,
+      nextNdNumber: 1,
+    },
+  });
+  console.log('✅ SUNAT settings created (disabled)');
+
   // NOTA: NO se crea suscripción automáticamente en seed.
   // Para desarrollo/testing, asigna planes manualmente desde /admin/billing
 

@@ -177,60 +177,67 @@ export default function ShiftsPage() {
     <AuthLayout storeName="Turnos / Caja">
       <div className="space-y-6">
         {/* Estado actual */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Estado Actual</h2>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-6">Estado Actual</h2>
 
           {!currentShift ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">No hay turno abierto</p>
-              <button
-                onClick={() => setShowOpenModal(true)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Abrir Turno
-              </button>
+            <div className="text-center py-12">
+              <div className="max-w-sm mx-auto">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-gray-600 mb-6">No hay turno abierto</p>
+                <button
+                  onClick={() => setShowOpenModal(true)}
+                  className="px-6 py-2.5 bg-[#2bee79] text-[#0d1b13] rounded-lg hover:bg-[#25c765] font-medium transition-colors"
+                >
+                  Abrir Turno
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Hora de apertura</p>
-                  <p className="text-lg font-semibold">
+                <div className="bg-gray-50/30 p-5 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-500 mb-2">Hora de apertura</p>
+                  <p className="text-base font-semibold text-gray-900" suppressHydrationWarning>
                     {new Date(currentShift.openedAt).toLocaleString('es-PE')}
                   </p>
                 </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Caja inicial</p>
-                  <p className="text-lg font-semibold">{formatMoney(currentShift.openingCash)}</p>
+                <div className="bg-green-50/30 p-5 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-500 mb-2">Caja inicial</p>
+                  <p className="text-base font-semibold text-gray-900">{formatMoney(currentShift.openingCash)}</p>
                 </div>
-                <div className="bg-purple-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Ventas en efectivo</p>
-                  <p className="text-lg font-semibold">{formatMoney(cashSales)}</p>
+                <div className="bg-purple-50/30 p-5 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-500 mb-2">Ventas en efectivo</p>
+                  <p className="text-base font-semibold text-gray-900">{formatMoney(cashSales)}</p>
                 </div>
               </div>
 
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-600">Efectivo esperado</p>
-                <p className="text-2xl font-bold text-yellow-800">{formatMoney(expectedCash)}</p>
-                <p className="text-xs text-gray-600 mt-1">
+              <div className="bg-yellow-50/40 p-6 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-600 mb-2">Efectivo esperado</p>
+                <p className="text-2xl font-bold text-gray-900">{formatMoney(expectedCash)}</p>
+                <p className="text-xs text-gray-500 mt-2">
                   Caja inicial ({formatMoney(currentShift.openingCash)}) + Ventas ({formatMoney(cashSales)})
                 </p>
               </div>
 
               {/* Desglose por método de pago */}
               {Object.keys(salesByMethod).length > 0 && (
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-700 mb-3">Ventas por Método de Pago</p>
+                <div className="border border-gray-200 rounded-lg p-5">
+                  <p className="text-sm font-medium text-gray-700 mb-4">Ventas por Método de Pago</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {Object.entries(salesByMethod).map(([method, data]) => (
-                      <div key={method} className="bg-gray-50 p-3 rounded">
-                        <p className="text-xs text-gray-600">
+                      <div key={method} className="bg-gray-50/50 p-4 rounded-lg">
+                        <p className="text-xs text-gray-500 mb-1">
                           {method === 'CASH' ? 'Efectivo' :
                            method === 'YAPE' ? 'Yape' :
                            method === 'PLIN' ? 'Plin' :
                            method === 'CARD' ? 'Tarjeta' : 'Fiado'}
                         </p>
-                        <p className="text-lg font-semibold">{formatMoney(data.total)}</p>
+                        <p className="text-base font-bold text-gray-900">{formatMoney(data.total)}</p>
                         <p className="text-xs text-gray-500">{data.count} ticket{data.count !== 1 ? 's' : ''}</p>
                       </div>
                     ))}
@@ -240,7 +247,7 @@ export default function ShiftsPage() {
 
               <button
                 onClick={() => setShowCloseModal(true)}
-                className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                className="w-full px-5 py-2.5 bg-white text-gray-700 border-2 border-[#2bee79] rounded-lg hover:bg-[#2bee79] hover:text-[#0d1b13] font-medium transition-colors"
               >
                 Cerrar Turno
               </button>
@@ -249,11 +256,18 @@ export default function ShiftsPage() {
         </div>
 
         {/* Historial */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Historial de Turnos</h2>
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-6">Historial de Turnos</h2>
 
           {history.length === 0 ? (
-            <p className="text-gray-600 text-center py-4">No hay turnos cerrados</p>
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <p className="text-gray-600">No hay turnos cerrados</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -313,12 +327,12 @@ export default function ShiftsPage() {
 
       {/* Modal abrir turno */}
       {showOpenModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Abrir Turno</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-gray-900 mb-5">Abrir Turno</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Caja inicial (S/)
                 </label>
                 <input
@@ -326,22 +340,22 @@ export default function ShiftsPage() {
                   step="0.01"
                   value={openingCash}
                   onChange={(e) => setOpeningCash(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2bee79] focus:border-[#2bee79] transition-colors"
                   placeholder="0.00"
                   autoFocus
                 />
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowOpenModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleOpenShift}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex-1 px-4 py-2.5 bg-[#2bee79] text-[#0d1b13] rounded-lg hover:bg-[#25c765] font-medium transition-colors"
                 >
                   Abrir Turno
                 </button>
@@ -353,18 +367,18 @@ export default function ShiftsPage() {
 
       {/* Modal cerrar turno */}
       {showCloseModal && currentShift && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Cerrar Turno</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-gray-900 mb-5">Cerrar Turno</h3>
 
-            <div className="bg-yellow-50 p-4 rounded-lg mb-4">
-              <p className="text-sm text-gray-600">Efectivo esperado</p>
-              <p className="text-2xl font-bold text-yellow-800">{formatMoney(expectedCash)}</p>
+            <div className="bg-yellow-50/40 p-5 rounded-lg mb-5 border border-gray-200">
+              <p className="text-sm text-gray-600 mb-2">Efectivo esperado</p>
+              <p className="text-2xl font-bold text-gray-900">{formatMoney(expectedCash)}</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Caja final (S/)
                 </label>
                 <input
@@ -372,34 +386,34 @@ export default function ShiftsPage() {
                   step="0.01"
                   value={closingCash}
                   onChange={(e) => setClosingCash(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2bee79] focus:border-[#2bee79] transition-colors"
                   placeholder="0.00"
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Notas (opcional)
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2bee79] focus:border-[#2bee79] transition-colors"
                   rows={3}
                   placeholder="Ej: Faltaron S/ 5 por error en cambio"
                 />
               </div>
 
               {closingCash && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Diferencia</p>
+                <div className="bg-gray-50/50 p-5 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-2">Diferencia</p>
                   <p className={`text-xl font-bold ${
                     parseFloat(closingCash) - expectedCash > 0
                       ? 'text-green-600'
                       : parseFloat(closingCash) - expectedCash < 0
                       ? 'text-red-600'
-                      : 'text-gray-600'
+                      : 'text-gray-700'
                   }`}>
                     {parseFloat(closingCash) - expectedCash > 0 ? '+' : ''}
                     {formatMoney(parseFloat(closingCash) - expectedCash)}
@@ -407,20 +421,20 @@ export default function ShiftsPage() {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => {
                     setShowCloseModal(false);
                     setClosingCash('');
                     setNotes('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleCloseShift}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium transition-colors"
                 >
                   Cerrar Turno
                 </button>

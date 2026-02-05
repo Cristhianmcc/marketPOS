@@ -266,6 +266,30 @@ export default function SettingsPage() {
             Gestionar Backups
           </button>
         </div>
+
+        {/* SUNAT Section - MÓDULO 18.8 */}
+        {process.env.NEXT_PUBLIC_ENABLE_SUNAT === 'true' && (
+          <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">🧾 Facturación Electrónica SUNAT</h2>
+            <p className="text-gray-600 mb-4">
+              Configura la emisión de boletas y facturas electrónicas para tu negocio.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => router.push('/onboarding/sunat')}
+                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+              >
+                Configurar SUNAT
+              </button>
+              <button
+                onClick={() => router.push('/sunat/documents')}
+                className="px-6 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium"
+              >
+                📋 Ver Documentos Electrónicos
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -108,8 +108,8 @@ export default function AdminBillingPage() {
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
-  const handleRegisterPayment = async (storeId: string) => {
-    const store = stores.find(s => s.id === storeId);
+  const handleRegisterPayment = async (store_id: string) => {
+    const store = stores.find(s => s.id === store_id);
     setSelectedStore(store || null);
     setModalType('payment');
   };
@@ -141,8 +141,8 @@ export default function AdminBillingPage() {
     }
   };
 
-  const handleExtendSubscription = async (storeId: string) => {
-    const store = stores.find(s => s.id === storeId);
+  const handleExtendSubscription = async (store_id: string) => {
+    const store = stores.find(s => s.id === store_id);
     setSelectedStore(store || null);
     setModalType('extend');
   };
@@ -172,8 +172,8 @@ export default function AdminBillingPage() {
     }
   };
 
-  const handleChangePlan = async (storeId: string) => {
-    const store = stores.find(s => s.id === storeId);
+  const handleChangePlan = async (store_id: string) => {
+    const store = stores.find(s => s.id === store_id);
     setSelectedStore(store || null);
     setSelectedPlan(store?.subscription?.planCode || 'STARTER');
     setModalType('plan');
@@ -221,17 +221,17 @@ export default function AdminBillingPage() {
     setDemoUnit('days');
   };
 
-  const handleSuspend = async (storeId: string) => {
-    console.log('🔴 handleSuspend llamado para:', storeId);
+  const handleSuspend = async (store_id: string) => {
+    console.log('🔴 handleSuspend llamado para:', store_id);
     showConfirmModal({
       title: '⚠️ Confirmar Suspensión',
       message: '¿Estás seguro de suspender esta suscripción? La tienda no podrá operar hasta que se reactive.',
       confirmText: 'Suspender',
       type: 'danger',
       onConfirm: async () => {
-        console.log('🔴 Ejecutando suspensión para:', storeId);
+        console.log('🔴 Ejecutando suspensión para:', store_id);
         try {
-          const res = await fetch(`/api/admin/billing/stores/${storeId}/subscription`, {
+          const res = await fetch(`/api/admin/billing/stores/${store_id}/subscription`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -255,8 +255,8 @@ export default function AdminBillingPage() {
     });
   };
 
-  const handleReactivate = async (storeId: string) => {
-    const store = stores.find(s => s.id === storeId);
+  const handleReactivate = async (store_id: string) => {
+    const store = stores.find(s => s.id === store_id);
     const planName = store?.subscription?.planCode || 'plan actual';
     
     showConfirmModal({
@@ -266,7 +266,7 @@ export default function AdminBillingPage() {
       type: 'success',
       onConfirm: async () => {
         try {
-          const res = await fetch(`/api/admin/billing/stores/${storeId}/subscription`, {
+          const res = await fetch(`/api/admin/billing/stores/${store_id}/subscription`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

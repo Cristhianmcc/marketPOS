@@ -41,6 +41,11 @@ const FLAG_LABELS: Record<FeatureFlagKey, { name: string; description: string; c
     description: 'Promociones aplicadas a categorías completas',
     critical: false,
   },
+  ENABLE_SUNAT: {
+    name: 'Facturación Electrónica SUNAT',
+    description: 'Habilita la generación de comprobantes electrónicos (facturas, boletas)',
+    critical: true,
+  },
 };
 
 export default function FeatureFlagsPage() {
@@ -86,7 +91,7 @@ export default function FeatureFlagsPage() {
     setSaving(key);
     setError(null);
     try {
-      // No enviamos storeId porque el API usa session.storeId para OWNER
+      // No enviamos store_id porque el API usa session.store_id para OWNER
       const res = await fetch('/api/admin/feature-flags', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

@@ -91,6 +91,8 @@ export async function PUT(request: NextRequest) {
       storeId = session.storeId;
     }
 
+    console.log('[FeatureFlags PUT] storeId:', storeId, 'key:', key, 'enabled:', enabled);
+
     // Validaciones
     if (!storeId) {
       return NextResponse.json(

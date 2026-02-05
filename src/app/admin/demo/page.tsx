@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 export default function DemoModePage() {
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [isDemoActive, setIsDemoActive] = useState(false);
+  const [is_demoActive, setis_demoActive] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showEnableConfirm, setShowEnableConfirm] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -23,7 +23,7 @@ export default function DemoModePage() {
       const response = await fetch('/api/store');
       if (response.ok) {
         const data = await response.json();
-        setIsDemoActive(data.store?.isDemoStore || false);
+        setis_demoActive(data.store?.is_demo_store || false);
       }
     } catch (error) {
       console.error('[Demo Check] Error:', error);
@@ -52,7 +52,7 @@ export default function DemoModePage() {
       }
 
       toast.success(data.message);
-      setIsDemoActive(true);
+      setis_demoActive(true);
       setShowEnableConfirm(false);
       // Recargar para actualizar estado en toda la app
       setTimeout(() => window.location.reload(), 1500);
@@ -84,7 +84,7 @@ export default function DemoModePage() {
       }
 
       toast.success(data.message);
-      setIsDemoActive(false);
+      setis_demoActive(false);
       setShowResetConfirm(false);
       // Recargar para actualizar estado en toda la app
       setTimeout(() => window.location.reload(), 1500);
@@ -134,7 +134,7 @@ export default function DemoModePage() {
               </div>
 
               {/* Badge de estado */}
-              {isDemoActive && (
+              {is_demoActive && (
                 <div className="mt-4 bg-yellow-100 border-2 border-yellow-500 text-yellow-900 px-4 py-3 rounded-lg font-bold text-center flex items-center justify-center gap-2">
                   <AlertTriangle className="w-5 h-5" />
                   DEMO MODE ACTIVO
@@ -239,10 +239,10 @@ export default function DemoModePage() {
                 {!showEnableConfirm ? (
                   <button
                     onClick={() => setShowEnableConfirm(true)}
-                    disabled={loading || isDemoActive}
+                    disabled={loading || is_demoActive}
                     className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
-                    {isDemoActive ? (
+                    {is_demoActive ? (
                       <>
                         <CheckCircle className="w-5 h-5" />
                         Ya Activo
@@ -313,7 +313,7 @@ export default function DemoModePage() {
                 {!showResetConfirm ? (
                   <button
                     onClick={() => setShowResetConfirm(true)}
-                    disabled={!isDemoActive}
+                    disabled={!is_demoActive}
                     className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     <RotateCcw className="w-5 h-5" />

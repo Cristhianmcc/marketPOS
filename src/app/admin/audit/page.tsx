@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import AuthLayout from '@/components/AuthLayout';
 import { toast, Toaster } from 'sonner';
 import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
@@ -44,7 +44,7 @@ export default function AuditLogsPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Filtros
-  const [storeId, setStoreId] = useState('');
+  const [store_id, setStoreId] = useState('');
   const [severity, setSeverity] = useState('');
   const [action, setAction] = useState('');
   const [entityType, setEntityType] = useState('');
@@ -79,7 +79,7 @@ export default function AuditLogsPage() {
         offset: pagination.offset.toString(),
       });
 
-      if (storeId) params.append('storeId', storeId);
+      if (store_id) params.append('store_id', store_id);
       if (severity) params.append('severity', severity);
       if (action) params.append('action', action);
       if (entityType) params.append('entityType', entityType);
@@ -275,7 +275,7 @@ export default function AuditLogsPage() {
                   </label>
                   <input
                     type="text"
-                    value={storeId}
+                    value={store_id}
                     onChange={(e) => setStoreId(e.target.value)}
                     placeholder="Store ID..."
                     className="w-full border border-gray-300 rounded-md px-3 py-2"
@@ -341,9 +341,8 @@ export default function AuditLogsPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {logs.map((log) => (
-                        <>
+                        <React.Fragment key={log.id}>
                           <tr
-                            key={log.id}
                             onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}
                             className="hover:bg-gray-50 cursor-pointer"
                           >
@@ -405,7 +404,7 @@ export default function AuditLogsPage() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>

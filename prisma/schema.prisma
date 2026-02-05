@@ -119,6 +119,10 @@ model Store {
   subscription       Subscription? // ✅ MÓDULO 16: Licencia y Suscripción
   payments           Payment[] // ✅ MÓDULO 16: Historial de pagos
   productsCreated    ProductMaster[] @relation("ProductCreatedByStore") // ✅ MÓDULO 18.1: Productos creados por esta tienda
+  
+  // ✅ MÓDULO 18: Facturación Electrónica SUNAT
+  sunatSettings       SunatSettings?
+  electronicDocuments ElectronicDocument[]
 
   @@map("stores")
 }
@@ -313,6 +317,9 @@ model Sale {
 
   items      SaleItem[]
   receivable Receivable? // ✅ Relación uno a uno con cuenta por cobrar
+  
+  // ✅ MÓDULO 18: Documento electrónico asociado
+  electronicDocuments ElectronicDocument[]
 
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
@@ -659,6 +666,7 @@ enum AuditEntityType {
   SUBSCRIPTION  // MÓDULO 16
   PAYMENT       // MÓDULO 16
   CATALOG       // ✅ MÓDULO 18.1: Acciones del catálogo global
+  SUNAT         // ✅ MÓDULO 18: Facturación electrónica
 }
 
 model AuditLog {
@@ -697,6 +705,7 @@ enum FeatureFlagKey {
   ENABLE_VOLUME_PROMOS
   ENABLE_NTH_PROMOS
   ENABLE_CATEGORY_PROMOS
+  ENABLE_SUNAT  // ✅ MÓDULO 18: Facturación Electrónica
 }
 
 model FeatureFlag {
@@ -802,4 +811,197 @@ model Payment {
   @@index([storeId])
   @@index([subscriptionId])
   @@map("payments")
+}
+
+//// MÓDULO 18 — FACTURACIÓN ELECTRÓNICA SUNAT
+
+enum SunatDocType {
+  FACTURA
+  BOLETA
+  NOTA_CREDITO
+  NOTA_DEBITO
+  SUMMARY     // Resumen Diario (RC)
+  VOIDED      // Comunicación de Baja (RA)
+}
+
+enum SunatStatus {
+  DRAFT       // Creado, aún no procesado
+  PENDING     // Pendiente de envío
+  XML_BUILT   // XML generado
+  SIGNED      // XML firmado
+  SENT        // Enviado a SUNAT
+  ACCEPTED    // Aceptado por SUNAT
+  REJECTED    // Rechazado por SUNAT
+  OBSERVED    // Aceptado con observaciones
+  ERROR       // Error técnico
+  CANCELED    // Anulado fiscalmente
+}
+
+enum SunatEnv {
+  BETA
+  PROD
+}
+
+enum CustomerDocType {
+  DNI
+  RUC
+  CE
+  PASSPORT
+  OTHER
+}
+
+// Configuración SUNAT por tienda
+model SunatSettings {
+  id      String @id @default(cuid())
+  storeId String @unique @map("store_id")
+  
+  env     SunatEnv @default(BETA)
+  enabled Boolean @default(false)
+  
+  // Datos del emisor
+  ruc        String?
+  razonSocial String? @map("razon_social")
+  address    String?
+  ubigeo     String?
+  
+  // Credenciales SOL (cifradas en producción)
+  solUser String? @map("sol_user")
+  solPass String? @map("sol_pass")
+  
+  // Certificado digital (Base64)
+  certPfxBase64 String? @map("cert_pfx_base64") @db.Text
+  certPassword  String? @map("cert_password")
+  
+  // ✅ MÓDULO 18.8: Onboarding steps tracking
+  stepFiscalData     Boolean @default(false) @map("step_fiscal_data")
+  stepSolCredentials Boolean @default(false) @map("step_sol_credentials")
+  stepCertificate    Boolean @default(false) @map("step_certificate")
+  stepTestSign       Boolean @default(false) @map("step_test_sign")
+  stepTestBeta       Boolean @default(false) @map("step_test_beta")
+  
+  // ✅ MÓDULO 18.8: Preferencias de emisión
+  autoEmitBoleta Boolean @default(true) @map("auto_emit_boleta")
+  allowFactura   Boolean @default(false) @map("allow_factura")
+  defaultDocType String  @default("NONE") @map("default_doc_type") // NONE, BOLETA, FACTURA
+  
+  // Series por defecto
+  defaultFacturaSeries String @default("F001") @map("default_factura_series")
+  defaultBoletaSeries  String @default("B001") @map("default_boleta_series")
+  defaultNcSeries      String @default("FC01") @map("default_nc_series")
+  defaultNdSeries      String @default("FD01") @map("default_nd_series")
+  
+  // ✅ MÓDULO 18.6: Series para Summary y Voided
+  defaultSummarySeries String @default("RC01") @map("default_summary_series")
+  defaultVoidedSeries  String @default("RA01") @map("default_voided_series")
+  
+  // Correlativos
+  nextFacturaNumber Int @default(1) @map("next_factura_number")
+  nextBoletaNumber  Int @default(1) @map("next_boleta_number")
+  nextNcNumber      Int @default(1) @map("next_nc_number")
+  nextNdNumber      Int @default(1) @map("next_nd_number")
+  
+  // ✅ MÓDULO 18.6: Correlativos para Summary y Voided
+  nextSummaryNumber Int @default(1) @map("next_summary_number")
+  nextVoidedNumber  Int @default(1) @map("next_voided_number")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  store              Store                @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  electronicDocuments ElectronicDocument[]
+  
+  @@map("sunat_settings")
+}
+
+// Documento electrónico (Factura, Boleta, NC, ND, Summary, Voided)
+model ElectronicDocument {
+  id      String @id @default(cuid())
+  storeId String @map("store_id")
+  saleId  String? @map("sale_id") // Nullable para Summary/Voided
+  
+  // Identificación del documento
+  docType    SunatDocType @map("doc_type")
+  series     String
+  number     Int
+  fullNumber String @map("full_number")
+  issueDate  DateTime @map("issue_date")
+  currency   String @default("PEN")
+  
+  // Cliente
+  customerDocType   CustomerDocType @map("customer_doc_type")
+  customerDocNumber String @map("customer_doc_number")
+  customerName      String @map("customer_name")
+  customerAddress   String? @map("customer_address")
+  
+  // Totales
+  taxable Decimal @db.Decimal(10, 2)
+  igv     Decimal @db.Decimal(10, 2)
+  total   Decimal @db.Decimal(10, 2)
+  
+  // Estado y respuesta SUNAT
+  status        SunatStatus @default(DRAFT)
+  hash          String?
+  qrText        String? @map("qr_text")
+  xmlSigned     String? @map("xml_signed") @db.Text
+  cdrZip        String? @map("cdr_zip") @db.Text
+  sunatTicket   String? @map("sunat_ticket") // Para Summary/Voided
+  sunatCode     String? @map("sunat_code")
+  sunatMessage  String? @map("sunat_message") @db.Text
+  sunatResponseAt DateTime? @map("sunat_response_at")
+  
+  // ✅ MÓDULO 18.6: Campos para Summary y Voided
+  reportedInSummary Boolean @default(false) @map("reported_in_summary") // Boletas incluidas en un RC
+  referenceDocId    String? @map("reference_doc_id") // Para VOIDED: doc original que se anula
+  voidReason        String? @map("void_reason") // Razón de baja/anulación
+  
+  // Solo para desarrollo
+  zipSentBase64 String? @map("zip_sent_base64") @db.Text
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  store         Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sale          Sale?           @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  sunatSettings SunatSettings   @relation(fields: [storeId], references: [storeId], onDelete: Restrict, map: "electronic_documents_sunat_settings_fkey")
+  jobs          SunatJob[]
+  
+  // Referencia al documento original (para VOIDED)
+  referenceDoc  ElectronicDocument?  @relation("VoidedReference", fields: [referenceDocId], references: [id], onDelete: SetNull)
+  voidedBy      ElectronicDocument[] @relation("VoidedReference")
+  
+  @@unique([storeId, docType, series, number])
+  @@index([storeId, status])
+  @@index([saleId])
+  @@index([storeId, docType, issueDate]) // Para buscar boletas del día
+  @@index([storeId, reportedInSummary]) // Para Summary
+  @@index([storeId, issueDate]) // ✅ MÓDULO 18.10: Para listado por fecha
+  @@index([fullNumber]) // ✅ MÓDULO 18.10: Para búsqueda por número
+  @@index([docType]) // ✅ MÓDULO 18.10: Para filtro por tipo
+  @@map("electronic_documents")
+}
+
+// Cola de trabajos SUNAT
+model SunatJob {
+  id         String @id @default(cuid())
+  storeId    String @map("store_id")
+  documentId String @map("electronic_document_id")
+  
+  type    String // SEND_CPE, SEND_SUMMARY, SEND_VOIDED, QUERY_TICKET
+  status  String @default("QUEUED") // QUEUED, RUNNING, DONE, FAILED
+  
+  attempts    Int      @default(0)
+  lastError   String?  @map("last_error") @db.Text
+  nextRunAt   DateTime? @map("next_run_at")
+  lockedAt    DateTime? @map("locked_at")
+  lockedBy    String?   @map("locked_by")
+  completedAt DateTime? @map("completed_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  document ElectronicDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  @@index([status, nextRunAt])
+  @@index([documentId])
+  @@map("sunat_jobs")
 }

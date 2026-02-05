@@ -6,6 +6,8 @@ import AuthLayout from '@/components/AuthLayout';
 import { formatMoney } from '@/lib/money';
 import { Search, Printer } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import SunatStatusBadge, { SunatStatus } from '@/components/sunat/SunatStatusBadge'; // ✅ MÓDULO 18.5
+import SunatActions from '@/components/sunat/SunatActions'; // ✅ MÓDULO 18.5
 
 interface Sale {
   id: string;
@@ -20,11 +22,25 @@ interface Sale {
   couponCode?: string | null;
   couponDiscount?: number;
   total: number;
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
   createdAt: string;
   printedAt: string | null;
   user: {
     name: string;
+  };
+}
+
+// ✅ MÓDULO 18.5: Datos de documento electrónico SUNAT
+interface ElectronicDocumentData {
+  hasDocument: boolean;
+  document?: {
+    id: string;
+    fullNumber: string;
+    status: SunatStatus;
+    sunatCode?: string | null;
+    sunatMessage?: string | null;
+    hasCdr: boolean;
+    hasXml: boolean;
   };
 }
 
@@ -40,11 +56,28 @@ export default function SalesPage() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [userRole, setUserRole] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
+  
+  // ✅ MÓDULO 18.5: Datos de documentos electrónicos SUNAT
+  const [documentsData, setDocumentsData] = useState<Record<string, ElectronicDocumentData>>({});
+  const [sunatEnabled, setSunatEnabled] = useState(false);
 
   useEffect(() => {
     loadUserInfo();
+    checkSunatStatus(); // ✅ MÓDULO 18.5
     fetchSales();
   }, []);
+
+  const checkSunatStatus = async () => {
+    try {
+      const res = await fetch('/api/sunat/settings/status');
+      if (res.ok) {
+        const data = await res.json();
+        setSunatEnabled(data.enabled && data.configured);
+      }
+    } catch (error) {
+      console.error('Error checking SUNAT status:', error);
+    }
+  };
 
   const loadUserInfo = async () => {
     try {
@@ -69,11 +102,37 @@ export default function SalesPage() {
       const res = await fetch(`/api/sales?${params.toString()}`);
       const data = await res.json();
       setSales(data.sales || []);
+      
+      // ✅ MÓDULO 18.5: Cargar datos SUNAT para cada venta
+      if (sunatEnabled && data.sales) {
+        fetchDocumentsData(data.sales.map((s: Sale) => s.id));
+      }
     } catch (error) {
       console.error('Error fetching sales:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ MÓDULO 18.5: Obtener documentos electrónicos para múltiples ventas
+  const fetchDocumentsData = async (saleIds: string[]) => {
+    const results: Record<string, ElectronicDocumentData> = {};
+    
+    await Promise.all(
+      saleIds.map(async (saleId) => {
+        try {
+          const res = await fetch(`/api/sunat/by-sale/${saleId}`);
+          if (res.ok) {
+            const data = await res.json();
+            results[saleId] = data;
+          }
+        } catch (error) {
+          console.error(`Error fetching document for sale ${saleId}:`, error);
+        }
+      })
+    );
+    
+    setDocumentsData(results);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -264,21 +323,22 @@ export default function SalesPage() {
                 No se encontraron ventas
               </div>
             ) : (
-              <table className="w-full table-fixed">
+              <table className="w-full table-auto">
                 <colgroup>
                   <col style={{width: '5%'}} /> {/* N° Ticket */}
-                  <col style={{width: '9%'}} /> {/* Fecha */}
-                  <col style={{width: '6%'}} /> {/* Promociones */}
-                  <col style={{width: '6%'}} /> {/* Cat. Promos */}
-                  <col style={{width: '6%'}} /> {/* Pack */}
-                  <col style={{width: '6%'}} /> {/* N-ésimo */}
-                  <col style={{width: '6%'}} /> {/* Descuentos */}
-                  <col style={{width: '8%'}} /> {/* Cupón */}
+                  <col style={{width: '8%'}} /> {/* Fecha */}
+                  <col style={{width: '5%'}} /> {/* Promociones */}
+                  <col style={{width: '5%'}} /> {/* Cat. Promos */}
+                  <col style={{width: '5%'}} /> {/* Pack */}
+                  <col style={{width: '5%'}} /> {/* N-ésimo */}
+                  <col style={{width: '5%'}} /> {/* Descuentos */}
+                  <col style={{width: '6%'}} /> {/* Cupón */}
                   <col style={{width: '7%'}} /> {/* Total */}
-                  <col style={{width: '6%'}} /> {/* Pago */}
-                  <col style={{width: '9%'}} /> {/* Cajero */}
-                  <col style={{width: '6%'}} /> {/* Estado */}
-                  <col style={{width: '20%'}} /> {/* Acciones */}
+                  <col style={{width: '5%'}} /> {/* Pago */}
+                  <col style={{width: '8%'}} /> {/* Cajero */}
+                  <col style={{width: '5%'}} /> {/* Estado */}
+                  {sunatEnabled && <col style={{width: '14%'}} />} {/* SUNAT */}
+                  <col style={{width: sunatEnabled ? '17%' : '20%'}} /> {/* Acciones */}
                 </colgroup>
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -318,6 +378,11 @@ export default function SalesPage() {
                     <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                       Estado
                     </th>
+                    {sunatEnabled && (
+                      <th className="px-2 py-3 text-center text-xs font-medium text-indigo-600 uppercase">
+                        SUNAT
+                      </th>
+                    )}
                     <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                       Acciones
                     </th>
@@ -407,23 +472,63 @@ export default function SalesPage() {
                           {isAnulada ? 'ANULADA' : 'ACTIVA'}
                         </span>
                       </td>
+                      
+                      {/* ✅ MÓDULO 18.5: Columna SUNAT */}
+                      {sunatEnabled && (
+                        <td className="px-2 py-3">
+                          {documentsData[sale.id]?.hasDocument && documentsData[sale.id].document ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <SunatStatusBadge
+                                status={documentsData[sale.id].document!.status}
+                                sunatCode={documentsData[sale.id].document!.sunatCode}
+                                sunatMessage={documentsData[sale.id].document!.sunatMessage}
+                              />
+                              <span className="text-xs text-gray-600">
+                                {documentsData[sale.id].document!.fullNumber}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400 text-center">
+                              Sin comprobante
+                            </div>
+                          )}
+                        </td>
+                      )}
+                      
                       <td className="px-3 py-3">
-                        <div className="flex gap-1.5 justify-center">
-                          <button
-                            onClick={() => router.push(`/receipt/${sale.id}`)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            Ver
-                          </button>
-                          {canCancelSale(sale) && (
+                        <div className="flex flex-col gap-1.5">
+                          {/* Acciones normales */}
+                          <div className="flex gap-1.5 justify-center">
                             <button
-                              onClick={() => handleCancelClick(sale)}
-                              disabled={cancelling === sale.id}
-                              className="px-2.5 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 transition-colors text-xs whitespace-nowrap"
+                              onClick={() => router.push(`/receipt/${sale.id}`)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-xs"
                             >
-                              {cancelling === sale.id ? 'Anulando...' : 'Anular'}
+                              <Printer className="w-3.5 h-3.5" />
+                              Ver
                             </button>
+                            {canCancelSale(sale) && (
+                              <button
+                                onClick={() => handleCancelClick(sale)}
+                                disabled={cancelling === sale.id}
+                                className="px-2.5 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:bg-gray-400 transition-colors text-xs whitespace-nowrap"
+                              >
+                                {cancelling === sale.id ? 'Anulando...' : 'Anular'}
+                              </button>
+                            )}
+                          </div>
+                          
+                          {/* ✅ MÓDULO 18.5: Acciones SUNAT */}
+                          {sunatEnabled && !isAnulada && (
+                            <SunatActions
+                              saleId={sale.id}
+                              documentId={documentsData[sale.id]?.document?.id}
+                              status={documentsData[sale.id]?.document?.status}
+                              hasXml={documentsData[sale.id]?.document?.hasXml}
+                              hasCdr={documentsData[sale.id]?.document?.hasCdr}
+                              userRole={userRole}
+                              paymentMethod={sale.paymentMethod}
+                              onActionComplete={() => fetchDocumentsData([sale.id])}
+                            />
                           )}
                         </div>
                       </td>

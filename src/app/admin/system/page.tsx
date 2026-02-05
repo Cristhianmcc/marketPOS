@@ -20,7 +20,7 @@ interface HealthStatus {
 }
 
 interface StoreStatus {
-  storeId: string;
+  store_id: string;
   storeName: string;
   storeStatus: string;
   currentShift: {
@@ -36,7 +36,7 @@ interface StoreStatus {
 }
 
 interface ConfigSnapshot {
-  storeId: string;
+  store_id: string;
   featureFlags: Record<string, boolean>;
   operationalLimits: {
     maxDiscountPercent: number | null;
