@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
-import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package } from 'lucide-react';
+import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
 import { EditPriceModal } from '@/components/inventory/EditPriceModal';
 import { StockMovementModal } from '@/components/inventory/StockMovementModal';
+import { ProductConversionsModal } from '@/components/inventory/ProductConversionsModal';
+import { ProductSellUnitPricesModal } from '@/components/inventory/ProductSellUnitPricesModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { toast, Toaster } from 'sonner';
+import { useFlags } from '@/hooks/useFlags';
 
 interface Product {
   id: string;
@@ -56,6 +59,27 @@ export default function InventoryPage() {
     productId?: string;
     productName?: string;
   }>({ open: false });
+  // ✅ MÓDULO F2: Modal de conversiones
+  const [conversionsModal, setConversionsModal] = useState<{
+    open: boolean;
+    productId?: string;
+    productName?: string;
+  }>({ open: false });
+  // ✅ MÓDULO F2.3: Modal de precios por unidad de venta
+  const [sellUnitPricesModal, setSellUnitPricesModal] = useState<{
+    open: boolean;
+    storeProductId?: string;
+    productId?: string;
+    productName?: string;
+    price?: number;
+  }>({ open: false });
+
+  // ✅ MÓDULO F2: Feature flags para unidades avanzadas
+  const { isOn: isFlagOn } = useFlags();
+  const advancedUnitsEnabled = isFlagOn('ENABLE_ADVANCED_UNITS');
+  const conversionsEnabled = isFlagOn('ENABLE_CONVERSIONS');
+  const sellUnitPricingEnabled = isFlagOn('ENABLE_SELLUNIT_PRICING'); // ✅ MÓDULO F2.3
+  const servicesEnabled = isFlagOn('ENABLE_SERVICES'); // ✅ MÓDULO F3
 
   useEffect(() => {
     fetchUser();
@@ -169,12 +193,29 @@ export default function InventoryPage() {
             </div>
             {isOwner && (
               <div className="flex gap-2">
+                {/* ✅ MÓDULO F3: Link a Servicios */}
+                {servicesEnabled && (
+                  <button
+                    onClick={() => router.push('/inventory/services')}
+                    className="h-10 px-4 border border-indigo-300 bg-indigo-50 rounded-md text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                  >
+                    <Wrench className="w-4 h-4" />
+                    Servicios
+                  </button>
+                )}
                 <button
                   onClick={() => router.push('/admin/catalog')}
                   className="h-10 px-4 border border-blue-300 bg-blue-50 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-2"
                 >
                   <Globe className="w-4 h-4" />
                   Catálogo Global
+                </button>
+                <button
+                  onClick={() => router.push('/inventory/categories')}
+                  className="h-10 px-4 border border-amber-300 bg-amber-50 rounded-md text-sm font-medium text-amber-700 hover:bg-amber-100 transition-colors flex items-center gap-2"
+                >
+                  <FolderTree className="w-4 h-4" />
+                  Categorías
                 </button>
                 <button
                   onClick={() => router.push('/inventory/import')}
@@ -401,6 +442,36 @@ export default function InventoryPage() {
                                 >
                                   <Edit className="w-4 h-4 text-gray-600" />
                                 </button>
+                                {/* ✅ MÓDULO F2: Botón de conversiones */}
+                                {advancedUnitsEnabled && conversionsEnabled && (
+                                  <button
+                                    onClick={() => setConversionsModal({ 
+                                      open: true, 
+                                      productId: sp.product.id, 
+                                      productName: sp.product.name 
+                                    })}
+                                    className="p-1 hover:bg-indigo-50 rounded-md transition-colors"
+                                    title="Unidades y conversiones"
+                                  >
+                                    <Scale className="w-4 h-4 text-indigo-600" />
+                                  </button>
+                                )}
+                                {/* ✅ MÓDULO F2.3: Botón de precios por presentación */}
+                                {conversionsEnabled && sellUnitPricingEnabled && (
+                                  <button
+                                    onClick={() => setSellUnitPricesModal({ 
+                                      open: true, 
+                                      storeProductId: sp.id,
+                                      productId: sp.product.id, 
+                                      productName: sp.product.name,
+                                      price: sp.price
+                                    })}
+                                    className="p-1 hover:bg-green-50 rounded-md transition-colors"
+                                    title="Precios por presentación"
+                                  >
+                                    <Tag className="w-4 h-4 text-green-600" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => setStockModal({ open: true, storeProduct: sp })}
                                   className="p-1 hover:bg-gray-100 rounded-md transition-colors"
@@ -477,6 +548,28 @@ export default function InventoryPage() {
         cancelText="Cancelar"
         confirmColor="blue"
       />
+
+      {/* ✅ MÓDULO F2: Modal de conversiones */}
+      {conversionsModal.open && conversionsModal.productId && (
+        <ProductConversionsModal
+          isOpen={conversionsModal.open}
+          onClose={() => setConversionsModal({ open: false })}
+          productId={conversionsModal.productId}
+          productName={conversionsModal.productName || ''}
+        />
+      )}
+
+      {/* ✅ MÓDULO F2.3: Modal de precios por presentación */}
+      {sellUnitPricesModal.open && sellUnitPricesModal.productId && (
+        <ProductSellUnitPricesModal
+          isOpen={sellUnitPricesModal.open}
+          onClose={() => setSellUnitPricesModal({ open: false })}
+          storeProductId={sellUnitPricesModal.storeProductId || ''}
+          productId={sellUnitPricesModal.productId}
+          productName={sellUnitPricesModal.productName || ''}
+          basePrice={sellUnitPricesModal.price || 0}
+        />
+      )}
     </AuthLayout>
   );
 }

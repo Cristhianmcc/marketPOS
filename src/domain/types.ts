@@ -15,6 +15,7 @@ export interface Product {
   content: string | null;
   category: string;
   unitType: UnitType; // ✅ unitType ahora en Product
+  baseUnitId?: string | null; // ✅ MÓDULO F2.1: Unidad SUNAT
   imageUrl: string | null;
   isGlobal?: boolean; // ✅ MÓDULO 18.1: Catálogo Global
 }

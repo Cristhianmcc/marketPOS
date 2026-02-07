@@ -1,0 +1,113 @@
+name,category,barcode,brand,content,baseUnitCode,price,stock,minStock,conversions
+Tornillo Autorroscante 1/4 x 1,Tornillos,,Stanley,,UNIT,0.15,2000,200,"BOX:100,PACK:25"
+Tornillo Autorroscante 1/4 x 2,Tornillos,,Stanley,,UNIT,0.20,1500,200,"BOX:100,PACK:25"
+Tornillo Madera 2 x 12,Tornillos,,Stanley,,UNIT,0.10,3000,300,"BOX:100"
+Clavo 2 pulgadas,Clavos,,Nacional,,KG,8.50,50,10,"BOX:25"
+Clavo 3 pulgadas,Clavos,,Nacional,,KG,8.00,60,10,"BOX:25"
+Clavo 4 pulgadas,Clavos,,Nacional,,KG,7.50,40,10,"BOX:25"
+Cable THW 14 AWG Rojo,Cables Eléctricos,7896541230001,Indeco,14 AWG,M,2.80,500,50,"ROLL:100"
+Cable THW 14 AWG Azul,Cables Eléctricos,7896541230002,Indeco,14 AWG,M,2.80,500,50,"ROLL:100"
+Cable THW 14 AWG Negro,Cables Eléctricos,7896541230003,Indeco,14 AWG,M,2.80,500,50,"ROLL:100"
+Cable THW 12 AWG Rojo,Cables Eléctricos,7896541230004,Indeco,12 AWG,M,4.20,300,30,"ROLL:100"
+Cable THW 12 AWG Azul,Cables Eléctricos,7896541230005,Indeco,12 AWG,M,4.20,300,30,"ROLL:100"
+Cable Mellizo 2x16,Cables Eléctricos,7896541230010,Indeco,2x16,M,3.50,200,20,"ROLL:100"
+Tubo PVC 1/2 x 5m,Tubos PVC,7891234567001,Nicoll,1/2 pulgada,UNIT,8.50,80,10,
+Tubo PVC 3/4 x 5m,Tubos PVC,7891234567002,Nicoll,3/4 pulgada,UNIT,12.00,60,10,
+Tubo PVC 1 x 5m,Tubos PVC,7891234567003,Nicoll,1 pulgada,UNIT,18.00,40,8,
+Tubo PVC 2 x 5m,Tubos PVC,7891234567004,Nicoll,2 pulgadas,UNIT,35.00,30,5,
+Tubo PVC 4 Desagüe x 3m,Tubos PVC,7891234567005,Nicoll,4 pulgadas,UNIT,28.00,25,5,
+Codo PVC 1/2 x 90,Accesorios PVC,,Nicoll,1/2 pulgada,UNIT,1.20,200,30,"PACK:10"
+Codo PVC 3/4 x 90,Accesorios PVC,,Nicoll,3/4 pulgada,UNIT,1.80,150,25,"PACK:10"
+Codo PVC 1 x 90,Accesorios PVC,,Nicoll,1 pulgada,UNIT,2.50,100,20,"PACK:10"
+Tee PVC 1/2,Accesorios PVC,,Nicoll,1/2 pulgada,UNIT,1.50,150,20,"PACK:10"
+Tee PVC 3/4,Accesorios PVC,,Nicoll,3/4 pulgada,UNIT,2.20,100,15,"PACK:10"
+Unión Universal PVC 1/2,Accesorios PVC,,Nicoll,1/2 pulgada,UNIT,3.50,80,10,"PACK:5"
+Adaptador PVC 1/2 Rosca,Accesorios PVC,,Nicoll,1/2 pulgada,UNIT,1.80,100,15,"PACK:10"
+Pegamento PVC 1/4 gal,Pegamento PVC,7891234568001,Oatey,1/4 galón,UNIT,35.00,20,5,
+Pegamento PVC 1/8 gal,Pegamento PVC,7891234568002,Oatey,1/8 galón,UNIT,18.00,30,8,
+Cemento Pacasmayo Tipo I,Cemento y Agregados,7891234500001,Pacasmayo,42.5 kg,UNIT,28.50,100,20,
+Cemento Quisqueya Extra,Cemento y Agregados,7891234500002,Quisqueya,42.5 kg,UNIT,27.00,80,15,
+Fierro Corrugado 3/8,Fierros y Varillas,,Siderperu,9m,UNIT,18.00,50,10,"PACK:10"
+Fierro Corrugado 1/2,Fierros y Varillas,,Siderperu,9m,UNIT,28.00,40,8,"PACK:10"
+Fierro Corrugado 5/8,Fierros y Varillas,,Siderperu,9m,UNIT,42.00,30,5,"PACK:10"
+Fierro Corrugado 3/4,Fierros y Varillas,,Siderperu,9m,UNIT,58.00,25,5,"PACK:10"
+Alambre Negro 16,Alambre y Mallas,,Nacional,,KG,6.50,100,15,"ROLL:5"
+Alambre Negro 8,Alambre y Mallas,,Nacional,,KG,6.00,80,10,"ROLL:5"
+Malla Gallinero 1m x 50m,Alambre y Mallas,,Nacional,1m x 50m,ROLL,85.00,10,2,
+Interruptor Simple,Interruptores,7891234570001,Bticino,,UNIT,8.50,100,15,"PACK:10"
+Interruptor Doble,Interruptores,7891234570002,Bticino,,UNIT,14.00,80,12,"PACK:10"
+Interruptor Triple,Interruptores,7891234570003,Bticino,,UNIT,18.00,50,8,"PACK:10"
+Tomacorriente Simple,Tomacorrientes,7891234570010,Bticino,,UNIT,7.50,120,20,"PACK:10"
+Tomacorriente Doble,Tomacorrientes,7891234570011,Bticino,,UNIT,12.00,100,15,"PACK:10"
+Tomacorriente Triple,Tomacorrientes,7891234570012,Bticino,,UNIT,18.00,60,10,"PACK:10"
+Foco LED 9W,Focos y Fluorescentes,7891234580001,Philips,9W,UNIT,12.00,100,20,"PACK:12"
+Foco LED 12W,Focos y Fluorescentes,7891234580002,Philips,12W,UNIT,15.00,80,15,"PACK:12"
+Fluorescente LED 18W,Focos y Fluorescentes,7891234580010,Philips,18W 1.2m,UNIT,25.00,40,8,
+Pintura Látex Blanco,Pinturas Látex,7891234590001,CPP,4L,GAL,65.00,20,5,
+Pintura Látex Blanco,Pinturas Látex,7891234590002,CPP,1L,L,18.00,40,10,
+Pintura Látex Marfil,Pinturas Látex,7891234590003,CPP,4L,GAL,68.00,15,3,
+Esmalte Sintético Negro,Esmaltes,7891234590010,Anypsa,1L,L,32.00,25,5,
+Esmalte Sintético Blanco,Esmaltes,7891234590011,Anypsa,1L,L,32.00,30,5,
+Thinner Acrílico,Thinner y Solventes,7891234590020,Anypsa,1L,L,12.00,50,10,
+Thinner Acrílico,Thinner y Solventes,7891234590021,Anypsa,4L,GAL,42.00,20,5,
+Brocha 2 pulgadas,Brochas,,Nacional,2",UNIT,8.00,50,10,
+Brocha 3 pulgadas,Brochas,,Nacional,3",UNIT,12.00,40,8,
+Brocha 4 pulgadas,Brochas,,Nacional,4",UNIT,18.00,30,5,
+Rodillo 9" Pelo Corto,Rodillos,,Nacional,9",UNIT,15.00,40,8,
+Rodillo 9" Pelo Largo,Rodillos,,Nacional,9",UNIT,18.00,35,6,
+Lija al Agua 80,Lijas,,Norton,80,UNIT,2.00,200,30,"PACK:25"
+Lija al Agua 120,Lijas,,Norton,120,UNIT,2.00,200,30,"PACK:25"
+Lija al Agua 220,Lijas,,Norton,220,UNIT,2.00,200,30,"PACK:25"
+Lija al Agua 400,Lijas,,Norton,400,UNIT,2.20,150,25,"PACK:25"
+Masilla para Madera,Masillas,7891234595001,Anypsa,1kg,UNIT,25.00,30,8,
+Martillo Carpintero 16oz,Martillos,7891234600001,Stanley,16oz,UNIT,45.00,15,3,
+Martillo Uña 20oz,Martillos,7891234600002,Stanley,20oz,UNIT,55.00,12,2,
+Destornillador Plano 1/4,Destornilladores,7891234600010,Stanley,1/4",UNIT,12.00,30,5,
+Destornillador Estrella 2,Destornilladores,7891234600011,Stanley,PH2,UNIT,12.00,30,5,
+Juego Llaves 8-19mm,Llaves,,Stanley,8-19mm,SET,85.00,10,2,
+Alicate Universal 8",Alicates,7891234600020,Stanley,8",UNIT,35.00,20,4,
+Alicate Corte 6",Alicates,7891234600021,Stanley,6",UNIT,28.00,15,3,
+Wincha 5m,Medición,7891234600030,Stanley,5m,UNIT,18.00,25,5,
+Wincha 8m,Medición,7891234600031,Stanley,8m,UNIT,28.00,20,4,
+Nivel de Burbuja 60cm,Medición,7891234600040,Stanley,60cm,UNIT,35.00,12,2,
+Taladro Percutor 1/2,Taladros,7891234700001,Bosch,1/2",UNIT,380.00,5,1,
+Amoladora 4 1/2,Amoladoras,7891234700010,Bosch,4.5",UNIT,250.00,6,1,
+Broca Concreto 1/4,Accesorios para Herramientas,,Bosch,1/4",UNIT,6.00,50,10,"PACK:10"
+Broca Concreto 5/16,Accesorios para Herramientas,,Bosch,5/16",UNIT,8.00,40,8,"PACK:10"
+Broca Concreto 3/8,Accesorios para Herramientas,,Bosch,3/8",UNIT,10.00,35,6,"PACK:10"
+Disco Corte Metal 4 1/2,Accesorios para Herramientas,,Norton,4.5",UNIT,5.00,100,20,"BOX:25"
+Disco Corte Metal 7",Accesorios para Herramientas,,Norton,7",UNIT,8.50,60,12,"BOX:25"
+Disco Desbaste 4 1/2,Accesorios para Herramientas,,Norton,4.5",UNIT,12.00,50,10,"BOX:10"
+Melamina Blanca 18mm,Melamina,7891234800001,Vesto,2.44x2.15m,SHEET,185.00,10,2,
+Melamina Roble 18mm,Melamina,7891234800002,Vesto,2.44x2.15m,SHEET,195.00,8,2,
+MDF 3mm,MDF,7891234800010,Maderera,2.44x1.52m,SHEET,28.00,15,3,
+MDF 6mm,MDF,7891234800011,Maderera,2.44x1.52m,SHEET,45.00,12,2,
+MDF 12mm,MDF,7891234800012,Maderera,2.44x1.52m,SHEET,75.00,10,2,
+Triplay 4mm,Triplay,7891234800020,Maderera,2.44x1.22m,SHEET,32.00,15,3,
+Triplay 6mm,Triplay,7891234800021,Maderera,2.44x1.22m,SHEET,48.00,12,2,
+Triplay 12mm,Triplay,7891234800022,Maderera,2.44x1.22m,SHEET,85.00,10,2,
+Bisagra 3",Bisagras,,Stanley,3",UNIT,4.50,100,20,"PACK:2"
+Bisagra 3.5",Bisagras,,Stanley,3.5",UNIT,6.00,80,15,"PACK:2"
+Bisagra Cangrejo,Bisagras,,Nacional,,UNIT,5.00,80,15,"PACK:2"
+Cerradura para Puerta,Cerraduras,7891234810001,Yale,,UNIT,85.00,15,3,
+Cerradura Bola,Cerraduras,7891234810002,Yale,,UNIT,45.00,20,4,
+Candado 40mm,Candados,7891234820001,Yale,40mm,UNIT,35.00,30,5,
+Candado 50mm,Candados,7891234820002,Yale,50mm,UNIT,48.00,25,4,
+Candado 60mm,Candados,7891234820003,Yale,60mm,UNIT,65.00,20,3,
+Guantes Cuero,Guantes,7891234830001,Nacional,,PAIR,18.00,40,8,
+Guantes Nitrilo,Guantes,7891234830002,Nacional,,BOX,45.00,25,5,
+Casco Seguridad,Cascos,7891234830010,3M,,UNIT,28.00,20,4,
+Lentes Seguridad,Lentes de Seguridad,7891234830020,3M,,UNIT,12.00,30,5,
+Mascarilla N95,Mascarillas,7891234830030,3M,,BOX,85.00,15,3,
+Pegamento Cerámico 25kg,Pegamento para Cerámico,7891234840001,Celima,25kg,SACK,32.00,30,5,
+Fragua Blanca 1kg,Fraguas,,Celima,1kg,UNIT,8.00,50,10,
+Fragua Negro 1kg,Fraguas,,Celima,1kg,UNIT,10.00,30,5,
+Silicona Transparente,Siliconas,7891234850001,Sikaflex,280ml,UNIT,18.00,30,5,
+Silicona Blanca,Siliconas,7891234850002,Sikaflex,280ml,UNIT,18.00,25,4,
+Sikaflex 1A,Selladores,7891234850010,Sika,300ml,UNIT,45.00,15,3,
+Cinta Aislante,Cintas Adhesivas,7891234860001,3M,,UNIT,4.50,100,20,"PACK:10"
+Cinta Masking 3/4,Cintas Adhesivas,7891234860002,3M,3/4",UNIT,8.00,60,12,
+Cinta Embalaje Transparente,Cintas Adhesivas,7891234860003,3M,,UNIT,6.00,80,15,"PACK:6"
+Manguera 1/2 x 25m,Mangueras,7891234870001,Nacional,1/2" x 25m,ROLL,55.00,15,3,
+Manguera 3/4 x 25m,Mangueras,7891234870002,Nacional,3/4" x 25m,ROLL,75.00,12,2,
+Aspersor Giratorio,Aspersores,,Nacional,,UNIT,25.00,20,4,

@@ -41,11 +41,31 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
   const [fuzzySuggestions, setFuzzySuggestions] = useState<FuzzySuggestion[]>([]); // ✅ MÓDULO 18.2
   const [loadingFuzzy, setLoadingFuzzy] = useState(false); // ✅ MÓDULO 18.2
   const barcodeInputRef = useRef<HTMLInputElement>(null);
+  
+  // ✅ MÓDULO F5: Categorías dinámicas según perfil de negocio
+  const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
+  const [businessProfile, setBusinessProfile] = useState<string>('BODEGA');
+  
+  // ✅ MÓDULO F2.1: Unidades SUNAT dinámicas
+  interface UnitOption {
+    id: string;
+    code: string;
+    sunatCode: string | null;
+    name: string;
+    displayName: string | null;
+    symbol: string | null;
+    allowDecimals: boolean;
+    precision: number;
+    label: string;
+    sunatLabel: string;
+  }
+  const [availableUnits, setAvailableUnits] = useState<UnitOption[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
     unitType: 'UNIT' as 'UNIT' | 'KG',
-    category: 'Abarrotes',
+    baseUnitId: '', // ✅ MÓDULO F2.1: ID de unidad SUNAT
+    category: '',
     brand: '',
     content: '',
     barcode: '',
@@ -55,7 +75,8 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     imageUrl: '',
   });
 
-  const categories = [
+  // Categorías por defecto (fallback)
+  const defaultCategories = [
     'Abarrotes',
     'Bebidas',
     'Lácteos',
@@ -67,6 +88,49 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     'Cuidado Personal',
     'Otros',
   ];
+  
+  // ✅ MÓDULO F5: Usar categorías dinámicas o fallback
+  const categories = dynamicCategories.length > 0 ? dynamicCategories : defaultCategories;
+
+  // ✅ MÓDULO F5 + F2.1: Cargar perfil de tienda, categorías y unidades al abrir
+  useEffect(() => {
+    const loadStoreData = async () => {
+      try {
+        // Cargar categorías
+        const profileRes = await fetch('/api/store/profile');
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          setDynamicCategories(data.categories || []);
+          setBusinessProfile(data.store?.businessProfile || 'BODEGA');
+          if (data.categories?.length > 0 && !formData.category) {
+            setFormData(prev => ({ ...prev, category: data.categories[0] }));
+          }
+        }
+        
+        // ✅ MÓDULO F2.1: Cargar unidades SUNAT
+        const unitsRes = await fetch('/api/units?kind=GOODS');
+        if (unitsRes.ok) {
+          const unitsData = await unitsRes.json();
+          setAvailableUnits(unitsData.units || []);
+          // Establecer la primera unidad como default (NIU - Unidad)
+          if (unitsData.units?.length > 0 && !formData.baseUnitId) {
+            const defaultUnit = unitsData.units.find((u: UnitOption) => u.code === 'UNIT') || unitsData.units[0];
+            setFormData(prev => ({ 
+              ...prev, 
+              baseUnitId: defaultUnit.id,
+              unitType: defaultUnit.code === 'KG' ? 'KG' : 'UNIT', // Compat legacy
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Error loading store data:', err);
+      }
+    };
+
+    if (isOpen) {
+      loadStoreData();
+    }
+  }, [isOpen]);
 
   // Autofocus en barcode cuando se abre el modal (para pistola escáner)
   useEffect(() => {
@@ -306,6 +370,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       const productPayload = {
         name: formData.name,
         unitType: formData.unitType,
+        baseUnitId: formData.baseUnitId || null, // ✅ MÓDULO F2.1: Unidad SUNAT
         category: formData.category,
         barcode: tab === 'with-code' && formData.barcode ? formData.barcode : null,
         brand: formData.brand || null,
@@ -363,10 +428,13 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
   };
 
   const resetForm = () => {
+    // ✅ MÓDULO F2.1: Obtener primera unidad disponible
+    const defaultUnit = availableUnits.find(u => u.code === 'UNIT') || availableUnits[0];
     setFormData({
       name: '',
       unitType: 'UNIT',
-      category: 'Abarrotes',
+      baseUnitId: defaultUnit?.id || '', // ✅ MÓDULO F2.1: Primera unidad SUNAT
+      category: categories[0] || 'Otros', // ✅ MÓDULO F5: Primera categoría del perfil
       brand: '',
       content: '',
       barcode: '',
@@ -583,21 +651,40 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
             </p>
           </div>
 
+          {/* ✅ MÓDULO F2.1: Dropdown de unidades SUNAT dinámico */}
           <div>
             <label className="block text-sm font-medium text-[#1F2A37] mb-2">
-              Tipo de unidad *
+              Unidad de medida *
             </label>
             <select
-              value={formData.unitType}
-              onChange={(e) =>
-                setFormData({ ...formData, unitType: e.target.value as 'UNIT' | 'KG' })
-              }
+              value={formData.baseUnitId}
+              onChange={(e) => {
+                const selectedUnit = availableUnits.find(u => u.id === e.target.value);
+                setFormData({ 
+                  ...formData, 
+                  baseUnitId: e.target.value,
+                  // Mantener compatibilidad con unitType legacy
+                  unitType: selectedUnit?.code === 'KG' ? 'KG' : 'UNIT',
+                });
+              }}
               required
               className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
             >
-              <option value="UNIT">Unidad</option>
-              <option value="KG">Kilogramo (kg)</option>
+              {availableUnits.length === 0 ? (
+                <>
+                  <option value="">Cargando...</option>
+                </>
+              ) : (
+                availableUnits.map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.sunatCode ? `${unit.sunatCode} — ` : ''}{unit.displayName || unit.name} {unit.symbol ? `(${unit.symbol})` : ''}
+                  </option>
+                ))
+              )}
             </select>
+            <p className="text-xs text-gray-500 mt-1">
+              {availableUnits.length} unidades SUNAT disponibles
+            </p>
           </div>
 
           <div>

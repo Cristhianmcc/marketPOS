@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const CreateProductSchema = z.object({
   name: z.string().min(1, 'Nombre es requerido'),
   unitType: z.enum(['UNIT', 'KG']),
+  baseUnitId: z.string().optional().nullable(), // ✅ MÓDULO F2.1: Unidad SUNAT
   category: z.string().default('Otros'),
   brand: z.string().optional().nullable(),
   content: z.string().optional().nullable(),

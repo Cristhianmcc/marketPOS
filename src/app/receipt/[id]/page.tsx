@@ -33,6 +33,16 @@ interface SaleItem {
   discountValue: number | null;
   discountAmount: number;
   totalLine: number;
+  // ✅ MÓDULO F2.2: Unidades avanzadas
+  unitCodeUsed: string | null;
+  unitSymbol: string | null;
+  unitSunatCode: string | null;
+  quantityOriginal: number | null;
+  quantityBase: number | null;
+  conversionFactorUsed: number | null;
+  // ✅ MÓDULO F2.3: Precio por unidad de venta
+  pricingMode: 'BASE_UNIT' | 'SELL_UNIT_OVERRIDE' | null;
+  sellUnitPriceApplied: number | null;
 }
 
 interface Sale {
@@ -284,20 +294,50 @@ export default function ReceiptPage() {
 
           {/* Items */}
           <div className="items">
-            {sale.items.map((item) => (
-              <div key={item.id} className="item">
-                <div className="item-name">
-                  {item.productName}
-                  {item.productContent && ` ${item.productContent}`}
-                </div>
-                <div className="item-line">
-                  <span>
-                    {item.unitType === 'KG' 
-                      ? `${Number(item.quantity).toFixed(3)} kg` 
-                      : `${item.quantity} und`} x {formatMoney(item.unitPrice)}
-                  </span>
-                  <span>{formatMoney(item.subtotal)}</span>
-                </div>
+            {sale.items.map((item) => {
+              // ✅ MÓDULO F2.2: Determinar si hay conversión de unidad
+              const hasConversion = item.quantityOriginal !== null && 
+                                    item.conversionFactorUsed !== null && 
+                                    item.conversionFactorUsed !== 1;
+              
+              // Formatear cantidad según si hay conversión o unitType
+              const getQuantityDisplay = () => {
+                if (hasConversion && item.quantityOriginal) {
+                  // Mostrar: "2 CAJA" (cantidad en unidad de venta)
+                  const unitSymbol = item.unitSymbol || item.unitCodeUsed || 'UN';
+                  return `${Number(item.quantityOriginal)} ${unitSymbol}`;
+                }
+                // Fallback a comportamiento original
+                if (item.unitType === 'KG') {
+                  return `${Number(item.quantity).toFixed(3)} kg`;
+                }
+                return `${item.quantity} und`;
+              };
+
+              return (
+                <div key={item.id} className="item">
+                  <div className="item-name">
+                    {item.productName}
+                    {item.productContent && ` ${item.productContent}`}
+                  </div>
+                  <div className="item-line">
+                    <span>
+                      {getQuantityDisplay()} x {formatMoney(item.unitPrice)}
+                    </span>
+                    <span>{formatMoney(item.subtotal)}</span>
+                  </div>
+                  {/* ✅ MÓDULO F2.2: Mostrar equivalencia en unidad base */}
+                  {hasConversion && (
+                    <div className="item-conversion" style={{ fontSize: '10px', color: '#6b7280' }}>
+                      = {Number(item.quantityBase ?? item.quantity)} unid. base
+                    </div>
+                  )}
+                  {/* ✅ MÓDULO F2.3: Mostrar si se usó precio por presentación */}
+                  {item.pricingMode === 'SELL_UNIT_OVERRIDE' && item.sellUnitPriceApplied && (
+                    <div className="item-packprice" style={{ fontSize: '10px', color: '#16a34a' }}>
+                      Precio {item.unitSymbol || 'pack'}: {formatMoney(item.sellUnitPriceApplied)}
+                    </div>
+                  )}
                 {/* Promoción del ítem */}
                 {item.promotionDiscount > 0 && (
                   <div className="item-discount">
@@ -355,7 +395,8 @@ export default function ReceiptPage() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="separator">================================</div>

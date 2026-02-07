@@ -292,6 +292,9 @@ export async function POST(request: NextRequest) {
               productName: item.productName,
               productContent: item.productContent,
               unitType: item.unitType,
+              // ✅ SUNAT: Restaurar campos si existen en backup
+              unitSunatCode: item.unitSunatCode ?? null,
+              unitSymbol: item.unitSymbol ?? null,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
               subtotal: item.subtotal,

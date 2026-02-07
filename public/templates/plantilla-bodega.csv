@@ -1,0 +1,90 @@
+name,category,barcode,brand,content,baseUnitCode,price,stock,minStock,conversions
+Inca Kola 500ml,Gaseosas,7750243051234,Inca Kola,500ml,UNIT,2.50,120,24,"PACK:6,BOX:24"
+Inca Kola 1.5L,Gaseosas,7750243051235,Inca Kola,1.5L,UNIT,5.50,80,12,"PACK:6"
+Coca-Cola 500ml,Gaseosas,7750109004567,Coca-Cola,500ml,UNIT,2.50,120,24,"PACK:6,BOX:24"
+Coca-Cola 1.5L,Gaseosas,7750109004568,Coca-Cola,1.5L,UNIT,5.80,80,12,"PACK:6"
+Pepsi 500ml,Gaseosas,7751234567890,Pepsi,500ml,UNIT,2.30,100,20,"PACK:6,BOX:24"
+Sprite 500ml,Gaseosas,7750109004600,Sprite,500ml,UNIT,2.30,80,15,"PACK:6,BOX:24"
+Fanta Naranja 500ml,Gaseosas,7750109004610,Fanta,500ml,UNIT,2.30,60,12,"PACK:6,BOX:24"
+Agua San Luis 625ml,Aguas,7750109005001,San Luis,625ml,UNIT,1.50,150,30,"PACK:6,BOX:15"
+Agua San Luis 2.5L,Aguas,7750109005002,San Luis,2.5L,UNIT,3.50,60,12,"PACK:6"
+Agua Cielo 625ml,Aguas,7750200001234,Cielo,625ml,UNIT,1.20,100,20,"PACK:6,BOX:15"
+Jugo Frugos 1L,Jugos y Néctares,7750243060001,Frugos,1L,UNIT,4.50,60,12,"PACK:6"
+Jugo Pulp 1L,Jugos y Néctares,7750244070001,Pulp,1L,UNIT,4.20,50,10,"PACK:6"
+Néctar Gloria 1L,Jugos y Néctares,7750243080001,Gloria,1L,UNIT,5.00,40,8,"PACK:6"
+Cerveza Pilsen 650ml,Cervezas,7751234600001,Pilsen,650ml,UNIT,6.50,80,20,"PACK:6,BOX:12"
+Cerveza Cusqueña 620ml,Cervezas,7751234600002,Cusqueña,620ml,UNIT,7.00,60,15,"PACK:6,BOX:12"
+Cerveza Cristal 650ml,Cervezas,7751234600003,Cristal,650ml,UNIT,6.00,100,25,"PACK:6,BOX:12"
+Arroz Costeño 1kg,Arroz y Menestras,7751234700001,Costeño,1kg,UNIT,4.20,80,20,"PACK:12"
+Arroz Costeño 5kg,Arroz y Menestras,7751234700002,Costeño,5kg,UNIT,19.50,40,10,
+Arroz Extra Paisana 1kg,Arroz y Menestras,7751234700003,Paisana,1kg,UNIT,4.50,60,15,"PACK:12"
+Lentejas 500g,Arroz y Menestras,7751234710001,Costeño,500g,UNIT,4.00,50,10,"PACK:12"
+Frejol Canario 500g,Arroz y Menestras,7751234710002,Costeño,500g,UNIT,5.50,40,8,"PACK:12"
+Aceite Primor 1L,Aceites,7750106000123,Primor,1L,UNIT,12.50,60,15,"PACK:6"
+Aceite Primor 450ml,Aceites,7750106000124,Primor,450ml,UNIT,6.00,80,20,"PACK:12"
+Aceite Cocinero 1L,Aceites,7750106000130,Cocinero,1L,UNIT,11.00,50,12,"PACK:6"
+Azúcar Rubia Cartavio 1kg,Azúcar y Endulzantes,7751234800001,Cartavio,1kg,UNIT,4.00,100,25,"PACK:10"
+Azúcar Blanca Bell's 1kg,Azúcar y Endulzantes,7751234800002,Bell's,1kg,UNIT,4.50,80,20,"PACK:10"
+Azúcar Rubia 5kg,Azúcar y Endulzantes,7751234800003,Cartavio,5kg,UNIT,18.00,30,8,
+Fideos Don Vittorio Spaghetti,Fideos y Pastas,7750243100001,Don Vittorio,500g,UNIT,3.80,100,25,"PACK:20"
+Fideos Don Vittorio Tallarín,Fideos y Pastas,7750243100002,Don Vittorio,500g,UNIT,3.80,80,20,"PACK:20"
+Fideos Molitalia Codos,Fideos y Pastas,7751234100010,Molitalia,250g,UNIT,2.20,70,15,"PACK:24"
+Fideos Lavaggi Espiral,Fideos y Pastas,7751234100011,Lavaggi,500g,UNIT,3.50,60,12,"PACK:20"
+Atún Florida 140g,Conservas,7750243200001,Florida,140g,UNIT,5.50,60,15,"PACK:24"
+Atún Florida 170g,Conservas,7750243200002,Florida,170g,UNIT,7.00,50,12,"PACK:24"
+Sardina Campomar 425g,Conservas,7751234200010,Campomar,425g,UNIT,4.50,40,10,"PACK:12"
+Durazno en Almíbar Dos Caballos,Conservas,7751234200020,Dos Caballos,820g,UNIT,12.00,30,8,
+Ketchup Heinz 397g,Salsas y Condimentos,7750106300001,Heinz,397g,UNIT,9.50,40,10,
+Mayonesa Alacena 475g,Salsas y Condimentos,7750106300010,Alacena,475g,UNIT,10.00,50,12,
+Mostaza Heinz 396g,Salsas y Condimentos,7750106300020,Heinz,396g,UNIT,8.00,35,8,
+Ají Tarí 400g,Salsas y Condimentos,7750106300030,Tarí,400g,UNIT,8.50,40,10,
+Ajinomoto 100g,Salsas y Condimentos,7751234300040,Ajinomoto,100g,UNIT,3.50,80,20,"PACK:24"
+Sal Marina Emsal 1kg,Salsas y Condimentos,7751234300050,Emsal,1kg,UNIT,2.00,100,25,"PACK:24"
+Harina Blanca Flor 1kg,Harinas y Panificación,7751234400001,Blanca Flor,1kg,UNIT,5.00,50,12,"PACK:12"
+Harina preparada Blanca Flor,Harinas y Panificación,7751234400002,Blanca Flor,1kg,UNIT,5.50,40,10,"PACK:12"
+Leche Gloria Entera 400ml,Leches,7750243500001,Gloria,400ml,UNIT,3.50,100,25,"PACK:24"
+Leche Gloria Entera 170ml,Leches,7750243500002,Gloria,170ml,UNIT,1.80,120,30,"PACK:48"
+Leche Pura Vida 400ml,Leches,7750243500010,Pura Vida,400ml,UNIT,3.20,80,20,"PACK:24"
+Leche Ideal 400ml,Leches,7750243500020,Ideal,400ml,UNIT,3.30,60,15,"PACK:24"
+Yogurt Gloria Fresa 1L,Yogures,7750243600001,Gloria,1L,UNIT,7.00,40,10,
+Yogurt Gloria Fresa 180ml,Yogures,7750243600002,Gloria,180ml,UNIT,1.50,60,15,"PACK:6"
+Yogurt Laive Vainilla 1L,Yogures,7751234600010,Laive,1L,UNIT,6.80,35,8,
+Mantequilla Gloria 200g,Mantequilla y Margarina,7750243700001,Gloria,200g,UNIT,8.50,40,10,
+Margarina Sello de Oro 225g,Mantequilla y Margarina,7751234700010,Sello de Oro,225g,UNIT,5.00,50,12,
+Huevos Rosados x 15,Huevos,7751234800010,La Calera,15und,PACK,10.50,50,10,
+Huevos Pardos x 30,Huevos,7751234800011,La Calera,30und,BOX,20.00,30,5,
+Pan de Molde Bimbo,Panes,7751234900001,Bimbo,450g,UNIT,7.50,20,5,
+Tostadas Bimbo,Panes,7751234900010,Bimbo,210g,UNIT,5.00,30,8,
+Galleta Soda Field,Galletas,7751235000001,Field,140g,UNIT,2.50,80,20,"PACK:12"
+Galleta Oreo,Galletas,7751235000010,Oreo,119g,UNIT,3.00,60,15,"PACK:12"
+Galleta Casino,Galletas,7751235000020,Victoria,43g,UNIT,0.80,150,40,"PACK:6,BOX:48"
+Galleta Margarita,Galletas,7751235000030,Victoria,46g,UNIT,0.80,120,30,"PACK:6,BOX:48"
+Sublime 30g,Chocolates,7751235100001,Nestlé,30g,UNIT,2.00,100,25,"PACK:24"
+Triángulo 30g,Chocolates,7751235100010,Nestlé,30g,UNIT,2.00,80,20,"PACK:24"
+Cua Cua,Chocolates,7751235100020,Nestlé,20g,UNIT,1.00,120,30,"PACK:24"
+Caramelo Halls,Caramelos,7751235200001,Halls,25.2g,UNIT,1.50,150,40,"PACK:12"
+Caramelo Mentitas,Caramelos,7751235200010,Ambrosoli,20g,UNIT,1.00,100,25,"PACK:20"
+Papas Lays Clásica 42g,Snacks Salados,7751235300001,Lays,42g,UNIT,2.50,80,20,"PACK:12"
+Papas Lays Americana 42g,Snacks Salados,7751235300002,Lays,42g,UNIT,2.50,60,15,"PACK:12"
+Chifles Karinto 42g,Snacks Salados,7751235300010,Karinto,42g,UNIT,2.00,50,12,"PACK:12"
+Doritos 45g,Snacks Salados,7751235300020,Doritos,45g,UNIT,3.00,60,15,"PACK:12"
+Detergente Ariel 500g,Detergentes,7751236000001,Ariel,500g,UNIT,12.00,50,12,"PACK:12"
+Detergente Bolivar 500g,Detergentes,7751236000010,Bolivar,500g,UNIT,10.00,60,15,"PACK:12"
+Detergente Ace 850g,Detergentes,7751236000020,Ace,850g,UNIT,11.00,40,10,"PACK:12"
+Lejía Clorox 1L,Lejías y Desinfectantes,7751236100001,Clorox,1L,UNIT,4.50,60,15,"PACK:12"
+Lejía Sapolio 1L,Lejías y Desinfectantes,7751236100010,Sapolio,1L,UNIT,3.50,50,12,"PACK:12"
+Desinfectante Pinesol 900ml,Lejías y Desinfectantes,7751236100020,Pinesol,900ml,UNIT,8.00,35,8,"PACK:6"
+Jabón Bolivar 200g,Jabones,7751236200001,Bolivar,200g,UNIT,3.00,80,20,"PACK:48"
+Jabón Marsella 200g,Jabones,7751236200010,Marsella,200g,UNIT,2.50,60,15,"PACK:48"
+Papel Higiénico Elite x 4,Papel Higiénico,7751236300001,Elite,4 rollos,PACK,6.50,50,12,
+Papel Higiénico Suave x 2,Papel Higiénico,7751236300010,Suave,2 rollos,PACK,3.00,80,20,
+Papel Higiénico Noble x 8,Papel Higiénico,7751236300020,Noble,8 rollos,PACK,10.00,30,8,
+Shampoo Head & Shoulders 375ml,Shampoo y Acondicionador,7751237000001,Head & Shoulders,375ml,UNIT,18.00,30,8,
+Shampoo Pantene 400ml,Shampoo y Acondicionador,7751237000010,Pantene,400ml,UNIT,16.00,25,6,
+Shampoo Dove 400ml,Shampoo y Acondicionador,7751237000020,Dove,400ml,UNIT,14.00,20,5,
+Jabón Dove 90g,Jabones Personales,7751237100001,Dove,90g,UNIT,5.00,60,15,"PACK:6"
+Jabón Palmolive 120g,Jabones Personales,7751237100010,Palmolive,120g,UNIT,3.50,80,20,"PACK:6"
+Desodorante Rexona 150ml,Desodorantes,7751237200001,Rexona,150ml,UNIT,12.00,40,10,
+Desodorante Axe 150ml,Desodorantes,7751237200010,Axe,150ml,UNIT,14.00,35,8,
+Pasta Dental Colgate 90g,Pasta Dental,7751237300001,Colgate,90g,UNIT,4.50,80,20,"PACK:12"
+Pasta Dental Colgate 150ml,Pasta Dental,7751237300010,Colgate,150ml,UNIT,8.00,50,12,"PACK:12"

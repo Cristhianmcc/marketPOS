@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, AlertTriangle, Tag, Package as PackageIcon, Clock, Milk } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, AlertTriangle, Tag, Package as PackageIcon, Clock, Milk, Scale, Wrench } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import QuickSellGrid from '@/components/pos/QuickSellGrid';
 import CartPanel from '@/components/pos/CartPanel';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
+import AdvancedUnitSelector from '@/components/pos/AdvancedUnitSelector'; // ✅ MÓDULO F1
 import { toast, Toaster } from 'sonner';
 import { usePosShortcuts } from '@/hooks/usePosShortcuts';
 import { usePosHotkeys } from '@/hooks/usePosHotkeys';
+import { useFlags } from '@/hooks/useFlags'; // ✅ MÓDULO F1
 import { formatMoney } from '@/lib/money';
 import { Shift } from '@/domain/types';
 
@@ -30,6 +32,15 @@ interface StoreProduct {
     internalSku: string;
     imageUrl?: string | null;
   };
+}
+
+// ✅ MÓDULO F3: Servicio (sin stock)
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  taxable: boolean;
+  active: boolean;
 }
 
 interface CartItem {
@@ -54,6 +65,17 @@ interface CartItem {
   nthPromoQty?: number | null;
   nthPromoPercent?: number | null;
   nthPromoDiscount?: number;
+  // ✅ MÓDULO F1: Unidades avanzadas (ferretería)
+  unitIdUsed?: string;           // ID de la unidad usada (default: baseUnitId)
+  unitCodeUsed?: string;         // Código de unidad (para display)
+  quantityOriginal?: number;     // Cantidad en unidad seleccionada
+  quantityBase?: number;         // Cantidad convertida a unidad base
+  conversionFactorUsed?: number; // Factor de conversión aplicado
+  // ✅ MÓDULO F2.3: Precio por unidad de venta
+  sellUnitPriceApplied?: number; // Precio especial de la presentación si existe
+  // ✅ MÓDULO F3: Servicios
+  isService?: boolean;           // true si es servicio
+  service?: Service;             // Datos del servicio
 }
 
 interface Customer {
@@ -173,6 +195,104 @@ export default function POSPage() {
   // ✅ MÓDULO 17.3: Estado para drawer móvil
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
+  // ✅ MÓDULO F1: Feature flags para unidades avanzadas
+  const { isOn: isFlagOn, isLoading: flagsLoading } = useFlags();
+  const advancedUnitsEnabled = isFlagOn('ENABLE_ADVANCED_UNITS');
+  const conversionsEnabled = isFlagOn('ENABLE_CONVERSIONS');
+  // ✅ MÓDULO F3: Servicios
+  const servicesEnabled = isFlagOn('ENABLE_SERVICES');
+  const [services, setServices] = useState<Service[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [posTab, setPosTab] = useState<'products' | 'services'>('products');
+
+  // ✅ MÓDULO F3: Cargar servicios
+  const loadServices = useCallback(async () => {
+    if (!servicesEnabled) return;
+    try {
+      setLoadingServices(true);
+      const res = await fetch('/api/services?active=true');
+      if (res.ok) {
+        const data = await res.json();
+        setServices(data.services || []);
+      }
+    } catch (error) {
+      console.error('Error loading services:', error);
+    } finally {
+      setLoadingServices(false);
+    }
+  }, [servicesEnabled]);
+
+  // ✅ MÓDULO F3: Agregar servicio al carrito
+  const addServiceToCart = useCallback((service: Service) => {
+    // Crear un "fake" storeProduct para compatibilidad con el carrito
+    const fakeStoreProduct: StoreProduct = {
+      id: `service-${service.id}`, // Prefijo para diferenciar
+      price: Number(service.price),
+      stock: null, // Servicios no tienen stock
+      active: true,
+      product: {
+        id: service.id,
+        name: service.name,
+        brand: null,
+        content: '(Servicio)',
+        category: 'Servicio',
+        unitType: 'UNIT',
+        barcode: null,
+        internalSku: `SRV-${service.id.slice(-6)}`,
+        imageUrl: null,
+      },
+    };
+
+    setCart(prev => {
+      const existingIndex = prev.findIndex(item => 
+        item.isService && item.service?.id === service.id
+      );
+
+      if (existingIndex >= 0) {
+        // Incrementar cantidad
+        return prev.map((item, i) => 
+          i === existingIndex 
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+
+      // Agregar nuevo
+      return [...prev, {
+        storeProduct: fakeStoreProduct,
+        quantity: 1,
+        isService: true,
+        service,
+      }];
+    });
+
+    toast.success(`Servicio "${service.name}" agregado`);
+  }, []);
+
+  // ✅ MÓDULO F1: Actualizar unidad de un item del carrito
+  const updateItemUnit = useCallback((
+    storeProductId: string,
+    newQuantity: number,
+    unitId: string,
+    quantityBase: number,
+    factor: number,
+    unitCode?: string
+  ) => {
+    setCart(prev => prev.map(item => {
+      if (item.storeProduct.id !== storeProductId) return item;
+      
+      return {
+        ...item,
+        quantity: quantityBase, // Para cálculos de precio usamos quantityBase
+        quantityOriginal: newQuantity,
+        quantityBase,
+        unitIdUsed: unitId,
+        unitCodeUsed: unitCode,
+        conversionFactorUsed: factor,
+      };
+    }));
+  }, []);
+
   // ✅ MÓDULO 17.1: Handlers para atajos de teclado
   const shortcutHandlers = {
     focusSearch: () => {
@@ -279,6 +399,13 @@ export default function POSPage() {
     fetchOperationalLimits();
     checkDemoMode(); // ✅ MÓDULO 17.4: Verificar demo mode
   }, []);
+
+  // ✅ MÓDULO F3: Cargar servicios cuando flag está habilitado
+  useEffect(() => {
+    if (servicesEnabled && !flagsLoading) {
+      loadServices();
+    }
+  }, [servicesEnabled, flagsLoading, loadServices]);
 
   // ✅ MÓDULO 18.1: Listener para escaneo de código de barras con pistola
   useEffect(() => {
@@ -1185,13 +1312,28 @@ export default function POSPage() {
       const idempotencyKey = `checkout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const checkoutData: any = {
-        items: cart.map((item) => ({
-          storeProductId: item.storeProduct.id,
-          quantity: item.quantity,
-          unitPrice: item.storeProduct.price,
-          discountType: item.discountType,
-          discountValue: item.discountValue,
-        })),
+        items: cart.map((item) => {
+          // ✅ MÓDULO F3: Diferenciar productos de servicios
+          if (item.isService && item.service) {
+            return {
+              isService: true,
+              serviceId: item.service.id,
+              serviceName: item.service.name,
+              quantity: item.quantity,
+              unitPrice: Number(item.service.price),
+            };
+          }
+          // Producto normal
+          return {
+            storeProductId: item.storeProduct.id,
+            quantity: item.quantityBase ?? item.quantity, // ✅ F1: Usar quantityBase si hay conversión
+            unitPrice: item.storeProduct.price,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            // ✅ MÓDULO F1: Campos de unidades avanzadas
+            saleUnitId: item.unitIdUsed,
+          };
+        }),
         paymentMethod,
         discountTotal: globalDiscount > 0 ? globalDiscount : undefined,
         couponCode: appliedCoupon?.code, // ✅ Cupón (Módulo 14.2-A)
@@ -1439,12 +1581,91 @@ export default function POSPage() {
                 </div>
               </div>
 
+              {/* ✅ MÓDULO F3: Tabs Productos/Servicios */}
+              {servicesEnabled && currentShift && !query.trim() && (
+                <div className="flex gap-2 bg-white border border-gray-200 rounded-lg p-2">
+                  <button
+                    onClick={() => setPosTab('products')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md font-medium transition-colors ${
+                      posTab === 'products'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    Productos
+                  </button>
+                  <button
+                    onClick={() => setPosTab('services')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md font-medium transition-colors ${
+                      posTab === 'services'
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Wrench className="w-4 h-4" />
+                    Servicios
+                    {services.length > 0 && (
+                      <span className="text-xs bg-indigo-600 text-white px-1.5 py-0.5 rounded-full">
+                        {services.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+
               {/* ✅ MÓDULO 17.2: Quick Sell Grid - Oculto cuando hay búsqueda activa */}
-              {currentShift && !query.trim() && (
+              {currentShift && !query.trim() && posTab === 'products' && (
                 <QuickSellGrid 
                   onAddProduct={handleAddFromQuickSell}
                   disabled={!currentShift}
                 />
+              )}
+
+              {/* ✅ MÓDULO F3: Services Grid */}
+              {servicesEnabled && currentShift && !query.trim() && posTab === 'services' && (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-indigo-900 flex items-center gap-2">
+                        <Wrench className="w-4 h-4" />
+                        Servicios disponibles ({services.length})
+                      </h3>
+                      <button
+                        onClick={loadServices}
+                        disabled={loadingServices}
+                        className="text-xs text-indigo-600 hover:text-indigo-800"
+                      >
+                        {loadingServices ? 'Cargando...' : 'Actualizar'}
+                      </button>
+                    </div>
+                  </div>
+                  {services.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <Wrench className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>No hay servicios configurados</p>
+                      <p className="text-xs mt-1">Crea servicios en Inventario &gt; Servicios</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-4">
+                      {services.map((service) => (
+                        <button
+                          key={service.id}
+                          onClick={() => addServiceToCart(service)}
+                          className="flex flex-col items-center justify-center p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors group"
+                        >
+                          <Wrench className="w-8 h-8 text-indigo-600 mb-2 group-hover:scale-110 transition-transform" />
+                          <span className="text-sm font-medium text-indigo-900 text-center line-clamp-2">
+                            {service.name}
+                          </span>
+                          <span className="text-lg font-bold text-indigo-700 mt-1">
+                            {formatMoney(Number(service.price))}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Results */}
@@ -1549,6 +1770,8 @@ export default function POSPage() {
                 appliedCoupon={appliedCoupon ? { code: appliedCoupon.code, discount: appliedCoupon.discount } : null}
                 onRemoveCoupon={handleRemoveCoupon}
                 processing={processing}
+                advancedUnitsEnabled={advancedUnitsEnabled}
+                onUpdateItemUnit={updateItemUnit}
               />
             </div>
           </div>
@@ -1595,6 +1818,7 @@ export default function POSPage() {
               setMobileCartOpen(false);
             }}
             processing={processing}
+            advancedUnitsEnabled={advancedUnitsEnabled}
           />
         </div>
       </main>

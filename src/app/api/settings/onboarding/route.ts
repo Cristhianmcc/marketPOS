@@ -14,6 +14,19 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getSessionOrThrow();
 
+    // ✅ Verificar que la tienda existe antes de anything
+    const store = await prisma.store.findUnique({
+      where: { id: session.storeId },
+      select: { id: true },
+    });
+
+    if (!store) {
+      return NextResponse.json(
+        { error: 'STORE_NOT_FOUND', message: 'La tienda no existe. Por favor, cierra sesión e inicia nuevamente.' },
+        { status: 404 }
+      );
+    }
+
     const settings = await prisma.storeSettings.findUnique({
       where: { storeId: session.storeId },
       select: {

@@ -232,7 +232,96 @@ async function main() {
   // NOTA: NO se crea suscripción automáticamente en seed.
   // Para desarrollo/testing, asigna planes manualmente desde /admin/billing
 
+  // 7. ✅ MÓDULO V2: Create base units for advanced unit conversions
+  await seedBaseUnits();
+
+  // 8. ✅ MÓDULO F5: Seed categorías ferretería (solo si no existen)
+  await seedHardwareCategories();
+
   console.log('🎉 Seed completed successfully!');
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * MÓDULO V2 — SEED DE UNIDADES BASE
+ * ══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Unidades estándar para conversiones en ferreterías y negocios multi-rubro.
+ * Estas son globales (no por tienda) y se usan como referencia.
+ */
+async function seedBaseUnits() {
+  const baseUnits = [
+    // Unidades básicas
+    { code: 'UNIT', name: 'Unidad', symbol: 'und', allowDecimals: false, precision: 0, isBase: true },
+    
+    // Peso
+    { code: 'KG', name: 'Kilogramo', symbol: 'kg', allowDecimals: true, precision: 3, isBase: true },
+    { code: 'G', name: 'Gramo', symbol: 'g', allowDecimals: true, precision: 2, isBase: false },
+    
+    // Longitud
+    { code: 'M', name: 'Metro', symbol: 'm', allowDecimals: true, precision: 2, isBase: true },
+    { code: 'CM', name: 'Centímetro', symbol: 'cm', allowDecimals: true, precision: 1, isBase: false },
+    { code: 'MM', name: 'Milímetro', symbol: 'mm', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'PIE', name: 'Pie', symbol: 'ft', allowDecimals: true, precision: 2, isBase: false },
+    { code: 'PULG', name: 'Pulgada', symbol: 'in', allowDecimals: true, precision: 2, isBase: false },
+    
+    // Volumen
+    { code: 'L', name: 'Litro', symbol: 'L', allowDecimals: true, precision: 2, isBase: true },
+    { code: 'ML', name: 'Mililitro', symbol: 'ml', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'GAL', name: 'Galón', symbol: 'gal', allowDecimals: true, precision: 2, isBase: false },
+    
+    // Empaque/Presentación
+    { code: 'BOX', name: 'Caja', symbol: 'caja', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'PACK', name: 'Paquete', symbol: 'paq', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'ROLL', name: 'Rollo', symbol: 'rollo', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'DOZEN', name: 'Docena', symbol: 'doc', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'PAIR', name: 'Par', symbol: 'par', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'SET', name: 'Juego', symbol: 'juego', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'BAG', name: 'Bolsa', symbol: 'bolsa', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'SACK', name: 'Saco', symbol: 'saco', allowDecimals: false, precision: 0, isBase: false },
+    { code: 'SHEET', name: 'Plancha/Lámina', symbol: 'plc', allowDecimals: false, precision: 0, isBase: false },
+    
+    // Área (para ferreterías)
+    { code: 'M2', name: 'Metro cuadrado', symbol: 'm²', allowDecimals: true, precision: 2, isBase: true },
+    { code: 'PIE2', name: 'Pie cuadrado', symbol: 'ft²', allowDecimals: true, precision: 2, isBase: false },
+  ];
+
+  for (const unit of baseUnits) {
+    await prisma.unit.upsert({
+      where: { code: unit.code },
+      update: { 
+        name: unit.name, 
+        symbol: unit.symbol, 
+        isBase: unit.isBase,
+        allowDecimals: unit.allowDecimals,
+        precision: unit.precision,
+      },
+      create: unit,
+    });
+  }
+
+  // ✅ MÓDULO F2.2: Las conversiones ya NO son globales
+  // Las conversiones se crean por tienda y producto vía:
+  // - POST /api/units/conversions
+  // - POST /api/units/products/[id]/conversions
+  // Cada tienda configura sus propias conversiones por producto.
+  // Ej: "Tornillo Philips" en Tienda A: 1 CAJA = 100 NIU
+  //     "Tornillo Philips" en Tienda B: 1 CAJA = 50 NIU (diferente proveedor)
+  
+  console.log('✅ Base units created (conversions are per-store/product in F2.2)');
+}
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ * MÓDULO F5 — LOG DE CATEGORÍAS FERRETERÍA
+ * ══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Las categorías son strings libres en ProductMaster.category.
+ * Esta función solo imprime las categorías sugeridas para documentación.
+ * La UI obtiene categorías de /lib/hardware-categories.ts
+ */
+async function seedHardwareCategories() {
+  console.log('✅ Hardware categories available in /lib/hardware-categories.ts');
 }
 
 main()

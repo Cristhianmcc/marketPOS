@@ -24,6 +24,12 @@ yarn-error.log*
 # local env files
 .env
 .env*.local
+.env.*.backup
+
+# AWS credentials and sensitive files
+AWS_RDS_CREDENTIALS.md
+*.backup.sql
+market_pos_backup.sql
 
 # vercel
 .vercel

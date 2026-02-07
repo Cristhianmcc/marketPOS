@@ -1,10 +1,23 @@
 // src/components/pos/CartPanel.tsx
 // ✅ MÓDULO 18.3: Panel del carrito rediseñado con estilo Stitch
+// ✅ MÓDULO F2.2: Selector de unidades integrado
 'use client';
 
-import { ShoppingCart, Trash2, Plus, Minus, Tag, X, CreditCard, Banknote } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ShoppingCart, Trash2, Plus, Minus, Tag, X, CreditCard, Banknote, Scale, ChevronDown } from 'lucide-react';
 import { formatMoney } from '@/lib/money';
 import Image from 'next/image';
+
+// ✅ F2.2: Tipos para unidades
+interface UnitOption {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  factor: number;
+  allowsDecimals: boolean;
+  isBase: boolean;
+}
 
 interface StoreProduct {
   id: string;
@@ -42,6 +55,14 @@ interface CartItem {
   nthPromoQty?: number | null;
   nthPromoPercent?: number | null;
   nthPromoDiscount?: number;
+  // ✅ MÓDULO F1: Unidades avanzadas
+  unitIdUsed?: string;
+  unitCodeUsed?: string;
+  quantityOriginal?: number;
+  quantityBase?: number;
+  conversionFactorUsed?: number;
+  // ✅ MÓDULO F2.3: Precio por unidad de venta
+  sellUnitPriceApplied?: number;
 }
 
 interface CartPanelProps {
@@ -54,6 +75,138 @@ interface CartPanelProps {
   appliedCoupon: { code: string; discount: number } | null;
   onRemoveCoupon: () => void;
   processing: boolean;
+  // ✅ MÓDULO F1: Unidades avanzadas
+  advancedUnitsEnabled?: boolean;
+  onUpdateItemUnit?: (storeProductId: string, newQuantity: number, unitId: string, quantityBase: number, factor: number, unitCode?: string) => void;
+}
+
+// ✅ MÓDULO F2.2: Cache de unidades por producto
+const unitsCache = new Map<string, { units: UnitOption[]; baseUnit: UnitOption | null } | null>();
+
+// ✅ MÓDULO F2.2: Componente interno para selector de unidades
+function UnitDropdown({
+  productMasterId,
+  storeProductId,
+  currentQuantity,
+  currentUnitId,
+  onUnitChange,
+}: {
+  productMasterId: string;
+  storeProductId: string;
+  currentQuantity: number;
+  currentUnitId?: string;
+  onUnitChange: (storeProductId: string, quantity: number, unitId: string, quantityBase: number, factor: number, unitCode: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [units, setUnits] = useState<UnitOption[]>([]);
+  const [baseUnit, setBaseUnit] = useState<UnitOption | null>(null);
+
+  // Cargar unidades (con cache)
+  useEffect(() => {
+    const fetchUnits = async () => {
+      // Check cache first
+      if (unitsCache.has(productMasterId)) {
+        const cached = unitsCache.get(productMasterId);
+        if (cached) {
+          setUnits(cached.units);
+          setBaseUnit(cached.baseUnit);
+        }
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/pos/units?productMasterId=${productMasterId}`);
+        if (!res.ok) throw new Error('Error');
+        const data = await res.json();
+        
+        if (!data.enabled) {
+          unitsCache.set(productMasterId, null);
+          setLoading(false);
+          return;
+        }
+
+        const base: UnitOption | null = data.baseUnit ? {
+          id: data.baseUnit.id,
+          code: data.baseUnit.code,
+          name: data.baseUnit.name,
+          symbol: data.baseUnit.symbol || data.baseUnit.code,
+          factor: 1,
+          allowsDecimals: data.baseUnit.allowDecimals ?? false,
+          isBase: true,
+        } : null;
+
+        const available: UnitOption[] = (data.availableUnits || []).map((u: any) => ({
+          id: u.id,
+          code: u.code,
+          name: u.name,
+          symbol: u.symbol || u.code,
+          factor: u.factor,
+          allowsDecimals: u.allowsDecimals ?? false,
+          isBase: false,
+        }));
+
+        // Agregar unidad base a las opciones
+        const allUnits = base ? [base, ...available] : available;
+        
+        unitsCache.set(productMasterId, { units: allUnits, baseUnit: base });
+        setUnits(allUnits);
+        setBaseUnit(base);
+      } catch {
+        unitsCache.set(productMasterId, null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUnits();
+  }, [productMasterId]);
+
+  // Si no hay unidades alternativas (solo base), no mostrar dropdown
+  if (loading || units.length <= 1) {
+    return null;
+  }
+
+  const currentUnit = units.find(u => u.id === currentUnitId) || baseUnit;
+  
+  const handleSelectUnit = (unit: UnitOption) => {
+    setIsOpen(false);
+    const quantityBase = currentQuantity * unit.factor;
+    onUnitChange(storeProductId, currentQuantity, unit.id, quantityBase, unit.factor, unit.code);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+      >
+        <Scale className="w-3 h-3" />
+        <span>{currentUnit?.symbol || 'UN'}</span>
+        <ChevronDown className="w-3 h-3" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg min-w-[140px]">
+          {units.map((unit) => (
+            <button
+              key={unit.id}
+              onClick={() => handleSelectUnit(unit)}
+              className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                currentUnit?.id === unit.id ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              <span className="font-medium">{unit.symbol}</span>
+              <span className="text-gray-500 dark:text-gray-400">
+                {unit.isBase ? '(base)' : `×${unit.factor}`}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function CartPanel({
@@ -66,6 +219,8 @@ export default function CartPanel({
   appliedCoupon,
   onRemoveCoupon,
   processing,
+  advancedUnitsEnabled = false,
+  onUpdateItemUnit,
 }: CartPanelProps) {
   // Calcular subtotal sin descuentos
   const subtotal = cart.reduce((sum, item) => {
@@ -186,7 +341,7 @@ export default function CartPanel({
 
               const hasDiscount = item.discountType || item.promotionName || 
                                   item.categoryPromoName || item.volumePromoName || 
-                                  item.nthPromoName;
+                                  item.nthPromoName || item.sellUnitPriceApplied;
 
               return (
                 <div
@@ -257,6 +412,15 @@ export default function CartPanel({
                             </span>
                           </div>
                         )}
+                        {/* ✅ MÓDULO F2.3: Badge de precio por presentación */}
+                        {item.sellUnitPriceApplied && item.unitCodeUsed && (
+                          <div className="flex items-center gap-1 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded">
+                            <Scale className="w-3 h-3" />
+                            <span className="truncate">
+                              Precio {item.unitCodeUsed}: {formatMoney(item.sellUnitPriceApplied)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                     
@@ -270,7 +434,7 @@ export default function CartPanel({
                           <Minus className="w-4 h-4 text-text-secondary dark:text-gray-400" />
                         </button>
                         <span className="px-2 text-sm font-semibold text-text-main dark:text-white min-w-[2rem] text-center">
-                          {item.quantity}
+                          {item.quantityOriginal ?? item.quantity}
                         </span>
                         <button
                           onClick={() => onUpdateQuantity(item.storeProduct.id, 1)}
@@ -280,6 +444,17 @@ export default function CartPanel({
                         </button>
                       </div>
                       
+                      {/* ✅ MÓDULO F2.2: Selector de unidad */}
+                      {advancedUnitsEnabled && onUpdateItemUnit && (
+                        <UnitDropdown
+                          productMasterId={item.storeProduct.product.id}
+                          storeProductId={item.storeProduct.id}
+                          currentQuantity={item.quantityOriginal ?? item.quantity}
+                          currentUnitId={item.unitIdUsed}
+                          onUnitChange={onUpdateItemUnit}
+                        />
+                      )}
+                      
                       <button
                         onClick={() => onRemoveItem(item.storeProduct.id)}
                         className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
@@ -287,6 +462,16 @@ export default function CartPanel({
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {/* Unit Conversion Info - MÓDULO F2.2 */}
+                    {advancedUnitsEnabled && item.conversionFactorUsed && item.conversionFactorUsed !== 1 && (
+                      <div className="mt-1 flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-1 rounded">
+                        <Scale className="w-3 h-3" />
+                        <span>
+                          {item.quantityOriginal} {item.unitCodeUsed || 'UN'} → {item.quantityBase} base
+                        </span>
+                      </div>
+                    )}
 
                     {/* Price */}
                     <div className="mt-2 text-right">

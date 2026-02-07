@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       content: data.content || null,
       category: data.category,
       unitType: data.unitType,
+      baseUnitId: data.baseUnitId || null, // ✅ MÓDULO F2.1: Unidad SUNAT
       imageUrl: data.imageUrl || null,
     });
 

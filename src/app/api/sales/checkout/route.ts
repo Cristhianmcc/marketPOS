@@ -25,16 +25,23 @@ import {
 import { checkRateLimit } from '@/lib/rateLimit'; // ✅ MÓDULO 16.1: Rate Limiting
 import { getIdempotentResult, saveIdempotentResult } from '@/lib/idempotency'; // ✅ MÓDULO 16.1: Idempotency
 import { acquireCheckoutLock, releaseCheckoutLock } from '@/lib/checkoutLock'; // ✅ MÓDULO 16.1: Checkout Lock
+import { normalizeToBaseUnit } from '@/lib/units'; // ✅ MÓDULO V2: Conversiones de unidades
 
 const shiftRepo = new PrismaShiftRepository();
 
 interface CheckoutItem {
-  storeProductId: string;
+  storeProductId?: string; // ✅ F3: Opcional para servicios
   quantity: number;
   unitPrice: number;
   // Descuentos (Módulo 14)
   discountType?: 'PERCENT' | 'AMOUNT';
   discountValue?: number;
+  // ✅ MÓDULO V2: Conversiones de unidades (opcional)
+  saleUnitId?: string; // ID de la unidad usada en la venta (si diferente a base)
+  // ✅ MÓDULO F3: Servicios
+  isService?: boolean;
+  serviceId?: string;
+  serviceName?: string; // Para snapshot
 }
 
 interface CheckoutBody {
@@ -82,17 +89,49 @@ async function executeCheckout(
     });
     const isDemoMode = store?.isDemoStore ?? false;
 
-    // 2. Validar stock disponible y tipos
+    // ✅ MÓDULO F3: Separar items de productos y servicios
+    const productItems = items.filter(i => !i.isService && i.storeProductId);
+    const serviceItems = items.filter(i => i.isService && i.serviceId);
+
+    // ✅ F3: Validar servicios existen y están activos
+    let validatedServices: Array<{ id: string; name: string; price: any; taxable: boolean }> = [];
+    if (serviceItems.length > 0) {
+      const serviceIds = serviceItems.map(i => i.serviceId!);
+      validatedServices = await tx.service.findMany({
+        where: {
+          id: { in: serviceIds },
+          storeId: session.storeId,
+          active: true,
+        },
+        select: { id: true, name: true, price: true, taxable: true },
+      });
+
+      if (validatedServices.length !== serviceItems.length) {
+        throw new CheckoutError(
+          'SERVICE_NOT_FOUND',
+          400,
+          'Algunos servicios no existen o están inactivos'
+        );
+      }
+    }
+
+    // 2. Validar stock disponible y tipos (solo productos)
     const storeProducts = await tx.storeProduct.findMany({
       where: {
-        id: { in: items.map((i) => i.storeProductId) },
+        id: { in: productItems.map((i) => i.storeProductId!) },
         storeId: session.storeId,
         active: true,
       },
-      include: { product: true },
+      include: {
+        product: {
+          include: {
+            baseUnit: true, // ✅ SUNAT: Para snapshot unitSunatCode
+          },
+        },
+      },
     });
 
-    if (storeProducts.length !== items.length) {
+    if (storeProducts.length !== productItems.length) {
       throw new CheckoutError(
         'PRODUCT_NOT_FOUND',
         400,
@@ -100,8 +139,8 @@ async function executeCheckout(
       );
     }
 
-    // Validar stock y cantidades
-    for (const item of items) {
+    // Validar stock y cantidades (solo productos)
+    for (const item of productItems) {
       const sp = storeProducts.find((p) => p.id === item.storeProductId);
       if (!sp) {
         throw new CheckoutError(
@@ -193,11 +232,92 @@ async function executeCheckout(
       endsAt: p.endsAt,
     }));
 
-    // 3. Validar y calcular descuentos por ítem (con promociones)
+    // 3. Validar y calcular descuentos por ítem (con promociones) - SOLO PRODUCTOS
     // Orden: 1) Promo producto → 2) Promo categoría → 3) Volumen pack → 4) N-ésimo → 5) Descuento manual
-    const itemsWithDiscounts = await Promise.all(items.map(async (item) => {
+    
+    // ✅ MÓDULO V2: Verificar si conversiones están habilitadas
+    const enableConversions = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
+    
+    // ✅ MÓDULO F2.3: Verificar si precios por unidad de venta están habilitados
+    const enableSellUnitPricing = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_SELLUNIT_PRICING);
+    
+    const itemsWithDiscounts = await Promise.all(productItems.map(async (item) => {
       const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
-      const subtotalItem = item.quantity * item.unitPrice;
+      
+      // ✅ MÓDULO F2.2: Calcular conversión de unidades si está habilitado
+      let unitCodeUsed: string | null = null;
+      let quantityOriginal: number = item.quantity;
+      let quantityBase: number = item.quantity;
+      let conversionFactorUsed: number = 1;
+      
+      if (enableConversions && item.saleUnitId && sp.product.baseUnitId) {
+        // ✅ F2.2: Verificar que el flag ENABLE_CONVERSIONS está activo
+        // Si saleUnitId != baseUnitId, requiere conversión
+        if (item.saleUnitId !== sp.product.baseUnitId) {
+          const conversionResult = await normalizeToBaseUnit(
+            item.quantity,
+            item.saleUnitId,
+            sp.product.baseUnitId,
+            session.storeId,       // ✅ F2.2: storeId para buscar conversión
+            sp.product.id          // ✅ F2.2: productMasterId para buscar conversión
+          );
+          
+          if (!conversionResult.success) {
+            // ✅ F2.2: Error detallado si no hay conversión
+            throw new CheckoutError(
+              'NO_CONVERSION_AVAILABLE',
+              400,
+              `${sp.product.name}: ${conversionResult.error}`
+            );
+          }
+          
+          unitCodeUsed = conversionResult.baseUnitCode;
+          quantityOriginal = item.quantity;
+          quantityBase = conversionResult.quantityBase;
+          conversionFactorUsed = conversionResult.factor;
+        }
+      } else if (item.saleUnitId && item.saleUnitId !== sp.product.baseUnitId && !enableConversions) {
+        // ✅ F2.2: Si intentan usar conversión con flag deshabilitado
+        throw new CheckoutError(
+          'CONVERSIONS_DISABLED',
+          403,
+          `${sp.product.name}: Las conversiones de unidades no están habilitadas`
+        );
+      }
+      
+      // ✅ MÓDULO F2.3: Verificar si hay precio especial por unidad de venta
+      let pricingMode: 'BASE_UNIT' | 'SELL_UNIT_OVERRIDE' = 'BASE_UNIT';
+      let sellUnitPriceApplied: number | null = null;
+      let subtotalItem: number;
+      
+      // Si hay conversión y el flag de precios por sellUnit está activo, buscar override
+      if (enableSellUnitPricing && item.saleUnitId && item.saleUnitId !== sp.product.baseUnitId) {
+        const sellUnitPrice = await prisma.sellUnitPrice.findFirst({
+          where: {
+            storeId: session.storeId,
+            productMasterId: sp.product.id,
+            sellUnitId: item.saleUnitId,
+            active: true,
+          },
+          select: { price: true },
+        });
+        
+        if (sellUnitPrice) {
+          // Usar precio especial de la unidad de venta
+          pricingMode = 'SELL_UNIT_OVERRIDE';
+          sellUnitPriceApplied = Number(sellUnitPrice.price);
+          // Subtotal = cantidad original (en sellUnit) × precio sellUnit
+          subtotalItem = quantityOriginal * sellUnitPriceApplied;
+        } else {
+          // Sin override: usar cantidad base × precio unitario base
+          const quantityForCalcs = quantityBase;
+          subtotalItem = quantityForCalcs * item.unitPrice;
+        }
+      } else {
+        // Usar quantityBase para cálculos de subtotal y stock (modo normal)
+        const quantityForCalcs = quantityBase;
+        subtotalItem = quantityForCalcs * item.unitPrice;
+      }
       
       // PASO 1: Aplicar promoción automática por PRODUCTO (si existe)
       const appliedPromo = applyBestPromotion(
@@ -360,11 +480,36 @@ async function executeCheckout(
         nthPromoDiscount,
         discountAmount,
         totalLine,
+        // ✅ MÓDULO V2: Campos de conversión de unidades
+        unitCodeUsed,
+        quantityOriginal,
+        quantityBase,
+        conversionFactorUsed,
+        // ✅ MÓDULO F2.3: Campos de precio por unidad de venta
+        pricingMode,
+        sellUnitPriceApplied,
       };
     }));
 
-    // 4. Calcular totales
-    const subtotalBeforeDiscounts = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
+    // ✅ MÓDULO F3: Procesar servicios (sin promociones, sin stock)
+    const servicesWithTotals = serviceItems.map((item) => {
+      const service = validatedServices.find((s) => s.id === item.serviceId)!;
+      const subtotalItem = item.quantity * item.unitPrice;
+      return {
+        serviceId: item.serviceId!,
+        serviceName: item.serviceName || service.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotalItem,
+        totalLine: subtotalItem, // Sin descuentos en servicios
+        taxable: service.taxable,
+      };
+    });
+
+    // 4. Calcular totales (productos + servicios)
+    const productsSubtotal = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
+    const servicesSubtotal = servicesWithTotals.reduce((sum, item) => sum + item.subtotalItem, 0);
+    const subtotalBeforeDiscounts = productsSubtotal + servicesSubtotal;
     const promotionsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.promotionDiscount, 0);
     const categoryPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.categoryPromoDiscount, 0);
     const volumePromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.volumePromoDiscount, 0); // ✅ Módulo 14.2-C1
@@ -652,19 +797,31 @@ async function executeCheckout(
     const sale = await tx.sale.create({ data: saleData });
 
     // 6. Crear SaleItems con snapshot y descuentos
-    const saleItems = await Promise.all(
+    // 6. Crear SaleItems con snapshot y descuentos (PRODUCTOS)
+    const productSaleItems = await Promise.all(
       itemsWithDiscounts.map((item) => {
         const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
         return tx.saleItem.create({
           data: {
             saleId: sale.id,
-            storeProductId: item.storeProductId,
+            storeProductId: item.storeProductId!,
             productName: sp.product.name,
             productContent: sp.product.content,
             unitType: sp.product.unitType,
-            quantity: new Prisma.Decimal(item.quantity),
+            // ✅ SUNAT: Snapshot de unidad para facturación electrónica
+            unitSunatCode: sp.product.baseUnit?.sunatCode ?? (sp.product.unitType === 'KG' ? 'KGM' : 'NIU'),
+            unitSymbol: sp.product.baseUnit?.symbol ?? (sp.product.unitType === 'KG' ? 'kg' : 'und'),
+            quantity: new Prisma.Decimal(item.quantityBase), // ✅ V2: Usar quantityBase para inventario
             unitPrice: new Prisma.Decimal(item.unitPrice),
             subtotal: new Prisma.Decimal(item.subtotalItem),
+            // ✅ MÓDULO F2: Snapshot de conversión de unidades
+            baseUnitQty: item.conversionFactorUsed !== 1 ? new Prisma.Decimal(item.quantityBase) : null,
+            conversionFactor: item.conversionFactorUsed !== 1 ? new Prisma.Decimal(item.conversionFactorUsed) : null,
+            sellUnitLabel: item.pricingMode === 'SELL_UNIT_OVERRIDE' ? `Pack ${item.unitCodeUsed || ''}` : null,
+            // ✅ MÓDULO F2.3: Snapshot de precio por presentación
+            quantityOriginal: item.quantityOriginal !== item.quantityBase ? new Prisma.Decimal(item.quantityOriginal) : null,
+            pricingMode: item.pricingMode,
+            sellUnitPriceApplied: item.sellUnitPriceApplied !== null ? new Prisma.Decimal(item.sellUnitPriceApplied) : null,
             // Promociones por producto (Módulo 14.1)
             promotionType: item.promotionType,
             promotionName: item.promotionName,
@@ -687,20 +844,53 @@ async function executeCheckout(
             discountValue: item.discountValue !== undefined ? new Prisma.Decimal(item.discountValue) : null,
             discountAmount: new Prisma.Decimal(item.discountAmount),
             totalLine: new Prisma.Decimal(item.totalLine),
+            // ✅ F3: No es servicio
+            isService: false,
           },
         });
       })
     );
 
-    // 7. Crear Movements (sin cambios - usa subtotal original)
+    // ✅ MÓDULO F3: Crear SaleItems para SERVICIOS
+    const serviceSaleItems = await Promise.all(
+      servicesWithTotals.map((item) => {
+        return tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            serviceId: item.serviceId,
+            isService: true,
+            productName: item.serviceName, // Reutilizamos campo para nombre
+            productContent: '(Servicio)', // Indica que es servicio
+            unitType: 'UNIT', // Servicios siempre en unidades
+            // ✅ SUNAT: Servicios usan ZZ (mutuo acuerdo)
+            unitSunatCode: 'ZZ',
+            unitSymbol: 'serv',
+            quantity: new Prisma.Decimal(item.quantity),
+            unitPrice: new Prisma.Decimal(item.unitPrice),
+            subtotal: new Prisma.Decimal(item.subtotalItem),
+            totalLine: new Prisma.Decimal(item.totalLine),
+            // Sin promociones para servicios
+            promotionDiscount: new Prisma.Decimal(0),
+            categoryPromoDiscount: new Prisma.Decimal(0),
+            volumePromoDiscount: new Prisma.Decimal(0),
+            nthPromoDiscount: new Prisma.Decimal(0),
+            discountAmount: new Prisma.Decimal(0),
+          },
+        });
+      })
+    );
+
+    const saleItems = [...productSaleItems, ...serviceSaleItems];
+
+    // 7. Crear Movements (sin cambios - usa subtotal original) - SOLO PRODUCTOS
     await Promise.all(
       itemsWithDiscounts.map((item) => {
         return tx.movement.create({
           data: {
             storeId: session.storeId,
-            storeProductId: item.storeProductId,
+            storeProductId: item.storeProductId!, // ✅ F3: Siempre existe en productItems
             type: 'SALE',
-            quantity: new Prisma.Decimal(-item.quantity), // Negativo = salida
+            quantity: new Prisma.Decimal(-item.quantityBase), // ✅ V2: Usar quantityBase para inventario
             unitPrice: new Prisma.Decimal(item.unitPrice),
             total: new Prisma.Decimal(item.subtotalItem), // Usa subtotal sin descuento para movements
             notes: `Venta #${nextSaleNumber}`,
@@ -716,7 +906,7 @@ async function executeCheckout(
       itemsWithDiscounts.map((item) => {
         const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
         const currentStock = sp.stock ? sp.stock.toNumber() : 0;
-        const newStock = currentStock - item.quantity;
+        const newStock = currentStock - item.quantityBase; // ✅ V2: Usar quantityBase para inventario
 
         return tx.storeProduct.update({
           where: { id: item.storeProductId },

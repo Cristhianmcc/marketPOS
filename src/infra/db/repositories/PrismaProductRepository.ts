@@ -102,6 +102,7 @@ export class PrismaProductRepository implements ProductRepository {
         content: product.content,
         category: product.category,
         unitType: product.unitType,
+        baseUnitId: product.baseUnitId || null, // ✅ MÓDULO F2.1: Unidad SUNAT
         imageUrl: product.imageUrl || null,
       },
     });
@@ -115,6 +116,7 @@ export class PrismaProductRepository implements ProductRepository {
       content: created.content,
       category: created.category,
       unitType: created.unitType,
+      baseUnitId: created.baseUnitId, // ✅ MÓDULO F2.1
       imageUrl: created.imageUrl,
     };
   }

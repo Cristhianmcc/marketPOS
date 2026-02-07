@@ -97,7 +97,7 @@ export async function POST(
     // 8. Verificar que no exista un job QUEUED o DONE ya
     const existingJob = await prisma.sunatJob.findFirst({
       where: {
-        documentId,
+        documentId: documentId,
         type: 'SEND_CPE',
         status: {
           in: ['QUEUED', 'DONE'],
@@ -119,7 +119,7 @@ export async function POST(
     // 9. Crear job QUEUED
     const job = await prisma.sunatJob.create({
       data: {
-        documentId,
+        documentId: documentId,
         storeId: document.storeId,
         type: 'SEND_CPE', // Factura/Boleta/NC/ND
         status: 'QUEUED',

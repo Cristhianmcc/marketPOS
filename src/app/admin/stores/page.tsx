@@ -4,6 +4,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, Toaster } from 'sonner';
 
+// ✅ MÓDULO V1: Tipos de perfiles de negocio
+type BusinessProfile = 'BODEGA' | 'FERRETERIA' | 'TALLER' | 'LAVANDERIA' | 'POLLERIA' | 'HOSTAL' | 'BOTICA' | 'ACCESORIOS';
+
+interface ProfileOption {
+  profile: BusinessProfile;
+  name: string;
+  description: string;
+  icon: string;
+}
+
 interface Store {
   id: string;
   name: string;
@@ -11,6 +21,7 @@ interface Store {
   address: string | null;
   phone: string | null;
   status: 'ACTIVE' | 'ARCHIVED';
+  businessProfile: BusinessProfile; // ✅ MÓDULO V1
   archivedAt: string | null;
   createdAt: string;
   _count: {
@@ -29,6 +40,8 @@ export default function AdminStoresPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [actioningStoreId, setActioningStoreId] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<ProfileOption[]>([]);
+  const [changingProfileStoreId, setChangingProfileStoreId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -38,11 +51,26 @@ export default function AdminStoresPage() {
     ownerName: '',
     ownerEmail: '',
     ownerPassword: '',
+    businessProfile: 'BODEGA' as BusinessProfile, // ✅ MÓDULO V1
   });
 
   useEffect(() => {
     loadStores();
+    loadProfiles(); // ✅ MÓDULO V1
   }, [showArchived]);
+
+  // ✅ MÓDULO V1: Cargar perfiles disponibles
+  async function loadProfiles() {
+    try {
+      const res = await fetch('/api/admin/business-profiles');
+      if (res.ok) {
+        const data = await res.json();
+        setProfiles(data.profiles);
+      }
+    } catch (err) {
+      console.error('Error cargando perfiles:', err);
+    }
+  }
 
   async function loadStores() {
     try {
@@ -144,6 +172,7 @@ export default function AdminStoresPage() {
         ownerName: '',
         ownerEmail: '',
         ownerPassword: '',
+        businessProfile: 'BODEGA',
       });
       setShowForm(false);
     } catch (err) {
@@ -154,6 +183,37 @@ export default function AdminStoresPage() {
   }
 
   const archivedCount = stores.filter(s => s.status === 'ARCHIVED').length;
+
+  // ✅ MÓDULO V1: Cambiar perfil de tienda
+  async function handleChangeProfile(storeId: string, newProfile: BusinessProfile) {
+    setChangingProfileStoreId(storeId);
+    try {
+      const res = await fetch(`/api/admin/stores/${storeId}/set-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessProfile: newProfile }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || 'Error al cambiar perfil');
+        return;
+      }
+
+      toast.success(`Perfil cambiado a ${newProfile}`);
+      loadStores();
+    } catch (err) {
+      toast.error('Error de red');
+    } finally {
+      setChangingProfileStoreId(null);
+    }
+  }
+
+  // Helper para obtener info del perfil
+  function getProfileInfo(profile: BusinessProfile) {
+    return profiles.find(p => p.profile === profile) || { icon: '🏪', name: profile };
+  }
 
   if (loading) {
     return (
@@ -228,6 +288,30 @@ export default function AdminStoresPage() {
                     onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+
+                {/* ✅ MÓDULO V1: Selector de Perfil de Negocio */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Rubro / Perfil de Negocio *
+                  </label>
+                  <select
+                    required
+                    value={formData.businessProfile}
+                    onChange={(e) => setFormData({ ...formData, businessProfile: e.target.value as BusinessProfile })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  >
+                    {profiles.map(p => (
+                      <option key={p.profile} value={p.profile}>
+                        {p.icon} {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  {profiles.find(p => p.profile === formData.businessProfile) && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {profiles.find(p => p.profile === formData.businessProfile)?.description}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -352,6 +436,7 @@ export default function AdminStoresPage() {
             <thead className="bg-gray-100 border-b">
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tienda</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Rubro</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">RUC</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Usuarios</th>
@@ -363,7 +448,7 @@ export default function AdminStoresPage() {
             <tbody>
               {stores.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
                     {showArchived ? 'No hay tiendas archivadas' : 'No hay tiendas activas'}
                   </td>
                 </tr>
@@ -381,6 +466,31 @@ export default function AdminStoresPage() {
                         {store.address && (
                           <p className="text-sm text-gray-500">{store.address}</p>
                         )}
+                      </div>
+                    </td>
+                    {/* ✅ MÓDULO V1: Columna Rubro */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{getProfileInfo(store.businessProfile).icon}</span>
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">
+                            {getProfileInfo(store.businessProfile).name}
+                          </p>
+                          {store.status === 'ACTIVE' && (
+                            <select
+                              value={store.businessProfile}
+                              onChange={(e) => handleChangeProfile(store.id, e.target.value as BusinessProfile)}
+                              disabled={changingProfileStoreId === store.id}
+                              className="text-xs text-blue-600 bg-transparent border-none cursor-pointer hover:underline p-0 focus:ring-0"
+                            >
+                              {profiles.map(p => (
+                                <option key={p.profile} value={p.profile}>
+                                  {p.icon} {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-700">{store.ruc || '-'}</td>

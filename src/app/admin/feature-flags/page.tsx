@@ -46,6 +46,44 @@ const FLAG_LABELS: Record<FeatureFlagKey, { name: string; description: string; c
     description: 'Habilita la generación de comprobantes electrónicos (facturas, boletas)',
     critical: true,
   },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MÓDULO V0 — FLAGS MULTI-RUBRO
+  // ═══════════════════════════════════════════════════════════════════════════
+  ENABLE_ADVANCED_UNITS: {
+    name: 'Unidades Avanzadas (Ferretería)',
+    description: 'Permite vender por metro cuadrado, metro lineal, kg fraccionados y conversiones',
+    critical: false,
+  },
+  ENABLE_CONVERSIONS: {
+    name: 'Conversiones de Unidades',
+    description: 'Convierte automáticamente entre unidades (ej: 1 caja = 12 unidades). Requiere Unidades Avanzadas.',
+    critical: false,
+  },
+  ENABLE_SELLUNIT_PRICING: {
+    name: 'Precio por Unidad de Venta',
+    description: 'Permite definir precios especiales por presentación (ej: CAJA a S/5 en lugar de 12×S/0.50). Requiere Conversiones.',
+    critical: false,
+  },
+  ENABLE_SERVICES: {
+    name: 'Servicios (Taller/Lavandería)',
+    description: 'Items de servicio como mano de obra, sin manejo de inventario',
+    critical: false,
+  },
+  ENABLE_WORK_ORDERS: {
+    name: 'Órdenes de Trabajo (Taller)',
+    description: 'Gestión de recepción, diagnóstico y seguimiento de trabajos',
+    critical: false,
+  },
+  ENABLE_RESERVATIONS: {
+    name: 'Reservaciones (Hostal)',
+    description: 'Check-in, check-out y disponibilidad de habitaciones',
+    critical: false,
+  },
+  ENABLE_BATCH_EXPIRY: {
+    name: 'Lotes y Vencimientos (Botica)',
+    description: 'Trazabilidad de lotes, alertas de vencimiento, FIFO automático',
+    critical: false,
+  },
 };
 
 export default function FeatureFlagsPage() {

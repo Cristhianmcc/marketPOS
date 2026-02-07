@@ -2,7 +2,7 @@
 // ✅ MÓDULO 17.3: Drawer del carrito para mobile (<768px)
 'use client';
 
-import { X, ShoppingCart, Trash2, Plus, Minus, Tag } from 'lucide-react';
+import { X, ShoppingCart, Trash2, Plus, Minus, Tag, Scale } from 'lucide-react';
 import { formatMoney } from '@/lib/money';
 
 interface StoreProduct {
@@ -40,6 +40,12 @@ interface CartItem {
   nthPromoQty?: number | null;
   nthPromoPercent?: number | null;
   nthPromoDiscount?: number;
+  // ✅ MÓDULO F1: Unidades avanzadas
+  unitIdUsed?: string;
+  unitCodeUsed?: string;
+  quantityOriginal?: number;
+  quantityBase?: number;
+  conversionFactorUsed?: number;
 }
 
 interface MobileCartDrawerProps {
@@ -54,6 +60,8 @@ interface MobileCartDrawerProps {
   appliedCoupon: { code: string; discount: number } | null;
   onRemoveCoupon: () => void;
   processing: boolean;
+  // ✅ MÓDULO F1: Unidades avanzadas
+  advancedUnitsEnabled?: boolean;
 }
 
 export default function MobileCartDrawer({
@@ -68,6 +76,7 @@ export default function MobileCartDrawer({
   appliedCoupon,
   onRemoveCoupon,
   processing,
+  advancedUnitsEnabled = false,
 }: MobileCartDrawerProps) {
   // Calcular subtotal sin descuentos
   const subtotal = cart.reduce((sum, item) => {
@@ -287,7 +296,12 @@ export default function MobileCartDrawer({
                         <Minus className="w-5 h-5 text-gray-700" />
                       </button>
                       <span className="w-12 text-center font-semibold text-lg">
-                        {item.quantity}
+                        {item.quantityOriginal ?? item.quantity}
+                        {item.unitCodeUsed && advancedUnitsEnabled && (
+                          <span className="ml-1 text-xs text-gray-500">
+                            {item.unitCodeUsed}
+                          </span>
+                        )}
                       </span>
                       <button
                         onClick={() => onUpdateQuantity(item.storeProduct.id, 1)}
@@ -308,6 +322,14 @@ export default function MobileCartDrawer({
                       </p>
                     </div>
                   </div>
+
+                  {/* Unit Conversion Info - MÓDULO F1 */}
+                  {advancedUnitsEnabled && item.unitCodeUsed && item.quantityBase !== item.quantityOriginal && (
+                    <div className="mt-2 flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                      <Scale className="w-3 h-3" />
+                      <span>→ {item.quantityBase} {item.storeProduct.product.unitType}</span>
+                    </div>
+                  )}
 
                   {/* Botón descuento */}
                   {!item.discountType && (

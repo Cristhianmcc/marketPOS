@@ -90,6 +90,15 @@ export async function GET(request: NextRequest) {
       'Desc. Monto',
       'Total Linea',
       'Metodo Pago',
+      // ✅ MÓDULO F2.2: Columnas de conversión de unidades
+      'Unidad Usada',
+      'Cantidad Original',
+      'Cantidad Base',
+      'Factor Conversion',
+      'Codigo SUNAT',
+      // ✅ MÓDULO F2.3: Columnas de precio por unidad de venta
+      'Modo Precio',
+      'Precio Presentacion',
     ];
 
     const rows = items.map(item => {
@@ -137,6 +146,15 @@ export async function GET(request: NextRequest) {
         escapeCSV(Number(item.discountAmount).toFixed(2)),
         escapeCSV(Number(item.totalLine).toFixed(2)),
         escapeCSV(item.sale.paymentMethod),
+        // ✅ MÓDULO F2.2: Columnas de conversión de unidades
+        escapeCSV(item.unitSunatCode || item.unitType),
+        escapeCSV(item.quantityOriginal !== null ? Number(item.quantityOriginal).toFixed(3) : Number(item.quantity).toFixed(3)),
+        escapeCSV(item.baseUnitQty !== null ? Number(item.baseUnitQty).toFixed(3) : Number(item.quantity).toFixed(3)),
+        escapeCSV(item.conversionFactor !== null ? Number(item.conversionFactor).toFixed(6) : '1'),
+        escapeCSV(item.unitSunatCode || '-'),
+        // ✅ MÓDULO F2.3: Columnas de precio por unidad de venta
+        escapeCSV(item.pricingMode || 'BASE_UNIT'),
+        escapeCSV(item.sellUnitPriceApplied !== null ? Number(item.sellUnitPriceApplied).toFixed(2) : '-'),
       ];
     });
 

@@ -143,8 +143,13 @@ export async function POST(
         }
       }
 
-      // 3. Por cada item: revertir stock + crear movement inverso
+      // 3. Por cada item: revertir stock + crear movement inverso (SOLO PRODUCTOS)
       for (const item of sale.items) {
+        // ✅ F3: Skip servicios - no tienen stock
+        if (item.isService || !item.storeProduct) {
+          continue;
+        }
+
         const storeProduct = item.storeProduct;
 
         // Actualizar stock (sumar lo que se vendió)
