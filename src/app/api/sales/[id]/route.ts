@@ -73,9 +73,10 @@ export async function GET(
             // Unidades avanzadas
             unitSunatCode: true,
             unitSymbol: true,
+            unitCodeUsed: true,
             quantityOriginal: true,
-            baseUnitQty: true,
-            conversionFactor: true,
+            quantityBase: true,
+            conversionFactorUsed: true,
             pricingMode: true,
             sellUnitPriceApplied: true,
           },

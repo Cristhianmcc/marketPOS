@@ -5,9 +5,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ✅ MÓDULO S10: Soporte para PgBouncer + migraciones directas
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")  // Para migraciones (bypass pooler)
 }
 
 //// ENUMS
@@ -385,6 +387,7 @@ model Sale {
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
   @@index([customerId])
+  @@index([shiftId]) // MÓDULO S4: Reportes por turno
   @@map("sales")
 }
 
@@ -434,14 +437,14 @@ model SaleItem {
   isService        Boolean  @default(false) @map("is_service")
   unitSunatCode    String?  @map("unit_sunat_code")
   unitSymbol       String?  @map("unit_symbol")
-  baseUnitQty      Decimal? @map("base_unit_qty") @db.Decimal(10, 3)
-  conversionFactor Decimal? @map("conversion_factor") @db.Decimal(10, 4)
-  sellUnitLabel    String?  @map("sell_unit_label")
+  unitCodeUsed     String?  @map("unit_code_used")
   
   // ✅ MÓDULO F2.3: Snapshot de precio por presentación
-  quantityOriginal      Decimal? @map("quantity_original") @db.Decimal(10, 3)
-  pricingMode           String?  @map("pricing_mode")  // "BASE_UNIT" | "SELL_UNIT_OVERRIDE"
-  sellUnitPriceApplied  Decimal? @map("sell_unit_price_applied") @db.Decimal(10, 2)
+  quantityOriginal       Decimal?     @map("quantity_original") @db.Decimal(10, 3)
+  quantityBase           Decimal?     @map("quantity_base") @db.Decimal(10, 3)
+  conversionFactorUsed   Decimal?     @map("conversion_factor_used") @db.Decimal(12, 6)
+  pricingMode            PricingMode? @map("pricing_mode")
+  sellUnitPriceApplied   Decimal?     @map("sell_unit_price_applied") @db.Decimal(10, 2)
   
   sale         Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct? @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
@@ -769,6 +772,7 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([severity])
+  @@index([severity, createdAt]) // MÓDULO S4: Alertas por fecha
   @@index([entityType, entityId])
   @@map("audit_logs")
 }

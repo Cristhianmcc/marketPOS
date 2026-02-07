@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Store, ShoppingCart, DollarSign, FileText, Receipt, Package, BarChart3, Tag, Settings, LogOut, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { ShortcutsButton } from '@/components/shortcuts/ShortcutsModal';
 
 interface SidebarProps {
   user?: {
@@ -147,6 +149,12 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* Footer Actions */}
       <div className="px-3 py-4 space-y-1 border-t border-border-light dark:border-border-dark">
+        {/* Theme & Shortcuts */}
+        <div className="flex items-center gap-2 px-3 py-2 mb-2">
+          <ThemeToggle />
+          <ShortcutsButton />
+        </div>
+        
         <Link
           href="/settings"
           className={`

@@ -8,6 +8,7 @@ import { isSuperAdmin, generateTemporaryPassword } from '@/lib/superadmin';
 import { BusinessProfile } from '@prisma/client';
 import { getProfileFlags } from '@/lib/businessProfiles';
 import bcrypt from 'bcrypt';
+import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 
 // GET /api/admin/stores - Listar todas las tiendas (SUPERADMIN)
 export async function GET(request: NextRequest) {
@@ -63,7 +64,17 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin/stores - Crear nueva tienda + owner (SUPERADMIN)
 export async function POST(request: NextRequest) {
-  try {
+  try {    // ✅ MÓDULO S8: Rate limit store creation
+    const clientIP = getClientIP(request);
+    const rateLimitResult = checkRateLimit('admin-store-create', clientIP);
+    
+    if (!rateLimitResult.allowed) {
+      const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
+      return NextResponse.json(
+        { code: 'TOO_MANY_REQUESTS', message: `Demasiadas solicitudes. Intenta en ${waitSeconds}s` },
+        { status: 429, headers: { 'Retry-After': String(waitSeconds) } }
+      );
+    }
     const session = await getSession();
 
     if (!session?.email) {

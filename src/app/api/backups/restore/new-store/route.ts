@@ -5,6 +5,7 @@ import { hash } from 'bcryptjs';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
+import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 
 function isSuperAdmin(email: string): boolean {
   const superadminEmails = process.env.SUPERADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
@@ -13,6 +14,25 @@ function isSuperAdmin(email: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    // ✅ MÓDULO S8: Rate limit backup restore (muy restrictivo)
+    const clientIP = getClientIP(request);
+    const rateLimitResult = checkRateLimit('backup-restore', clientIP);
+    
+    if (!rateLimitResult.allowed) {
+      const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
+      await logAudit({
+        action: 'BACKUP_RESTORE_RATE_LIMIT',
+        entityType: 'STORE',
+        severity: 'WARN',
+        ip: clientIP,
+        meta: { waitSeconds },
+      });
+      return NextResponse.json(
+        { code: 'TOO_MANY_REQUESTS', message: `Demasiadas solicitudes. Intenta en ${waitSeconds}s` },
+        { status: 429, headers: { 'Retry-After': String(waitSeconds) } }
+      );
+    }
+
     const session = await getSession();
     if (!session.userId || !isSuperAdmin(session.email)) {
       return NextResponse.json(

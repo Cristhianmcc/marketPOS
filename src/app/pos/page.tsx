@@ -16,6 +16,24 @@ import { useFlags } from '@/hooks/useFlags'; // ✅ MÓDULO F1
 import { formatMoney } from '@/lib/money';
 import { Shift } from '@/domain/types';
 
+// ✅ MÓDULO S1: Funciones de cálculo centralizadas
+import {
+  calculateItemSubtotal,
+  calculateItemPromotion,
+  calculateItemCategoryPromo,
+  calculateItemDiscount,
+  calculateItemTotal,
+  getTotalItems,
+  getSubtotalBeforeDiscounts,
+  getTotalPromotions,
+  getTotalCategoryPromotions,
+  getTotalVolumePromotions,
+  getTotalNthPromotions,
+  getTotalItemDiscounts,
+  getCartTotal,
+  getTotalBeforeCoupon
+} from '@/modules/pos';
+
 interface StoreProduct {
   id: string;
   price: number;
@@ -1016,86 +1034,6 @@ export default function POSPage() {
     setProcessing(false); // ✅ MÓDULO 16.1: Reactivar botón después de venta exitosa
   };
 
-  const getTotalItems = () => {
-    return cart.reduce((sum, item) => sum + item.quantity, 0);
-  };
-
-  const calculateItemSubtotal = (item: CartItem) => {
-    return item.quantity * item.storeProduct.price;
-  };
-
-  const calculateItemPromotion = (item: CartItem) => {
-    return item.promotionDiscount ?? 0;
-  };
-
-  const calculateItemCategoryPromo = (item: CartItem) => {
-    return item.categoryPromoDiscount ?? 0;
-  };
-
-  const calculateItemDiscount = (item: CartItem) => {
-    if (!item.discountType || !item.discountValue) return 0;
-    
-    const subtotal = calculateItemSubtotal(item);
-    const productPromotion = calculateItemPromotion(item);
-    const categoryPromotion = calculateItemCategoryPromo(item);
-    const volumePromotion = item.volumePromoDiscount ?? 0;
-    const nthPromotion = item.nthPromoDiscount ?? 0;
-    // Base para descuento manual = subtotal - promo producto - promo categoría - promo volumen - nth promo
-    const subtotalAfterPromos = subtotal - productPromotion - categoryPromotion - volumePromotion - nthPromotion;
-    
-    if (item.discountType === 'PERCENT') {
-      return Math.round((subtotalAfterPromos * item.discountValue) / 100 * 100) / 100;
-    } else {
-      return item.discountValue;
-    }
-  };
-
-  const calculateItemTotal = (item: CartItem) => {
-    const subtotal = calculateItemSubtotal(item);
-    const productPromotion = calculateItemPromotion(item);
-    const categoryPromotion = calculateItemCategoryPromo(item);
-    const volumePromotion = item.volumePromoDiscount ?? 0;
-    const nthPromotion = item.nthPromoDiscount ?? 0;
-    const manualDiscount = calculateItemDiscount(item);
-    return subtotal - productPromotion - categoryPromotion - volumePromotion - nthPromotion - manualDiscount;
-  };
-
-  const getSubtotalBeforeDiscounts = () => {
-    return cart.reduce((sum, item) => sum + calculateItemSubtotal(item), 0);
-  };
-
-  const getTotalPromotions = () => {
-    return cart.reduce((sum, item) => sum + calculateItemPromotion(item), 0);
-  };
-
-  const getTotalCategoryPromotions = () => {
-    return cart.reduce((sum, item) => sum + (item.categoryPromoDiscount ?? 0), 0);
-  };
-
-  const getTotalVolumePromotions = () => {
-    return cart.reduce((sum, item) => sum + (item.volumePromoDiscount ?? 0), 0);
-  };
-
-  const getTotalNthPromotions = () => {
-    return cart.reduce((sum, item) => sum + (item.nthPromoDiscount ?? 0), 0);
-  };
-
-  const getTotalItemDiscounts = () => {
-    return cart.reduce((sum, item) => sum + calculateItemDiscount(item), 0);
-  };
-
-  const getCartTotal = () => {
-    const subtotalAfterItemDiscounts = cart.reduce((sum, item) => sum + calculateItemTotal(item), 0);
-    const totalBeforeCoupon = subtotalAfterItemDiscounts - globalDiscount;
-    const couponDiscount = appliedCoupon?.discount ?? 0;
-    return totalBeforeCoupon - couponDiscount;
-  };
-
-  const getTotalBeforeCoupon = () => {
-    const subtotalAfterItemDiscounts = cart.reduce((sum, item) => sum + calculateItemTotal(item), 0);
-    return subtotalAfterItemDiscounts - globalDiscount;
-  };
-
   // ✅ Validar y aplicar cupón (Módulo 14.2-A)
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -1103,8 +1041,8 @@ export default function POSPage() {
       return;
     }
 
-    const totalBeforeCoupon = getTotalBeforeCoupon();
-    if (totalBeforeCoupon <= 0) {
+    const totalBeforeCouponVal = getTotalBeforeCoupon(cart, globalDiscount);
+    if (totalBeforeCouponVal <= 0) {
       toast.error('No hay monto disponible para aplicar cupón');
       return;
     }
@@ -1117,7 +1055,7 @@ export default function POSPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: couponCode,
-          totalBeforeCoupon,
+          totalBeforeCoupon: totalBeforeCouponVal,
         }),
       });
 
@@ -1333,7 +1271,16 @@ export default function POSPage() {
   };
 
   const handleConfirmPayment = async () => {
-    const total = getCartTotal();
+    // ✅ MÓDULO S6: Guard offline - bloquear checkout sin conexión
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error('Sin conexión a internet', {
+        description: 'No puedes procesar ventas sin conexión. Verifica tu conexión e intenta nuevamente.',
+        duration: 5000,
+      });
+      return;
+    }
+
+    const total = getCartTotal(cart, globalDiscount, appliedCoupon);
 
     // Validaciones según método de pago
     if (paymentMethod === 'CASH') {
@@ -1535,7 +1482,18 @@ export default function POSPage() {
       setSunatData(null); // ✅ Limpiar datos SUNAT
     } catch (error) {
       console.error('Checkout error:', error);
-      toast.error('Error de conexión');
+      // ✅ MÓDULO S6: Detectar error de red/offline
+      if (!navigator.onLine) {
+        toast.error('Sin conexión a internet', {
+          description: 'No se pudo procesar la venta. Verifica tu conexión e intenta nuevamente.',
+          duration: 5000,
+        });
+      } else {
+        toast.error('Error de conexión', {
+          description: 'No se pudo contactar al servidor. Intenta nuevamente.',
+          duration: 4000,
+        });
+      }
       setProcessing(false); // ✅ Reactivar botón solo en error de conexión
     } finally {
       // ✅ MÓDULO 16.1: No reactivar el botón aquí - solo en clearCart
@@ -1848,7 +1806,7 @@ export default function POSPage() {
             >
               <ShoppingCart className="w-6 h-6" />
               <span>Carrito ({cart.length})</span>
-              <span className="text-emerald-100">• {formatMoney(getCartTotal())}</span>
+              <span className="text-emerald-100">• {formatMoney(getCartTotal(cart, globalDiscount, appliedCoupon))}</span>
             </button>
           )}
 
@@ -1908,7 +1866,7 @@ export default function POSPage() {
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
                 <div className="text-xs text-green-700 mb-0.5">Total a pagar</div>
                 <div className="text-2xl font-bold text-green-800">
-                  {formatMoney(getCartTotal())}
+                  {formatMoney(getCartTotal(cart, globalDiscount, appliedCoupon))}
                 </div>
               </div>
 
@@ -1972,17 +1930,17 @@ export default function POSPage() {
                   />
                   
                   {/* Vuelto */}
-                  {amountPaid && parseFloat(amountPaid) >= getCartTotal() && (
+                  {amountPaid && parseFloat(amountPaid) >= getCartTotal(cart, globalDiscount, appliedCoupon) && (
                     <div className="mt-2 p-2 bg-green-100 border border-green-300 rounded-lg flex items-center justify-between">
                       <span className="text-sm text-green-700">Vuelto:</span>
                       <span className="text-xl font-bold text-green-700">
-                        {formatMoney(parseFloat(amountPaid) - getCartTotal())}
+                        {formatMoney(parseFloat(amountPaid) - getCartTotal(cart, globalDiscount, appliedCoupon))}
                       </span>
                     </div>
                   )}
 
                   {amountPaid && (() => {
-                    const totalRounded = Math.round(getCartTotal() * 100) / 100;
+                    const totalRounded = Math.round(getCartTotal(cart, globalDiscount, appliedCoupon) * 100) / 100;
                     const paidRounded = Math.round(parseFloat(amountPaid) * 100) / 100;
                     return paidRounded < totalRounded && paidRounded > 0;
                   })() && (
@@ -2184,7 +2142,7 @@ export default function POSPage() {
                         // ✅ Validar límite de balance de FIADO
                         if (operationalLimits?.maxReceivableBalance !== null && 
                             operationalLimits?.maxReceivableBalance !== undefined) {
-                          const saleTotal = getCartTotal();
+                          const saleTotal = getCartTotal(cart, globalDiscount, appliedCoupon);
                           const newBalance = customer.totalBalance + saleTotal;
                           
                           if (newBalance > operationalLimits.maxReceivableBalance) {
@@ -2428,7 +2386,7 @@ export default function POSPage() {
 
       {/* Modal de Descuento Global */}
       {showGlobalDiscountModal && (() => {
-        const maxDiscount = getSubtotalBeforeDiscounts() - getTotalItemDiscounts();
+        const maxDiscount = getSubtotalBeforeDiscounts(cart) - getTotalItemDiscounts(cart);
         
         const handleApplyGlobalDiscount = () => {
           const value = parseFloat(globalDiscountValue);
@@ -2457,7 +2415,7 @@ export default function POSPage() {
           if (operationalLimits?.maxManualDiscountAmount !== null && 
               operationalLimits?.maxManualDiscountAmount !== undefined) {
             // Calcular descuentos manuales de items
-            const itemDiscounts = getTotalItemDiscounts();
+            const itemDiscounts = getTotalItemDiscounts(cart);
             const totalManualDiscounts = itemDiscounts + discount;
             
             if (totalManualDiscounts > operationalLimits.maxManualDiscountAmount) {

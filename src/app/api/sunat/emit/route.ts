@@ -26,6 +26,7 @@ import { prisma } from '@/lib/prisma';
 import { auditSunatEmitRequested, auditSunatEmitSuccess, auditSunatEmitFailed } from '@/domain/sunat/audit';
 import { validateFacturaData, validateBoletaData, isValidRuc, isValidDni } from '@/lib/sunat/validation/fiscalValidations';
 import { isSuperAdmin } from '@/lib/superadmin';
+import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 
 /**
  * Genera emitKey para idempotencia
@@ -38,6 +39,18 @@ function generateEmitKey(saleId: string, docType: string, customerDocNumber: str
 
 export async function POST(req: NextRequest) {
   try {
+    // ✅ MÓDULO S8: Rate limit SUNAT emit
+    const clientIP = getClientIP(req);
+    const rateLimitResult = checkRateLimit('sunat', clientIP);
+    
+    if (!rateLimitResult.allowed) {
+      const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
+      return NextResponse.json(
+        { error: `Demasiadas solicitudes. Intenta en ${waitSeconds}s`, code: 'TOO_MANY_REQUESTS' },
+        { status: 429, headers: { 'Retry-After': String(waitSeconds) } }
+      );
+    }
+
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });

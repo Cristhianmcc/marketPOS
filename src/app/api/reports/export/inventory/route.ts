@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
       'Stock',
       'Stock Minimo',
       'Estado',
+      'Imagen URL', // ✅ MÓDULO S5: URL de imagen del producto
     ];
 
     const rows = products.map(sp => [
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
       escapeCSV(sp.stock !== null ? Number(sp.stock).toFixed(3) : ''),
       escapeCSV(sp.minStock !== null ? Number(sp.minStock).toFixed(3) : ''),
       escapeCSV(sp.active ? 'Activo' : 'Inactivo'),
+      escapeCSV(sp.product.imageUrl || ''), // ✅ MÓDULO S5: URL de imagen
     ]);
 
     const csv = [

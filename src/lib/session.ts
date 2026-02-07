@@ -1,5 +1,6 @@
 import { getIronSession, IronSession, SessionOptions } from 'iron-session';
 import { cookies } from 'next/headers';
+import { cache } from 'react';
 import { UserRole } from '@/domain/types';
 
 export interface SessionData {
@@ -24,10 +25,12 @@ export const sessionOptions: SessionOptions = {
 
 /**
  * Get current session (server-side only)
+ * MÓDULO S2: Cached per request using React.cache()
+ * This eliminates duplicate session reads within the same request
  */
-export async function getSession(): Promise<IronSession<SessionData>> {
+export const getSession = cache(async (): Promise<IronSession<SessionData>> => {
   return getIronSession<SessionData>(await cookies(), sessionOptions);
-}
+});
 
 /**
  * Set session data after login

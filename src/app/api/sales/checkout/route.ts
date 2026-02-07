@@ -815,9 +815,9 @@ async function executeCheckout(
             unitPrice: new Prisma.Decimal(item.unitPrice),
             subtotal: new Prisma.Decimal(item.subtotalItem),
             // ✅ MÓDULO F2: Snapshot de conversión de unidades
-            baseUnitQty: item.conversionFactorUsed !== 1 ? new Prisma.Decimal(item.quantityBase) : null,
-            conversionFactor: item.conversionFactorUsed !== 1 ? new Prisma.Decimal(item.conversionFactorUsed) : null,
-            sellUnitLabel: item.pricingMode === 'SELL_UNIT_OVERRIDE' ? `Pack ${item.unitCodeUsed || ''}` : null,
+            unitCodeUsed: item.unitCodeUsed || null,
+            quantityBase: item.conversionFactorUsed !== 1 ? new Prisma.Decimal(item.quantityBase) : null,
+            conversionFactorUsed: item.conversionFactorUsed !== 1 ? new Prisma.Decimal(item.conversionFactorUsed) : null,
             // ✅ MÓDULO F2.3: Snapshot de precio por presentación
             quantityOriginal: item.quantityOriginal !== item.quantityBase ? new Prisma.Decimal(item.quantityOriginal) : null,
             pricingMode: item.pricingMode,

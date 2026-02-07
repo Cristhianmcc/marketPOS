@@ -1,18 +1,53 @@
 // lib/featureFlags.ts
 // ✅ MÓDULO 15 - FASE 2: Feature Flags
+// ✅ MÓDULO S3: TTL Cache + Invalidación
 // Helper centralizado para verificar flags por tienda
 
 import { prisma } from '@/infra/db/prisma';
 import { FeatureFlagKey } from '@prisma/client';
 
+// ════════════════════════════════════════════════════════════════════════════
+// MÓDULO S3: CACHE CON TTL POR TIENDA
+// ════════════════════════════════════════════════════════════════════════════
+
 /**
- * Cache en memoria (simple) para flags
- * Evita queries repetitivas en la misma request
+ * TTL configurable vía env (default: 60 segundos)
  */
-const flagCache = new Map<string, boolean>();
+const CACHE_TTL_MS = (parseInt(process.env.FEATURE_FLAGS_TTL_SECONDS || '60', 10)) * 1000;
+
+/**
+ * Estructura del cache con timestamp
+ */
+interface CacheEntry {
+  value: boolean;
+  timestamp: number;
+}
+
+/**
+ * Cache en memoria con TTL para flags
+ * Formato: "storeId:flagKey" => { value, timestamp }
+ */
+const flagCache = new Map<string, CacheEntry>();
+
+/**
+ * Cache de todos los flags por tienda (para getAllFeatureFlags)
+ */
+interface StoreFlagsCache {
+  flags: Map<FeatureFlagKey, boolean>;
+  timestamp: number;
+}
+const storeFlagsCache = new Map<string, StoreFlagsCache>();
+
+/**
+ * Verifica si una entrada de cache está expirada
+ */
+function isCacheExpired(timestamp: number): boolean {
+  return Date.now() - timestamp > CACHE_TTL_MS;
+}
 
 /**
  * Verifica si una feature está habilitada para una tienda
+ * MÓDULO S3: Usa cache con TTL para reducir queries
  * @param storeId - ID de la tienda
  * @param flagKey - Clave del flag
  * @returns true si está habilitado, false si está deshabilitado o no existe
@@ -24,9 +59,10 @@ export async function isFeatureEnabled(
   try {
     const cacheKey = `${storeId}:${flagKey}`;
     
-    // Verificar cache
-    if (flagCache.has(cacheKey)) {
-      return flagCache.get(cacheKey)!;
+    // Verificar cache con TTL
+    const cached = flagCache.get(cacheKey);
+    if (cached && !isCacheExpired(cached.timestamp)) {
+      return cached.value;
     }
 
     // Buscar en DB
@@ -42,8 +78,8 @@ export async function isFeatureEnabled(
     // Si no existe, default = false (seguro)
     const enabled = flag?.enabled ?? false;
     
-    // Guardar en cache
-    flagCache.set(cacheKey, enabled);
+    // Guardar en cache con timestamp
+    flagCache.set(cacheKey, { value: enabled, timestamp: Date.now() });
     
     return enabled;
   } catch (error) {
@@ -87,15 +123,44 @@ export class FeatureDisabledError extends Error {
 
 /**
  * Obtiene todas las flags de una tienda
+ * MÓDULO S3: Usa cache con TTL
  * @param storeId - ID de la tienda
  * @returns Array de flags con su estado
  */
 export async function getAllFeatureFlags(storeId: string) {
   try {
+    // Verificar cache por tienda
+    const cached = storeFlagsCache.get(storeId);
+    if (cached && !isCacheExpired(cached.timestamp)) {
+      const allKeys = Object.values(FeatureFlagKey);
+      return allKeys.map(key => ({
+        key,
+        enabled: cached.flags.get(key) ?? false,
+      }));
+    }
+
+    // Consultar DB
     const flags = await prisma.featureFlag.findMany({
       where: { storeId },
       orderBy: { key: 'asc' },
     });
+
+    // Construir mapa de flags
+    const flagsMap = new Map<FeatureFlagKey, boolean>();
+    for (const flag of flags) {
+      flagsMap.set(flag.key, flag.enabled);
+    }
+
+    // Guardar en cache
+    storeFlagsCache.set(storeId, {
+      flags: flagsMap,
+      timestamp: Date.now(),
+    });
+
+    // También actualizar flagCache individual
+    for (const [key, enabled] of flagsMap) {
+      flagCache.set(`${storeId}:${key}`, { value: enabled, timestamp: Date.now() });
+    }
 
     // Retornar todas las flags posibles, con default false si no existen
     const allKeys = Object.values(FeatureFlagKey);
@@ -116,6 +181,7 @@ export async function getAllFeatureFlags(storeId: string) {
 
 /**
  * Actualiza o crea un flag para una tienda
+ * MÓDULO S3: Invalida cache inmediatamente después del update
  * @param storeId - ID de la tienda
  * @param flagKey - Clave del flag
  * @param enabled - Nuevo estado
@@ -127,11 +193,7 @@ export async function setFeatureFlag(
   enabled: boolean
 ) {
   try {
-    // Limpiar cache
-    const cacheKey = `${storeId}:${flagKey}`;
-    flagCache.delete(cacheKey);
-
-    // Upsert en DB
+    // Upsert en DB primero
     const flag = await prisma.featureFlag.upsert({
       where: {
         storeId_key: {
@@ -149,6 +211,9 @@ export async function setFeatureFlag(
       },
     });
 
+    // MÓDULO S3: Invalidar cache de esta tienda inmediatamente
+    invalidateStoreFlags(storeId);
+
     return flag;
   } catch (error) {
     console.error(`[FeatureFlags] Error setting ${flagKey} for store ${storeId}:`, error);
@@ -157,10 +222,43 @@ export async function setFeatureFlag(
 }
 
 /**
- * Limpia el cache de flags (útil para testing o forzar reload)
+ * MÓDULO S3: Invalida todo el cache de flags para una tienda específica
+ * Esto fuerza a que la siguiente verificación consulte la DB
+ * @param storeId - ID de la tienda a invalidar
+ */
+export function invalidateStoreFlags(storeId: string): void {
+  // Eliminar todas las entradas de flagCache que pertenezcan a esta tienda
+  for (const key of flagCache.keys()) {
+    if (key.startsWith(`${storeId}:`)) {
+      flagCache.delete(key);
+    }
+  }
+  
+  // Eliminar del cache de getAllFeatureFlags
+  storeFlagsCache.delete(storeId);
+  
+  console.log(`[FeatureFlags] Cache invalidado para tienda ${storeId}`);
+}
+
+/**
+ * Limpia TODO el cache de flags (útil para testing o forzar reload global)
+ * MÓDULO S3: Limpia ambos caches
  */
 export function clearFlagCache() {
   flagCache.clear();
+  storeFlagsCache.clear();
+  console.log('[FeatureFlags] Cache global limpiado');
+}
+
+/**
+ * MÓDULO S3: Obtiene estadísticas del cache (para debug/monitoring)
+ */
+export function getCacheStats() {
+  return {
+    flagCacheSize: flagCache.size,
+    storeFlagsCacheSize: storeFlagsCache.size,
+    ttlSeconds: CACHE_TTL_MS / 1000,
+  };
 }
 
 /**

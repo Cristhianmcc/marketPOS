@@ -209,8 +209,8 @@ export async function POST(
             unitPrice: woItem.unitPrice,
             subtotal: woItem.subtotal,
             // Campos de conversión (usando campos existentes en schema)
-            baseUnitQty: woItem.quantityBase,
-            conversionFactor: woItem.conversionFactor,
+            quantityBase: woItem.quantityBase,
+            conversionFactorUsed: woItem.conversionFactor,
             // Sin promociones desde OT
             promotionDiscount: new Prisma.Decimal(0),
             categoryPromoDiscount: new Prisma.Decimal(0),

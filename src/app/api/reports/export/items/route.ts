@@ -149,8 +149,8 @@ export async function GET(request: NextRequest) {
         // ✅ MÓDULO F2.2: Columnas de conversión de unidades
         escapeCSV(item.unitSunatCode || item.unitType),
         escapeCSV(item.quantityOriginal !== null ? Number(item.quantityOriginal).toFixed(3) : Number(item.quantity).toFixed(3)),
-        escapeCSV(item.baseUnitQty !== null ? Number(item.baseUnitQty).toFixed(3) : Number(item.quantity).toFixed(3)),
-        escapeCSV(item.conversionFactor !== null ? Number(item.conversionFactor).toFixed(6) : '1'),
+        escapeCSV(item.quantityBase !== null ? Number(item.quantityBase).toFixed(3) : Number(item.quantity).toFixed(3)),
+        escapeCSV(item.conversionFactorUsed !== null ? Number(item.conversionFactorUsed).toFixed(6) : '1'),
         escapeCSV(item.unitSunatCode || '-'),
         // ✅ MÓDULO F2.3: Columnas de precio por unidad de venta
         escapeCSV(item.pricingMode || 'BASE_UNIT'),

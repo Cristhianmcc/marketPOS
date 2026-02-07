@@ -4,6 +4,8 @@ import { prisma } from '@/infra/db/prisma';
 import archiver from 'archiver';
 import { Readable } from 'stream';
 import crypto from 'crypto';
+import { checkRateLimit, getClientIP } from '@/lib/rateLimit';
+import { logAudit } from '@/lib/auditLog';
 
 // Verificar si es SUPERADMIN
 function isSuperAdmin(email: string): boolean {
@@ -13,6 +15,18 @@ function isSuperAdmin(email: string): boolean {
 
 export async function GET(request: NextRequest) {
   try {
+    // ✅ MÓDULO S8: Rate limit backup export
+    const clientIP = getClientIP(request);
+    const rateLimitResult = checkRateLimit('backup-export', clientIP);
+    
+    if (!rateLimitResult.allowed) {
+      const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
+      return NextResponse.json(
+        { code: 'TOO_MANY_REQUESTS', message: `Demasiadas solicitudes. Intenta en ${waitSeconds}s` },
+        { status: 429, headers: { 'Retry-After': String(waitSeconds) } }
+      );
+    }
+
     const session = await getSession();
     if (!session.userId) {
       return NextResponse.json(

@@ -38,6 +38,17 @@ export interface RateLimitResult {
  * Configuraciones de rate limiting por endpoint
  */
 export const RATE_LIMITS: Record<string, RateLimitConfig> = {
+  // ✅ MÓDULO S8 - Login protection
+  'login': { maxRequests: 5, windowSeconds: 300 }, // 5 intentos / 5 min
+  
+  // ✅ MÓDULO S8 - Admin sensitive endpoints
+  'backup-export': { maxRequests: 3, windowSeconds: 60 },
+  'backup-restore': { maxRequests: 1, windowSeconds: 120 },
+  'admin-store-create': { maxRequests: 3, windowSeconds: 60 },
+  'admin-user-create': { maxRequests: 5, windowSeconds: 60 },
+  'sunat': { maxRequests: 10, windowSeconds: 60 },
+  
+  // Existing limits
   'checkout': { maxRequests: 5, windowSeconds: 10 },
   'cancel': { maxRequests: 3, windowSeconds: 30 },
   'shift-open': { maxRequests: 2, windowSeconds: 60 },
@@ -46,6 +57,27 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   'restore': { maxRequests: 1, windowSeconds: 60 },
   'admin': { maxRequests: 10, windowSeconds: 60 },
 };
+
+/**
+ * Extrae la IP del request (soporta proxies)
+ */
+export function getClientIP(request: Request): string {
+  const headers = request.headers;
+  
+  // Check common proxy headers
+  const forwardedFor = headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim();
+  }
+  
+  const realIP = headers.get('x-real-ip');
+  if (realIP) {
+    return realIP;
+  }
+  
+  // Fallback
+  return 'unknown';
+}
 
 /**
  * Verifica y actualiza el rate limit para un endpoint y usuario
