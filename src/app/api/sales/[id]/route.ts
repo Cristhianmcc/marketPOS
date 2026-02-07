@@ -16,54 +16,99 @@ export async function GET(
       );
     }
 
+    // ✅ MÓDULO 18.2: Consulta optimizada - No hacer JOINs innecesarios
+    // Los datos del producto ya están como snapshot en sale_items
     const sale = await prisma.sale.findUnique({
       where: {
         id,
         storeId: session.storeId,
       },
-      include: {
+      select: {
+        id: true,
+        saleNumber: true,
+        subtotal: true,
+        tax: true,
+        discountTotal: true,
+        totalBeforeDiscount: true,
+        totalBeforeCoupon: true,
+        couponCode: true,
+        couponType: true,
+        couponValue: true,
+        couponDiscount: true,
+        total: true,
+        paymentMethod: true,
+        amountPaid: true,
+        changeAmount: true,
+        createdAt: true,
+        printedAt: true,
+        customerId: true,
+        userId: true,
+        // Items - ya tienen snapshot del producto
         items: {
-          include: {
-            storeProduct: {
-              include: {
-                product: true,
-              },
-            },
-          },
-        },
-        user: {
           select: {
             id: true,
-            name: true,
-            email: true,
-            role: true,
+            productName: true,
+            productContent: true,
+            unitType: true,
+            quantity: true,
+            unitPrice: true,
+            subtotal: true,
+            promotionType: true,
+            promotionName: true,
+            promotionDiscount: true,
+            categoryPromoName: true,
+            categoryPromoType: true,
+            categoryPromoDiscount: true,
+            volumePromoName: true,
+            volumePromoQty: true,
+            volumePromoDiscount: true,
+            nthPromoName: true,
+            nthPromoQty: true,
+            nthPromoPercent: true,
+            nthPromoDiscount: true,
+            discountType: true,
+            discountValue: true,
+            discountAmount: true,
+            totalLine: true,
+            // Unidades avanzadas
+            unitSunatCode: true,
+            unitSymbol: true,
+            quantityOriginal: true,
+            baseUnitQty: true,
+            conversionFactor: true,
+            pricingMode: true,
+            sellUnitPriceApplied: true,
           },
         },
+        // Usuario - solo nombre
+        user: {
+          select: {
+            name: true,
+          },
+        },
+        // Cliente - solo nombre y teléfono
         customer: {
           select: {
             name: true,
             phone: true,
           },
         },
+        // Turno - solo fecha de apertura
         shift: {
-          include: {
-            openedBy: {
-              select: {
-                name: true,
-              },
-            },
+          select: {
+            openedAt: true,
           },
         },
+        // Tienda - datos para el ticket
         store: {
           select: {
-            id: true,
             name: true,
             ruc: true,
             address: true,
             phone: true,
           },
         },
-        // ✅ MÓDULO 18.8: Incluir comprobante electrónico
+        // Comprobante electrónico - solo el más reciente
         electronicDocuments: {
           select: {
             id: true,
@@ -81,7 +126,7 @@ export async function GET(
           orderBy: {
             createdAt: 'desc',
           },
-          take: 1, // Solo el más reciente
+          take: 1,
         },
       },
     });

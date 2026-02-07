@@ -23,8 +23,10 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    // ✅ MÓDULO 18.2: Query logging deshabilitado para mejor rendimiento
+    // En desarrollo solo mostrar errores y warnings (no queries)
     log: process.env.NODE_ENV === 'development' 
-      ? ['query', 'error', 'warn'] 
+      ? ['error', 'warn'] 
       : ['error'],
   });
 

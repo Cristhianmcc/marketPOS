@@ -21,7 +21,9 @@ interface QuickSellGridProps {
   disabled?: boolean;
 }
 
-export default function QuickSellGrid({ onAddProduct, disabled = false }: QuickSellGridProps) {
+import React, { memo } from 'react';
+
+function QuickSellGridComponent({ onAddProduct, disabled = false }: QuickSellGridProps) {
   const [products, setProducts] = useState<QuickSellProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,3 +167,6 @@ export default function QuickSellGrid({ onAddProduct, disabled = false }: QuickS
     </div>
   );
 }
+
+// ✅ MÓDULO 18.2: React.memo para evitar re-renders innecesarios
+export default memo(QuickSellGridComponent);

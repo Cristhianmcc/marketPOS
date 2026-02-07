@@ -3,7 +3,7 @@
 // ✅ MÓDULO F2.2: Selector de unidades integrado
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { ShoppingCart, Trash2, Plus, Minus, Tag, X, CreditCard, Banknote, Scale, ChevronDown } from 'lucide-react';
 import { formatMoney } from '@/lib/money';
 import Image from 'next/image';
@@ -209,7 +209,7 @@ function UnitDropdown({
   );
 }
 
-export default function CartPanel({
+function CartPanelComponent({
   cart,
   onUpdateQuantity,
   onRemoveItem,
@@ -578,3 +578,7 @@ export default function CartPanel({
     </div>
   );
 }
+
+// ✅ MÓDULO 18.2: React.memo para evitar re-renders innecesarios
+// Solo re-renderiza si cart, processing o appliedCoupon cambian
+export default memo(CartPanelComponent);

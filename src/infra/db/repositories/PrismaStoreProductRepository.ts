@@ -1,8 +1,6 @@
 import { StoreProduct } from '@/domain/types';
 import { IStoreProductRepository } from '@/repositories/IStoreProductRepository';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../prisma';
 
 export class PrismaStoreProductRepository implements IStoreProductRepository {
   async findById(id: string): Promise<StoreProduct | null> {
@@ -67,6 +65,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       where,
       include: { product: true },
       orderBy: { product: { name: 'asc' } },
+      // ✅ MÓDULO 18.2: Limitar resultados para mejor rendimiento en búsquedas
+      take: filters?.query ? 20 : undefined,
     });
 
     let results = storeProducts.map((sp: any) => ({

@@ -1,8 +1,6 @@
 import { Movement } from '@/domain/types';
 import { IMovementRepository } from '@/repositories/IMovementRepository';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../prisma';
 
 export class PrismaMovementRepository implements IMovementRepository {
   async create(movement: Omit<Movement, 'id' | 'createdAt'>): Promise<Movement> {
