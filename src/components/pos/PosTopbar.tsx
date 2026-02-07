@@ -41,8 +41,8 @@ export function PosTopbar({ shiftStatus, shiftOpenedAt, cashierName = 'Usuario',
             <Store className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-text-main dark:text-white">BodegaPOS</h1>
-            <p className="text-xs text-text-secondary dark:text-gray-400">Punto de venta</p>
+            <h1 className="text-lg font-bold text-text-main dark:text-white">Monterrial</h1>
+            <p className="text-xs text-text-secondary dark:text-gray-400">Sistema de ventas</p>
           </div>
         </div>
 

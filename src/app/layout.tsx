@@ -21,14 +21,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'BodegaPOS',
+  title: 'Monterrial',
   description: 'Sistema de inventarios y ventas para bodegas',
   // ✅ MÓDULO S6: PWA manifest
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'BodegaPOS',
+    title: 'Monterrial',
   },
   formatDetection: {
     telephone: false,

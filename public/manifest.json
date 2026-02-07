@@ -1,7 +1,7 @@
 {
   "id": "/pos",
-  "name": "BodegaPOS - Sistema de Ventas",
-  "short_name": "BodegaPOS",
+  "name": "Monterrial - Sistema de Ventas",
+  "short_name": "Monterrial",
   "description": "Sistema de inventarios y ventas para bodegas",
   "start_url": "/pos",
   "display": "standalone",

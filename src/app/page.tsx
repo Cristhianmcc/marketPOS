@@ -31,7 +31,7 @@ export default async function HomePage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">Market POS</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Monterrial</h1>
               </div>
               <p className="text-gray-700 text-lg mb-2">
                 Bienvenido, <span className="font-semibold">{session.name}</span>

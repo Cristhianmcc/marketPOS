@@ -56,7 +56,7 @@ export default function LoginPage() {
                 <div className="flex items-center gap-2 text-primary">
                   <Store className="w-8 h-8" />
                   <span className="text-xl font-bold tracking-tight text-text-main dark:text-white">
-                    Bodega<span className="text-primary">POS</span>
+                    Monterrial
                   </span>
                 </div>
               </div>
@@ -157,7 +157,7 @@ export default function LoginPage() {
             {/* Footer Links */}
             <div className="mt-8 text-center flex flex-col gap-4">
               <div className="text-xs text-text-secondary/60 dark:text-gray-600">
-                Versión 2.4.0 © 2024 BodegaPOS Systems
+                Versión 2.4.0 © 2024 Monterrial
               </div>
             </div>
           </div>
