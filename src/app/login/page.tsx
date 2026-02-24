@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, User, Lock, Eye, EyeOff, ArrowRight, Package } from 'lucide-react';
+import { Store, User, Lock, Eye, EyeOff, ArrowRight, Package, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingSetup, setCheckingSetup] = useState(false); // No verificar setup, login maneja todo
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,7 +33,16 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to dashboard
+      // Si necesita provisioning (autenticó en nube pero no hay usuarios locales)
+      // La sesión ya fue creada en el servidor como SUPERADMIN
+      if (data.needsProvisioning) {
+        // Redirigir al dashboard donde puede crear tiendas
+        router.push('/');
+        router.refresh();
+        return;
+      }
+
+      // Login normal - Redirect to dashboard
       router.push('/');
       router.refresh();
     } catch (err) {
@@ -41,6 +51,18 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // Mostrar loading mientras carga
+  if (checkingSetup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto mb-4" />
+          <p className="text-text-secondary">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-light dark:bg-background-dark">

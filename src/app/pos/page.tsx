@@ -2086,7 +2086,47 @@ export default function POSPage() {
 
             <div className="space-y-3">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  // ✅ D6: Thermal print via ESC/POS if desktop & configured
+                  const desktop = (window as unknown as { desktop?: { 
+                    isDesktop?: boolean; 
+                    escpos?: { 
+                      getConfig: () => Promise<{ mode: string; netHost: string | null; vendorId: number | null }>;
+                      printSale: (id: string) => Promise<{ success: boolean; error?: string }>;
+                    };
+                  }})?.desktop;
+                  
+                  if (desktop?.isDesktop && desktop?.escpos) {
+                    try {
+                      const config = await desktop.escpos.getConfig();
+                      console.log('[POS] ESC/POS config:', config);
+                      
+                      // Check if ESC/POS mode is configured
+                      const isNetConfigured = config.mode === 'ESCPOS_NET' && config.netHost;
+                      const isUsbConfigured = config.mode === 'ESCPOS_USB' && config.vendorId;
+                      
+                      if (isNetConfigured || isUsbConfigured) {
+                        toast.info('Enviando a impresora...');
+                        const result = await desktop.escpos.printSale(completedSale.id);
+                        if (result.success) {
+                          toast.success('Ticket impreso correctamente');
+                        } else {
+                          toast.error(result.error || 'Error al imprimir');
+                          // Fallback to web view
+                          window.open(`/receipt/${completedSale.id}`, '_blank');
+                        }
+                        return;
+                      } else {
+                        // Mode is HTML or not properly configured
+                        console.log('[POS] ESC/POS not configured, mode:', config.mode);
+                        toast.info('Abriendo vista previa (configure impresora en Ajustes)');
+                      }
+                    } catch (err) {
+                      console.error('[POS] ESC/POS print error:', err);
+                      toast.error('Error de impresión ESC/POS');
+                    }
+                  }
+                  // Fallback: Open receipt in browser/new window
                   window.open(`/receipt/${completedSale.id}`, '_blank');
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"

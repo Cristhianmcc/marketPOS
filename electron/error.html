@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error - Monterrial POS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      text-align: center;
+      max-width: 500px;
+    }
+    .icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 28px;
+      margin-bottom: 16px;
+      color: #f59e0b;
+    }
+    p {
+      font-size: 16px;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 32px;
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn:hover {
+      background: #15803d;
+    }
+    .help {
+      margin-top: 32px;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      text-align: left;
+    }
+    .help h3 {
+      font-size: 14px;
+      color: #f59e0b;
+      margin-bottom: 12px;
+    }
+    .help ul {
+      font-size: 14px;
+      color: #94a3b8;
+      padding-left: 20px;
+    }
+    .help li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">⚠️</div>
+    <h1>No se pudo conectar al servidor</h1>
+    <p>
+      Monterrial POS no pudo iniciar el servidor interno. 
+      Esto puede ocurrir si hay un problema con la instalación o la base de datos.
+    </p>
+    <button class="btn" onclick="location.reload()">Reintentar</button>
+    
+    <div class="help">
+      <h3>Posibles soluciones:</h3>
+      <ul>
+        <li>Verifica que la base de datos esté accesible</li>
+        <li>Revisa el archivo .env con las credenciales correctas</li>
+        <li>Reinicia la aplicación</li>
+        <li>Contacta soporte técnico si el problema persiste</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

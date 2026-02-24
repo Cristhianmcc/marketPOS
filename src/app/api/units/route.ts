@@ -26,6 +26,32 @@ import {
   requireRole,
   guardErrorToResponse 
 } from '@/lib/guards/requireFlag';
+import { SUNAT_UNITS_DATA } from '@/lib/sunat-units-data';
+
+// Helper: Seed unidades si no existen
+async function ensureUnitsExist() {
+  const count = await prisma.unit.count();
+  if (count === 0) {
+    console.log('[units] No units found, seeding SUNAT units...');
+    await prisma.unit.createMany({
+      data: SUNAT_UNITS_DATA.map(unit => ({
+        code: unit.code,
+        sunatCode: unit.sunatCode,
+        name: unit.name,
+        displayName: unit.displayName,
+        symbol: unit.symbol,
+        kind: unit.kind,
+        allowDecimals: unit.allowDecimals,
+        precision: unit.precision,
+        isBase: unit.isBase,
+        sortOrder: unit.sortOrder,
+        active: true,
+      })),
+      skipDuplicates: true,
+    });
+    console.log('[units] SUNAT units seeded successfully');
+  }
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // TOP UNITS POR RUBRO (UX - Dropdown ordenado)
@@ -40,30 +66,36 @@ const TOP_UNITS_GENERAL = ['NIU', 'KGM', 'LTR', 'MTR', 'C62'];
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Verificar autenticación
+    // 1. Verificar autenticación (permitir SUPERADMIN sin storeId)
     const user = await getCurrentUser();
-    if (!user?.storeId) {
+    if (!user) {
       return NextResponse.json(
         { error: 'No autenticado' },
         { status: 401 }
       );
     }
 
+    // ✅ DESKTOP: Seedear unidades automáticamente si no existen
+    await ensureUnitsExist();
+
     const { searchParams } = new URL(request.url);
     const kind = searchParams.get('kind') as UnitKind | null;
     const showAll = searchParams.get('all') === 'true';
     const profileParam = searchParams.get('profile') as 'BODEGA' | 'FERRETERIA' | null;
 
-    // 2. Obtener perfil de la tienda
-    const store = await prisma.store.findUnique({
-      where: { id: user.storeId },
-      select: { 
-        businessProfile: true,
-        featureFlags: {
-          where: { key: FeatureFlagKey.ENABLE_ADVANCED_UNITS, enabled: true },
+    // 2. Obtener perfil de la tienda (si existe storeId)
+    let store = null;
+    if (user.storeId) {
+      store = await prisma.store.findUnique({
+        where: { id: user.storeId },
+        select: { 
+          businessProfile: true,
+          featureFlags: {
+            where: { key: FeatureFlagKey.ENABLE_ADVANCED_UNITS, enabled: true },
+          },
         },
-      },
-    });
+      });
+    }
 
     const hasAdvancedUnitsFlag = (store?.featureFlags?.length || 0) > 0;
     const isFerreteria = store?.businessProfile === 'FERRETERIA';

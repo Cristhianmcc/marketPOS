@@ -4,6 +4,21 @@ import { prisma } from '@/infra/db/prisma';
 
 // ✅ MÓDULO F2.2: CRUD de Categorías personalizadas por tienda
 
+const DEFAULT_CATEGORIES = [
+  { name: 'Abarrotes',             slug: 'abarrotes',            color: '#F59E0B', icon: '🛒', sortOrder: 1 },
+  { name: 'Bebidas',               slug: 'bebidas',              color: '#3B82F6', icon: '🥤', sortOrder: 2 },
+  { name: 'Lácteos y Derivados',   slug: 'lacteos-derivados',    color: '#BFDBFE', icon: '🥛', sortOrder: 3 },
+  { name: 'Panadería y Pastelería',slug: 'panaderia-pasteleria', color: '#D97706', icon: '🍞', sortOrder: 4 },
+  { name: 'Carnes y Embutidos',    slug: 'carnes-embutidos',     color: '#EF4444', icon: '🥩', sortOrder: 5 },
+  { name: 'Frutas y Verduras',     slug: 'frutas-verduras',      color: '#10B981', icon: '🥦', sortOrder: 6 },
+  { name: 'Limpieza del Hogar',    slug: 'limpieza-hogar',       color: '#6366F1', icon: '🧹', sortOrder: 7 },
+  { name: 'Cuidado Personal',      slug: 'cuidado-personal',     color: '#EC4899', icon: '🧴', sortOrder: 8 },
+  { name: 'Golosinas y Snacks',    slug: 'golosinas-snacks',     color: '#F97316', icon: '🍬', sortOrder: 9 },
+  { name: 'Congelados',            slug: 'congelados',           color: '#60A5FA', icon: '🧊', sortOrder: 10 },
+  { name: 'Farmacia',              slug: 'farmacia',             color: '#34D399', icon: '💊', sortOrder: 11 },
+  { name: 'Otros',                 slug: 'otros',                color: '#9CA3AF', icon: '📦', sortOrder: 12 },
+];
+
 // GET - Listar categorías de la tienda
 export async function GET(request: NextRequest) {
   try {
@@ -39,6 +54,32 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { sortOrder: 'asc' },
     });
+
+    // Auto-seed categorías por defecto si la tienda no tiene ninguna
+    if (categories.length === 0 && !flat) {
+      try {
+        await prisma.category.createMany({
+          data: DEFAULT_CATEGORIES.map((cat) => ({
+            storeId: session.storeId,
+            name: cat.name,
+            slug: cat.slug,
+            color: cat.color,
+            icon: cat.icon,
+            sortOrder: cat.sortOrder,
+            active: true,
+          })),
+          skipDuplicates: true,
+        });
+        const seeded = await prisma.category.findMany({
+          where: { storeId: session.storeId, active: true, parentId: null },
+          include: { children: { where: { active: true }, orderBy: { sortOrder: 'asc' } } },
+          orderBy: { sortOrder: 'asc' },
+        });
+        return NextResponse.json({ categories: seeded });
+      } catch (seedError) {
+        console.error('Error al sembrar categorías por defecto:', seedError);
+      }
+    }
 
     return NextResponse.json({ categories });
   } catch (error) {

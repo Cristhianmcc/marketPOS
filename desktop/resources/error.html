@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monterrial POS - Error</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+    
+    .container {
+      text-align: center;
+      padding: 2rem;
+      max-width: 500px;
+    }
+    
+    .icon {
+      width: 100px;
+      height: 100px;
+      background: #e74c3c;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 2rem;
+    }
+    
+    .icon svg {
+      width: 50px;
+      height: 50px;
+      stroke: white;
+    }
+    
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    p {
+      font-size: 1rem;
+      color: #aaa;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #333;
+      color: white;
+    }
+    
+    .technical {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #888;
+      text-align: left;
+    }
+    
+    .technical code {
+      display: block;
+      margin-top: 0.5rem;
+      font-family: 'Consolas', monospace;
+      color: #e74c3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </div>
+    
+    <h1>No se pudo iniciar la aplicación</h1>
+    <p>
+      El servidor local no respondió. Esto puede ocurrir si hay otro proceso
+      usando el puerto o si hubo un error durante el inicio.
+    </p>
+    
+    <div class="actions">
+      <button class="btn-primary" onclick="location.reload()">
+        Reintentar
+      </button>
+      <button class="btn-secondary" onclick="window.close()">
+        Cerrar
+      </button>
+    </div>
+    
+    <div class="technical">
+      <strong>Información técnica:</strong>
+      <code>Error: ECONNREFUSED localhost:3001</code>
+    </div>
+  </div>
+</body>
+</html>

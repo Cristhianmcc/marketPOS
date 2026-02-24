@@ -163,6 +163,38 @@ export default function AdminStoresPage() {
       }
 
       toast.success('Tienda creada exitosamente');
+      
+      // ✅ DESKTOP: Cambiar sesión al nuevo store y seedear productos
+      if (data.store?.id) {
+        try {
+          // Cambiar la sesión al nuevo store
+          const switchRes = await fetch('/api/setup/switch-store', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              storeId: data.store.id,
+              userId: data.owner?.id 
+            }),
+          });
+          
+          if (switchRes.ok) {
+            // Seedear productos de ejemplo
+            const seedRes = await fetch('/api/setup/seed-products', { method: 'POST' });
+            if (seedRes.ok) {
+              const seedData = await seedRes.json();
+              toast.success(`${seedData.productsCreated} productos de ejemplo creados`);
+            }
+            
+            // Redirigir al dashboard principal
+            router.push('/');
+            router.refresh();
+            return;
+          }
+        } catch (switchErr) {
+          console.warn('Error al configurar tienda:', switchErr);
+        }
+      }
+      
       loadStores();
       setFormData({
         storeName: '',

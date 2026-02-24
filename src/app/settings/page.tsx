@@ -267,6 +267,38 @@ export default function SettingsPage() {
           </button>
         </div>
 
+        {/* Database Local Section - D7.2 (Solo Desktop) */}
+        {typeof window !== 'undefined' && (window as any).desktop?.isDesktop && (
+          <>
+            {/* Thermal Printer Section - D6 */}
+            <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">🖨️ Impresora Térmica</h2>
+              <p className="text-gray-600 mb-4">
+                Configura la impresión directa ESC/POS por USB o Red (puerto 9100).
+              </p>
+              <button
+                onClick={() => router.push('/settings/printer')}
+                className="px-6 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 font-medium"
+              >
+                Configurar Impresora
+              </button>
+            </div>
+
+            <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">🗄️ Base de Datos Local</h2>
+              <p className="text-gray-600 mb-4">
+                Configura PostgreSQL embebido para funcionamiento offline completo.
+              </p>
+              <button
+                onClick={() => router.push('/settings/database')}
+                className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-medium"
+              >
+                Configurar Base de Datos
+              </button>
+            </div>
+          </>
+        )}
+
         {/* SUNAT Section - MÓDULO 18.8 */}
         {process.env.NEXT_PUBLIC_ENABLE_SUNAT === 'true' && (
           <div className="mt-8 bg-white rounded-lg shadow-md p-6">

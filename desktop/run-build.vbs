@@ -1,0 +1,2 @@
+Set oShell = CreateObject("WScript.Shell")
+oShell.Run "cmd.exe /k ""cd /d C:\Users\Cris\Desktop\marketPOS && echo [1/4] Compilando Next.js... && npm run desktop:standalone && echo. && echo [2/4] Preparando build desktop... && cd desktop && node scripts/prepare-build.js && echo. && echo [3/4] Compilando TypeScript... && npx tsc && echo. && echo [4/4] Empaquetando instalador... && set CSC_IDENTITY_AUTO_DISCOVERY=false && set NODE_ENV=production && npx electron-builder --win --x64 && echo. && echo ===== LISTO! El instalador esta en dist-electron ====""", 1, False

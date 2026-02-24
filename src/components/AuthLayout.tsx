@@ -21,10 +21,24 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebarCollapsed') !== 'false';
+    }
+    return true;
+  });
 
   useEffect(() => {
     fetchUser();
   }, []);
+
+  const handleToggleSidebar = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebarCollapsed', String(next));
+      return next;
+    });
+  };
 
   const fetchUser = async () => {
     try {
@@ -54,15 +68,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="flex h-screen bg-background-light dark:bg-background-dark overflow-hidden">
       {/* Sidebar */}
-      <Sidebar 
+      <Sidebar
         user={user ? {
           name: user.name,
           role: user.role.toLowerCase() as 'owner' | 'admin' | 'cashier'
         } : undefined}
+        collapsed={sidebarCollapsed}
+        onToggle={handleToggleSidebar}
       />
-      
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <main className="flex-1 overflow-auto">
           {children}
         </main>

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+
+# Large binary build artifacts (postgres, VC++ redist, compiled server)
+vendor/
+build-resources/server/
+build-resources/static/
+build-resources/prisma/
+resources/vc_redist.x64.exe
+
+# Editor
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env.local

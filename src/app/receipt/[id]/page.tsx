@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Printer, Download, ArrowLeft } from 'lucide-react';
 import { formatMoney } from '@/lib/money';
 
@@ -101,8 +101,12 @@ interface Sale {
 export default function ReceiptPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // D6.2: Print mode for Playwright screenshot
+  const isPrintMode = searchParams.get('print') === '1';
 
   useEffect(() => {
     fetchSale();
@@ -148,7 +152,7 @@ export default function ReceiptPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center" data-receipt-ready="false">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
@@ -156,7 +160,7 @@ export default function ReceiptPage() {
 
   if (!sale) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center" data-receipt-ready="false">
         <div className="text-gray-600">Venta no encontrada</div>
       </div>
     );
@@ -165,19 +169,20 @@ export default function ReceiptPage() {
   const isAnulada = Number(sale.total) === 0 && Number(sale.subtotal) === 0;
 
   return (
-    <>
-      {/* Action buttons - hidden on print */}
-      <div className="no-print bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between sticky top-0 z-10">
-        <button
-          onClick={() => router.push('/pos')}
-          className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Volver
-        </button>
-        <div className="flex gap-2">
+    <div data-receipt-ready="true">
+      {/* Action buttons - hidden on print and in print mode (D6.2) */}
+      {!isPrintMode && (
+        <div className="no-print bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between sticky top-0 z-10">
           <button
-            onClick={handleDownloadPDF}
+            onClick={() => router.push('/pos')}
+            className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownloadPDF}
             className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
           >
             <Download className="w-4 h-4" />
@@ -192,9 +197,10 @@ export default function ReceiptPage() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Receipt */}
-      <div className="receipt-container">
+      <div className={`receipt-container ${isPrintMode ? 'print-mode' : ''}`}>
         <div className="receipt">
           {/* Header */}
           <div className="receipt-header">
@@ -505,6 +511,21 @@ export default function ReceiptPage() {
           padding: 2rem 1rem;
         }
 
+        /* D6.2: Print mode for Playwright screenshot */
+        .receipt-container.print-mode {
+          min-height: auto;
+          background: white;
+          padding: 0;
+          margin: 0;
+          justify-content: flex-start;
+        }
+
+        .receipt-container.print-mode .receipt {
+          box-shadow: none;
+          margin: 0;
+          padding: 10px;
+        }
+
         .receipt {
           width: 80mm;
           background: white;
@@ -642,6 +663,6 @@ export default function ReceiptPage() {
           }
         }
       `}</style>
-    </>
+    </div>
   );
 }

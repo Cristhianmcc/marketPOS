@@ -47,8 +47,8 @@ export function ImportProductModal({
     // Verificar si es SUPERADMIN por el flag que viene del backend
     if (currentUser?.isSuperAdmin) {
       loadStores();
-    } else if (currentUser?.store_id) {
-      setSelectedStoreId(currentUser.store_id);
+    } else if (currentUser?.storeId) {
+      setSelectedStoreId(currentUser.storeId);
     }
   }, [currentUser]);
 

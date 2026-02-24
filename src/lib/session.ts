@@ -5,7 +5,7 @@ import { UserRole } from '@/domain/types';
 
 export interface SessionData {
   userId: string;
-  storeId: string;
+  storeId: string | null; // null para SUPERADMIN sin tienda local
   email: string;
   name: string;
   role: UserRole;

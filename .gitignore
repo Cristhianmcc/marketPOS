@@ -12,6 +12,24 @@ out/
 build
 dist
 
+# electron
+dist-electron/
+pgsql/
+desktop/vendor/
+desktop/build-resources/server/
+desktop/build-resources/static/
+desktop/build-resources/prisma/
+desktop/dist/
+desktop/resources/vc_redist.x64.exe
+
+# build logs
+*.log
+build-debug.log
+build-log.txt
+build-output.log
+build-web.log
+build.log
+
 # misc
 .DS_Store
 *.pem
@@ -25,6 +43,7 @@ yarn-error.log*
 .env
 .env*.local
 .env.*.backup
+.env.desktop
 
 # AWS credentials and sensitive files
 AWS_RDS_CREDENTIALS.md
@@ -40,3 +59,4 @@ next-env.d.ts
 
 # prisma
 prisma/migrations
+prisma/schema.sql

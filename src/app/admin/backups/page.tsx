@@ -2,12 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, AlertCircle, CheckCircle2, Database } from 'lucide-react';
+import { Upload, AlertCircle, CheckCircle2, Database, Cloud, HardDrive } from 'lucide-react';
 import { toast } from 'sonner';
+import dynamic from 'next/dynamic';
+
+// Lazy load del componente de Cloud Backups
+const CloudBackupsTab = dynamic(() => import('@/components/admin/CloudBackupsTab'), {
+  loading: () => <div className="p-4 text-center text-gray-500">Cargando...</div>,
+});
 
 export default function AdminBackupsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'local' | 'cloud'>('local');
   const [restoring, setRestoring] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [result, setResult] = useState<any>(null);
@@ -103,7 +110,38 @@ export default function AdminBackupsPage() {
           <p className="text-gray-600 mt-2">Panel exclusivo para SUPERADMIN</p>
         </div>
 
-        {/* Restore Section */}
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('local')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'local'
+                ? 'bg-purple-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <HardDrive className="w-4 h-4" />
+            Restaurar Local
+          </button>
+          <button
+            onClick={() => setActiveTab('cloud')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'cloud'
+                ? 'bg-purple-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <Cloud className="w-4 h-4" />
+            Backups en la Nube
+          </button>
+        </div>
+
+        {/* Cloud Tab Content */}
+        {activeTab === 'cloud' && <CloudBackupsTab />}
+
+        {/* Local Tab Content */}
+        {activeTab === 'local' && (
+        <>
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <Upload className="w-5 h-5" />
@@ -182,7 +220,7 @@ export default function AdminBackupsPage() {
 
         {/* Result Display */}
         {result && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6 mt-6">
             <div className="flex items-start gap-3 mb-4">
               <CheckCircle2 className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -221,6 +259,8 @@ export default function AdminBackupsPage() {
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

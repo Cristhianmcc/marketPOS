@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { logAudit } from '@/lib/auditLog';
 import { v2 as cloudinary } from 'cloudinary';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 // Configurar Cloudinary (asegúrate de tener las variables de entorno)
 cloudinary.config({
@@ -9,6 +12,55 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+const LOCAL_IMAGES_DIR = path.join(os.homedir(), 'Documents', 'MonterrialPOS', 'local-images');
+const INDEX_PATH = path.join(LOCAL_IMAGES_DIR, 'index.json');
+
+function isDesktopMode(): boolean {
+  return process.env.DESKTOP_MODE === 'true';
+}
+
+function ensureLocalDir(): void {
+  if (!fs.existsSync(LOCAL_IMAGES_DIR)) {
+    fs.mkdirSync(LOCAL_IMAGES_DIR, { recursive: true });
+  }
+}
+
+function loadIndex(): Record<string, { filename: string; mime: string; createdAt: string }> {
+  try {
+    if (fs.existsSync(INDEX_PATH)) {
+      const raw = fs.readFileSync(INDEX_PATH, 'utf-8');
+      return JSON.parse(raw) as Record<string, { filename: string; mime: string; createdAt: string }>;
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+function saveIndex(index: Record<string, { filename: string; mime: string; createdAt: string }>): void {
+  ensureLocalDir();
+  fs.writeFileSync(INDEX_PATH, JSON.stringify(index, null, 2), 'utf-8');
+}
+
+async function saveLocalImage(file: File): Promise<{ url: string; localId: string }> {
+  ensureLocalDir();
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+  const ext = file.type === 'image/png' ? 'png'
+    : file.type === 'image/webp' ? 'webp'
+    : 'jpg';
+  const localId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const filename = `${localId}.${ext}`;
+  const filePath = path.join(LOCAL_IMAGES_DIR, filename);
+  fs.writeFileSync(filePath, buffer);
+
+  const index = loadIndex();
+  index[localId] = { filename, mime: file.type, createdAt: new Date().toISOString() };
+  saveIndex(index);
+
+  return { url: `/api/desktop/local-image/${localId}`, localId };
+}
 
 /**
  * POST /api/uploads/product-image
@@ -75,10 +127,9 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Subir a Cloudinary
+    // Subir a Cloudinary (fallback a local en desktop)
     const uploadResult = await new Promise<any>((resolve, reject) => {
       const folder = process.env.CLOUDINARY_FOLDER || 'market-pos-products';
-      
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: folder,
@@ -92,8 +143,13 @@ export async function POST(req: NextRequest) {
           else resolve(result);
         }
       );
-
       uploadStream.end(buffer);
+    }).catch(async (err) => {
+      if (isDesktopMode()) {
+        const local = await saveLocalImage(file);
+        return { secure_url: local.url, public_id: local.localId, __local: true };
+      }
+      throw err;
     });
 
     // Audit log
@@ -114,6 +170,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       url: uploadResult.secure_url,
       publicId: uploadResult.public_id,
+      pending: Boolean(uploadResult.__local),
     });
   } catch (error) {
     console.error('Error uploading product image:', error);
