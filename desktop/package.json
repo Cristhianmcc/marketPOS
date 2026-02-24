@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "concurrently \"npm run watch\" \"wait-on tcp:3001 && electron .\"",
     "watch": "tsc -w",
+    "setup:postgres": "node scripts/download-postgres.js",
     "prepare-build": "node scripts/prepare-build.js",
     "build": "npm run prepare-build && tsc && electron-builder --win --x64",
     "build:mac": "npm run prepare-build && tsc && electron-builder --mac",
