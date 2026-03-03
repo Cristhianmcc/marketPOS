@@ -83,18 +83,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verificar configuración de Cloudinary
-    if (
-      !process.env.CLOUDINARY_CLOUD_NAME ||
-      !process.env.CLOUDINARY_API_KEY ||
-      !process.env.CLOUDINARY_API_SECRET
-    ) {
-      return NextResponse.json(
-        { error: 'Cloudinary no está configurado. Contacta al administrador.' },
-        { status: 500 }
-      );
-    }
-
     const formData = await req.formData();
     const file = formData.get('image') as File;
 
@@ -123,11 +111,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // En modo desktop: guardar directo en disco local (no necesita internet)
+    if (isDesktopMode()) {
+      const local = await saveLocalImage(file);
+      
+      await logAudit({
+        storeId: user.storeId,
+        userId: user.userId,
+        action: 'PRODUCT_IMAGE_UPLOADED',
+        entityType: 'PRODUCT',
+        severity: 'INFO',
+        meta: { imageUrl: local.url, publicId: local.localId, storage: 'local' },
+        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined,
+        userAgent: req.headers.get('user-agent') || undefined,
+      });
+
+      return NextResponse.json({
+        url: local.url,
+        publicId: local.localId,
+        pending: false,
+      });
+    }
+
+    // Modo web: verificar Cloudinary
+    if (
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET
+    ) {
+      return NextResponse.json(
+        { error: 'Cloudinary no está configurado. Contacta al administrador.' },
+        { status: 500 }
+      );
+    }
+
     // Convertir File a Buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Subir a Cloudinary (fallback a local en desktop)
+    // Subir a Cloudinary
     const uploadResult = await new Promise<any>((resolve, reject) => {
       const folder = process.env.CLOUDINARY_FOLDER || 'market-pos-products';
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -144,12 +166,6 @@ export async function POST(req: NextRequest) {
         }
       );
       uploadStream.end(buffer);
-    }).catch(async (err) => {
-      if (isDesktopMode()) {
-        const local = await saveLocalImage(file);
-        return { secure_url: local.url, public_id: local.localId, __local: true };
-      }
-      throw err;
     });
 
     // Audit log
