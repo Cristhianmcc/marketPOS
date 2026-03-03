@@ -10,6 +10,7 @@ import * as net from 'net';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
+import * as os from 'os';
 
 // ============================================================================
 // CONFIGURACIÓN
@@ -17,8 +18,8 @@ import * as http from 'http';
 
 const PORT_RANGE_START = 43110;
 const PORT_RANGE_END = 43200;
-const HEALTH_CHECK_TIMEOUT = 30000;
-const HEALTH_CHECK_INTERVAL = 500;
+const HEALTH_CHECK_TIMEOUT = 300000; // 5 minutos (primer arranque puede initializar PostgreSQL)
+const HEALTH_CHECK_INTERVAL = 1000;
 
 // ============================================================================
 // TIPOS
@@ -148,9 +149,87 @@ function loadEnvFile(envPath: string): Record<string, string> {
 // ============================================================================
 
 /**
+ * Devuelve el ejecutable de Node.js a usar.
+ * En producción (empaquetado con Electron) usa el propio ejecutable de Electron
+ * con ELECTRON_RUN_AS_NODE=1, evitando la dependencia de Node.js del sistema.
+ */
+function getNodeExecutable(isPackaged: boolean): { bin: string; extraEnv: Record<string, string> } {
+  if (isPackaged) {
+    // El exe de Electron con ELECTRON_RUN_AS_NODE=1 se comporta como Node.js puro.
+    return {
+      bin: process.execPath,
+      extraEnv: { ELECTRON_RUN_AS_NODE: '1' },
+    };
+  }
+  // En desarrollo: usar node del sistema
+  return { bin: 'node', extraEnv: {} };
+}
+
+/**
+ * Reintenta registros de tiendas pendientes en la nube.
+ * Se ejecuta en background al arrancar la app.
+ */
+async function retryPendingRegistrations(
+  dataDir: string,
+  envVars: Record<string, string>
+): Promise<void> {
+  const pendingFile = path.join(dataDir, 'pending_registrations.json');
+  if (!fs.existsSync(pendingFile)) return;
+
+  const cloudUrl = envVars['CLOUD_URL'] || process.env.CLOUD_URL || '';
+  const apiKey = envVars['LICENSE_API_KEY'] || process.env.LICENSE_API_KEY || '';
+  if (!cloudUrl || !apiKey) return;
+
+  let pending: any[] = [];
+  try {
+    pending = JSON.parse(fs.readFileSync(pendingFile, 'utf-8'));
+  } catch {
+    fs.unlinkSync(pendingFile);
+    return;
+  }
+
+  if (!pending.length) {
+    fs.unlinkSync(pendingFile);
+    return;
+  }
+
+  console.log(`[LocalServer] Retrying ${pending.length} pending cloud registrations...`);
+
+  // Esperar 10 segundos para que Render despierte si estaba dormido
+  await new Promise(r => setTimeout(r, 10000));
+
+  const remaining: any[] = [];
+  for (const entry of pending) {
+    try {
+      const res = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify(entry),
+      });
+      if (res.ok) {
+        console.log(`[LocalServer] Registered pending store: ${entry.storeName}`);
+      } else {
+        remaining.push(entry);
+      }
+    } catch (e: any) {
+      console.warn(`[LocalServer] Retry failed for ${entry.storeName}:`, e.message);
+      remaining.push(entry);
+    }
+  }
+
+  if (remaining.length > 0) {
+    fs.writeFileSync(pendingFile, JSON.stringify(remaining, null, 2));
+    console.log(`[LocalServer] ${remaining.length} stores still pending (will retry next startup)`);
+  } else {
+    fs.unlinkSync(pendingFile);
+    console.log('[LocalServer] All pending stores registered successfully');
+  }
+}
+
+/**
  * Inicia el servidor Next.js standalone
  */
-export async function startLocalServer(resourcesPath: string): Promise<LocalServer> {
+export async function startLocalServer(resourcesPath: string, isPackaged = true): Promise<LocalServer> {
   console.log('[LocalServer] Starting Next.js standalone server...');
   
   // Encontrar puerto libre
@@ -176,6 +255,9 @@ export async function startLocalServer(resourcesPath: string): Promise<LocalServ
   // porque ensurePostgres() lo configura dinámicamente con el puerto correcto
   const databaseUrl = process.env.DATABASE_URL;
   
+  // Directorio de datos de la app
+  const monterrialDataDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS');
+
   // Configurar entorno
   const env: Record<string, string> = {
     ...process.env as Record<string, string>,
@@ -184,6 +266,7 @@ export async function startLocalServer(resourcesPath: string): Promise<LocalServ
     PORT: port.toString(),
     HOSTNAME: '127.0.0.1',
     DESKTOP_MODE: 'true',
+    MONTERRIAL_DATA_DIR: monterrialDataDir,
   };
   
   // Restaurar DATABASE_URL del proceso principal (PostgreSQL embebido)
@@ -194,9 +277,12 @@ export async function startLocalServer(resourcesPath: string): Promise<LocalServ
   }
   
   // Lanzar proceso
-  const serverProcess: ChildProcess = spawn('node', ['server.js'], {
+  const { bin: nodeExec, extraEnv } = getNodeExecutable(isPackaged);
+  console.log(`[LocalServer] Node executable: ${nodeExec}`);
+
+  const serverProcess: ChildProcess = spawn(nodeExec, ['server.js'], {
     cwd: serverDir,
-    env: env as NodeJS.ProcessEnv,
+    env: { ...env, ...extraEnv } as NodeJS.ProcessEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
     windowsHide: true,
@@ -220,6 +306,9 @@ export async function startLocalServer(resourcesPath: string): Promise<LocalServ
   // Esperar a que esté listo
   console.log('[LocalServer] Waiting for server to be ready...');
   await waitForServer(port);
+
+  // Reintentar registros de tiendas pendientes en la nube
+  retryPendingRegistrations(monterrialDataDir, envVars).catch(() => {});
   
   const url = `http://127.0.0.1:${port}`;
   console.log(`[LocalServer] READY ${url}`);

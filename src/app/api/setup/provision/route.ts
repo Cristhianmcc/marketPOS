@@ -4,6 +4,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
+import * as fs from 'fs';
+import * as path from 'path';
 
 interface ProvisionRequest {
   // Datos de la tienda
@@ -159,23 +161,60 @@ export async function POST(request: Request) {
     console.log(`[setup/provision] Store created: ${result.store.name} (ID: ${result.store.id})`);
     console.log(`[setup/provision] User created: ${result.user.email} (Role: ${result.user.role})`);
 
-    // Registrar la tienda en la BD cloud (fire-and-forget) para que aparezca en /admin/billing
+    // Registrar la tienda en la BD cloud para que aparezca en /admin/billing
     const cloudUrl = process.env.CLOUD_URL || process.env.NEXT_PUBLIC_CLOUD_URL;
     const licenseApiKey = process.env.LICENSE_API_KEY;
     if (cloudUrl && licenseApiKey) {
-      fetch(`${cloudUrl}/api/license/register-store`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': licenseApiKey },
-        body: JSON.stringify({
-          storeId: result.store.id,
-          storeName: result.store.name,
-          ownerEmail: result.user.email,
-          ownerName: result.user.name,
-          ruc: body.storeRuc || null,
-          address: body.storeAddress || null,
-          phone: body.storePhone || null,
-        }),
-      }).catch((e) => console.warn('[setup/provision] Cloud registration skipped:', e.message));
+      const registrationPayload = {
+        storeId: result.store.id,
+        storeName: result.store.name,
+        ownerEmail: result.user.email,
+        ownerName: result.user.name,
+        ruc: body.storeRuc || null,
+        address: body.storeAddress || null,
+        phone: body.storePhone || null,
+      };
+
+      // Intentar registro en la nube, con fallback a archivo pendiente
+      const tryRegister = async () => {
+        try {
+          const res = await fetch(`${cloudUrl}/api/license/register-store`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': licenseApiKey },
+            body: JSON.stringify(registrationPayload),
+            signal: AbortSignal.timeout(15000), // 15 segundos máximo
+          });
+          if (res.ok) {
+            console.log(`[setup/provision] Cloud registration OK: ${result.store.name}`);
+            return;
+          }
+          throw new Error(`HTTP ${res.status}`);
+        } catch (e: any) {
+          console.warn(`[setup/provision] Cloud registration failed (${e.message}), saving as pending`);
+          // Guardar en archivo pendiente para reintento al próximo arranque
+          const dataDir = process.env.MONTERRIAL_DATA_DIR;
+          if (dataDir) {
+            try {
+              const pendingFile = path.join(dataDir, 'pending_registrations.json');
+              let pending: any[] = [];
+              if (fs.existsSync(pendingFile)) {
+                pending = JSON.parse(fs.readFileSync(pendingFile, 'utf-8'));
+              }
+              // Evitar duplicados
+              if (!pending.find((p: any) => p.storeId === registrationPayload.storeId)) {
+                pending.push(registrationPayload);
+                fs.mkdirSync(dataDir, { recursive: true });
+                fs.writeFileSync(pendingFile, JSON.stringify(pending, null, 2));
+                console.log(`[setup/provision] Saved to pending file for retry on next startup`);
+              }
+            } catch (fsErr: any) {
+              console.warn('[setup/provision] Could not save pending registration:', fsErr.message);
+            }
+          }
+        }
+      };
+
+      tryRegister(); // fire-and-forget con fallback
     }
 
     return NextResponse.json({
