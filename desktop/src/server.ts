@@ -227,76 +227,134 @@ async function retryPendingRegistrations(
 }
 
 /**
- * Sincroniza la tienda local con la nube al arrancar.
- * Corre desde el proceso principal de Electron donde CLOUD_URL y
- * LICENSE_API_KEY están garantizados disponibles via envVars.
+ * Obtiene los datos de la tienda local.
+ * Intenta leer store_info.json primero; si no existe,
+ * llama al API local /api/desktop/license como fallback.
  */
-async function syncStoreToCloud(
+async function getLocalStoreData(
+  serverUrl: string,
+  dataDir: string
+): Promise<{ storeId: string; storeName: string; ownerEmail: string; ownerName?: string } | null> {
+  // 1. Intentar leer store_info.json
+  const storeInfoFile = path.join(dataDir, 'store_info.json');
+  if (fs.existsSync(storeInfoFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(storeInfoFile, 'utf-8'));
+      if (data?.storeId && data?.ownerEmail) {
+        return data;
+      }
+    } catch { /* fallback al API */ }
+  }
+
+  // 2. Fallback: consultar API local (funciona para tiendas creadas con instaladores viejos)
+  try {
+    const res = await (fetch as any)(`${serverUrl}/api/desktop/license`, {
+      headers: { 'x-desktop-app': 'true' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data?.storeId || !data?.ownerEmail) return null;
+
+    // Guardar para futuras consultas
+    try {
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(storeInfoFile, JSON.stringify({
+        storeId: data.storeId,
+        storeName: data.storeName,
+        ownerEmail: data.ownerEmail,
+        ownerName: data.ownerName,
+      }, null, 2));
+    } catch { /* no critical */ }
+
+    return {
+      storeId: data.storeId,
+      storeName: data.storeName || '',
+      ownerEmail: data.ownerEmail,
+      ownerName: data.ownerName,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Inicia un polling que sincroniza la tienda con la nube cada 30s
+ * hasta tener éxito. Funciona sin importar:
+ * - Si la tienda fue creada con un installer viejo (sin store_info.json)
+ * - Si Render está dormido (reintenta)
+ * - Si la tienda aún no fue creada (espera a que aparezca)
+ */
+function startCloudSyncPolling(
   serverUrl: string,
   dataDir: string,
   envVars: Record<string, string>
-): Promise<void> {
+): void {
   const cloudUrl = envVars['CLOUD_URL'] || process.env.CLOUD_URL || '';
   const apiKey = envVars['LICENSE_API_KEY'] || process.env.LICENSE_API_KEY || '';
   if (!cloudUrl || !apiKey) {
-    console.warn('[LocalServer] syncStoreToCloud: CLOUD_URL or LICENSE_API_KEY not set, skipping');
+    console.warn('[CloudSync] CLOUD_URL or LICENSE_API_KEY not set, sync disabled');
     return;
   }
 
-  // Leer store_info.json de disco — escrito por provision sin depender de env vars
-  const storeInfoFile = path.join(dataDir, 'store_info.json');
-  if (!fs.existsSync(storeInfoFile)) {
-    console.warn('[LocalServer] syncStoreToCloud: store_info.json no existe todavía, nada que sincronizar');
-    return;
-  }
+  const syncedFile = path.join(dataDir, '.cloud_synced');
+  let attempts = 0;
+  const MAX_ATTEMPTS = 60; // 30min máximo (60 x 30s)
 
-  let storeData: { storeId: string; storeName: string; ownerEmail: string; ownerName?: string } | null = null;
-  try {
-    storeData = JSON.parse(fs.readFileSync(storeInfoFile, 'utf-8'));
-  } catch (e: any) {
-    console.warn('[LocalServer] syncStoreToCloud: error leyendo store_info.json:', e.message);
-    return;
-  }
+  const trySync = async () => {
+    attempts++;
+    try {
+      const storeData = await getLocalStoreData(serverUrl, dataDir);
+      if (!storeData) {
+        console.log(`[CloudSync] Attempt ${attempts}: No store data yet, will retry...`);
+        return false;
+      }
 
-  if (!storeData?.storeId || !storeData?.ownerEmail) {
-    console.warn('[LocalServer] syncStoreToCloud: store_info.json incompleto');
-    return;
-  }
+      console.log(`[CloudSync] Attempt ${attempts}: Syncing ${storeData.storeName} (${storeData.storeId})...`);
 
-  console.log(`[LocalServer] syncStoreToCloud: sincronizando ${storeData.storeName} (${storeData.storeId})`);
+      const regRes = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify(storeData),
+        signal: AbortSignal.timeout(25000),
+      });
 
-  try {
-    const regRes = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify(storeData),
-      signal: AbortSignal.timeout(20000),
-    });
-    if (regRes.ok) {
-      console.log(`[LocalServer] Cloud sync OK for store: ${storeData.storeId} (${storeData.storeName})`);
-      return;
+      if (regRes.ok) {
+        const result = await regRes.json();
+        console.log(`[CloudSync] SUCCESS: ${storeData.storeName} synced (${result.already ? 'already existed' : 'new registration'})`);
+        // Marcar como sincronizado
+        try {
+          fs.mkdirSync(dataDir, { recursive: true });
+          fs.writeFileSync(syncedFile, new Date().toISOString());
+        } catch { /* no critical */ }
+        return true;
+      }
+      console.warn(`[CloudSync] Attempt ${attempts}: Server returned ${regRes.status}, will retry...`);
+      return false;
+    } catch (e: any) {
+      console.warn(`[CloudSync] Attempt ${attempts}: Failed (${e.message}), will retry...`);
+      return false;
     }
-    console.warn(`[LocalServer] Cloud sync returned ${regRes.status} — saving to pending`);
-  } catch (e: any) {
-    console.warn(`[LocalServer] Cloud sync failed (${e.message}) — saving to pending for retry`);
-  }
+  };
 
-  // Si la llamada a cloud falló, guardar en pending_registrations.json para retry al siguiente arranque
-  try {
-    const pendingFile = path.join(dataDir, 'pending_registrations.json');
-    let existing: any[] = [];
-    if (fs.existsSync(pendingFile)) {
-      existing = JSON.parse(fs.readFileSync(pendingFile, 'utf-8'));
-    }
-    if (!existing.find((e: any) => e.storeId === storeData!.storeId)) {
-      existing.push(storeData);
-      fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(pendingFile, JSON.stringify(existing, null, 2));
-      console.log('[LocalServer] Saved to pending_registrations.json for retry on next startup');
-    }
-  } catch (e: any) {
-    console.warn('[LocalServer] Could not write pending file:', e.message);
-  }
+  // Primer intento a los 8 segundos (dar tiempo a Next.js)
+  setTimeout(async () => {
+    const ok = await trySync();
+    if (ok) return;
+
+    // Si falló, seguir intentando cada 30 segundos
+    const interval = setInterval(async () => {
+      if (attempts >= MAX_ATTEMPTS) {
+        console.warn(`[CloudSync] Max attempts (${MAX_ATTEMPTS}) reached, stopping`);
+        clearInterval(interval);
+        return;
+      }
+      const ok = await trySync();
+      if (ok) {
+        clearInterval(interval);
+      }
+    }, 30000);
+  }, 8000);
 }
 
 /**
@@ -380,10 +438,10 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   console.log('[LocalServer] Waiting for server to be ready...');
   await waitForServer(port);
 
-  // Reintentar registros de tiendas pendientes + sincronizar tienda actual
+  // Reintentar registros de tiendas pendientes + iniciar polling de sync con cloud
   const url = `http://127.0.0.1:${port}`;
   retryPendingRegistrations(monterrialDataDir, envVars).catch(() => {});
-  syncStoreToCloud(url, monterrialDataDir, envVars).catch(() => {});
+  startCloudSyncPolling(url, monterrialDataDir, envVars);
   
   console.log(`[LocalServer] READY ${url}`);
   
