@@ -6,6 +6,10 @@ import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+
+// Ruta fija sin depender de env vars — siempre disponible en Node.js
+const MONTERRIAL_DIR = path.join(os.homedir(), 'Documents', 'MonterrialPOS');
 
 interface ProvisionRequest {
   // Datos de la tienda
@@ -161,6 +165,24 @@ export async function POST(request: Request) {
     console.log(`[setup/provision] Store created: ${result.store.name} (ID: ${result.store.id})`);
     console.log(`[setup/provision] User created: ${result.user.email} (Role: ${result.user.role})`);
 
+    // Escribir store_info.json en disco — lo lee server.ts para sincronizar con cloud
+    const storeInfoPayload = {
+      storeId: result.store.id,
+      storeName: result.store.name,
+      ownerEmail: result.user.email,
+      ownerName: result.user.name,
+    };
+    try {
+      fs.mkdirSync(MONTERRIAL_DIR, { recursive: true });
+      fs.writeFileSync(
+        path.join(MONTERRIAL_DIR, 'store_info.json'),
+        JSON.stringify(storeInfoPayload, null, 2)
+      );
+      console.log('[setup/provision] store_info.json escrito en disco');
+    } catch (e: any) {
+      console.warn('[setup/provision] No se pudo escribir store_info.json:', e.message);
+    }
+
     // Registrar la tienda en la BD cloud para que aparezca en /admin/billing
     const cloudUrl = process.env.CLOUD_URL || process.env.NEXT_PUBLIC_CLOUD_URL;
     const licenseApiKey = process.env.LICENSE_API_KEY;
@@ -191,25 +213,21 @@ export async function POST(request: Request) {
           throw new Error(`HTTP ${res.status}`);
         } catch (e: any) {
           console.warn(`[setup/provision] Cloud registration failed (${e.message}), saving as pending`);
-          // Guardar en archivo pendiente para reintento al próximo arranque
-          const dataDir = process.env.MONTERRIAL_DATA_DIR;
-          if (dataDir) {
-            try {
-              const pendingFile = path.join(dataDir, 'pending_registrations.json');
-              let pending: any[] = [];
-              if (fs.existsSync(pendingFile)) {
-                pending = JSON.parse(fs.readFileSync(pendingFile, 'utf-8'));
-              }
-              // Evitar duplicados
-              if (!pending.find((p: any) => p.storeId === registrationPayload.storeId)) {
-                pending.push(registrationPayload);
-                fs.mkdirSync(dataDir, { recursive: true });
-                fs.writeFileSync(pendingFile, JSON.stringify(pending, null, 2));
-                console.log(`[setup/provision] Saved to pending file for retry on next startup`);
-              }
-            } catch (fsErr: any) {
-              console.warn('[setup/provision] Could not save pending registration:', fsErr.message);
+          // Guardar en archivo pendiente — usa path fijo, NO depende de env vars
+          try {
+            const pendingFile = path.join(MONTERRIAL_DIR, 'pending_registrations.json');
+            let pending: any[] = [];
+            if (fs.existsSync(pendingFile)) {
+              pending = JSON.parse(fs.readFileSync(pendingFile, 'utf-8'));
             }
+            if (!pending.find((p: any) => p.storeId === registrationPayload.storeId)) {
+              pending.push(registrationPayload);
+              fs.mkdirSync(MONTERRIAL_DIR, { recursive: true });
+              fs.writeFileSync(pendingFile, JSON.stringify(pending, null, 2));
+              console.log('[setup/provision] Saved to pending_registrations.json para retry');
+            }
+          } catch (fsErr: any) {
+            console.warn('[setup/provision] Could not save pending registration:', fsErr.message);
           }
         }
       };

@@ -243,40 +243,27 @@ async function syncStoreToCloud(
     return;
   }
 
-  // Esperar 5s para que Next.js y Prisma estén completamente listos
-  await new Promise(r => setTimeout(r, 5000));
-
-  let storeData: { storeId: string; storeName: string; ownerEmail: string; ownerName?: string } | null = null;
-
-  try {
-    const res = await (fetch as any)(`${serverUrl}/api/desktop/license`, {
-      headers: { 'x-desktop-app': 'true' },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) {
-      console.warn('[LocalServer] syncStoreToCloud: failed to get local license info');
-      return;
-    }
-    const data = await res.json() as {
-      storeId?: string;
-      storeName?: string;
-      ownerEmail?: string;
-      ownerName?: string;
-    };
-    if (!data.storeId || !data.ownerEmail) {
-      console.warn('[LocalServer] syncStoreToCloud: missing storeId or ownerEmail in response');
-      return;
-    }
-    storeData = {
-      storeId: data.storeId,
-      storeName: data.storeName || '',
-      ownerEmail: data.ownerEmail,
-      ownerName: data.ownerName,
-    };
-  } catch (e: any) {
-    console.warn('[LocalServer] syncStoreToCloud: could not fetch local license:', e.message);
+  // Leer store_info.json de disco — escrito por provision sin depender de env vars
+  const storeInfoFile = path.join(dataDir, 'store_info.json');
+  if (!fs.existsSync(storeInfoFile)) {
+    console.warn('[LocalServer] syncStoreToCloud: store_info.json no existe todavía, nada que sincronizar');
     return;
   }
+
+  let storeData: { storeId: string; storeName: string; ownerEmail: string; ownerName?: string } | null = null;
+  try {
+    storeData = JSON.parse(fs.readFileSync(storeInfoFile, 'utf-8'));
+  } catch (e: any) {
+    console.warn('[LocalServer] syncStoreToCloud: error leyendo store_info.json:', e.message);
+    return;
+  }
+
+  if (!storeData?.storeId || !storeData?.ownerEmail) {
+    console.warn('[LocalServer] syncStoreToCloud: store_info.json incompleto');
+    return;
+  }
+
+  console.log(`[LocalServer] syncStoreToCloud: sincronizando ${storeData.storeName} (${storeData.storeId})`);
 
   try {
     const regRes = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
