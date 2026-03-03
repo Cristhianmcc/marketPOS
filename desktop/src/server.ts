@@ -233,7 +233,7 @@ async function retryPendingRegistrations(
  */
 async function syncStoreToCloud(
   serverUrl: string,
-  _dataDir: string,
+  dataDir: string,
   envVars: Record<string, string>
 ): Promise<void> {
   const cloudUrl = envVars['CLOUD_URL'] || process.env.CLOUD_URL || '';
@@ -243,13 +243,15 @@ async function syncStoreToCloud(
     return;
   }
 
-  try {
-    // Esperar 3s para que Next.js esté completamente listo
-    await new Promise(r => setTimeout(r, 3000));
+  // Esperar 5s para que Next.js y Prisma estén completamente listos
+  await new Promise(r => setTimeout(r, 5000));
 
+  let storeData: { storeId: string; storeName: string; ownerEmail: string; ownerName?: string } | null = null;
+
+  try {
     const res = await (fetch as any)(`${serverUrl}/api/desktop/license`, {
       headers: { 'x-desktop-app': 'true' },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
       console.warn('[LocalServer] syncStoreToCloud: failed to get local license info');
@@ -265,25 +267,48 @@ async function syncStoreToCloud(
       console.warn('[LocalServer] syncStoreToCloud: missing storeId or ownerEmail in response');
       return;
     }
+    storeData = {
+      storeId: data.storeId,
+      storeName: data.storeName || '',
+      ownerEmail: data.ownerEmail,
+      ownerName: data.ownerName,
+    };
+  } catch (e: any) {
+    console.warn('[LocalServer] syncStoreToCloud: could not fetch local license:', e.message);
+    return;
+  }
 
+  try {
     const regRes = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify({
-        storeId: data.storeId,
-        storeName: data.storeName,
-        ownerEmail: data.ownerEmail,
-        ownerName: data.ownerName,
-      }),
-      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify(storeData),
+      signal: AbortSignal.timeout(20000),
     });
     if (regRes.ok) {
-      console.log(`[LocalServer] Cloud sync OK for store: ${data.storeId} (${data.storeName})`);
-    } else {
-      console.warn(`[LocalServer] Cloud sync returned ${regRes.status}`);
+      console.log(`[LocalServer] Cloud sync OK for store: ${storeData.storeId} (${storeData.storeName})`);
+      return;
+    }
+    console.warn(`[LocalServer] Cloud sync returned ${regRes.status} — saving to pending`);
+  } catch (e: any) {
+    console.warn(`[LocalServer] Cloud sync failed (${e.message}) — saving to pending for retry`);
+  }
+
+  // Si la llamada a cloud falló, guardar en pending_registrations.json para retry al siguiente arranque
+  try {
+    const pendingFile = path.join(dataDir, 'pending_registrations.json');
+    let existing: any[] = [];
+    if (fs.existsSync(pendingFile)) {
+      existing = JSON.parse(fs.readFileSync(pendingFile, 'utf-8'));
+    }
+    if (!existing.find((e: any) => e.storeId === storeData!.storeId)) {
+      existing.push(storeData);
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(pendingFile, JSON.stringify(existing, null, 2));
+      console.log('[LocalServer] Saved to pending_registrations.json for retry on next startup');
     }
   } catch (e: any) {
-    console.warn('[LocalServer] Cloud sync skipped:', e.message);
+    console.warn('[LocalServer] Could not write pending file:', e.message);
   }
 }
 
