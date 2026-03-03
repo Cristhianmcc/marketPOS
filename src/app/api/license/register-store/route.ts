@@ -41,11 +41,15 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // El email puede ya existir si el mismo owner tiene otra tienda registrada.
+      // Usamos un email único por tienda para evitar conflicto con el constraint @unique.
+      const normalizedEmail = ownerEmail.toLowerCase().trim();
+      const cloudEmail = `${storeId}__${normalizedEmail}`;
       const hashedPw = await hashPassword(Math.random().toString(36) + Date.now());
       await tx.user.create({
         data: {
           storeId,
-          email: ownerEmail.toLowerCase().trim(),
+          email: cloudEmail,
           name: ownerName || ownerEmail,
           password: hashedPw,
           role: 'OWNER',
