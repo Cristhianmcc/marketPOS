@@ -63,25 +63,38 @@ export function LicenseBanner() {
     ? new Date(expiryDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
     : '';
 
-  // Licencia vencida — bloqueante
+  // Licencia vencida — overlay bloqueante de pantalla completa
   if (!license.canOperate) {
     return (
-      <div className="w-full bg-red-600 text-white px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <XCircle className="w-5 h-5 flex-shrink-0" />
-          <div>
-            <span className="font-semibold">Licencia vencida.</span>
-            {' '}Contacta a soporte para renovar y continuar operando.
+      <div className="fixed inset-0 z-[9999] bg-gray-950/95 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full mx-4 text-center flex flex-col items-center gap-6">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center">
+            <XCircle className="w-12 h-12 text-red-600" />
           </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Licencia vencida</h2>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              Tu suscripción ha expirado o fue suspendida.<br />
+              Contacta a soporte para renovar y continuar operando.
+            </p>
+          </div>
+          {formattedDate && (
+            <p className="text-xs text-gray-400">
+              Venció el <span className="font-medium text-gray-600">{formattedDate}</span>
+            </p>
+          )}
+          <button
+            onClick={check}
+            disabled={checking}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors w-full justify-center"
+          >
+            <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+            {checking ? 'Verificando...' : 'Verificar licencia'}
+          </button>
+          <p className="text-xs text-gray-400">
+            soporte@monterrial.com
+          </p>
         </div>
-        <button
-          onClick={check}
-          disabled={checking}
-          className="flex items-center gap-2 bg-red-700 hover:bg-red-800 px-3 py-1.5 rounded text-sm font-medium transition-colors flex-shrink-0"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
-          Verificar
-        </button>
       </div>
     );
   }
