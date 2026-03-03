@@ -231,50 +231,38 @@ async function retryPendingRegistrations(
  * Intenta leer store_info.json primero; si no existe,
  * llama al API local /api/desktop/license como fallback.
  */
-async function getLocalStoreData(
-  serverUrl: string,
-  dataDir: string
-): Promise<{ storeId: string; storeName: string; ownerEmail: string; ownerName?: string } | null> {
-  // 1. Intentar leer store_info.json
-  const storeInfoFile = path.join(dataDir, 'store_info.json');
-  if (fs.existsSync(storeInfoFile)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(storeInfoFile, 'utf-8'));
-      if (data?.storeId && data?.ownerEmail) {
-        return data;
-      }
-    } catch { /* fallback al API */ }
-  }
-
-  // 2. Fallback: consultar API local (funciona para tiendas creadas con instaladores viejos)
+/**
+ * Obtiene TODAS las tiendas de la DB local via API.
+ * Devuelve array — vacío si aún no hay tiendas.
+ */
+async function getAllLocalStores(
+  serverUrl: string
+): Promise<Array<{ storeId: string; storeName: string; ownerEmail: string; ownerName?: string }>> {
   try {
     const res = await (fetch as any)(`${serverUrl}/api/desktop/license`, {
       headers: { 'x-desktop-app': 'true' },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
-    if (!data?.storeId || !data?.ownerEmail) return null;
 
-    // Guardar para futuras consultas
-    try {
-      fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(storeInfoFile, JSON.stringify({
+    // El endpoint ahora devuelve allStores[]
+    if (Array.isArray(data?.allStores) && data.allStores.length > 0) {
+      return data.allStores.filter((s: any) => s.storeId && s.ownerEmail);
+    }
+
+    // Fallback: solo la tienda principal (compatibilidad)
+    if (data?.storeId && data?.ownerEmail) {
+      return [{
         storeId: data.storeId,
-        storeName: data.storeName,
+        storeName: data.storeName || '',
         ownerEmail: data.ownerEmail,
         ownerName: data.ownerName,
-      }, null, 2));
-    } catch { /* no critical */ }
-
-    return {
-      storeId: data.storeId,
-      storeName: data.storeName || '',
-      ownerEmail: data.ownerEmail,
-      ownerName: data.ownerName,
-    };
+      }];
+    }
+    return [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -284,6 +272,11 @@ async function getLocalStoreData(
  * - Si la tienda fue creada con un installer viejo (sin store_info.json)
  * - Si Render está dormido (reintenta)
  * - Si la tienda aún no fue creada (espera a que aparezca)
+ */
+/**
+ * Sincroniza TODAS las tiendas locales con la nube.
+ * Registra cada tienda individualmente. Reintenta cada 30s hasta que
+ * todas estén sincronizadas o se alcance el máximo de intentos.
  */
 function startCloudSyncPolling(
   serverUrl: string,
@@ -297,52 +290,78 @@ function startCloudSyncPolling(
     return;
   }
 
-  const syncedFile = path.join(dataDir, '.cloud_synced');
+  const syncedFile = path.join(dataDir, '.cloud_synced_ids');
   let attempts = 0;
-  const MAX_ATTEMPTS = 60; // 30min máximo (60 x 30s)
+  const MAX_ATTEMPTS = 60;
 
-  const trySync = async () => {
-    attempts++;
+  // Leer IDs ya sincronizados
+  const loadSyncedIds = (): Set<string> => {
     try {
-      const storeData = await getLocalStoreData(serverUrl, dataDir);
-      if (!storeData) {
-        console.log(`[CloudSync] Attempt ${attempts}: No store data yet, will retry...`);
-        return false;
+      if (fs.existsSync(syncedFile)) {
+        const ids = JSON.parse(fs.readFileSync(syncedFile, 'utf-8'));
+        return new Set(Array.isArray(ids) ? ids : []);
       }
-
-      console.log(`[CloudSync] Attempt ${attempts}: Syncing ${storeData.storeName} (${storeData.storeId})...`);
-
-      const regRes = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-        body: JSON.stringify(storeData),
-        signal: AbortSignal.timeout(25000),
-      });
-
-      if (regRes.ok) {
-        const result = await regRes.json();
-        console.log(`[CloudSync] SUCCESS: ${storeData.storeName} synced (${result.already ? 'already existed' : 'new registration'})`);
-        // Marcar como sincronizado
-        try {
-          fs.mkdirSync(dataDir, { recursive: true });
-          fs.writeFileSync(syncedFile, new Date().toISOString());
-        } catch { /* no critical */ }
-        return true;
-      }
-      console.warn(`[CloudSync] Attempt ${attempts}: Server returned ${regRes.status}, will retry...`);
-      return false;
-    } catch (e: any) {
-      console.warn(`[CloudSync] Attempt ${attempts}: Failed (${e.message}), will retry...`);
-      return false;
-    }
+    } catch { /* fresh start */ }
+    return new Set();
   };
 
-  // Primer intento a los 8 segundos (dar tiempo a Next.js)
+  const saveSyncedIds = (ids: Set<string>) => {
+    try {
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(syncedFile, JSON.stringify([...ids], null, 2));
+    } catch { /* no critical */ }
+  };
+
+  const trySync = async (): Promise<boolean> => {
+    attempts++;
+    const syncedIds = loadSyncedIds();
+
+    const allStores = await getAllLocalStores(serverUrl);
+    if (!allStores.length) {
+      console.log(`[CloudSync] Attempt ${attempts}: No stores yet, will retry...`);
+      return false;
+    }
+
+    // Filtrar solo las que NO están sincronizadas
+    const pending = allStores.filter(s => !syncedIds.has(s.storeId));
+    if (!pending.length) {
+      console.log(`[CloudSync] All ${allStores.length} stores already synced`);
+      return true;
+    }
+
+    console.log(`[CloudSync] Attempt ${attempts}: ${pending.length} stores pending of ${allStores.length} total`);
+
+    let allOk = true;
+    for (const store of pending) {
+      try {
+        const regRes = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+          body: JSON.stringify(store),
+          signal: AbortSignal.timeout(25000),
+        });
+        if (regRes.ok) {
+          console.log(`[CloudSync] OK: ${store.storeName} (${store.storeId})`);
+          syncedIds.add(store.storeId);
+        } else {
+          console.warn(`[CloudSync] ${store.storeName}: server returned ${regRes.status}`);
+          allOk = false;
+        }
+      } catch (e: any) {
+        console.warn(`[CloudSync] ${store.storeName}: ${e.message}`);
+        allOk = false;
+      }
+    }
+
+    saveSyncedIds(syncedIds);
+    return allOk;
+  };
+
+  // Primer intento a los 10 segundos
   setTimeout(async () => {
     const ok = await trySync();
     if (ok) return;
 
-    // Si falló, seguir intentando cada 30 segundos
     const interval = setInterval(async () => {
       if (attempts >= MAX_ATTEMPTS) {
         console.warn(`[CloudSync] Max attempts (${MAX_ATTEMPTS}) reached, stopping`);
@@ -350,11 +369,9 @@ function startCloudSyncPolling(
         return;
       }
       const ok = await trySync();
-      if (ok) {
-        clearInterval(interval);
-      }
+      if (ok) clearInterval(interval);
     }, 30000);
-  }, 8000);
+  }, 10000);
 }
 
 /**

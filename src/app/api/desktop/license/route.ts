@@ -22,8 +22,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Obtener la primera (y única) tienda local con su owner
-    const store = await prisma.store.findFirst({
+    // Obtener TODAS las tiendas locales con su owner
+    const stores = await prisma.store.findMany({
       select: {
         id: true,
         name: true,
@@ -33,22 +33,34 @@ export async function GET(req: NextRequest) {
           take: 1,
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    if (!store) {
+    if (!stores.length) {
       return NextResponse.json({
         storeId: null,
-        canOperate: true, // sin tienda = setup en progreso, no bloquear
+        canOperate: true,
         status: 'NO_SUBSCRIPTION',
         daysRemaining: 0,
+        allStores: [],
       });
     }
 
+    // Info de la tienda más reciente (para licencia / LicenseBanner)
+    const store = stores[0];
     const owner = store.users[0] || null;
 
     const sub = await prisma.subscription.findUnique({
       where: { storeId: store.id },
     });
+
+    // Lista compacta de TODAS las tiendas para cloud sync
+    const allStores = stores.map(s => ({
+      storeId: s.id,
+      storeName: s.name,
+      ownerEmail: s.users[0]?.email || null,
+      ownerName: s.users[0]?.name || null,
+    }));
 
     if (!sub) {
       return NextResponse.json({
@@ -56,9 +68,10 @@ export async function GET(req: NextRequest) {
         storeName: store.name,
         ownerEmail: owner?.email || null,
         ownerName: owner?.name || null,
-        canOperate: true, // sin suscripción en local = trial no creado aún
+        canOperate: true,
         status: 'NO_SUBSCRIPTION',
         daysRemaining: 0,
+        allStores,
       });
     }
 
@@ -78,6 +91,7 @@ export async function GET(req: NextRequest) {
       trialEndsAt: sub.trialEndsAt?.toISOString() || null,
       planCode: sub.planCode,
       daysRemaining,
+      allStores,
     });
   } catch (error) {
     console.error('[desktop/license] Error:', error);
