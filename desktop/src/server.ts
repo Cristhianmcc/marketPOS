@@ -227,6 +227,67 @@ async function retryPendingRegistrations(
 }
 
 /**
+ * Sincroniza la tienda local con la nube al arrancar.
+ * Corre desde el proceso principal de Electron donde CLOUD_URL y
+ * LICENSE_API_KEY están garantizados disponibles via envVars.
+ */
+async function syncStoreToCloud(
+  serverUrl: string,
+  _dataDir: string,
+  envVars: Record<string, string>
+): Promise<void> {
+  const cloudUrl = envVars['CLOUD_URL'] || process.env.CLOUD_URL || '';
+  const apiKey = envVars['LICENSE_API_KEY'] || process.env.LICENSE_API_KEY || '';
+  if (!cloudUrl || !apiKey) {
+    console.warn('[LocalServer] syncStoreToCloud: CLOUD_URL or LICENSE_API_KEY not set, skipping');
+    return;
+  }
+
+  try {
+    // Esperar 3s para que Next.js esté completamente listo
+    await new Promise(r => setTimeout(r, 3000));
+
+    const res = await (fetch as any)(`${serverUrl}/api/desktop/license`, {
+      headers: { 'x-desktop-app': 'true' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      console.warn('[LocalServer] syncStoreToCloud: failed to get local license info');
+      return;
+    }
+    const data = await res.json() as {
+      storeId?: string;
+      storeName?: string;
+      ownerEmail?: string;
+      ownerName?: string;
+    };
+    if (!data.storeId || !data.ownerEmail) {
+      console.warn('[LocalServer] syncStoreToCloud: missing storeId or ownerEmail in response');
+      return;
+    }
+
+    const regRes = await (fetch as any)(`${cloudUrl}/api/license/register-store`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({
+        storeId: data.storeId,
+        storeName: data.storeName,
+        ownerEmail: data.ownerEmail,
+        ownerName: data.ownerName,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (regRes.ok) {
+      console.log(`[LocalServer] Cloud sync OK for store: ${data.storeId} (${data.storeName})`);
+    } else {
+      console.warn(`[LocalServer] Cloud sync returned ${regRes.status}`);
+    }
+  } catch (e: any) {
+    console.warn('[LocalServer] Cloud sync skipped:', e.message);
+  }
+}
+
+/**
  * Inicia el servidor Next.js standalone
  */
 export async function startLocalServer(resourcesPath: string, isPackaged = true): Promise<LocalServer> {
@@ -307,10 +368,11 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   console.log('[LocalServer] Waiting for server to be ready...');
   await waitForServer(port);
 
-  // Reintentar registros de tiendas pendientes en la nube
-  retryPendingRegistrations(monterrialDataDir, envVars).catch(() => {});
-  
+  // Reintentar registros de tiendas pendientes + sincronizar tienda actual
   const url = `http://127.0.0.1:${port}`;
+  retryPendingRegistrations(monterrialDataDir, envVars).catch(() => {});
+  syncStoreToCloud(url, monterrialDataDir, envVars).catch(() => {});
+  
   console.log(`[LocalServer] READY ${url}`);
   
   return {

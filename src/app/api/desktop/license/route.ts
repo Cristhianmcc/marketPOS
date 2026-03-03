@@ -22,9 +22,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Obtener la primera (y única) tienda local
+    // Obtener la primera (y única) tienda local con su owner
     const store = await prisma.store.findFirst({
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        users: {
+          where: { role: 'OWNER', active: true },
+          select: { email: true, name: true },
+          take: 1,
+        },
+      },
     });
 
     if (!store) {
@@ -36,6 +44,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    const owner = store.users[0] || null;
+
     const sub = await prisma.subscription.findUnique({
       where: { storeId: store.id },
     });
@@ -44,6 +54,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         storeId: store.id,
         storeName: store.name,
+        ownerEmail: owner?.email || null,
+        ownerName: owner?.name || null,
         canOperate: true, // sin suscripción en local = trial no creado aún
         status: 'NO_SUBSCRIPTION',
         daysRemaining: 0,
@@ -58,6 +70,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       storeId: store.id,
       storeName: store.name,
+      ownerEmail: owner?.email || null,
+      ownerName: owner?.name || null,
       canOperate,
       status: effectiveStatus,
       currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
