@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/session';
 import { CreateProductSchema } from '@/domain/schemas/inventory';
 import { PrismaProductRepository } from '@/infra/db/repositories/PrismaProductRepository';
 import { nanoid } from 'nanoid';
+import { syncProductToCatalog } from '@/lib/catalogSync';
 
 const productRepo = new PrismaProductRepository();
 
@@ -77,6 +78,18 @@ export async function POST(req: NextRequest) {
       unitType: data.unitType,
       baseUnitId: data.baseUnitId || null, // ✅ MÓDULO F2.1: Unidad SUNAT
       imageUrl: data.imageUrl || null,
+    });
+
+    // Sincronizar al catálogo cloud en segundo plano (fire-and-forget)
+    syncProductToCatalog({
+      name: product.name,
+      brand: product.brand,
+      content: product.content,
+      category: product.category,
+      barcode: product.barcode,
+      imageUrl: product.imageUrl,
+      unitType: product.unitType,
+      sourceStoreId: user.storeId,
     });
 
     return NextResponse.json({ product }, { status: 201 });

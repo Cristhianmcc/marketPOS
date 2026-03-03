@@ -274,7 +274,7 @@ function CartPanelComponent({
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="hidden md:flex md:flex-col h-full w-96 bg-surface-light dark:bg-surface-dark border-l border-border-light dark:border-border-dark">
+    <div className="hidden md:flex md:flex-col h-full w-full bg-surface-light dark:bg-surface-dark border-l border-border-light dark:border-border-dark overflow-hidden">
       {/* Header */}
       <div className="px-6 py-4 border-b border-border-light dark:border-border-dark shrink-0">
         <div className="flex items-center justify-between mb-2">
@@ -295,7 +295,7 @@ function CartPanelComponent({
       </div>
 
       {/* Cart Items */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-20 h-20 rounded-full bg-background-light dark:bg-background-dark border-2 border-dashed border-border-light dark:border-border-dark flex items-center justify-center mb-4">
@@ -504,7 +504,7 @@ function CartPanelComponent({
 
       {/* Footer - Totals & Checkout */}
       {cart.length > 0 && (
-        <div className="px-6 py-4 border-t border-border-light dark:border-border-dark space-y-4 shrink-0">
+        <div className="px-4 py-3 border-t border-border-light dark:border-border-dark space-y-3 shrink-0">
           {/* Cupón */}
           {appliedCoupon && (
             <div className="flex items-center justify-between bg-yellow-50 dark:bg-yellow-950/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-900/50">

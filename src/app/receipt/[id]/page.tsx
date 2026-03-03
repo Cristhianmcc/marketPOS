@@ -81,6 +81,7 @@ interface Sale {
     ruc: string | null;
     address: string | null;
     phone: string | null;
+    settings?: { ticketFooter: string | null; ticketLogo: string | null } | null;
   };
   // ✅ MÓDULO 18.8: Comprobante electrónico
   electronicDocuments?: Array<{
@@ -204,6 +205,13 @@ export default function ReceiptPage() {
         <div className="receipt">
           {/* Header */}
           <div className="receipt-header">
+            {sale.store.settings?.ticketLogo && (
+              <img
+                src={sale.store.settings.ticketLogo}
+                alt="Logo"
+                style={{ maxWidth: '80%', maxHeight: '60px', margin: '0 auto 6px', display: 'block', objectFit: 'contain' }}
+              />
+            )}
             <div className="store-name">{sale.store.name}</div>
             {sale.store.ruc && <div className="store-info">RUC: {sale.store.ruc}</div>}
             {sale.store.address && <div className="store-info">{sale.store.address}</div>}
@@ -265,35 +273,6 @@ export default function ReceiptPage() {
               <span>Ticket N°:</span>
               <span>{sale.saleNumber}</span>
             </div>
-            <div className="info-row">
-              <span>Cajero:</span>
-              <span>{sale.user.name}</span>
-            </div>
-            {sale.customer && (
-              <>
-                <div className="info-row">
-                  <span>Cliente:</span>
-                  <span>{sale.customer.name}</span>
-                </div>
-                {sale.customer.phone && (
-                  <div className="info-row">
-                    <span>Tel:</span>
-                    <span>{sale.customer.phone}</span>
-                  </div>
-                )}
-              </>
-            )}
-            {sale.shift && (
-              <div className="info-row">
-                <span>Turno:</span>
-                <span>{new Date(sale.shift.openedAt).toLocaleString('es-PE', { 
-                  day: '2-digit', 
-                  month: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}</span>
-              </div>
-            )}
           </div>
 
           <div className="separator">================================</div>
@@ -492,7 +471,9 @@ export default function ReceiptPage() {
 
           {/* Footer */}
           <div className="receipt-footer">
-            Gracias por su compra
+            <div className="footer-message">
+              {sale.store.settings?.ticketFooter || 'Gracias por su compra'}
+            </div>
           </div>
         </div>
       </div>
@@ -529,7 +510,7 @@ export default function ReceiptPage() {
         .receipt {
           width: 80mm;
           background: white;
-          padding: 10mm;
+          padding: 8mm 6mm;
           font-family: 'Courier New', Courier, monospace;
           font-size: 11px;
           line-height: 1.4;
@@ -543,9 +524,11 @@ export default function ReceiptPage() {
         }
 
         .store-name {
-          font-size: 14px;
+          font-size: 18px;
           font-weight: bold;
-          margin-bottom: 4px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 3px;
         }
 
         .store-info {
@@ -575,8 +558,10 @@ export default function ReceiptPage() {
 
         .total-final {
           font-weight: bold;
-          font-size: 12px;
-          margin-top: 4px;
+          font-size: 13px;
+          margin-top: 6px;
+          padding-top: 4px;
+          border-top: 1px solid #000;
         }
 
         .items {
@@ -584,18 +569,20 @@ export default function ReceiptPage() {
         }
 
         .item {
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
 
         .item-name {
           font-weight: bold;
-          margin-bottom: 2px;
+          margin-bottom: 1px;
+          word-break: break-word;
         }
 
         .item-line {
           display: flex;
           justify-content: space-between;
           font-size: 10px;
+          padding-left: 6px;
         }
 
         .item-discount {
@@ -627,8 +614,13 @@ export default function ReceiptPage() {
 
         .receipt-footer {
           text-align: center;
-          font-size: 10px;
           margin-top: 8px;
+        }
+
+        .footer-message {
+          font-size: 10px;
+          font-weight: bold;
+          white-space: pre-line;
         }
 
         @media print {

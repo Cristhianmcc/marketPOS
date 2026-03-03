@@ -102,7 +102,30 @@ export async function POST(request: Request) {
         },
       });
 
-      // 4. Crear categorías por defecto
+      // 4. Crear suscripción TRIAL de 30 días automáticamente
+      const now = new Date();
+      const trialEnd = new Date(now);
+      trialEnd.setDate(trialEnd.getDate() + 30);
+      const periodEnd = new Date(now);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+      await tx.subscription.create({
+        data: {
+          storeId: store.id,
+          planCode: 'STARTER',
+          status: 'TRIAL',
+          startAt: now,
+          trialEndsAt: trialEnd,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          priceAmount: 0,
+          priceCurrency: 'PEN',
+          billingCycle: 'MONTHLY',
+          notes: 'Trial automático al instalar desktop',
+        },
+      });
+
+      // 5. Crear categorías por defecto
       const defaultCategories = [
         { name: 'Abarrotes',            slug: 'abarrotes',            color: '#F59E0B', icon: '🛒', sortOrder: 1 },
         { name: 'Bebidas',              slug: 'bebidas',              color: '#3B82F6', icon: '🥤', sortOrder: 2 },
@@ -135,6 +158,25 @@ export async function POST(request: Request) {
 
     console.log(`[setup/provision] Store created: ${result.store.name} (ID: ${result.store.id})`);
     console.log(`[setup/provision] User created: ${result.user.email} (Role: ${result.user.role})`);
+
+    // Registrar la tienda en la BD cloud (fire-and-forget) para que aparezca en /admin/billing
+    const cloudUrl = process.env.CLOUD_URL || process.env.NEXT_PUBLIC_CLOUD_URL;
+    const licenseApiKey = process.env.LICENSE_API_KEY;
+    if (cloudUrl && licenseApiKey) {
+      fetch(`${cloudUrl}/api/license/register-store`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': licenseApiKey },
+        body: JSON.stringify({
+          storeId: result.store.id,
+          storeName: result.store.name,
+          ownerEmail: result.user.email,
+          ownerName: result.user.name,
+          ruc: body.storeRuc || null,
+          address: body.storeAddress || null,
+          phone: body.storePhone || null,
+        }),
+      }).catch((e) => console.warn('[setup/provision] Cloud registration skipped:', e.message));
+    }
 
     return NextResponse.json({
       success: true,

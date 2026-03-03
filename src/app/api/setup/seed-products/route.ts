@@ -122,16 +122,28 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Obtener unidad base (NIU)
-    const baseUnit = await prisma.unit.findFirst({
+    // Obtener unidad base (NIU) — si no existe, crearla automáticamente
+    let baseUnit = await prisma.unit.findFirst({
       where: { sunatCode: 'NIU' },
     });
 
     if (!baseUnit) {
-      return NextResponse.json(
-        { error: 'Unidades SUNAT no inicializadas' },
-        { status: 500 }
-      );
+      console.log('[seed-products] NIU unit not found, creating it...');
+      baseUnit = await prisma.unit.create({
+        data: {
+          code: 'UNIT',
+          sunatCode: 'NIU',
+          name: 'Unidad',
+          displayName: 'UNIDAD (BIENES)',
+          symbol: 'UND',
+          kind: 'GOODS',
+          allowDecimals: false,
+          precision: 0,
+          isBase: true,
+          sortOrder: 1,
+        },
+      });
+      console.log('[seed-products] NIU unit created:', baseUnit.id);
     }
 
     // Crear categorías

@@ -1516,8 +1516,8 @@ export default function POSPage() {
           Admin Backups
         </a>
       )}
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto">          {/* Banner de turno */}
+      <main className="h-full flex flex-col overflow-hidden px-4 py-4">
+        <div className="w-full max-w-7xl mx-auto flex-1 min-h-0 flex flex-col">          {/* Banner de turno */}
           {!currentShift && (
             <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1564,9 +1564,9 @@ export default function POSPage() {
             </div>
           )}
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-[calc(100vh-200px)]">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
             {/* Columna Izquierda: Búsqueda y Productos */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-4 overflow-y-auto pb-2">
               {/* Search - Optimizado para táctil */}
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 {/* ✅ MÓDULO 17.1: Hints de atajos */}
@@ -1776,7 +1776,7 @@ export default function POSPage() {
             </div>
 
             {/* Columna Derecha: Carrito Desktop/Tablet */}
-            <div className="lg:col-span-1 h-full">
+            <div className="lg:col-span-1 h-full overflow-hidden flex flex-col">
               <CartPanel
                 cart={cart}
                 onUpdateQuantity={(id, delta) => {

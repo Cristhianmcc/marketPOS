@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Printer, Wifi, Usb, Check, X, AlertCircle, TestTube, Save, Bluetooth, RefreshCw } from 'lucide-react';
+import { Printer, Wifi, Usb, Check, X, AlertCircle, TestTube, Save, Bluetooth, RefreshCw, Bug } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 import { toast } from 'sonner';
 
@@ -16,10 +16,13 @@ interface EscposConfig {
   netTimeout: number;
   btPort: string | null;
   btBaud: number;
-  charsPerLine: 42 | 48;
+  charsPerLine: 32 | 42 | 48;
   autoCut: boolean;
   openCashDrawer: boolean;
   encoding: string;
+  ticketWebsite: string;
+  ticketSlogan: string;
+  ticketShowQr: boolean;
 }
 
 interface UsbDevice {
@@ -51,6 +54,7 @@ function useDesktopEscpos() {
     listUsb: () => Promise<UsbDevice[]>;
     listBt: () => Promise<BtPortInfo[]>;
     netPing: (host?: string, port?: number) => Promise<PingResult>;
+    diagnose: () => Promise<string>;
   } | null>(null);
 
   useEffect(() => {
@@ -80,6 +84,8 @@ export default function PrinterSettingsPage() {
   const [pinging, setPinging] = useState(false);
   const [pingResult, setPingResult] = useState<PingResult | null>(null);
   const [loadingUsb, setLoadingUsb] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnoseReport, setDiagnoseReport] = useState<string | null>(null);
 
   // Bluetooth state
   const [btPorts, setBtPorts] = useState<BtPortInfo[]>([]);
@@ -96,7 +102,10 @@ export default function PrinterSettingsPage() {
   const [showManual, setShowManual] = useState(false);
   const [autoCut, setAutoCut] = useState(true);
   const [openCashDrawer, setOpenCashDrawer] = useState(false);
-  const [charsPerLine, setCharsPerLine] = useState<42 | 48>(42);
+  const [charsPerLine, setCharsPerLine] = useState<32 | 42 | 48>(42);
+  const [ticketWebsite, setTicketWebsite] = useState('');
+  const [ticketSlogan, setTicketSlogan] = useState('Gracias por su compra!');
+  const [ticketShowQr, setTicketShowQr] = useState(false);
 
   const refreshUsbDevices = async () => {
     if (!api) return;
@@ -143,7 +152,10 @@ export default function PrinterSettingsPage() {
         setNetPort(cfg.netPort || 9100);
         setAutoCut(cfg.autoCut);
         setOpenCashDrawer(cfg.openCashDrawer);
-        setCharsPerLine(cfg.charsPerLine);
+        setCharsPerLine((cfg.charsPerLine as 32 | 42 | 48) || 42);
+        setTicketWebsite(cfg.ticketWebsite || '');
+        setTicketSlogan(cfg.ticketSlogan || 'Gracias por su compra!');
+        setTicketShowQr(cfg.ticketShowQr ?? false);
         
         if (cfg.vendorId && cfg.productId) {
           setSelectedUsb(`${cfg.vendorId}:${cfg.productId}`);
@@ -179,6 +191,9 @@ export default function PrinterSettingsPage() {
         autoCut,
         openCashDrawer,
         charsPerLine,
+        ticketWebsite,
+        ticketSlogan,
+        ticketShowQr,
       };
 
       if (mode === 'ESCPOS_NET') {
@@ -219,6 +234,20 @@ export default function PrinterSettingsPage() {
       toast.error('Error al imprimir');
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleDiagnose = async () => {
+    if (!api) return;
+    setDiagnosing(true);
+    setDiagnoseReport(null);
+    try {
+      const report = await api.diagnose();
+      setDiagnoseReport(report);
+    } catch (err) {
+      setDiagnoseReport(`Error al ejecutar diagnóstico: ${err}`);
+    } finally {
+      setDiagnosing(false);
     }
   };
 
@@ -645,17 +674,70 @@ export default function PrinterSettingsPage() {
               />
             </label>
 
-            <div className="flex items-center justify-between">
-              <span>Ancho de papel</span>
-              <select
-                value={charsPerLine}
-                onChange={(e) => setCharsPerLine(Number(e.target.value) as 42 | 48)}
-                className="px-3 py-2 border rounded-lg"
-              >
-                <option value={42}>58mm (42 chars)</option>
-                <option value={48}>80mm (48 chars)</option>
-              </select>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span>Ancho de papel</span>
+                <select
+                  value={charsPerLine}
+                  onChange={(e) => setCharsPerLine(Number(e.target.value) as 32 | 42 | 48)}
+                  className="px-3 py-2 border rounded-lg"
+                >
+                  <option value={32}>58mm — Papel estrecho (32 col.)</option>
+                  <option value={42}>80mm — Papel ancho, Font A (42 col.)</option>
+                  <option value={48}>80mm — Papel ancho, Font B (48 col.)</option>
+                </select>
+              </div>
+              <p className="text-xs text-gray-500">
+                Epson TM-T20II en 80mm usa <strong>Font A = 42 columnas</strong>. Si el precio sale en línea separada, selecciona 42.
+              </p>
             </div>
+          </div>
+        </div>
+
+        {/* Ticket Customization */}
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h2 className="font-semibold text-lg">Personalización del Ticket</h2>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sitio web / URL
+              </label>
+              <input
+                type="text"
+                value={ticketWebsite}
+                onChange={(e) => setTicketWebsite(e.target.value)}
+                placeholder="www.mitienda.com"
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+              <p className="text-xs text-gray-500 mt-1">Se imprime al final del ticket. Si activas el QR, también genera un QR con esta URL.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mensaje de despedida / slogan
+              </label>
+              <input
+                type="text"
+                value={ticketSlogan}
+                onChange={(e) => setTicketSlogan(e.target.value)}
+                placeholder="Gracias por su compra!"
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+            </div>
+
+            <label className="flex items-center justify-between">
+              <div>
+                <span className="font-medium">Imprimir código QR</span>
+                <p className="text-xs text-gray-500">Genera un QR con la URL del sitio web al final del ticket</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={ticketShowQr}
+                onChange={(e) => setTicketShowQr(e.target.checked)}
+                className="w-5 h-5 text-blue-600 rounded"
+              />
+            </label>
           </div>
         </div>
 
@@ -686,7 +768,43 @@ export default function PrinterSettingsPage() {
             )}
             Imprimir Prueba
           </button>
+
+          {mode === 'ESCPOS_USB' && isDesktop && (
+            <button
+              onClick={handleDiagnose}
+              disabled={diagnosing}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 font-medium"
+              title="Muestra qué impresoras ve Windows y por qué falla la conexión"
+            >
+              {diagnosing ? <span className="animate-spin">⏳</span> : <Bug className="w-5 h-5" />}
+              Diagnóstico
+            </button>
+          )}
         </div>
+
+        {/* Diagnose Report Modal */}
+        {diagnoseReport && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDiagnoseReport(null)}>
+            <div
+              className="bg-gray-900 text-green-300 rounded-xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[80vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                  <Bug className="w-5 h-5 text-orange-400" /> Diagnóstico USB
+                </h3>
+                <button onClick={() => setDiagnoseReport(null)} className="text-gray-400 hover:text-white text-xl leading-none">×</button>
+              </div>
+              <pre className="overflow-auto text-xs font-mono whitespace-pre-wrap flex-1 leading-relaxed">{diagnoseReport}</pre>
+              <button
+                onClick={() => { navigator.clipboard.writeText(diagnoseReport); toast.success('Copiado al portapapeles'); }}
+                className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm self-end"
+              >
+                Copiar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </AuthLayout>
   );

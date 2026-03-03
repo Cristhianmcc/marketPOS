@@ -496,6 +496,8 @@ model StoreSettings {
 
   // Configuración de ticket
   ticketFooter      String? @map("ticket_footer") @db.Text
+  ticketWebsite     String? @map("ticket_website") @db.VarChar(255)
+  ticketLogo        String? @map("ticket_logo") @db.VarChar(500)       // URL de logo para el ticket
   ticketHeaderLine1 String? @map("ticket_header_line1") @db.VarChar(100) // ej: "Bodega X"
   ticketHeaderLine2 String? @map("ticket_header_line2") @db.VarChar(100) // ej: "RUC: ..."
   taxRate           Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)

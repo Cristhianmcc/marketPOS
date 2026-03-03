@@ -119,6 +119,8 @@ interface DesktopAPI {
     printSale: (saleId: string) => Promise<EscposPrintResult>;
     // D6.1-NET: Network-specific
     netPing: (host?: string, port?: number) => Promise<PingResult>;
+    // Diagnóstico
+    diagnose: () => Promise<string>;
   };
 
   // Raster Print (D6.2)
@@ -128,6 +130,11 @@ interface DesktopAPI {
     testPrint: () => Promise<EscposPrintResult>;
     printSale: (saleId: string) => Promise<EscposPrintResult>;
     validateConfig: () => Promise<string | null>;
+  };
+
+  // License (D9)
+  license: {
+    check: () => Promise<unknown>;
   };
 
   // PostgreSQL Management (D7.2)
@@ -640,6 +647,8 @@ const desktopAPI: DesktopAPI = {
     // D6.1-NET: Network-specific
     netPing: (host?: string, port?: number) => 
       ipcRenderer.invoke('escpos:net-ping', host, port),
+    diagnose: () =>
+      ipcRenderer.invoke('escpos:diagnose'),
   },
 
   // Raster Print (D6.2)
@@ -654,6 +663,12 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke('raster:print-sale', saleId),
     validateConfig: () => 
       ipcRenderer.invoke('raster:validate-config'),
+  },
+
+  // License (D9)
+  license: {
+    check: () =>
+      ipcRenderer.invoke('license:check'),
   },
 
   // PostgreSQL Management (D7.2)

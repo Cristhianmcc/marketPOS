@@ -325,6 +325,52 @@ export class MigrationRunner {
   }
 
   /**
+   * Apply SQL patches for columns that may be missing from older installs.
+   * Uses ALTER TABLE ... ADD COLUMN IF NOT EXISTS — safe to run multiple times.
+   */
+  private async runSchemaPatch(databaseUrl: string): Promise<void> {
+    const psqlPath = this.findPsqlPath();
+    if (!psqlPath) {
+      console.warn('[MigrationRunner] psql not found, skipping schema patch');
+      return;
+    }
+
+    const conn = this.parseConnectionUrl(databaseUrl);
+    const psqlBase = [
+      '-h', conn.host,
+      '-p', conn.port,
+      '-U', conn.user,
+      '-d', conn.database,
+      '-v', 'ON_ERROR_STOP=0',
+    ];
+
+    // List of idempotent column patches — add new ones here as needed
+    const patches: string[] = [
+      // ticket_website added after initial release
+      `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ticket_website VARCHAR(255);`,
+      // ticket_logo added for custom logo on receipt
+      `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ticket_logo VARCHAR(500);`,
+    ];
+
+    const sql = patches.join('\n');
+    const tmpSql = path.join(os.tmpdir(), `schema_patch_${Date.now()}.sql`);
+
+    try {
+      fs.writeFileSync(tmpSql, sql, 'utf-8');
+      execFileSync(psqlPath, [...psqlBase, '-f', tmpSql], {
+        env: { ...process.env, PGPASSWORD: conn.password },
+        timeout: 15_000,
+        stdio: 'pipe',
+      });
+      console.log('[MigrationRunner] Schema patch applied successfully');
+    } catch (e) {
+      console.error('[MigrationRunner] Schema patch error (non-fatal):', e);
+    } finally {
+      try { fs.unlinkSync(tmpSql); } catch { /* ignore */ }
+    }
+  }
+
+  /**
    * Run prisma migrate deploy
    * This applies all pending migrations that haven't been applied yet
    */
@@ -334,6 +380,9 @@ export class MigrationRunner {
     try {
       const schemaPath = this.getPrismaSchemaPath();
       const databaseUrl = this.getDatabaseUrl();
+
+      // Apply SQL patches for columns missing in older installs
+      await this.runSchemaPatch(databaseUrl);
       
       console.log(`[MigrationRunner] Schema: ${schemaPath}`);
       console.log(`[MigrationRunner] Database: ${databaseUrl.replace(/:[^:@]+@/, ':****@')}`);

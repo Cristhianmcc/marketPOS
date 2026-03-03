@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
-import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag } from 'lucide-react';
+import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag, Download, Upload } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
-import { EditPriceModal } from '@/components/inventory/EditPriceModal';
+import { EditProductModal } from '@/components/inventory/EditProductModal';
 import { StockMovementModal } from '@/components/inventory/StockMovementModal';
 import { ProductConversionsModal } from '@/components/inventory/ProductConversionsModal';
 import { ProductSellUnitPricesModal } from '@/components/inventory/ProductSellUnitPricesModal';
@@ -219,10 +219,19 @@ export default function InventoryPage() {
                 </button>
                 <button
                   onClick={() => router.push('/inventory/import')}
-                  className="h-10 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="h-10 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
                 >
+                  <Upload className="w-4 h-4" />
                   Importar CSV
                 </button>
+                <a
+                  href="/api/reports/export/inventory"
+                  download
+                  className="h-10 px-4 border border-blue-300 bg-blue-50 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Exportar CSV
+                </a>
                 <button
                   onClick={() => setCreateModalOpen(true)}
                   className="h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] transition-colors flex items-center gap-2"
@@ -438,7 +447,7 @@ export default function InventoryPage() {
                                 <button
                                   onClick={() => setEditPriceModal({ open: true, storeProduct: sp })}
                                   className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                                  title="Editar precio"
+                                  title="Editar producto"
                                 >
                                   <Edit className="w-4 h-4 text-gray-600" />
                                 </button>
@@ -515,11 +524,11 @@ export default function InventoryPage() {
       />
 
       {editPriceModal.open && editPriceModal.storeProduct && (
-        <EditPriceModal
+        <EditProductModal
           isOpen={editPriceModal.open}
           onClose={() => setEditPriceModal({ open: false })}
           onSuccess={() => {
-            toast.success('Precio actualizado');
+            toast.success('Producto actualizado');
             loadProducts();
           }}
           storeProduct={editPriceModal.storeProduct}

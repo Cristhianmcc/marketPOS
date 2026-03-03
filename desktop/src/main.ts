@@ -6,7 +6,7 @@
  * de vida de la aplicación desktop.
  */
 
-import { app, BrowserWindow, shell, session, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, shell, session, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { startLocalServer, LocalServer } from './server';
@@ -44,6 +44,8 @@ import {
 } from './runtime/postgres';
 // D8 - Cloud Backup Sync
 import { initCloudBackupSync, getCloudBackupSync } from './sync';
+// D9 - License Checker
+import { checkLicense, LicenseState } from './licenseChecker';
 
 // ============================================================================
 // CONSTANTES Y CONFIGURACIÓN
@@ -53,6 +55,29 @@ import { initCloudBackupSync, getCloudBackupSync } from './sync';
 const isPgDaemonMode = process.argv.includes('--pg-daemon');
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+// ============================================================================
+// SINGLE INSTANCE LOCK
+// Garantiza que solo haya una instancia corriendo.
+// Si el usuario hace doble-click en el icono mientras ya está abierta,
+// la ventana existente se trae al frente inmediatamente.
+// ============================================================================
+if (!isPgDaemonMode) {
+  const gotLock = app.requestSingleInstanceLock();
+  if (!gotLock) {
+    // Ya hay una instancia corriendo — salir inmediatamente
+    app.quit();
+    process.exit(0);
+  }
+  // Segunda instancia detectada: mostrar la ventana existente
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
 
 // En desarrollo: conectar al servidor de desarrollo existente
 // En producción: iniciar servidor standalone local
@@ -145,6 +170,75 @@ function setupSecurityPolicies(): void {
 // ============================================================================
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let forceQuit = false; // true cuando el usuario elige "Salir" desde el tray
+
+/**
+ * Crea el ícono en la bandeja del sistema (System Tray).
+ * Al cerrar la ventana principal, la app se minimiza aquí.
+ */
+function createTray(): void {
+  const iconPath = path.join(RESOURCES_PATH, 'resources', 'icon.ico');
+  let trayIcon: Electron.NativeImage;
+  try {
+    trayIcon = nativeImage.createFromPath(iconPath);
+    if (trayIcon.isEmpty()) throw new Error('empty icon');
+  } catch {
+    trayIcon = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(trayIcon);
+  tray.setToolTip('Monterrial POS');
+
+  const buildMenu = () => Menu.buildFromTemplate([
+    {
+      label: 'Abrir Monterrial POS',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        } else {
+          createMainWindow();
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Iniciar con Windows',
+      type: 'checkbox',
+      checked: app.getLoginItemSettings().openAtLogin,
+      click: (menuItem) => {
+        app.setLoginItemSettings({
+          openAtLogin: menuItem.checked,
+          openAsHidden: true,
+          path: process.execPath,
+          args: ['--hidden'],
+        });
+        tray?.setContextMenu(buildMenu());
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Salir',
+      click: () => {
+        forceQuit = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(buildMenu());
+
+  // Doble click en el tray: mostrar ventana
+  tray.on('double-click', () => {
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createMainWindow();
+    }
+  });
+}
 
 /**
  * Crea la ventana principal de la aplicación con configuración de seguridad.
@@ -155,7 +249,7 @@ function createMainWindow(): void {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
-    icon: path.join(RESOURCES_PATH, 'resources', 'icon.png'),
+    icon: path.join(RESOURCES_PATH, 'resources', 'icon.ico'),
     show: false, // No mostrar hasta que esté lista
     
     webPreferences: {
@@ -179,9 +273,11 @@ function createMainWindow(): void {
     backgroundColor: '#ffffff',
   });
 
-  // Mostrar ventana cuando esté lista para evitar flash blanco
+  // Mostrar ventana cuando esté lista (excepto si arrancó minimizado al inicio de Windows)
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
+    if (!process.argv.includes('--hidden')) {
+      mainWindow?.show();
+    }
     
     // Configurar referencias de ventana para D5 modules
     const onlineMonitor = getOnlineMonitor();
@@ -203,7 +299,14 @@ function createMainWindow(): void {
   // Cargar la aplicación
   loadApplication();
 
-  // Cleanup al cerrar
+  // Interceptar el cierre: ocultar a la bandeja en vez de destruir
+  mainWindow.on('close', (event) => {
+    if (!forceQuit) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -231,8 +334,13 @@ function loadApplication(): void {
         console.log(`[App] Waiting for server... (${retries}/${maxRetries})`);
         setTimeout(tryConnect, 1000);
       } else {
-        console.error('[App] Could not connect to server');
-        mainWindow?.loadFile(path.join(__dirname, '..', 'resources', 'error.html'));
+        console.error('[App] Could not connect to server after retries');
+        const errQuery = encodeURIComponent('Tiempo de espera agotado');
+        const urlQuery = encodeURIComponent(serverUrl);
+        mainWindow?.loadFile(
+          path.join(__dirname, '..', 'resources', 'error.html'),
+          { query: { error: errQuery, url: urlQuery } }
+        );
       }
     });
   };
@@ -249,6 +357,44 @@ function loadApplication(): void {
 /**
  * Registra handlers IPC para funcionalidad de backups.
  */
+// ============================================================================
+// D9: LICENSE IPC HANDLERS
+// ============================================================================
+
+// URL del servidor local (se actualiza cuando el servidor arranca)
+let _licenseServerUrl = 'http://localhost:3001';
+export function setLicenseServerUrl(url: string) { _licenseServerUrl = url; }
+
+function setupLicenseIpcHandlers(): void {
+  // Verificar licencia (híbrido: cloud → caché → local BD)
+  ipcMain.handle('license:check', async () => {
+    try {
+      // Obtener storeId desde la BD local
+      const res = await fetch(`${_licenseServerUrl}/api/desktop/license`, {
+        headers: { 'x-desktop-app': 'true' },
+        signal: AbortSignal.timeout(5_000),
+      }).catch(() => null);
+
+      if (!res?.ok) {
+        return { canOperate: true, status: 'NO_SUBSCRIPTION', source: 'no_config' } as LicenseState;
+      }
+
+      const localInfo = await res.json() as { storeId?: string };
+      const storeId = localInfo?.storeId;
+
+      if (!storeId) {
+        return { canOperate: true, status: 'NO_SUBSCRIPTION', source: 'no_config' } as LicenseState;
+      }
+
+      const state = await checkLicense(storeId, _licenseServerUrl);
+      return state;
+    } catch (err) {
+      console.error('[License] Error en license:check:', err);
+      return { canOperate: true, status: 'NO_SUBSCRIPTION', source: 'no_config' } as LicenseState;
+    }
+  });
+}
+
 function setupBackupIpcHandlers(): void {
   // Crear backup
   ipcMain.handle('backup:create', async (_event, storeInfo: StoreInfo, trigger: 'manual' | 'shift-close' | 'scheduled') => {
@@ -595,6 +741,14 @@ function setupEscposIpcHandlers(): void {
     }
     return await manager.pingNetworkPrinter(host, port);
   });
+
+  // Diagnóstico de impresora USB — devuelve reporte de texto al renderer
+  ipcMain.handle('escpos:diagnose', async () => {
+    const manager = getEscposPrintManager();
+    const config = manager?.getConfig();
+    const { diagnosePrinters } = await import('./printing/escpos/usbPrinter');
+    return diagnosePrinters(config?.vendorId ?? undefined, config?.productId ?? undefined);
+  });
 }
 
 /**
@@ -672,6 +826,9 @@ function initRasterPrintManager(baseUrl: string): void {
     rasterOpenDrawer: false,
     rasterMarginTopPx: 0,
     rasterMarginLeftPx: 0,
+    ticketWebsite: '',
+    ticketSlogan: 'Gracias por su compra!',
+    ticketShowQr: false,
   };
   
   rasterPrintManager = new RasterPrintManager(rasterConfig, baseUrl);
@@ -837,6 +994,7 @@ setupSecurityPolicies();
 
 // Registrar handlers IPC
 setupBackupIpcHandlers();
+setupLicenseIpcHandlers();
 setupOnlineIpcHandlers();
 setupTaskQueueIpcHandlers();
 setupPrinterIpcHandlers();
@@ -965,8 +1123,9 @@ app.whenReady().then(async () => {
   if (!isDev) {
     try {
       console.log('[App] Starting local server...');
-      localServer = await startLocalServer(RESOURCES_PATH);
+      localServer = await startLocalServer(RESOURCES_PATH, app.isPackaged);
       serverUrl = localServer.url;
+      setLicenseServerUrl(serverUrl);
       console.log(`[App] Local server ready at: ${serverUrl}`);
       
       // Inicializar BackupScheduler
@@ -1010,10 +1169,22 @@ app.whenReady().then(async () => {
       initRasterPrintManager(serverUrl);
     } catch (error) {
       console.error('[App] Failed to start local server:', error);
-      // Mostrar error en la ventana
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errQuery = encodeURIComponent(errMsg);
+      const urlQuery = encodeURIComponent(serverUrl);
+      createMainWindow();
+      createTray();
+      setTimeout(() => {
+        mainWindow?.loadFile(
+          path.join(__dirname, '..', 'resources', 'error.html'),
+          { query: { error: errQuery, url: urlQuery } }
+        );
+      }, 500);
+      return;
     }
   } else {
     console.log(`[App] Using development server: ${serverUrl}`);
+    setLicenseServerUrl(serverUrl);
     
     // En desarrollo también inicializamos los módulos
     const scheduler = initBackupScheduler(serverUrl);
@@ -1057,6 +1228,29 @@ app.whenReady().then(async () => {
   }
   
   createMainWindow();
+
+  // Crear bandeja del sistema (solo en producción)
+  if (!isDev) {
+    createTray();
+
+    // Activar auto-inicio con Windows en primera instalación (solo producción)
+    const loginSettings = app.getLoginItemSettings();
+    if (!loginSettings.openAtLogin) {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        openAsHidden: true,
+        path: process.execPath,
+        args: ['--hidden'],
+      });
+      console.log('[App] Auto-start with Windows enabled');
+    }
+  }
+
+  // Si se abrió con --hidden (arranque automático), ocultar ventana hasta que user la abra
+  if (process.argv.includes('--hidden')) {
+    // ready-to-show se encargará de no mostrarla (ver createMainWindow)
+    console.log('[App] Started hidden (auto-start)');
+  }
   
   // Inicializar auto-updater después de crear ventana (D7)
   if (mainWindow && !isDev) {
@@ -1075,7 +1269,10 @@ app.whenReady().then(async () => {
 } // End of else block (not daemon mode)
 
 // Cerrar la app cuando todas las ventanas estén cerradas (excepto macOS)
+// Con el tray activo, esto solo ocurre cuando forceQuit = true
 app.on('window-all-closed', async () => {
+  if (!forceQuit && tray) return; // Minimizado a bandeja — no hacer nada
+
   // Detener auto-updater (D7)
   cleanupUpdater();
   

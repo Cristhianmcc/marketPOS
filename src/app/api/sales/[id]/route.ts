@@ -107,6 +107,12 @@ export async function GET(
             ruc: true,
             address: true,
             phone: true,
+            settings: {
+              select: {
+                ticketFooter: true,
+                ticketLogo: true,
+              },
+            },
           },
         },
         // Comprobante electrónico - solo el más reciente

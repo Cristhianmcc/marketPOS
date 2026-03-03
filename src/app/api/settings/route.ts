@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { storeName, storeRuc, storeAddress, storePhone, ticketFooter, taxRate } = body;
+    const { storeName, storeRuc, storeAddress, storePhone, ticketFooter, ticketLogo, taxRate } = body;
 
     // Actualizar Store y Settings en transacción
     const result = await prisma.$transaction(async (tx) => {
@@ -102,6 +102,7 @@ export async function PATCH(request: NextRequest) {
           where: { storeId: session.storeId },
           data: {
             ticketFooter: ticketFooter || null,
+            ticketLogo: ticketLogo || null,
             taxRate: taxRate !== undefined ? taxRate : 0,
           },
         });
@@ -110,6 +111,7 @@ export async function PATCH(request: NextRequest) {
           data: {
             storeId: session.storeId,
             ticketFooter: ticketFooter || null,
+            ticketLogo: ticketLogo || null,
             taxRate: taxRate !== undefined ? taxRate : 0,
           },
         });

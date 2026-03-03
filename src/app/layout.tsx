@@ -4,6 +4,7 @@ import './globals.css';
 import { OfflineBanner } from '@/components/pwa/OfflineBanner';
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
+import { LicenseBanner } from '@/components/license/LicenseBanner';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -50,6 +51,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ServiceWorkerRegistration />
           <OfflineBanner />
+          <LicenseBanner />
           {children}
         </ThemeProvider>
       </body>
