@@ -5,12 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monterrial POS - Error</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #1a1a2e;
@@ -20,84 +15,88 @@
       justify-content: center;
       color: white;
     }
-    
-    .container {
-      text-align: center;
-      padding: 2rem;
-      max-width: 500px;
-    }
-    
+    .container { text-align: center; padding: 2rem; max-width: 520px; }
     .icon {
-      width: 100px;
-      height: 100px;
+      width: 100px; height: 100px;
       background: #e74c3c;
       border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       margin: 0 auto 2rem;
     }
-    
-    .icon svg {
-      width: 50px;
-      height: 50px;
-      stroke: white;
-    }
-    
-    h1 {
-      font-size: 1.8rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-    
-    p {
-      font-size: 1rem;
-      color: #aaa;
-      margin-bottom: 2rem;
-      line-height: 1.6;
-    }
-    
-    .actions {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    
+    .icon svg { width: 50px; height: 50px; stroke: white; }
+    h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 1rem; }
+    p { font-size: 1rem; color: #aaa; margin-bottom: 2rem; line-height: 1.6; }
+    .actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.5rem; }
     button {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 500;
-      cursor: pointer;
+      padding: 0.75rem 1.5rem; border: none; border-radius: 8px;
+      font-size: 1rem; font-weight: 500; cursor: pointer;
       transition: transform 0.2s, opacity 0.2s;
     }
-    
-    button:hover {
-      transform: translateY(-2px);
-    }
-    
-    button:active {
-      transform: translateY(0);
-    }
-    
-    .btn-primary {
-      background: #667eea;
-      color: white;
-    }
-    
-    .btn-secondary {
-      background: #333;
-      color: white;
-    }
-    
+    button:hover { transform: translateY(-2px); }
+    button:active { transform: translateY(0); }
+    .btn-primary { background: #667eea; color: white; }
+    .btn-secondary { background: #333; color: white; }
     .technical {
-      margin-top: 2rem;
       padding: 1rem;
       background: rgba(255,255,255,0.05);
       border-radius: 8px;
       font-size: 0.85rem;
+      color: #888;
+      text-align: left;
+    }
+    .technical code {
+      display: block; margin-top: 0.5rem;
+      font-family: 'Consolas', monospace;
+      color: #e74c3c; word-break: break-all;
+    }
+    .steps { margin-top: 1.5rem; text-align: left; font-size: 0.88rem; color: #999; }
+    .steps li { margin: 0.4rem 0; padding-left: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </div>
+    <h1>No se pudo iniciar la aplicación</h1>
+    <p>El servidor local no respondió. Esto puede ocurrir la primera vez que se abre la aplicación (el sistema necesita unos minutos para inicializarse) o si otro proceso está usando el puerto.</p>
+    <div class="actions">
+      <button class="btn-primary" onclick="retryApp()">Reintentar</button>
+      <button class="btn-secondary" onclick="window.close()">Cerrar</button>
+    </div>
+    <ul class="steps">
+      <li>ℹ️ La primera ejecución puede tardar 2-3 minutos en inicializarse.</li>
+      <li>ℹ️ Si el problema persiste, reinicia la aplicación.</li>
+      <li>ℹ️ Si esto ocurre siempre, contacta a soporte.</li>
+    </ul>
+    <div class="technical" id="techInfo" style="margin-top:1.5rem">
+      <strong>Información técnica:</strong>
+      <code id="errorCode">Iniciando...</code>
+    </div>
+  </div>
+  <script>
+    // Leer el error real de los query params
+    const params = new URLSearchParams(window.location.search);
+    const errMsg = params.get('error') || 'El servidor no respondió';
+    const errUrl = params.get('url') || '';
+    document.getElementById('errorCode').textContent =
+      errUrl ? 'Error: ' + errMsg + ' (' + errUrl + ')' : 'Error: ' + errMsg;
+
+    function retryApp() {
+      // Notificar al proceso principal que reintente
+      if (window.electronAPI && window.electronAPI.reloadApp) {
+        window.electronAPI.reloadApp();
+      } else {
+        window.location.reload();
+      }
+    }
+  </script>
+</body>
+</html>
       color: #888;
       text-align: left;
     }

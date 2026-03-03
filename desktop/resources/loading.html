@@ -99,29 +99,37 @@
   <script>
     var steps = [
       "Inicializando sistema\u2026",
-      "Cargando inventario\u2026",
-      "Verificando impresora t\u00e9rmica\u2026",
-      "Sincronizando configuraci\u00f3n\u2026",
-      "Preparando entorno de venta\u2026"
+      "Iniciando base de datos\u2026",
+      "Preparando el servidor\u2026",
+      "Verificando configuraci\u00f3n\u2026",
+      "Preparando entorno de venta\u2026",
+      "Casi listo\u2026"
     ];
     var progress = 0, stepIdx = 0;
     var bar = document.getElementById("bar");
     var pctEl = document.getElementById("pct");
     var statusEl = document.getElementById("status-text");
+    var footer = document.querySelector(".footer");
+
+    // Aviso de primera ejecuci\u00f3n despu\u00e9s de 15 segundos
+    setTimeout(function() {
+      footer.textContent = "\u26a0\ufe0f Primera ejecuci\u00f3n: la base de datos puede tardar 2-3 minutos en iniciarse.";
+      footer.style.color = "rgba(191,164,99,0.9)";
+    }, 15000);
 
     setInterval(function() {
-      if (progress < 92) {
-        progress += Math.random() * 4;
-        var c = Math.min(100, Math.round(progress));
+      if (progress < 90) {
+        progress += Math.random() * 1.5;
+        var c = Math.min(90, Math.round(progress));
         bar.style.width = c + "%";
         pctEl.textContent = c + "%";
       }
-    }, 150);
+    }, 200);
 
     setInterval(function() {
       stepIdx = (stepIdx + 1) % steps.length;
       statusEl.textContent = steps[stepIdx];
-    }, 1200);
+    }, 2000);
   </script>
   
 </body>

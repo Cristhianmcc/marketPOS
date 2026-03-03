@@ -24,8 +24,13 @@ import { app } from 'electron';
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Se inyectan en build time o via env
-const CLOUD_URL      = process.env.CLOUD_URL || process.env.CATALOG_CLOUD_URL || '';
-const LICENSE_API_KEY = process.env.LICENSE_API_KEY     || '';
+// ⚠️ Funciones lazy: process.env se llena DESPUÉS de que server.ts carga .env
+function getCloudUrl(): string {
+  return process.env.CLOUD_URL || process.env.CATALOG_CLOUD_URL || '';
+}
+function getLicenseApiKey(): string {
+  return process.env.LICENSE_API_KEY || '';
+}
 const CACHE_TTL_MS   = 7  * 24 * 60 * 60 * 1000; // 7 días
 const GRACE_EXTRA_MS = 3  * 24 * 60 * 60 * 1000; // 3 días de gracia offline
 
@@ -114,12 +119,17 @@ function saveCache(storeId: string, state: LicenseState): void {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function verifyOnline(storeId: string): Promise<LicenseState | null> {
-  if (!CLOUD_URL || !LICENSE_API_KEY) return null;
+  const cloudUrl = getCloudUrl();
+  const apiKey = getLicenseApiKey();
+  if (!cloudUrl || !apiKey) {
+    console.log('[LicenseChecker] Sin CLOUD_URL o LICENSE_API_KEY en process.env — skip online');
+    return null;
+  }
 
   try {
-    const url = `${CLOUD_URL}/api/license/verify?storeId=${encodeURIComponent(storeId)}`;
+    const url = `${cloudUrl}/api/license/verify?storeId=${encodeURIComponent(storeId)}`;
     const res = await fetch(url, {
-      headers: { 'x-api-key': LICENSE_API_KEY },
+      headers: { 'x-api-key': apiKey },
       signal: AbortSignal.timeout(8_000),
     });
 
@@ -201,7 +211,7 @@ export async function checkLicense(storeId: string, serverUrl: string): Promise<
   console.log(`[LicenseChecker] Verificando licencia para storeId: ${storeId}`);
 
   // 1. Si no hay CLOUD_URL configurado → verificar solo en BD local
-  if (!CLOUD_URL || !LICENSE_API_KEY) {
+  if (!getCloudUrl() || !getLicenseApiKey()) {
     console.log('[LicenseChecker] Sin CLOUD_URL — usando BD local');
     const local = await verifyLocal(serverUrl);
     if (local) return local;

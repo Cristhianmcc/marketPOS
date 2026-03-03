@@ -128,16 +128,16 @@ class EscposPrintManager {
         ? generateTestPrint(this.config)
         : generateMinimalTest(this.config);
       
-      const success = await printAndClose(
+      const result = await printAndClose(
         this.config.vendorId,
         this.config.productId,
         data
       );
       
-      if (!success) {
+      if (!result.ok) {
         return { 
           success: false, 
-          error: 'No se pudo conectar con la impresora USB',
+          error: `USB: ${result.detail}`,
           fallbackToHtml: true 
         };
       }
@@ -284,16 +284,16 @@ class EscposPrintManager {
       const ticketBuffer = formatTicket(saleData, this.config);
       
       // Print
-      const success = await printAndClose(
+      const result = await printAndClose(
         this.config.vendorId,
         this.config.productId,
         ticketBuffer
       );
       
-      if (!success) {
+      if (!result.ok) {
         return { 
           success: false, 
-          error: 'No se pudo conectar con la impresora USB',
+          error: `USB: ${result.detail}`,
           fallbackToHtml: true 
         };
       }
@@ -510,6 +510,9 @@ class EscposPrintManager {
         ruc: sale.store?.ruc || undefined,
         address: sale.store?.address || undefined,
         phone: sale.store?.phone || undefined,
+        website: this.config.ticketWebsite || undefined,
+        slogan: this.config.ticketSlogan || undefined,
+        showQr: this.config.ticketShowQr || false,
       },
       saleNumber: sale.saleNumber || sale.id?.substring(0, 8)?.toUpperCase(),
       date,

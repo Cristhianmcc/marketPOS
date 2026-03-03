@@ -34,7 +34,7 @@ export interface EscposConfig {
   btPort: string | null;
   btBaud: number;
   // Common settings
-  charsPerLine: 42 | 48;
+  charsPerLine: 32 | 42 | 48;
   autoCut: boolean;
   openCashDrawer: boolean;
   encoding: 'CP437' | 'CP850' | 'CP858' | 'ISO8859_15';
@@ -46,6 +46,10 @@ export interface EscposConfig {
   rasterOpenDrawer: boolean;
   rasterMarginTopPx: number;
   rasterMarginLeftPx: number;
+  // Ticket appearance
+  ticketWebsite: string;
+  ticketSlogan: string;
+  ticketShowQr: boolean;
 }
 
 export const DEFAULT_ESCPOS_CONFIG: EscposConfig = {
@@ -69,6 +73,10 @@ export const DEFAULT_ESCPOS_CONFIG: EscposConfig = {
   rasterOpenDrawer: false,
   rasterMarginTopPx: 0,
   rasterMarginLeftPx: 0,
+  // Ticket appearance
+  ticketWebsite: '',
+  ticketSlogan: 'Gracias por su compra!',
+  ticketShowQr: false,
 };
 
 // ============== Print Data ==============
@@ -78,6 +86,9 @@ export interface PrintStoreInfo {
   ruc?: string;
   address?: string;
   phone?: string;
+  website?: string;
+  slogan?: string;
+  showQr?: boolean;
 }
 
 export interface PrintSaleItem {

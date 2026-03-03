@@ -399,6 +399,17 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   const envVars = loadEnvFile(envPath);
   console.log(`[LocalServer] Loaded ${Object.keys(envVars).length} env vars`);
   
+  // ⚠️ Copiar CLOUD_URL y LICENSE_API_KEY al proceso principal (Electron)
+  // para que licenseChecker.ts pueda usarlos al verificar licencia online
+  if (envVars['CLOUD_URL'] && !process.env.CLOUD_URL) {
+    process.env.CLOUD_URL = envVars['CLOUD_URL'];
+    console.log(`[LocalServer] Set process.env.CLOUD_URL = ${envVars['CLOUD_URL']}`);
+  }
+  if (envVars['LICENSE_API_KEY'] && !process.env.LICENSE_API_KEY) {
+    process.env.LICENSE_API_KEY = envVars['LICENSE_API_KEY'];
+    console.log(`[LocalServer] Set process.env.LICENSE_API_KEY = ***`);
+  }
+  
   // ⚠️ IMPORTANTE: DATABASE_URL de process.env tiene prioridad sobre .env
   // porque ensurePostgres() lo configura dinámicamente con el puerto correcto
   const databaseUrl = process.env.DATABASE_URL;

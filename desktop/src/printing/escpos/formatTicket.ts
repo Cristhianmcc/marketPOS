@@ -1,366 +1,274 @@
-/**
- * D6-USB - ESC/POS Ticket Formatter
- * Generates ESC/POS commands for thermal ticket printing
+﻿/**
+ * ESC/POS Ticket Formatter - Layout profesional 80mm / 58mm
+ * Diseño compacto: DESCRIPCION al lado izquierdo, PRECIO al extremo derecho.
  */
 
 import * as iconv from 'iconv-lite';
 import { PrintSaleData, EscposConfig, PrintSaleItem, PrintDiscount } from './types';
 
-// ============== ESC/POS Commands ==============
-
+// ── Comandos ESC/POS ─────────────────────────────────────────────────────────
 const ESC = 0x1B;
-const GS = 0x1D;
-const LF = 0x0A;
+const GS  = 0x1D;
+const LF  = 0x0A;
 
 const CMD = {
-  // Initialization
-  INIT: Buffer.from([ESC, 0x40]),                    // ESC @
-  
-  // Text formatting
-  ALIGN_LEFT: Buffer.from([ESC, 0x61, 0x00]),        // ESC a 0
-  ALIGN_CENTER: Buffer.from([ESC, 0x61, 0x01]),      // ESC a 1
-  ALIGN_RIGHT: Buffer.from([ESC, 0x61, 0x02]),       // ESC a 2
-  
-  BOLD_ON: Buffer.from([ESC, 0x45, 0x01]),           // ESC E 1
-  BOLD_OFF: Buffer.from([ESC, 0x45, 0x00]),          // ESC E 0
-  
-  DOUBLE_WIDTH: Buffer.from([GS, 0x21, 0x10]),       // GS ! 0x10
-  DOUBLE_HEIGHT: Buffer.from([GS, 0x21, 0x01]),      // GS ! 0x01
-  DOUBLE_SIZE: Buffer.from([GS, 0x21, 0x11]),        // GS ! 0x11
-  NORMAL_SIZE: Buffer.from([GS, 0x21, 0x00]),        // GS ! 0x00
-  
-  // Paper
-  FEED_LINE: Buffer.from([LF]),
-  FEED_LINES: (n: number) => Buffer.from([ESC, 0x64, n]), // ESC d n
-  
-  // Cut
-  CUT_PARTIAL: Buffer.from([GS, 0x56, 0x01]),        // GS V 1
-  CUT_FULL: Buffer.from([GS, 0x56, 0x00]),           // GS V 0
-  
-  // Cash drawer
-  OPEN_DRAWER: Buffer.from([ESC, 0x70, 0x00, 0x19, 0xFA]), // ESC p 0 25 250
-  
-  // Underline
-  UNDERLINE_ON: Buffer.from([ESC, 0x2D, 0x01]),      // ESC - 1
-  UNDERLINE_OFF: Buffer.from([ESC, 0x2D, 0x00]),     // ESC - 0
+  INIT:         Buffer.from([ESC, 0x40]),
+  ALIGN_LEFT:   Buffer.from([ESC, 0x61, 0x00]),
+  ALIGN_CENTER: Buffer.from([ESC, 0x61, 0x01]),
+  BOLD_ON:      Buffer.from([ESC, 0x45, 0x01]),
+  BOLD_OFF:     Buffer.from([ESC, 0x45, 0x00]),
+  FEED_LINE:    Buffer.from([LF]),
+  FEED_LINES:   (n: number) => Buffer.from([ESC, 0x64, n]),
+  CUT_PARTIAL:  Buffer.from([GS,  0x56, 0x01]),
+  CUT_FULL:     Buffer.from([GS,  0x56, 0x00]),
+  OPEN_DRAWER:  Buffer.from([ESC, 0x70, 0x00, 0x19, 0xFA]),
 };
 
-// ============== Formatter Class ==============
+// Precio siempre en los últimos PRICE_W caracteres de cada línea.
+// "S/999.99" = 8 chars → PRICE_W = 8
+const PRICE_W = 8;
 
+// ── Clase Formateadora ────────────────────────────────────────────────────────
 export class TicketFormatter {
   private buffer: Buffer[] = [];
+  private cols:   number;
+  private descW:  number;          // ancho disponible para descripción
   private config: EscposConfig;
-  private cols: number;
-  
+
   constructor(config: EscposConfig) {
     this.config = config;
-    this.cols = config.charsPerLine;
+    this.cols   = config.charsPerLine;
+    this.descW  = this.cols - PRICE_W;
   }
-  
-  // ============== Buffer Management ==============
-  
-  private push(...buffers: Buffer[]): void {
-    this.buffer.push(...buffers);
-  }
-  
-  private text(str: string): void {
-    const encoded = iconv.encode(str, this.config.encoding);
-    this.buffer.push(encoded);
-  }
-  
-  private line(str: string = ''): void {
-    this.text(str);
-    this.push(CMD.FEED_LINE);
-  }
-  
-  getBuffer(): Buffer {
-    return Buffer.concat(this.buffer);
-  }
-  
-  // ============== Formatting Helpers ==============
-  
+
+  // ── Buffer ───────────────────────────────────────────────────────────────────
+
+  private push(...bufs: Buffer[]): void { this.buffer.push(...bufs); }
+  private text(s: string): void { this.buffer.push(iconv.encode(s, this.config.encoding)); }
+  private line(s = ''): void    { this.text(s); this.push(CMD.FEED_LINE); }
+  getBuffer(): Buffer { return Buffer.concat(this.buffer); }
+
+  // ── Helpers de Formato ────────────────────────────────────────────────────────
+
+  private sep(c: string): string { return c.repeat(this.cols); }
+  private dash():          string { return this.sep('-'); }
+  private dots():          string { return this.sep('.'); }
+  private equals():        string { return this.sep('='); }
+
   /**
-   * Center text within column width
+   * Texto izquierda + texto derecha en la misma línea (total = cols chars).
+   * El precio siempre queda pegado al extremo derecho.
    */
-  center(str: string): string {
-    const trimmed = str.substring(0, this.cols);
-    const padding = Math.floor((this.cols - trimmed.length) / 2);
-    return ' '.repeat(padding) + trimmed;
+  private lr(left: string, right: string): string {
+    // El precio ocupa exactamente PRICE_W chars sin espacios en blanco extra
+    const r   = right.slice(0, PRICE_W).padStart(PRICE_W);
+    const l   = left.slice(0, this.cols - PRICE_W);
+    const pad = Math.max(0, this.cols - l.length - r.length);
+    return l + ' '.repeat(pad) + r;
   }
-  
-  /**
-   * Right-align text
-   */
-  right(str: string): string {
-    const trimmed = str.substring(0, this.cols);
-    return str.padStart(this.cols);
+
+  /** Dinero formateado: "S/21.70" relleno a PRICE_W chars hacia la derecha */
+  private money(n: number): string {
+    return `S/${n.toFixed(2)}`.padStart(PRICE_W);
   }
-  
-  /**
-   * Left-right alignment (e.g., "ITEM          $10.00")
-   */
-  leftRight(left: string, right: string): string {
-    const maxLeft = this.cols - right.length - 1;
-    const leftTrimmed = left.substring(0, maxLeft);
-    const spaces = this.cols - leftTrimmed.length - right.length;
-    return leftTrimmed + ' '.repeat(Math.max(1, spaces)) + right;
+
+  /** Centrar texto en cols caracteres */
+  private center(s: string): string {
+    const t   = s.slice(0, this.cols);
+    const pad = Math.floor((this.cols - t.length) / 2);
+    return ' '.repeat(pad) + t;
   }
-  
-  /**
-   * Three-column alignment (QTY, NAME, PRICE)
-   */
-  threeCol(left: string, middle: string, right: string): string {
-    const leftWidth = 4;  // "99x "
-    const rightWidth = 8; // "9999.99"
-    const middleWidth = this.cols - leftWidth - rightWidth - 2;
-    
-    const leftPart = left.padEnd(leftWidth);
-    const rightPart = right.padStart(rightWidth);
-    const middlePart = middle.substring(0, middleWidth).padEnd(middleWidth);
-    
-    return leftPart + middlePart + rightPart;
-  }
-  
-  /**
-   * Wrap long text to multiple lines
-   */
-  wrap(str: string, indent: number = 0): string[] {
-    const lines: string[] = [];
-    const maxWidth = this.cols - indent;
-    const prefix = ' '.repeat(indent);
-    
-    let remaining = str;
-    while (remaining.length > 0) {
-      if (remaining.length <= maxWidth) {
-        lines.push(prefix + remaining);
-        break;
-      }
-      
-      // Find last space within maxWidth
-      let breakPoint = remaining.lastIndexOf(' ', maxWidth);
-      if (breakPoint <= 0) breakPoint = maxWidth;
-      
-      lines.push(prefix + remaining.substring(0, breakPoint).trim());
-      remaining = remaining.substring(breakPoint).trim();
+
+  /** Word-wrap a (cols - indent) caracteres */
+  private wrap(s: string, indent = 0): string[] {
+    const maxW = this.cols - indent;
+    const pre  = ' '.repeat(indent);
+    const out: string[] = [];
+    let rem = s.trim();
+    while (rem.length > 0) {
+      if (rem.length <= maxW) { out.push(pre + rem); break; }
+      let bp = rem.lastIndexOf(' ', maxW);
+      if (bp <= 0) bp = maxW;
+      out.push(pre + rem.slice(0, bp).trimEnd());
+      rem = rem.slice(bp).trimStart();
     }
-    
-    return lines;
+    return out;
   }
-  
-  /**
-   * Divider line
-   */
-  divider(char: string = '-'): string {
-    return char.repeat(this.cols);
+
+  /** QR Code ESC/POS (GS ( k) — Epson Model 2 */
+  private qrCode(data: string, sz = 5): void {
+    const bytes = Buffer.from(data, 'utf8');
+    const len   = bytes.length + 3;
+    const pL    = len & 0xFF;
+    const pH    = (len >> 8) & 0xFF;
+    const s     = Math.max(1, Math.min(16, sz));
+    this.push(Buffer.from([GS, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00])); // Model 2
+    this.push(Buffer.from([GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, s]));           // Tamaño
+    this.push(Buffer.from([GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x33]));        // ECC H
+    this.push(Buffer.from([GS, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30]));            // Datos
+    this.push(bytes);
+    this.push(Buffer.from([GS, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]));        // Imprimir
   }
-  
-  /**
-   * Double divider
-   */
-  doubleDivider(): string {
-    return '='.repeat(this.cols);
-  }
-  
-  // ============== Ticket Building ==============
-  
-  /**
-   * Generate complete ticket from sale data
-   */
+
+  // ── Entrada principal ────────────────────────────────────────────────────────
+
   formatSale(data: PrintSaleData): Buffer {
     this.buffer = [];
-    
-    // Initialize printer
     this.push(CMD.INIT);
-    
-    // Header
     this.printHeader(data);
-    
-    // Sale info
     this.printSaleInfo(data);
-    
-    // Items
     this.printItems(data.items);
-    
-    // Discounts
-    if (data.discounts && data.discounts.length > 0) {
-      this.printDiscounts(data.discounts);
-    }
-    
-    // Totals
+    if (data.discounts?.length) this.printDiscounts(data.discounts);
     this.printTotals(data);
-    
-    // Payment
     this.printPayment(data);
-    
-    // Footer
     this.printFooter(data);
-    
-    // Feed and cut
     this.push(CMD.FEED_LINES(4));
-    
-    if (this.config.autoCut) {
-      this.push(CMD.CUT_PARTIAL);
-    }
-    
-    if (this.config.openCashDrawer) {
-      this.push(CMD.OPEN_DRAWER);
-    }
-    
+    if (this.config.autoCut)        this.push(CMD.CUT_PARTIAL);
+    if (this.config.openCashDrawer) this.push(CMD.OPEN_DRAWER);
     return this.getBuffer();
   }
-  
+
+  // ── Cabecera (Nombre tienda, RUC, dirección, teléfono) ──────────────────────
+
   private printHeader(data: PrintSaleData): void {
     const { store } = data;
-    
-    this.push(CMD.ALIGN_CENTER);
-    this.push(CMD.BOLD_ON);
-    this.push(CMD.DOUBLE_WIDTH);
-    this.line(store.name);
-    this.push(CMD.NORMAL_SIZE);
+    this.push(CMD.ALIGN_CENTER, CMD.BOLD_ON);
+    this.line(store.name.toUpperCase());
     this.push(CMD.BOLD_OFF);
-    
-    if (store.ruc) {
-      this.line(`RUC: ${store.ruc}`);
-    }
-    if (store.address) {
-      this.wrap(store.address).forEach(l => this.line(l));
-    }
-    if (store.phone) {
-      this.line(`Tel: ${store.phone}`);
-    }
-    
+    if (store.ruc)     this.line(`RUC: ${store.ruc}`);
+    if (store.address) this.wrap(store.address).forEach(l => this.line(l));
+    if (store.phone)   this.line(`Tel: ${store.phone}`);
     this.push(CMD.ALIGN_LEFT);
-    this.line(this.divider());
+    this.line(this.dash());
   }
-  
+
+  // ── Info de la venta (número ticket, fecha, cajero) ─────────────────────────
+
   private printSaleInfo(data: PrintSaleData): void {
-    this.line(this.leftRight(`TICKET: ${data.saleNumber}`, data.date));
-    this.line(this.leftRight('', data.time));
-    if (data.cashierName) {
-      this.line(`Cajero: ${data.cashierName}`);
+    const num      = String(data.saleNumber).padStart(5, '0');
+    const datetime = `${data.date} ${data.time}`.trim();
+    this.line(this.lr(`N° ${num}`, datetime.slice(-PRICE_W)));
+    if (datetime.length > PRICE_W) {
+      this.line(this.lr('', datetime));
     }
-    this.line(this.divider());
+    this.line(this.dash());
   }
-  
+
+  // ── Productos ────────────────────────────────────────────────────────────────
+
   private printItems(items: PrintSaleItem[]): void {
     this.push(CMD.BOLD_ON);
-    this.line(this.threeCol('CANT', 'DESCRIPCION', 'IMPORTE'));
+    this.line(this.lr('DESCRIPCION', '  PRECIO'));
     this.push(CMD.BOLD_OFF);
-    this.line(this.divider('-'));
-    
+    this.line(this.dots());
+
     for (const item of items) {
-      const qty = `${item.quantity}${item.unit ? item.unit.charAt(0) : 'x'}`;
-      const price = this.formatMoney(item.subtotal);
-      
-      // First line: qty + name (truncated) + subtotal
-      this.line(this.threeCol(qty, item.name, price));
-      
-      // If name is too long, continue on next line
-      const middleWidth = this.cols - 4 - 8 - 2;
-      if (item.name.length > middleWidth) {
-        const remaining = item.name.substring(middleWidth);
-        this.wrap(remaining, 4).forEach(l => this.line(l));
+      const price = this.money(item.subtotal);
+
+      // Si el nombre cabe en descW-1 → todo en una línea
+      if (item.name.length <= this.descW - 1) {
+        this.line(this.lr(item.name, price));
+      } else {
+        // Nombre largo: partir en líneas, el precio va en la última
+        const lines = this.wrap(item.name);
+        for (let i = 0; i < lines.length - 1; i++) {
+          this.line(lines[i]);
+        }
+        this.line(this.lr(lines[lines.length - 1], price));
       }
-      
-      // Show unit price if different from subtotal
-      if (item.quantity > 1) {
-        const unitPrice = `  @${this.formatMoney(item.unitPrice)}`;
-        this.line(unitPrice);
+
+      // Cantidad y precio unitario (solo si qty ≠ 1)
+      if (item.quantity !== 1) {
+        const qtyU = item.unit ? item.unit.charAt(0).toUpperCase() : 'u';
+        this.line(`  ${item.quantity}${qtyU} x S/${item.unitPrice.toFixed(2)}`);
       }
-      
-      // Item discount
+
+      // Descuento por item
       if (item.discount && item.discount > 0) {
-        this.line(`  Desc: -${this.formatMoney(item.discount)}`);
+        this.line(this.lr('  Descuento:', `-S/${item.discount.toFixed(2)}`));
       }
     }
   }
-  
+
+  // ── Descuentos a nivel de orden ──────────────────────────────────────────────
+
   private printDiscounts(discounts: PrintDiscount[]): void {
-    this.line(this.divider('-'));
-    
-    for (const disc of discounts) {
-      const desc = disc.type === 'coupon' 
-        ? `CUPON: ${disc.description}`
-        : disc.description;
-      this.line(this.leftRight(desc, `-${this.formatMoney(disc.amount)}`));
+    this.line(this.dots());
+    for (const d of discounts) {
+      const label = d.type === 'coupon' ? `CUPON: ${d.description}` : d.description;
+      this.line(this.lr(label, `-S/${d.amount.toFixed(2)}`));
     }
   }
-  
+
+  // ── Totales ──────────────────────────────────────────────────────────────────
+
   private printTotals(data: PrintSaleData): void {
-    this.line(this.doubleDivider());
-    
+    this.line(this.equals());
     if (data.totalDiscount > 0) {
-      this.line(this.leftRight('SUBTOTAL:', this.formatMoney(data.subtotal)));
-      this.line(this.leftRight('DESCUENTO:', `-${this.formatMoney(data.totalDiscount)}`));
+      this.line(this.lr('SUBTOTAL:', this.money(data.subtotal)));
+      this.line(this.lr('DESCUENTO:', `-S/${data.totalDiscount.toFixed(2)}`));
     }
-    
     this.push(CMD.BOLD_ON);
-    this.push(CMD.DOUBLE_HEIGHT);
-    this.line(this.leftRight('TOTAL:', this.formatMoney(data.total)));
-    this.push(CMD.NORMAL_SIZE);
+    this.line(this.lr('TOTAL:', this.money(data.total)));
     this.push(CMD.BOLD_OFF);
+    this.line(this.equals());
   }
-  
+
+  // ── Pago ─────────────────────────────────────────────────────────────────────
+
   private printPayment(data: PrintSaleData): void {
     const { payment } = data;
-    
-    this.line(this.divider('-'));
-    
-    const methodNames: Record<string, string> = {
-      CASH: 'EFECTIVO',
-      CARD: 'TARJETA',
-      YAPE: 'YAPE',
-      PLIN: 'PLIN',
-      TRANSFER: 'TRANSFERENCIA',
-      FIADO: 'CREDITO',
-      MIXED: 'MIXTO',
+    const METHOD: Record<string, string> = {
+      CASH:     'EFECTIVO',
+      CARD:     'TARJETA',
+      YAPE:     'YAPE',
+      PLIN:     'PLIN',
+      TRANSFER: 'TRANSFER.',
+      FIADO:    'CREDITO',
+      MIXED:    'MIXTO',
     };
-    
-    this.line(`PAGO: ${methodNames[payment.method] || payment.method}`);
-    
+    this.line(`PAGO: ${METHOD[payment.method] ?? payment.method}`);
     if (payment.method === 'CASH' && payment.amountPaid !== undefined) {
-      this.line(this.leftRight('RECIBIDO:', this.formatMoney(payment.amountPaid)));
+      this.line(this.lr('RECIBIDO:', this.money(payment.amountPaid)));
       if (payment.change !== undefined && payment.change > 0) {
         this.push(CMD.BOLD_ON);
-        this.line(this.leftRight('VUELTO:', this.formatMoney(payment.change)));
+        this.line(this.lr('VUELTO:', this.money(payment.change)));
         this.push(CMD.BOLD_OFF);
       }
     }
-    
     if (payment.method === 'FIADO') {
-      if (payment.customerName) {
+      if (payment.customerName)
         this.line(`CLIENTE: ${payment.customerName}`);
-      }
-      if (payment.customerBalance !== undefined) {
-        this.line(this.leftRight('SALDO PENDIENTE:', this.formatMoney(payment.customerBalance)));
-      }
+      if (payment.customerBalance !== undefined)
+        this.line(this.lr('SALDO:', this.money(payment.customerBalance)));
     }
   }
-  
+
+  // ── Pie de ticket ────────────────────────────────────────────────────────────
+
   private printFooter(data: PrintSaleData): void {
-    this.line(this.doubleDivider());
-    
-    this.push(CMD.ALIGN_CENTER);
-    
-    if (data.footer) {
-      this.wrap(data.footer).forEach(l => this.line(l));
-    } else {
-      this.line('Gracias por su compra!');
+    const { store } = data;
+    this.line(this.equals());
+    const slogan = store.slogan || data.footer || 'Gracias por su compra!';
+    this.push(CMD.BOLD_ON);
+    // Centrado por software: agrega espacios manualmente → funciona en cualquier impresora
+    this.wrap(slogan).forEach(l => this.line(this.center(l.trim())));
+    this.push(CMD.BOLD_OFF);
+    if (store.website) {
+      this.push(CMD.FEED_LINE);
+      this.line(this.center(store.website));
     }
-    
-    this.push(CMD.ALIGN_LEFT);
-  }
-  
-  // ============== Utilities ==============
-  
-  private formatMoney(amount: number): string {
-    return `S/${amount.toFixed(2)}`;
+    if (store.showQr && store.website) {
+      this.push(CMD.FEED_LINE);
+      // QR necesita ALIGN_CENTER por hardware (no se puede centrar por software)
+      this.push(CMD.ALIGN_CENTER);
+      this.qrCode(store.website, 5);
+      this.push(CMD.ALIGN_LEFT);
+    }
   }
 }
 
-// ============== Factory Function ==============
-
+// ── Función de fábrica ───────────────────────────────────────────────────────
 export function formatTicket(data: PrintSaleData, config: EscposConfig): Buffer {
-  const formatter = new TicketFormatter(config);
-  return formatter.formatSale(data);
+  return new TicketFormatter(config).formatSale(data);
 }

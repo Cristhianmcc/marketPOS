@@ -45,8 +45,8 @@ export function LicenseBanner() {
 
   useEffect(() => {
     check();
-    // Re-verificar cada 6 horas
-    const interval = setInterval(check, 6 * 60 * 60 * 1000);
+    // Re-verificar cada 10 minutos (para detectar suspensiones rápido)
+    const interval = setInterval(check, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 

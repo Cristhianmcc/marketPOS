@@ -113,24 +113,33 @@ export async function POST(req: NextRequest) {
 
     // En modo desktop: guardar directo en disco local (no necesita internet)
     if (isDesktopMode()) {
-      const local = await saveLocalImage(file);
-      
-      await logAudit({
-        storeId: user.storeId,
-        userId: user.userId,
-        action: 'PRODUCT_IMAGE_UPLOADED',
-        entityType: 'PRODUCT',
-        severity: 'INFO',
-        meta: { imageUrl: local.url, publicId: local.localId, storage: 'local' },
-        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined,
-        userAgent: req.headers.get('user-agent') || undefined,
-      });
+      try {
+        const local = await saveLocalImage(file);
+        
+        // Audit log no-blocking — no debe hacer fallar el upload
+        logAudit({
+          storeId: user.storeId,
+          userId: user.userId,
+          action: 'PRODUCT_IMAGE_UPLOADED',
+          entityType: 'PRODUCT',
+          severity: 'INFO',
+          meta: { imageUrl: local.url, publicId: local.localId, storage: 'local' },
+          ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined,
+          userAgent: req.headers.get('user-agent') || undefined,
+        }).catch(() => {}); // fire-and-forget
 
-      return NextResponse.json({
-        url: local.url,
-        publicId: local.localId,
-        pending: false,
-      });
+        return NextResponse.json({
+          url: local.url,
+          publicId: local.localId,
+          pending: false,
+        });
+      } catch (localErr: any) {
+        console.error('[desktop] Error saving local image:', localErr);
+        return NextResponse.json(
+          { error: `Error al guardar imagen local: ${localErr.message || localErr}` },
+          { status: 500 }
+        );
+      }
     }
 
     // Modo web: verificar Cloudinary
@@ -191,27 +200,29 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error uploading product image:', error);
 
-    // Audit log error
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Audit log error (no-blocking)
     try {
       const user = await getCurrentUser();
       if (user) {
-        await logAudit({
+        logAudit({
           storeId: user.storeId,
           userId: user.userId,
           action: 'PRODUCT_IMAGE_UPLOAD_FAILED',
           entityType: 'PRODUCT',
           severity: 'ERROR',
-          meta: { error: String(error) },
+          meta: { error: errorMessage },
           ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined,
           userAgent: req.headers.get('user-agent') || undefined,
-        });
+        }).catch(() => {});
       }
     } catch (auditError) {
       console.error('Error creating audit log:', auditError);
     }
 
     return NextResponse.json(
-      { error: 'Error al subir imagen' },
+      { error: `Error al subir imagen: ${errorMessage}` },
       { status: 500 }
     );
   }
