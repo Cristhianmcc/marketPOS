@@ -357,21 +357,40 @@ function startCloudSyncPolling(
     return allOk;
   };
 
-  // Primer intento a los 10 segundos
+  // Primer intento a los 10 segundos, luego cada 30s hasta que todas
+  // estén sincronizadas. Después, pasa a chequeo periódico cada 5min
+  // para detectar tiendas NUEVAS creadas después del arranque.
   setTimeout(async () => {
     const ok = await trySync();
-    if (ok) return;
+    if (ok) {
+      // Todas synced, pasar a chequeo periódico por tiendas nuevas
+      startPeriodicCheck();
+      return;
+    }
 
     const interval = setInterval(async () => {
       if (attempts >= MAX_ATTEMPTS) {
-        console.warn(`[CloudSync] Max attempts (${MAX_ATTEMPTS}) reached, stopping`);
+        console.warn(`[CloudSync] Max attempts (${MAX_ATTEMPTS}) reached, switching to periodic`);
         clearInterval(interval);
+        startPeriodicCheck();
         return;
       }
       const ok = await trySync();
-      if (ok) clearInterval(interval);
+      if (ok) {
+        clearInterval(interval);
+        startPeriodicCheck();
+      }
     }, 30000);
   }, 10000);
+
+  // Chequeo periódico cada 5 min por tiendas nuevas
+  function startPeriodicCheck(): void {
+    console.log('[CloudSync] Starting periodic check every 5min for new stores');
+    setInterval(async () => {
+      attempts = 0; // resetear contador para nuevas tiendas
+      await trySync();
+    }, 5 * 60 * 1000);
+  }
 }
 
 /**

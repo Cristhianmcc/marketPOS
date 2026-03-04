@@ -20,6 +20,16 @@ function isDesktopMode(): boolean {
   return process.env.DESKTOP_MODE === 'true';
 }
 
+// En standalone Next.js, file.type puede ser undefined. Inferir del nombre.
+function inferMimeType(file: File): string {
+  if (file.type) return file.type;
+  const name = (file.name || '').toLowerCase();
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.webp')) return 'image/webp';
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+  return 'image/jpeg'; // default
+}
+
 function ensureLocalDir(): void {
   if (!fs.existsSync(LOCAL_IMAGES_DIR)) {
     fs.mkdirSync(LOCAL_IMAGES_DIR, { recursive: true });
@@ -47,8 +57,9 @@ async function saveLocalImage(file: File): Promise<{ url: string; localId: strin
   ensureLocalDir();
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
-  const ext = file.type === 'image/png' ? 'png'
-    : file.type === 'image/webp' ? 'webp'
+  const mime = inferMimeType(file);
+  const ext = mime === 'image/png' ? 'png'
+    : mime === 'image/webp' ? 'webp'
     : 'jpg';
   const localId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const filename = `${localId}.${ext}`;
@@ -56,7 +67,7 @@ async function saveLocalImage(file: File): Promise<{ url: string; localId: strin
   fs.writeFileSync(filePath, buffer);
 
   const index = loadIndex();
-  index[localId] = { filename, mime: file.type, createdAt: new Date().toISOString() };
+  index[localId] = { filename, mime: mime, createdAt: new Date().toISOString() };
   saveIndex(index);
 
   return { url: `/api/desktop/local-image/${localId}`, localId };
@@ -93,9 +104,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validar tipo de archivo
+    // Validar tipo de archivo (file.type puede ser undefined en standalone)
+    const mimeType = inferMimeType(file);
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
+    if (!allowedTypes.includes(mimeType)) {
       return NextResponse.json(
         { error: 'Tipo de archivo no permitido. Solo JPG, PNG y WEBP.' },
         { status: 400 }
