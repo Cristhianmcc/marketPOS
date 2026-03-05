@@ -96,15 +96,31 @@ export default function ImportPage() {
     setSummary(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      // Leer archivo como texto en el cliente y enviar como JSON
+      // (evita problemas de FormData en Next.js standalone/Electron)
+      const fileContent = await file.text();
 
       const res = await fetch('/api/products/import-csv', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'preview',
+          fileContent,
+          fileName: file.name,
+        }),
       });
 
-      const data = await res.json();
+      // Leer respuesta como texto primero para detectar errores
+      const responseText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error('Server response (not JSON):', responseText.substring(0, 500));
+        toast.error('Error del servidor. Respuesta no válida.');
+        setLoading(false);
+        return;
+      }
 
       if (!res.ok) {
         toast.error(data.error || 'Error al procesar el archivo');
@@ -151,7 +167,16 @@ export default function ImportPage() {
         }),
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error('Import response (not JSON):', responseText.substring(0, 500));
+        toast.error('Error del servidor al importar.');
+        setImporting(false);
+        return;
+      }
 
       if (!res.ok) {
         toast.error(data.error || 'Error en la importación');

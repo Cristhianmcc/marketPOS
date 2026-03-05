@@ -28,11 +28,11 @@ import {
 } from '@/lib/guards/requireFlag';
 import { SUNAT_UNITS_DATA } from '@/lib/sunat-units-data';
 
-// Helper: Seed unidades si no existen
+// Helper: Seed unidades si faltan
 async function ensureUnitsExist() {
   const count = await prisma.unit.count();
-  if (count === 0) {
-    console.log('[units] No units found, seeding SUNAT units...');
+  if (count < SUNAT_UNITS_DATA.length) {
+    console.log(`[units] Only ${count}/${SUNAT_UNITS_DATA.length} units found, seeding missing SUNAT units...`);
     await prisma.unit.createMany({
       data: SUNAT_UNITS_DATA.map(unit => ({
         code: unit.code,
@@ -56,9 +56,9 @@ async function ensureUnitsExist() {
 // ════════════════════════════════════════════════════════════════════════════
 // TOP UNITS POR RUBRO (UX - Dropdown ordenado)
 // ════════════════════════════════════════════════════════════════════════════
-const TOP_UNITS_BODEGA = ['NIU', 'KGM', 'LTR', 'MLT', 'DZN', 'BX', 'PK', 'C62', 'SA', 'BE', 'GRM', 'BO'];
-const TOP_UNITS_FERRETERIA = ['NIU', 'KGM', 'GRM', 'MTR', 'CMT', 'MMT', 'MTK', 'LTR', 'MLT', 'BX', 'PK', 'SA', 'BE', 'C62', 'RL', 'ST'];
-const TOP_UNITS_GENERAL = ['NIU', 'KGM', 'LTR', 'MTR', 'C62'];
+const TOP_UNITS_BODEGA = ['NIU', 'KGM', 'LTR', 'MLT', 'GRM', 'DZN', 'BX', 'PK', 'BG', 'C62', 'SA', 'BE', 'BO', 'CA', 'CT', 'PR', 'SET'];
+const TOP_UNITS_FERRETERIA = ['NIU', 'KGM', 'GRM', 'MTR', 'CMT', 'MMT', 'MTK', 'LTR', 'MLT', 'BX', 'PK', 'SA', 'BE', 'C62', 'RL', 'ST', 'TU', 'CY', 'BJ', 'GLL', 'TNE'];
+const TOP_UNITS_GENERAL = ['NIU', 'KGM', 'LTR', 'MTR', 'C62', 'GRM', 'MLT', 'BX', 'PK', 'DZN'];
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GET - Listar unidades disponibles

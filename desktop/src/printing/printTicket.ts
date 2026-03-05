@@ -8,6 +8,7 @@
 import { BrowserWindow, PrinterInfo } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { app } from 'electron';
 
 // ============================================================================
@@ -201,8 +202,43 @@ export class PrinterManager {
       const receiptUrl = `${this.serverUrl}/receipt/${saleId}?print=true&thermal=true`;
       await win.loadURL(receiptUrl);
 
-      // Wait for content to render
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for React to finish loading sale data (data-receipt-ready="true"), max 6s
+      await win.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          const check = () => document.querySelector('[data-receipt-ready="true"]');
+          if (check()) return resolve(true);
+          const interval = setInterval(() => { if (check()) { clearInterval(interval); clearTimeout(to); resolve(true); } }, 80);
+          const to = setTimeout(() => { clearInterval(interval); resolve(false); }, 6000);
+        })
+      `);
+
+      // Inject logo as base64 directly from disk (avoids HTTP timing issues in hidden print window)
+      const localImagesDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS', 'local-images');
+      const indexPath = path.join(localImagesDir, 'index.json');
+      if (fs.existsSync(indexPath)) {
+        try {
+          const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8')) as Record<string, { filename: string; mime: string }>;
+          for (const [id, entry] of Object.entries(index)) {
+            const imgPath = path.join(localImagesDir, entry.filename);
+            if (fs.existsSync(imgPath)) {
+              const b64 = fs.readFileSync(imgPath).toString('base64');
+              const dataUrl = `data:${entry.mime};base64,${b64}`;
+              await win.webContents.executeJavaScript(`
+                document.querySelectorAll('img').forEach(img => {
+                  if (img.src && img.src.includes('/api/desktop/local-image/${id}')) {
+                    img.src = ${JSON.stringify(dataUrl)};
+                  }
+                });
+              `);
+            }
+          }
+        } catch (e) {
+          console.warn('[PrinterManager] Logo inject failed:', e);
+        }
+      }
+
+      // Brief pause to let browser paint the injected base64 image
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Print options
       const printOptions: Electron.WebContentsPrintOptions = {

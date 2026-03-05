@@ -265,8 +265,8 @@ export default function SettingsPage() {
             }}
             className="space-y-4"
           >
-            {/* Logo */}
-            <div>
+            {/* Logo — temporalmente oculto hasta resolver impresión en desktop */}
+            {false && <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Logo de la tienda (en el ticket)
               </label>
@@ -330,7 +330,7 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-400 mt-2">
                 Aparece arriba del nombre en el ticket impreso. Máx 3MB, fondo blanco recomendado.
               </p>
-            </div>
+            </div>}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

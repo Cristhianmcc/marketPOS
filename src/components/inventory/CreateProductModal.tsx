@@ -615,11 +615,21 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
             </label>
             <div className="flex items-center gap-3">
               {formData.imageUrl && (
-                <img
-                  src={formData.imageUrl}
-                  alt="Preview"
-                  className="w-16 h-16 object-cover rounded-md border border-gray-300"
-                />
+                <div className="relative">
+                  <img
+                    src={formData.imageUrl}
+                    alt="Preview"
+                    className="w-16 h-16 object-cover rounded-md border border-gray-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, imageUrl: '' }))}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                    title="Quitar imagen"
+                  >
+                    ×
+                  </button>
+                </div>
               )}
               <label className="flex-1">
                 <div className="flex items-center justify-center gap-2 h-10 px-4 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50 transition-colors">

@@ -20,16 +20,6 @@ function isDesktopMode(): boolean {
   return process.env.DESKTOP_MODE === 'true';
 }
 
-// En standalone Next.js, file.type puede ser undefined. Inferir del nombre.
-function inferMimeType(file: File): string {
-  if (file.type) return file.type;
-  const name = (file.name || '').toLowerCase();
-  if (name.endsWith('.png')) return 'image/png';
-  if (name.endsWith('.webp')) return 'image/webp';
-  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
-  return 'image/jpeg'; // default
-}
-
 function ensureLocalDir(): void {
   if (!fs.existsSync(LOCAL_IMAGES_DIR)) {
     fs.mkdirSync(LOCAL_IMAGES_DIR, { recursive: true });
@@ -53,21 +43,79 @@ function saveIndex(index: Record<string, { filename: string; mime: string; creat
   fs.writeFileSync(INDEX_PATH, JSON.stringify(index, null, 2), 'utf-8');
 }
 
-async function saveLocalImage(file: File): Promise<{ url: string; localId: string }> {
+// ─── DESKTOP: parseo manual de multipart (evita req.formData() que crashea en standalone) ───
+
+/**
+ * Parsea multipart/form-data manualmente leyendo el body crudo.
+ * req.formData() de Next.js standalone tiene un bug que llama toLowerCase
+ * en un valor undefined internamente. Esta función lo evita por completo.
+ */
+async function parseMultipartImage(req: NextRequest): Promise<{
+  buffer: Buffer; filename: string; contentType: string;
+} | null> {
+  const ct = req.headers.get('content-type') || '';
+  const bMatch = ct.match(/boundary="?([^\s";]+)"?/);
+  if (!bMatch) return null;
+
+  const raw = Buffer.from(await req.arrayBuffer());
+  const boundaryBuf = Buffer.from('--' + bMatch[1]);
+  const headerEndMark = Buffer.from('\r\n\r\n');
+
+  // Encontrar posiciones de boundaries
+  const positions: number[] = [];
+  let idx = 0;
+  while ((idx = raw.indexOf(boundaryBuf, idx)) !== -1) {
+    positions.push(idx);
+    idx += boundaryBuf.length;
+  }
+
+  for (let i = 0; i < positions.length - 1; i++) {
+    const start = positions[i] + boundaryBuf.length + 2; // +2 CRLF
+    const end = positions[i + 1] - 2; // -2 CRLF antes del siguiente boundary
+    const part = raw.subarray(start, end);
+
+    const hEnd = part.indexOf(headerEndMark);
+    if (hEnd === -1) continue;
+
+    const headers = part.subarray(0, hEnd).toString('utf-8');
+    if (!headers.includes('name="image"')) continue;
+
+    const fnMatch = headers.match(/filename="([^"]+)"/);
+    const filename = fnMatch ? fnMatch[1] : 'upload.jpg';
+
+    const ctMatch = headers.match(/Content-Type:\s*(.+)/i);
+    const contentType = ctMatch ? ctMatch[1].trim() : '';
+
+    return { buffer: Buffer.from(part.subarray(hEnd + 4)), filename, contentType };
+  }
+
+  return null;
+}
+
+/** Infiere MIME del Content-Type del part o del nombre del archivo */
+function inferMimeFromHeader(rawCT: string, filename: string): string {
+  const ct = (rawCT || '').toLowerCase().trim();
+  if (ct.startsWith('image/')) return ct;
+  const name = (filename || 'upload.jpg').toLowerCase();
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+/** Guarda un Buffer de imagen directamente en disco */
+function saveLocalImageBuffer(
+  buffer: Buffer, mimeType: string
+): { url: string; localId: string } {
   ensureLocalDir();
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const mime = inferMimeType(file);
-  const ext = mime === 'image/png' ? 'png'
-    : mime === 'image/webp' ? 'webp'
+  const ext = mimeType === 'image/png' ? 'png'
+    : mimeType === 'image/webp' ? 'webp'
     : 'jpg';
   const localId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const filename = `${localId}.${ext}`;
-  const filePath = path.join(LOCAL_IMAGES_DIR, filename);
-  fs.writeFileSync(filePath, buffer);
+  fs.writeFileSync(path.join(LOCAL_IMAGES_DIR, filename), buffer);
 
   const index = loadIndex();
-  index[localId] = { filename, mime: mime, createdAt: new Date().toISOString() };
+  index[localId] = { filename, mime: mimeType, createdAt: new Date().toISOString() };
   saveIndex(index);
 
   return { url: `/api/desktop/local-image/${localId}`, localId };
@@ -81,6 +129,51 @@ async function saveLocalImage(file: File): Promise<{ url: string; localId: strin
  * Returns: { url }
  */
 export async function POST(req: NextRequest) {
+  // ─── DESKTOP: parseo manual del multipart, SIN req.formData() ────────────
+  // req.formData() de Next.js standalone crashea con toLowerCase en undefined.
+  // Parseamos el body crudo directamente para evitarlo.
+  if (isDesktopMode()) {
+    try {
+      const parsed = await parseMultipartImage(req);
+      if (!parsed || parsed.buffer.length === 0) {
+        return NextResponse.json(
+          { error: 'No se proporcionó ninguna imagen' },
+          { status: 400 }
+        );
+      }
+
+      const mimeType = inferMimeFromHeader(parsed.contentType, parsed.filename);
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+      if (!allowedTypes.includes(mimeType)) {
+        return NextResponse.json(
+          { error: 'Tipo de archivo no permitido. Solo JPG, PNG y WEBP.' },
+          { status: 400 }
+        );
+      }
+
+      if (parsed.buffer.length > 5 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: 'La imagen es demasiado grande. Máximo 5MB.' },
+          { status: 400 }
+        );
+      }
+
+      const local = saveLocalImageBuffer(parsed.buffer, mimeType);
+      return NextResponse.json({
+        url: local.url,
+        publicId: local.localId,
+        pending: false,
+      });
+    } catch (desktopErr: any) {
+      console.error('[desktop] Error saving local image:', desktopErr);
+      return NextResponse.json(
+        { error: `Error al guardar imagen local: ${desktopErr?.message || String(desktopErr)}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  // ─── WEB: flujo original con Cloudinary (no se toca) ─────────────────────
   try {
     const user = await getCurrentUser();
     if (!user) {
@@ -104,54 +197,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validar tipo de archivo (file.type puede ser undefined en standalone)
-    const mimeType = inferMimeType(file);
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (!allowedTypes.includes(mimeType)) {
+    if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         { error: 'Tipo de archivo no permitido. Solo JPG, PNG y WEBP.' },
         { status: 400 }
       );
     }
 
-    // Validar tamaño (máximo 5MB)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       return NextResponse.json(
         { error: 'La imagen es demasiado grande. Máximo 5MB.' },
         { status: 400 }
       );
-    }
-
-    // En modo desktop: guardar directo en disco local (no necesita internet)
-    if (isDesktopMode()) {
-      try {
-        const local = await saveLocalImage(file);
-        
-        // Audit log no-blocking — no debe hacer fallar el upload
-        logAudit({
-          storeId: user.storeId,
-          userId: user.userId,
-          action: 'PRODUCT_IMAGE_UPLOADED',
-          entityType: 'PRODUCT',
-          severity: 'INFO',
-          meta: { imageUrl: local.url, publicId: local.localId, storage: 'local' },
-          ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined,
-          userAgent: req.headers.get('user-agent') || undefined,
-        }).catch(() => {}); // fire-and-forget
-
-        return NextResponse.json({
-          url: local.url,
-          publicId: local.localId,
-          pending: false,
-        });
-      } catch (localErr: any) {
-        console.error('[desktop] Error saving local image:', localErr);
-        return NextResponse.json(
-          { error: `Error al guardar imagen local: ${localErr.message || localErr}` },
-          { status: 500 }
-        );
-      }
     }
 
     // Modo web: verificar Cloudinary

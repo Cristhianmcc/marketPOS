@@ -223,8 +223,54 @@ export default function ReportsPage() {
       params.set('to', summaryTo);
     }
 
-    const url = `/api/reports/export/${type}?${params}`;
-    window.open(url, '_blank');
+    // Ventas usa endpoint XLSX con estilos; el resto sigue en CSV
+    const exportUrl = type === 'sales'
+      ? `/api/reports/export/sales/xlsx?${params}`
+      : `/api/reports/export/${type}?${params}`;
+
+    try {
+      const res = await fetch(exportUrl);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || `Error al exportar ${type}`);
+        return;
+      }
+      const blob = await res.blob();
+      const defaultExt = type === 'sales' ? 'xlsx' : 'csv';
+      const filename = res.headers.get('content-disposition')?.match(/filename="?([^"]+)"?/)?.[1]
+        || `${type}_${new Date().toISOString().slice(0, 10)}.${defaultExt}`;
+
+      // Desktop (Electron): convertir a data URI para forzar descarga
+      if (typeof window !== 'undefined' && (window as any).desktop) {
+        const mimeType = type === 'sales'
+          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          : 'text/csv';
+        const arrayBuffer = await blob.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
+        const binary = Array.from(uint8).map(b => String.fromCharCode(b)).join('');
+        const base64 = btoa(binary);
+        const dataUri = `data:${mimeType};base64,${base64}`;
+        const a = document.createElement('a');
+        a.href = dataUri;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        // Web: usar blob URL normalmente
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }
+    } catch {
+      alert('Error de red al exportar');
+    }
   };
 
   return (

@@ -73,10 +73,15 @@ const UNIT_CODE_TO_TYPE: Record<string, UnitType> = {
  * POST: Importar productos desde CSV
  */
 export async function POST(request: NextRequest) {
+  console.log('[CSV Import] ============ START ============');
+  
   try {
+    console.log('[CSV Import] 1. Getting session...');
     const session = await getSessionOrThrow();
+    console.log('[CSV Import] 2. Session OK, role:', session.role);
 
     if (session.role !== 'OWNER') {
+      console.log('[CSV Import] ❌ Not OWNER');
       return NextResponse.json(
         { error: 'Solo el propietario puede importar productos' },
         { status: 403 }
@@ -84,20 +89,52 @@ export async function POST(request: NextRequest) {
     }
 
     const contentType = request.headers.get('content-type') || '';
+    console.log('[CSV Import] 3. Content-Type:', contentType);
     
-    // Si es form-data, es preview/parse
+    // Si es form-data, es preview/parse (modo web legacy)
     if (contentType.includes('multipart/form-data')) {
-      return handlePreview(request, session);
+      console.log('[CSV Import] 4. Route: PREVIEW (FormData)');
+      const result = await handlePreview(request, session);
+      console.log('[CSV Import] 5. Preview complete');
+      return result;
     }
     
-    // Si es JSON, es confirmación de import
-    return handleImport(request, session);
-  } catch (error: any) {
-    console.error('Error in import-csv:', error);
+    // Si es JSON, puede ser preview (con fileContent) o import (con products)
+    if (contentType.includes('application/json')) {
+      const body = await request.json();
+      
+      if (body.action === 'preview' && body.fileContent) {
+        console.log('[CSV Import] 4. Route: PREVIEW (JSON text)');
+        const result = await handlePreviewFromText(body.fileContent, session);
+        console.log('[CSV Import] 5. Preview complete');
+        return result;
+      }
+      
+      console.log('[CSV Import] 4. Route: IMPORT');
+      const result = await handleImportFromBody(body, session);
+      console.log('[CSV Import] 5. Import complete');
+      return result;
+    }
+    
     return NextResponse.json(
-      { error: error.message || 'Error al procesar' },
+      { error: 'Content-Type no soportado' },
+      { status: 400 }
+    );
+  } catch (error: any) {
+    console.error('[CSV Import] ❌❌❌ CRITICAL ERROR ❌❌❌');
+    console.error('[CSV Import] Error:', error);
+    console.error('[CSV Import] Message:', error?.message);
+    console.error('[CSV Import] Stack:', error?.stack);
+    
+    return NextResponse.json(
+      { 
+        error: 'Error crítico al procesar CSV',
+        details: error?.message || 'Error desconocido'
+      },
       { status: 500 }
     );
+  } finally {
+    console.log('[CSV Import] ============ END ============');
   }
 }
 
@@ -108,79 +145,184 @@ async function handlePreview(
   request: NextRequest,
   session: { storeId: string; userId: string }
 ) {
-  const formData = await request.formData();
-  const file = formData.get('file') as File;
+  try {
+    console.log('[Preview] 1. Reading FormData...');
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
 
-  if (!file) {
-    return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 });
-  }
+    if (!file) {
+      console.log('[Preview] ❌ No file received');
+      return NextResponse.json({ error: 'No se recibió archivo' }, { status: 400 });
+    }
 
-  const text = await file.text();
-  const separator = detectSeparator(text);
-  const lines = text.split('\n').filter((line) => line.trim());
+    console.log('[Preview] 2. File:', file.name, file.size, 'bytes');
+    const text = await file.text();
+    console.log('[Preview] 3. Text length:', text.length, 'chars');
+    
+    const separator = detectSeparator(text);
+    console.log('[Preview] 4. Separator:', separator === ',' ? 'comma' : 'semicolon');
+    
+    const lines = text.split('\n').filter((line) => line.trim());
+    console.log('[Preview] 5. Total lines:', lines.length);
 
-  if (lines.length < 2) {
+    if (lines.length < 2) {
+      console.log('[Preview] ❌ Too few lines');
+      return NextResponse.json(
+        { error: 'El archivo debe contener al menos cabecera y una fila de datos' },
+        { status: 400 }
+      );
+    }
+
+    // Parse header
+    const header = parseCSVLine(lines[0], separator).map((h) =>
+      h.toLowerCase().trim().replace(/\uFEFF/g, '')
+    );
+    console.log('[Preview] 6. Headers:', header.join(', '));
+
+    // Validar columnas requeridas
+    if (!header.includes('name') && !header.includes('nombre')) {
+      console.log('[Preview] ❌ Missing name column');
+      return NextResponse.json(
+        { error: 'Columna "name" o "nombre" es requerida. Detectadas: ' + header.join(', ') },
+        { status: 400 }
+      );
+    }
+
+    // Obtener unidades disponibles
+    console.log('[Preview] 7. Fetching units from DB...');
+    const units = await prisma.unit.findMany({
+      select: { id: true, code: true, symbol: true },
+    });
+    console.log('[Preview] 8. Units found:', units.length);
+    const unitCodes = new Set(units.map((u) => u.code.toUpperCase()));
+
+    // Parse productos (max 50 para preview)
+    const products: ParsedProduct[] = [];
+    const maxRows = Math.min(lines.length - 1, 50);
+    console.log('[Preview] 9. Parsing', maxRows, 'rows...');
+
+    for (let i = 1; i <= maxRows; i++) {
+      const values = parseCSVLine(lines[i], separator);
+      const row = mapRowToObject(header, values);
+      const parsed = parseProductRow(row, i, unitCodes);
+      products.push(parsed);
+    }
+
+    const validCount = products.filter((p) => p.errors.length === 0).length;
+    const errorCount = products.filter((p) => p.errors.length > 0).length;
+    const totalRows = lines.length - 1;
+
+    console.log('[Preview] 10. ✅ Done - Valid:', validCount, 'Errors:', errorCount, 'Total:', totalRows);
+
+    return NextResponse.json({
+      preview: products,
+      summary: {
+        totalRows,
+        previewRows: products.length,
+        validRows: validCount,
+        errorRows: errorCount,
+        hasMore: totalRows > 50,
+      },
+      availableUnits: units.map((u) => ({ code: u.code, symbol: u.symbol })),
+    });
+  } catch (error: any) {
+    console.error('[Preview] ❌ ERROR:', error);
+    console.error('[Preview] Message:', error?.message);
+    console.error('[Preview] Stack:', error?.stack);
     return NextResponse.json(
-      { error: 'El archivo debe contener al menos cabecera y una fila de datos' },
-      { status: 400 }
+      { error: 'Error al procesar archivo: ' + (error?.message || 'desconocido') },
+      { status: 500 }
     );
   }
-
-  // Parse header
-  const header = parseCSVLine(lines[0], separator).map((h) =>
-    h.toLowerCase().trim().replace(/\uFEFF/g, '')
-  );
-
-  // Validar columnas requeridas
-  if (!header.includes('name') && !header.includes('nombre')) {
-    return NextResponse.json(
-      { error: 'Columna "name" o "nombre" es requerida' },
-      { status: 400 }
-    );
-  }
-
-  // Obtener unidades disponibles
-  const units = await prisma.unit.findMany({
-    select: { id: true, code: true, symbol: true },
-  });
-  const unitCodes = new Set(units.map((u) => u.code.toUpperCase()));
-
-  // Parse productos (max 50 para preview)
-  const products: ParsedProduct[] = [];
-  const maxRows = Math.min(lines.length - 1, 50);
-
-  for (let i = 1; i <= maxRows; i++) {
-    const values = parseCSVLine(lines[i], separator);
-    const row = mapRowToObject(header, values);
-    const parsed = parseProductRow(row, i, unitCodes);
-    products.push(parsed);
-  }
-
-  const validCount = products.filter((p) => p.errors.length === 0).length;
-  const errorCount = products.filter((p) => p.errors.length > 0).length;
-  const totalRows = lines.length - 1;
-
-  return NextResponse.json({
-    preview: products,
-    summary: {
-      totalRows,
-      previewRows: products.length,
-      validRows: validCount,
-      errorRows: errorCount,
-      hasMore: totalRows > 50,
-    },
-    availableUnits: units.map((u) => ({ code: u.code, symbol: u.symbol })),
-  });
 }
 
 /**
- * Confirmar e importar productos
+ * Preview desde texto plano (JSON) — funciona en Electron standalone
  */
-async function handleImport(
-  request: NextRequest,
+async function handlePreviewFromText(
+  text: string,
   session: { storeId: string; userId: string }
 ) {
-  const body = await request.json();
+  try {
+    console.log('[PreviewText] 1. Text length:', text.length);
+    
+    const separator = detectSeparator(text);
+    console.log('[PreviewText] 2. Separator:', separator === ',' ? 'comma' : 'semicolon');
+    
+    const lines = text.split('\n').filter((line) => line.trim());
+    console.log('[PreviewText] 3. Total lines:', lines.length);
+
+    if (lines.length < 2) {
+      return NextResponse.json(
+        { error: 'El archivo debe contener al menos cabecera y una fila de datos' },
+        { status: 400 }
+      );
+    }
+
+    // Parse header
+    const header = parseCSVLine(lines[0], separator).map((h) =>
+      h.toLowerCase().trim().replace(/\uFEFF/g, '')
+    );
+    console.log('[PreviewText] 4. Headers:', header.join(', '));
+
+    if (!header.includes('name') && !header.includes('nombre')) {
+      return NextResponse.json(
+        { error: 'Columna "name" o "nombre" es requerida. Detectadas: ' + header.join(', ') },
+        { status: 400 }
+      );
+    }
+
+    // Obtener unidades disponibles
+    const units = await prisma.unit.findMany({
+      select: { id: true, code: true, symbol: true },
+    });
+    console.log('[PreviewText] 5. Units found:', units.length);
+    const unitCodes = new Set(units.map((u) => u.code.toUpperCase()));
+
+    // Parse productos (max 50 para preview)
+    const products: ParsedProduct[] = [];
+    const maxRows = Math.min(lines.length - 1, 50);
+
+    for (let i = 1; i <= maxRows; i++) {
+      const values = parseCSVLine(lines[i], separator);
+      const row = mapRowToObject(header, values);
+      const parsed = parseProductRow(row, i, unitCodes);
+      products.push(parsed);
+    }
+
+    const validCount = products.filter((p) => p.errors.length === 0).length;
+    const errorCount = products.filter((p) => p.errors.length > 0).length;
+    const totalRows = lines.length - 1;
+
+    console.log('[PreviewText] 6. ✅ Done - Valid:', validCount, 'Errors:', errorCount);
+
+    return NextResponse.json({
+      preview: products,
+      summary: {
+        totalRows,
+        previewRows: products.length,
+        validRows: validCount,
+        errorRows: errorCount,
+        hasMore: totalRows > 50,
+      },
+      availableUnits: units.map((u) => ({ code: u.code, symbol: u.symbol })),
+    });
+  } catch (error: any) {
+    console.error('[PreviewText] ❌ ERROR:', error?.message);
+    return NextResponse.json(
+      { error: 'Error al procesar: ' + (error?.message || 'desconocido') },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Confirmar e importar productos (body ya parseado)
+ */
+async function handleImportFromBody(
+  body: any,
+  session: { storeId: string; userId: string }
+) {
   const { products, updateExisting = false } = body as {
     products: ParsedProduct[];
     updateExisting?: boolean;
