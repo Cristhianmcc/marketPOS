@@ -52,10 +52,11 @@ export async function GET(_request: NextRequest) {
         },
       }),
 
-      // 3. Turno actual
+      // 3. Turno actual del usuario autenticado
       prisma.shift.findFirst({
         where: {
           storeId: storeId,
+          openedById: userId,
           closedAt: null,
         },
         orderBy: { openedAt: 'desc' },

@@ -76,6 +76,7 @@ export function ConfigureStoreProductModal({
       active: true,
     });
     setError('');
+    setLoading(false);
   };
 
   if (!isOpen) return null;

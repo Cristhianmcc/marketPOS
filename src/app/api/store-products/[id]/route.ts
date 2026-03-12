@@ -50,7 +50,20 @@ export async function PUT(
       if (name !== undefined)       productUpdates.name       = String(name).trim();
       if (brand !== undefined)      productUpdates.brand      = brand ? String(brand).trim() : null;
       if (content !== undefined)    productUpdates.content    = content ? String(content).trim() : null;
-      if (barcode !== undefined)    productUpdates.barcode    = barcode ? String(barcode).trim() : null;
+      if (barcode !== undefined) {
+        const newBarcode = barcode ? String(barcode).trim() : null;
+        // Verificar que el nuevo barcode no esté usado por otro producto
+        if (newBarcode && newBarcode !== storeProduct.product.barcode) {
+          const conflict = await prisma.productMaster.findUnique({ where: { barcode: newBarcode } });
+          if (conflict) {
+            return NextResponse.json(
+              { error: 'Ya existe otro producto con ese código de barras' },
+              { status: 400 }
+            );
+          }
+        }
+        productUpdates.barcode = newBarcode;
+      }
       if (category !== undefined)   productUpdates.category   = String(category).trim();
       if (imageUrl !== undefined)   productUpdates.imageUrl   = imageUrl || null;
       if (baseUnitId !== undefined) productUpdates.baseUnitId = baseUnitId || null;

@@ -7,7 +7,7 @@ import { getSession } from '@/lib/session';
 import { isSuperAdmin, generateTemporaryPassword } from '@/lib/superadmin';
 import { BusinessProfile } from '@prisma/client';
 import { getProfileFlags } from '@/lib/businessProfiles';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 
 // GET /api/admin/stores - Listar todas las tiendas (SUPERADMIN)

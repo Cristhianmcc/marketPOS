@@ -116,7 +116,7 @@
       ],
       "icon": "resources/icon.ico",
       "artifactName": "${productName}-Setup-${version}.${ext}",
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
       "sign": null
     },
     "nsis": {

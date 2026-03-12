@@ -183,6 +183,7 @@ export function EditProductModal({
 
       onSuccess();
       onClose();
+      setLoading(false);
     } catch (err) {
       console.error('Error updating product:', err);
       setError('Error de conexión');

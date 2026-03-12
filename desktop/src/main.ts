@@ -6,9 +6,10 @@
  * de vida de la aplicación desktop.
  */
 
-import { app, BrowserWindow, shell, session, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, shell, session, ipcMain, dialog, Tray, Menu, nativeImage, Notification } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
 import { startLocalServer, LocalServer } from './server';
 import { initBackupScheduler, getBackupScheduler, BackupConfig, StoreInfo } from './backupScheduler';
 import { initOnlineMonitor, getOnlineMonitor, OnlineMonitorConfig } from './onlineMonitor';
@@ -94,8 +95,59 @@ const USER_DATA_PATH = app.getPath('userData');
 let localServer: LocalServer | null = null;
 let serverUrl: string = DEV_SERVER_URL;
 
+// Contador de reinicios del servidor para respawn automático
+let serverRestartCount = 0;
+const MAX_SERVER_RESTARTS = 3;
+
 // Raster print manager (D6.2)
 let rasterPrintManager: RasterPrintManager | null = null;
+
+// ============================================================================
+// SERVIDOR EN BACKGROUND — Fast Restart
+// Permite reinicio en ~3 segundos dejando Next.js + PostgreSQL vivos al cerrar.
+// ============================================================================
+
+interface ServerState {
+  port: number;
+  url: string;
+  databaseUrl: string;
+  startedAt: string;
+}
+
+function saveServerState(state: ServerState): void {
+  const stateFile = path.join(USER_DATA_PATH, 'server-state.json');
+  try {
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+  } catch (e) {
+    console.warn('[App] No se pudo guardar server-state.json:', e);
+  }
+}
+
+function loadServerState(): ServerState | null {
+  const stateFile = path.join(USER_DATA_PATH, 'server-state.json');
+  try {
+    if (!fs.existsSync(stateFile)) return null;
+    const raw = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+    if (!raw.url || !raw.port || !raw.databaseUrl) return null;
+    return raw as ServerState;
+  } catch {
+    return null;
+  }
+}
+
+function clearServerState(): void {
+  const stateFile = path.join(USER_DATA_PATH, 'server-state.json');
+  try { if (fs.existsSync(stateFile)) fs.unlinkSync(stateFile); } catch { /* ignore */ }
+}
+
+async function pingServerHealth(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
 
 async function syncLocalImages(serverUrl: string): Promise<void> {
   try {
@@ -296,8 +348,9 @@ function createMainWindow(): void {
     }
   });
 
-  // Cargar la aplicación
-  loadApplication();
+  // Mostrar pantalla de carga inmediatamente (loadApplication() se llama
+  // cuando el servidor esté listo, al final del startup)
+  mainWindow.loadFile(path.join(__dirname, '..', 'resources', 'loading.html'));
 
   // Interceptar el cierre: ocultar a la bandeja en vez de destruir
   mainWindow.on('close', (event) => {
@@ -351,8 +404,60 @@ function loadApplication(): void {
 }
 
 // ============================================================================
-// CICLO DE VIDA DE LA APLICACIÓN
+// RESPAWN AUTOMÁTICO DEL SERVIDOR
+// Si Next.js crashea inesperadamente, se reinicia solo (máx 3 veces).
 // ============================================================================
+
+async function respawnServer(): Promise<void> {
+  if (forceQuit) return;
+  if (serverRestartCount >= MAX_SERVER_RESTARTS) {
+    console.error('[App] Máximo de reinicios alcanzado, mostrando error');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const errQuery = encodeURIComponent('El servidor falló varias veces. Por favor reinicia la aplicación.');
+      mainWindow.loadFile(
+        path.join(__dirname, '..', 'resources', 'error.html'),
+        { query: { error: errQuery, url: '' } }
+      );
+    }
+    return;
+  }
+
+  serverRestartCount++;
+  console.log(`[App] Reiniciando servidor Next.js (intento ${serverRestartCount}/${MAX_SERVER_RESTARTS})...`);
+
+  // Mostrar pantalla de carga mientras reinicia
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.loadFile(path.join(__dirname, '..', 'resources', 'loading.html'));
+  }
+
+  // Esperar 2 segundos antes de reiniciar
+  await new Promise<void>(resolve => setTimeout(resolve, 2000));
+
+  try {
+    localServer = await startLocalServer(RESOURCES_PATH, app.isPackaged);
+    serverUrl = localServer.url;
+    setLicenseServerUrl(serverUrl);
+    attachServerCrashWatcher(localServer);
+    // Restablecer contador si el servidor arrancó OK
+    serverRestartCount = 0;
+    console.log('[App] Servidor reiniciado correctamente');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.loadURL(serverUrl);
+    }
+  } catch (err) {
+    console.error('[App] Fallo al reiniciar servidor:', err);
+    await respawnServer();
+  }
+}
+
+function attachServerCrashWatcher(server: LocalServer): void {
+  server.process.on('exit', (code, signal) => {
+    if (forceQuit) return; // cierre intencional
+    if (code === 0) return; // salida limpia
+    console.error(`[App] Servidor Next.js terminó inesperadamente (código=${code}, señal=${signal})`);
+    respawnServer();
+  });
+}
 
 /**
  * Registra handlers IPC para funcionalidad de backups.
@@ -1055,7 +1160,72 @@ app.whenReady().then(async () => {
   console.log('[App] Starting MarketPOS Desktop...');
   console.log(`[App] Mode: ${isDev ? 'Development' : 'Production'}`);
   console.log(`[App] User Data: ${USER_DATA_PATH}`);
-  
+
+  // Configurar ID para notificaciones de Windows
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.monterrial.pos');
+  }
+
+  // Mostrar ventana con pantalla de carga INMEDIATAMENTE — el usuario ve algo
+  // mientras PostgreSQL y Next.js arrancan en segundo plano
+  createMainWindow();
+  if (!isDev) {
+    createTray();
+    // Activar auto-inicio con Windows en primera instalación
+    const loginSettings = app.getLoginItemSettings();
+    if (!loginSettings.openAtLogin) {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        openAsHidden: true,
+        path: process.execPath,
+        args: ['--hidden'],
+      });
+      console.log('[App] Auto-start with Windows enabled');
+    }
+  }
+
+  // Si se abrió con --hidden (arranque automático), no mostrar ventana
+  if (process.argv.includes('--hidden')) {
+    console.log('[App] Started hidden (auto-start)');
+  }
+
+  // === FAST PATH: si el servidor sobrevivió al cierre anterior, conectar directo ===
+  // Evita reiniciar PostgreSQL + Next.js — reduce tiempo de apertura a ~3 segundos.
+  if (!isDev) {
+    const savedState = loadServerState();
+    if (savedState) {
+      console.log('[App] Verificando servidor en background...');
+      const alive = await pingServerHealth(savedState.url);
+      if (alive) {
+        console.log('[App] Fast path activo — servidor listo, conectando...');
+        serverUrl = savedState.url;
+        process.env.DATABASE_URL = savedState.databaseUrl;
+        setLicenseServerUrl(serverUrl);
+        const scheduler = initBackupScheduler(serverUrl);
+        scheduler.startScheduler();
+        const cloudSync = initCloudBackupSync(serverUrl);
+        const backupDir = scheduler.getBackupDir_public('');
+        if (backupDir) cloudSync.startAutoSync(path.dirname(backupDir));
+        const onlineMonitor = initOnlineMonitor();
+        onlineMonitor.start();
+        onlineMonitor.onStatusChange((isOnline) => { if (isOnline) syncLocalImages(serverUrl); });
+        initTaskQueue({ serverUrl }).start();
+        initPrinterManager(serverUrl);
+        initEscposPrintManager(serverUrl);
+        initRasterPrintManager(serverUrl);
+        if (mainWindow && !isDev) initUpdater(mainWindow);
+        app.on('activate', () => {
+          if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+        });
+        loadApplication();
+        return; // saltar startup completo
+      } else {
+        console.log('[App] Servidor en background no responde — iniciando desde cero...');
+        clearServerState();
+      }
+    }
+  }
+
   // En producción: primero asegurar PostgreSQL embebido (D7.1)
   if (!isDev) {
     // D7.2: Check if postgres is already running (daemon/service mode)
@@ -1119,6 +1289,31 @@ app.whenReady().then(async () => {
     console.log('[App] Preflight checks passed');
   }
   
+  // Generar o recuperar SESSION_SECRET único por instalación
+  // Se guarda en userData para persistir entre reinicios
+  if (!process.env.SESSION_SECRET) {
+    const secretsFile = path.join(USER_DATA_PATH, 'app-secrets.json');
+    let secrets: Record<string, string> = {};
+    try {
+      if (fs.existsSync(secretsFile)) {
+        secrets = JSON.parse(fs.readFileSync(secretsFile, 'utf-8'));
+      }
+    } catch { /* archivo corrupto, generar nuevo */ }
+
+    if (!secrets.sessionSecret || secrets.sessionSecret.length < 32) {
+      secrets.sessionSecret = crypto.randomBytes(48).toString('hex');
+      try {
+        fs.mkdirSync(USER_DATA_PATH, { recursive: true });
+        fs.writeFileSync(secretsFile, JSON.stringify(secrets, null, 2), { mode: 0o600 });
+        console.log('[App] SESSION_SECRET generado para esta instalación');
+      } catch (e) {
+        console.warn('[App] No se pudo guardar SESSION_SECRET:', e);
+      }
+    }
+    process.env.SESSION_SECRET = secrets.sessionSecret;
+    console.log('[App] SESSION_SECRET cargado desde userData');
+  }
+
   // En producción: iniciar servidor local
   if (!isDev) {
     try {
@@ -1126,6 +1321,7 @@ app.whenReady().then(async () => {
       localServer = await startLocalServer(RESOURCES_PATH, app.isPackaged);
       serverUrl = localServer.url;
       setLicenseServerUrl(serverUrl);
+      attachServerCrashWatcher(localServer);
       console.log(`[App] Local server ready at: ${serverUrl}`);
       
       // Inicializar BackupScheduler
@@ -1167,19 +1363,35 @@ app.whenReady().then(async () => {
       
       // Inicializar RasterPrintManager (D6.2)
       initRasterPrintManager(serverUrl);
+
+      // Guardar estado del servidor para reinicio rápido en el próximo arranque
+      saveServerState({
+        port: localServer.port,
+        url: localServer.url,
+        databaseUrl: process.env.DATABASE_URL || '',
+        startedAt: new Date().toISOString(),
+      });
+
+      // Servidor listo — navegar a la app
+      loadApplication();
+
+      // Notificar al usuario cuando el sistema esté listo (solo en arranque automático oculto)
+      if (process.argv.includes('--hidden') && Notification.isSupported()) {
+        new Notification({
+          title: 'Monterrial POS listo',
+          body: 'El sistema está listo. Haz clic en el ícono de la bandeja para abrir.',
+        }).show();
+      }
     } catch (error) {
       console.error('[App] Failed to start local server:', error);
       const errMsg = error instanceof Error ? error.message : String(error);
       const errQuery = encodeURIComponent(errMsg);
       const urlQuery = encodeURIComponent(serverUrl);
-      createMainWindow();
-      createTray();
-      setTimeout(() => {
-        mainWindow?.loadFile(
-          path.join(__dirname, '..', 'resources', 'error.html'),
-          { query: { error: errQuery, url: urlQuery } }
-        );
-      }, 500);
+      // La ventana ya existe (creada al inicio), solo mostrar error
+      mainWindow?.loadFile(
+        path.join(__dirname, '..', 'resources', 'error.html'),
+        { query: { error: errQuery, url: urlQuery } }
+      );
       return;
     }
   } else {
@@ -1225,34 +1437,12 @@ app.whenReady().then(async () => {
     
     // RasterPrintManager (D6.2)
     initRasterPrintManager(serverUrl);
-  }
-  
-  createMainWindow();
 
-  // Crear bandeja del sistema (solo en producción)
-  if (!isDev) {
-    createTray();
-
-    // Activar auto-inicio con Windows en primera instalación (solo producción)
-    const loginSettings = app.getLoginItemSettings();
-    if (!loginSettings.openAtLogin) {
-      app.setLoginItemSettings({
-        openAtLogin: true,
-        openAsHidden: true,
-        path: process.execPath,
-        args: ['--hidden'],
-      });
-      console.log('[App] Auto-start with Windows enabled');
-    }
+    // Servidor listo — navegar a la app (modo desarrollo)
+    loadApplication();
   }
 
-  // Si se abrió con --hidden (arranque automático), ocultar ventana hasta que user la abra
-  if (process.argv.includes('--hidden')) {
-    // ready-to-show se encargará de no mostrarla (ver createMainWindow)
-    console.log('[App] Started hidden (auto-start)');
-  }
-  
-  // Inicializar auto-updater después de crear ventana (D7)
+  // Inicializar auto-updater (D7)
   if (mainWindow && !isDev) {
     initUpdater(mainWindow);
     console.log('[App] AutoUpdater initialized');
@@ -1312,23 +1502,9 @@ app.on('window-all-closed', async () => {
     scheduler.destroy();
   }
   
-  // Matar servidor local si existe
-  if (localServer) {
-    console.log('[App] Stopping local server...');
-    await localServer.kill();
-    localServer = null;
-  }
-  
-  // D7.2: Solo detener PostgreSQL si está en modo APP_LIFETIME
-  if (!isDev) {
-    const pgConfig = loadRuntimeConfig();
-    if (!pgConfig || pgConfig.runMode === 'APP_LIFETIME') {
-      console.log('[App] Stopping embedded PostgreSQL (APP_LIFETIME mode)...');
-      await shutdownPostgres();
-    } else {
-      console.log(`[App] PostgreSQL kept running (${pgConfig.runMode} mode)`);
-    }
-  }
+// Next.js y PostgreSQL se mantienen en background para reinicio rápido.
+  // Serán detectados automáticamente en el próximo arranque vía server-state.json.
+  console.log('[App] Electron cerrando — servidor queda activo en background para reinicio rápido.');
   
   if (process.platform !== 'darwin') {
     app.quit();
@@ -1336,19 +1512,10 @@ app.on('window-all-closed', async () => {
 });
 
 // Al salir completamente
-app.on('will-quit', async (event) => {
-  // Ensure PostgreSQL is stopped (D7.1)
-  if (!isDev) {
-    await shutdownPostgres();
-  }
-  
-  if (localServer) {
-    event.preventDefault();
-    console.log('[App] Stopping local server before quit...');
-    await localServer.kill();
-    localServer = null;
-    app.quit();
-  }
+app.on('will-quit', () => {
+  // Next.js y PostgreSQL quedan corriendo en background.
+  // Serán detectados y reutilizados en el próximo arranque (fast path).
+  console.log('[App] Electron process exit — background server continues running.');
 });
 
 // Manejar errores no capturados

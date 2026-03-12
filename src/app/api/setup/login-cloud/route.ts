@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 // Cliente Prisma separado que conecta a la nube
 function getCloudPrisma() {

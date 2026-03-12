@@ -92,7 +92,7 @@ export async function POST(
     if (paymentMethod !== 'FIADO') {
       const currentShift = await shiftRepo.getCurrentShift(session.storeId, session.userId);
       if (!currentShift) {
-        return NextResponse.json({ error: 'No hay turno abierto para este método de pago' }, { status: 400 });
+        return NextResponse.json({ error: 'No tienes un turno abierto. Ve a Turnos y abre tu turno antes de procesar esta orden.' }, { status: 400 });
       }
       shiftId = currentShift.id;
     }
@@ -130,9 +130,13 @@ export async function POST(
 
     // Ejecutar conversión en transacción ACID
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Obtener siguiente número de venta
+      // 1. Obtener siguiente número de venta (excluir ventas demo >= 90000)
       const lastSale = await tx.sale.findFirst({
-        where: { storeId: session.storeId },
+        where: {
+          storeId: session.storeId,
+          isDemo: false,
+          saleNumber: { lt: 90000 },
+        },
         orderBy: { saleNumber: 'desc' },
         select: { saleNumber: true },
       });

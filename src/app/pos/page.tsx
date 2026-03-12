@@ -129,6 +129,8 @@ export default function POSPage() {
   // ✅ OPTIMIZACIÓN: useRef para barcode scanner (evita re-renders en cada tecla)
   const barcodeBufferRef = useRef('');
   const lastKeyTimeRef = useRef(0);
+  // ✅ Ref para que el barcode scanner siempre use la versión más reciente de addToCart
+  const addToCartRef = useRef<((sp: StoreProduct) => Promise<void>) | null>(null);
   
   // ✅ OPTIMIZACIÓN: AudioContext reutilizable
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -462,7 +464,7 @@ export default function POSPage() {
           if (res.ok) {
             const data = await res.json();
             if (data.products && data.products.length > 0) {
-              addToCart(data.products[0]);
+              await addToCartRef.current?.(data.products[0]);
               toast.success(`Producto escaneado: ${data.products[0].product.name}`);
             } else {
               toast.error(`Código no encontrado: ${barcodeToSearch}`);
@@ -957,6 +959,9 @@ export default function POSPage() {
       });
     }
   };
+
+  // Mantener siempre la referencia actualizada de addToCart para el barcode scanner
+  addToCartRef.current = addToCart;
 
   // ✅ MÓDULO 18.2: Ref para debounce de promociones en updateQuantity
   const promoDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -2110,6 +2115,8 @@ export default function POSPage() {
                         const result = await desktop.escpos.printSale(completedSale.id);
                         if (result.success) {
                           toast.success('Ticket impreso correctamente');
+                          // Marcar como impreso en la base de datos
+                          fetch(`/api/sales/${completedSale.id}/mark-printed`, { method: 'POST' }).catch(() => {});
                         } else {
                           toast.error(result.error || 'Error al imprimir');
                           // Fallback to web view

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { generateTemporaryPassword } from '@/lib/superadmin';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 
 // GET /api/admin/users - Listar usuarios de la tienda (OWNER)

@@ -98,11 +98,11 @@
 
   <script>
     var steps = [
-      "Inicializando sistema\u2026",
       "Iniciando base de datos\u2026",
       "Preparando el servidor\u2026",
       "Verificando configuraci\u00f3n\u2026",
-      "Preparando entorno de venta\u2026",
+      "Cargando m\u00f3dulos de venta\u2026",
+      "Preparando entorno de inventario\u2026",
       "Casi listo\u2026"
     ];
     var progress = 0, stepIdx = 0;
@@ -111,11 +111,17 @@
     var statusEl = document.getElementById("status-text");
     var footer = document.querySelector(".footer");
 
-    // Aviso de primera ejecuci\u00f3n despu\u00e9s de 15 segundos
+    // Aviso de primera ejecución después de 20 segundos
     setTimeout(function() {
-      footer.textContent = "\u26a0\ufe0f Primera ejecuci\u00f3n: la base de datos puede tardar 2-3 minutos en iniciarse.";
+      footer.textContent = "\u26a0\ufe0f Primer inicio: la base de datos puede tardar 2-3 minutos.";
       footer.style.color = "rgba(191,164,99,0.9)";
-    }, 15000);
+    }, 20000);
+
+    // Aviso adicional a los 90 segundos
+    setTimeout(function() {
+      footer.textContent = "\u23f3 PostgreSQL iniciando\u2026 por favor espere, no cierre la aplicaci\u00f3n.";
+      footer.style.color = "rgba(191,164,99,0.9)";
+    }, 90000);
 
     setInterval(function() {
       if (progress < 90) {

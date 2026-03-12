@@ -64,7 +64,7 @@ export async function PATCH(
 
     if (newStock < 0) {
       return NextResponse.json(
-        { error: 'Stock no puede ser negativo' },
+        { error: `Stock insuficiente. Stock actual: ${storeProduct.stock ?? 0}. El ajuste máximo negativo es -${storeProduct.stock ?? 0}.` },
         { status: 400 }
       );
     }

@@ -1141,13 +1141,25 @@ export async function POST(req: NextRequest) {
 
     // Validar formato de items
     for (const item of items) {
-      if (!item.storeProductId || typeof item.quantity !== 'number' || typeof item.unitPrice !== 'number') {
-        const error: ErrorResponse = {
-          code: 'INVALID_ITEM_FORMAT',
-          message: 'Formato de item inválido',
-          details: { requiredFields: ['storeProductId', 'quantity', 'unitPrice'] },
-        };
-        return NextResponse.json(error, { status: 400 });
+      // Servicios no tienen storeProductId — validar serviceId en su lugar
+      if (item.isService) {
+        if (!item.serviceId || typeof item.quantity !== 'number' || typeof item.unitPrice !== 'number') {
+          const error: ErrorResponse = {
+            code: 'INVALID_ITEM_FORMAT',
+            message: 'Formato de servicio inválido',
+            details: { requiredFields: ['serviceId', 'quantity', 'unitPrice'] },
+          };
+          return NextResponse.json(error, { status: 400 });
+        }
+      } else {
+        if (!item.storeProductId || typeof item.quantity !== 'number' || typeof item.unitPrice !== 'number') {
+          const error: ErrorResponse = {
+            code: 'INVALID_ITEM_FORMAT',
+            message: 'Formato de item inválido',
+            details: { requiredFields: ['storeProductId', 'quantity', 'unitPrice'] },
+          };
+          return NextResponse.json(error, { status: 400 });
+        }
       }
     }
 
@@ -1159,7 +1171,7 @@ export async function POST(req: NextRequest) {
       if (!currentShift) {
         const error: ErrorResponse = {
           code: 'SHIFT_REQUIRED',
-          message: 'Debes abrir un turno antes de realizar ventas',
+          message: 'No tienes un turno abierto. Ve a Turnos y abre tu turno antes de realizar ventas.',
         };
         return NextResponse.json(error, { status: 409 });
       }

@@ -123,16 +123,35 @@ export default function InventoryPage() {
     }
   };
 
-  const handleToggleActive = async (storeProduct: StoreProduct) => {
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; storeProduct?: StoreProduct }>({ open: false });
+
+  const handleToggleActive = (storeProduct: StoreProduct) => {
+    if (storeProduct.active) {
+      // Mostrar confirmación antes de eliminar/desactivar
+      setDeleteConfirm({ open: true, storeProduct });
+    } else {
+      // Reactivar directamente sin confirmación
+      handleSetActive(storeProduct, true);
+    }
+  };
+
+  const handleSetActive = async (storeProduct: StoreProduct, active: boolean) => {
     try {
       const res = await fetch(`/api/store-products/${storeProduct.id}/active`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: !storeProduct.active }),
+        body: JSON.stringify({ active }),
       });
 
       if (res.ok) {
-        toast.success(storeProduct.active ? 'Producto desactivado' : 'Producto activado');
+        const data = await res.json();
+        if (data.deleted) {
+          toast.success('Producto eliminado. El código de barras quedó libre.');
+        } else if (data.softDeleted) {
+          toast.warning(data.message);
+        } else {
+          toast.success('Producto activado');
+        }
         loadProducts();
       } else {
         const data = await res.json();
@@ -491,7 +510,7 @@ export default function InventoryPage() {
                                 <button
                                   onClick={() => handleToggleActive(sp)}
                                   className="p-1 hover:bg-gray-100 rounded-md transition-colors"
-                                  title={sp.active ? 'Desactivar' : 'Activar'}
+                                  title={sp.active ? 'Eliminar producto' : 'Activar producto'}
                                 >
                                   <Power
                                     className={`w-4 h-4 ${
@@ -579,6 +598,22 @@ export default function InventoryPage() {
           basePrice={sellUnitPricesModal.price || 0}
         />
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false })}
+        onConfirm={() => {
+          if (deleteConfirm.storeProduct) {
+            handleSetActive(deleteConfirm.storeProduct, false);
+          }
+          setDeleteConfirm({ open: false });
+        }}
+        title="Eliminar producto"
+        message={`¿Eliminar "${deleteConfirm.storeProduct?.product.name}"?\n\nSi el producto nunca tuvo ventas, se eliminará completamente y el código de barras quedará libre.\n\nSi tuvo ventas, solo se desactivará para conservar el historial.`}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        confirmColor="red"
+      />
     </AuthLayout>
   );
 }

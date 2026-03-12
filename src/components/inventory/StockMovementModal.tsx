@@ -75,6 +75,7 @@ export function StockMovementModal({
     setUnitPrice('');
     setNotes('');
     setError('');
+    setLoading(false);
   };
 
   if (!isOpen) return null;

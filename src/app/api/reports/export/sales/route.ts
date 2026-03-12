@@ -25,6 +25,15 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from');
     const to = searchParams.get('to');
 
+    // Validar fechas
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (from && !dateRegex.test(from)) {
+      return NextResponse.json({ error: 'Fecha \'from\' inválida. Use formato YYYY-MM-DD' }, { status: 400 });
+    }
+    if (to && !dateRegex.test(to)) {
+      return NextResponse.json({ error: 'Fecha \'to\' inválida. Use formato YYYY-MM-DD' }, { status: 400 });
+    }
+
     // Build where clause
     const where: any = {
       storeId: session.storeId,
@@ -98,7 +107,6 @@ export async function GET(request: NextRequest) {
       'Vuelto',
       'Cliente',
       'Cajero',
-      'Impreso',
     ];
 
     const rows = sales.map(s => [
@@ -121,7 +129,6 @@ export async function GET(request: NextRequest) {
       escapeCSV(s.changeAmount !== null ? Number(s.changeAmount).toFixed(2) : ''),
       escapeCSV(s.customer?.name || ''),
       escapeCSV(s.user.name),
-      escapeCSV(s.printedAt ? 'Si' : 'No'),
     ]);
 
     // --- Resumen por método de pago ---
@@ -274,9 +281,9 @@ export async function GET(request: NextRequest) {
       summaryRows.push(cells.join(';'));
     }
 
-    // Fila de gran total
+    // Fila de total ventas
     summaryRows.push('');
-    const totCells: string[] = [ec('GRAN TOTAL'), ec(`S/ ${grandTotal.toFixed(2)}`), ''];
+    const totCells: string[] = [ec('TOTAL VENTAS'), ec(`S/ ${grandTotal.toFixed(2)}`), ''];
     for (const [method, data] of methodEntries) {
       const label = methodLabels[method] || method;
       totCells.push(ec(`${label}: S/ ${data.total.toFixed(2)}`), ec(`(${data.count} tickets)`), '', '');

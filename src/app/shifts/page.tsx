@@ -69,19 +69,19 @@ export default function ShiftsPage() {
     if (!currentShift) return;
     
     try {
-      // Consultar directamente las ventas del turno actual
+      // Usar endpoint que incluye ventas CASH + cobros de FIADO en efectivo
+      const cashRes = await fetch(`/api/shifts/${currentShift.id}/cash-total`);
+      if (cashRes.ok) {
+        const cashData = await cashRes.json();
+        setCashSales(cashData.cashTotal ?? 0);
+      }
+
+      // Calcular desglose por método de pago (solo ventas, para información)
       const salesRes = await fetch(`/api/sales?shiftId=${currentShift.id}`);
       if (salesRes.ok) {
         const salesData = await salesRes.json();
         const sales = salesData.sales || [];
         
-        // Calcular total CASH
-        const cashTotal = sales
-          .filter((s: any) => s.paymentMethod === 'CASH' && s.total > 0)
-          .reduce((sum: number, s: any) => sum + parseFloat(s.total || 0), 0);
-        setCashSales(cashTotal);
-        
-        // Calcular por método de pago
         const byMethod: Record<string, { total: number; count: number }> = {};
         sales.filter((s: any) => s.total > 0).forEach((s: any) => {
           const method = s.paymentMethod;

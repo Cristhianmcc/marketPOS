@@ -131,6 +131,7 @@ export class PrismaShiftRepository implements IShiftRepository {
   }
 
   async hasOpenShift(storeId: string, userId: string): Promise<boolean> {
+    // Cada cajero puede tener a lo sumo un turno abierto a la vez
     const count = await prisma.shift.count({
       where: {
         storeId,

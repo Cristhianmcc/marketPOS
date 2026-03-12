@@ -464,8 +464,11 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
     stdio: ['ignore', 'pipe', 'pipe'],
     shell: false,
     windowsHide: true,
+    detached: true,  // El proceso sobrevive al cierre de Electron
   });
-  
+  // unref() permite que Electron cierre sin esperar a que Next.js termine
+  serverProcess.unref();
+
   // Capturar logs
   serverProcess.stdout?.on('data', (data: Buffer) => {
     const msg = data.toString().trim();

@@ -42,7 +42,6 @@ export function EditPriceModal({
 
       if (!res.ok) {
         setError(data.error || 'Error al actualizar precio');
-        setLoading(false);
         return;
       }
 
@@ -51,6 +50,7 @@ export function EditPriceModal({
     } catch (err) {
       console.error('Error updating price:', err);
       setError('Error de conexión');
+    } finally {
       setLoading(false);
     }
   };

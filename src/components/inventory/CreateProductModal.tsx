@@ -448,6 +448,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     setShowDuplicateWarning(false);
     setFuzzySuggestions([]); // ✅ MÓDULO 18.2
     setLoadingFuzzy(false); // ✅ MÓDULO 18.2
+    setLoading(false);
   };
 
   if (!isOpen) return null;

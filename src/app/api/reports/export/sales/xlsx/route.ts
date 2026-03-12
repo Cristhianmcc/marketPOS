@@ -118,6 +118,15 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from');
     const to   = searchParams.get('to');
 
+    // Validar fechas
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (from && !dateRegex.test(from)) {
+      return NextResponse.json({ error: 'Fecha \'from\' inválida. Use formato YYYY-MM-DD' }, { status: 400 });
+    }
+    if (to && !dateRegex.test(to)) {
+      return NextResponse.json({ error: 'Fecha \'to\' inválida. Use formato YYYY-MM-DD' }, { status: 400 });
+    }
+
     const where: any = { storeId: session.storeId, total: { gt: 0 } };
     if (from) where.createdAt = { ...where.createdAt, gte: new Date(from + 'T00:00:00.000-05:00') };
     if (to)   where.createdAt = { ...where.createdAt, lte: new Date(to   + 'T23:59:59.999-05:00') };
@@ -259,7 +268,7 @@ export async function GET(request: NextRequest) {
     const tableHeaders = [
       'Ticket', 'Fecha', 'Hora', 'Subtotal', 'Descuentos',
       ...(hasCoupons ? ['CupÃ³n'] : []),
-      'Impuesto', 'Total', 'Método Pago', 'Pagado', 'Vuelto', 'Cliente', 'Cajero', 'Impreso',
+      'Impuesto', 'Total', 'Método Pago', 'Pagado', 'Vuelto', 'Cliente', 'Cajero',
     ];
 
     // Cabecera de tabla
@@ -294,7 +303,6 @@ export async function GET(request: NextRequest) {
         s.changeAmount !== null ? Number(s.changeAmount) : '',
         s.customer?.name ?? '',
         s.user.name,
-        s.printedAt ? 'SÃ­' : 'No',
       ];
 
       vals.forEach((v, ci) => {
@@ -419,11 +427,11 @@ export async function GET(request: NextRequest) {
     });
     row++;
 
-    // â€” Gran total â€”
+    // — Total ventas —
     ws.getRow(row).height = 22;
     ws.mergeCells(row, 1, row, 2);
     styleCell(ws.getCell(row, 1), {
-      value: `GRAN TOTAL: S/ ${grandTotal.toFixed(2)}   (${sales.length} tickets)`,
+      value: `TOTAL VENTAS: S/ ${grandTotal.toFixed(2)}   (${sales.length} tickets)`,
       bg: C.navy, bold: true, color: C.white, size: 12, halign: 'center', border: borders('medium'),
     });
     methodEntries.forEach(([method, data], idx) => {
