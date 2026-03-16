@@ -3,6 +3,9 @@ import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
 import Link from 'next/link';
 import { LogoutButton } from '@/components/LogoutButton';
+import { getAllFeatureFlags } from '@/lib/featureFlags';
+import { FeatureFlagKey } from '@prisma/client';
+import { prisma } from '@/infra/db/prisma';
 
 export default async function HomePage() {
   const session = await getSession();
@@ -11,9 +14,34 @@ export default async function HomePage() {
     redirect('/login');
   }
 
+  // Si no tiene tienda asignada → ir a crear/gestionar tiendas (instalación nueva)
+  if (!session.storeId) {
+    redirect('/admin/stores');
+  }
+
   const isSuperAdminUser = isSuperAdmin(session.email);
   const isOwner = session.role === 'OWNER';
-  
+
+  // Flags del plan activo — solo se consultan para OWNER no-superadmin
+  const storeFlags = (isOwner && !isSuperAdminUser && session.storeId)
+    ? await getAllFeatureFlags(session.storeId)
+    : null;
+  // null = superadmin o sin tienda → muestra todo; array = filtra por plan
+  const hasFlag = (key: FeatureFlagKey) =>
+    storeFlags === null || (storeFlags.find(f => f.key === key)?.enabled ?? false);
+
+  // Plan del store — para ocultar módulos avanzados en STARTER
+  let planCode: string | null = null;
+  if (isOwner && !isSuperAdminUser && session.storeId) {
+    const sub = await prisma.subscription.findUnique({
+      where: { storeId: session.storeId },
+      select: { planCode: true },
+    });
+    planCode = sub?.planCode ?? 'DEMO';
+  }
+  // STARTER no tiene acceso a módulos admin avanzados
+  const isStarterPlan = planCode === 'STARTER';
+
   const roleDisplay = session.role === 'OWNER' ? 'Propietario' : 'Cajero';
   const currentTime = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
   const currentDate = new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -171,6 +199,7 @@ export default async function HomePage() {
                 <p className="text-blue-700 text-sm">Gestionar cajeros</p>
               </Link>
 
+              {hasFlag(FeatureFlagKey.ENABLE_PROMOTIONS) && (
               <Link
                 href="/promotions"
                 className="group bg-pink-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-pink-100"
@@ -186,7 +215,9 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Promociones</h2>
                 <p className="text-pink-700 text-sm">Gestionar promociones</p>
               </Link>
+              )}
 
+              {hasFlag(FeatureFlagKey.ALLOW_COUPONS) && (
               <Link
                 href="/coupons"
                 className="group bg-green-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-green-100"
@@ -202,7 +233,9 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Cupones</h2>
                 <p className="text-green-700 text-sm">Códigos de descuento</p>
               </Link>
+              )}
 
+              {hasFlag(FeatureFlagKey.ENABLE_CATEGORY_PROMOS) && (
               <Link
                 href="/category-promotions"
                 className="group bg-purple-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-purple-100"
@@ -218,7 +251,9 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Promos Categoría</h2>
                 <p className="text-purple-700 text-sm">Descuentos por categoría</p>
               </Link>
+              )}
 
+              {hasFlag(FeatureFlagKey.ENABLE_VOLUME_PROMOS) && (
               <Link
                 href="/volume-promotions"
                 className="group bg-orange-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-orange-100"
@@ -234,7 +269,9 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Promos Pack</h2>
                 <p className="text-orange-700 text-sm">Por volumen (3x S/5)</p>
               </Link>
+              )}
 
+              {hasFlag(FeatureFlagKey.ENABLE_NTH_PROMOS) && (
               <Link
                 href="/nth-promotions"
                 className="group bg-yellow-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-yellow-200"
@@ -250,6 +287,7 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Promos N-ésimo</h2>
                 <p className="text-yellow-700 text-sm">2do al 50%, 3ro gratis</p>
               </Link>
+              )}
 
               <Link
                 href="/admin/quick-sell"
@@ -284,6 +322,7 @@ export default async function HomePage() {
                 <p className="text-gray-600 text-sm">Ajustes de la tienda</p>
               </Link>
 
+              {!isStarterPlan && (
               <Link
                 href="/admin/feature-flags"
                 className="group bg-indigo-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-indigo-100"
@@ -299,7 +338,9 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Funcionalidades</h2>
                 <p className="text-indigo-700 text-sm">Activar/desactivar</p>
               </Link>
+              )}
 
+              {!isStarterPlan && (
               <Link
                 href="/settings/limits"
                 className="group bg-red-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-red-100"
@@ -315,7 +356,9 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Límites Operativos</h2>
                 <p className="text-red-700 text-sm">Configurar límites</p>
               </Link>
+              )}
 
+              {!isStarterPlan && (
               <Link
                 href="/admin/audit"
                 className="group bg-gray-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-gray-200"
@@ -331,7 +374,9 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Auditoría</h2>
                 <p className="text-gray-600 text-sm">Historial de operaciones</p>
               </Link>
+              )}
 
+              {!isStarterPlan && (
               <Link
                 href="/admin/system"
                 className="group bg-green-50 rounded-xl shadow hover:shadow-md transition-all duration-200 p-6 border border-green-100"
@@ -347,6 +392,7 @@ export default async function HomePage() {
                 <h2 className="text-base font-bold text-gray-900 mb-1">Observabilidad</h2>
                 <p className="text-green-700 text-sm">Estado del sistema</p>
               </Link>
+              )}
             </>
           )}
           </div>

@@ -31,8 +31,8 @@ function getCloudUrl(): string {
 function getLicenseApiKey(): string {
   return process.env.LICENSE_API_KEY || '';
 }
-const CACHE_TTL_MS   = 7  * 24 * 60 * 60 * 1000; // 7 días
-const GRACE_EXTRA_MS = 3  * 24 * 60 * 60 * 1000; // 3 días de gracia offline
+const CACHE_TTL_MS   = 30 * 24 * 60 * 60 * 1000; // 30 días de caché válida
+const GRACE_EXTRA_MS = 60 * 24 * 60 * 60 * 1000; // 60 días de gracia offline adicionales
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -266,18 +266,41 @@ export async function checkLicense(storeId: string, serverUrl: string): Promise<
   const local = await verifyLocal(serverUrl);
   if (local) {
     console.log(`[LicenseChecker] BD local — status: ${local.status}`);
+    // Si la nube suspendió explícitamente (y quedó en caché), respetar ese estado
+    // Pero si simplemente no hay internet y la BD local tiene suscripción → permitir operar
+    const suspendedByCloud = cached?.state.status === 'SUSPENDED' || cached?.state.status === 'CANCELLED';
+    if (!suspendedByCloud) {
+      return { ...local, canOperate: true, source: 'cache' };
+    }
     return local;
   }
 
-  // 5. No se pudo verificar nada → bloquear
+  // 5. Sin nada verificable → si la nube NO suspendió explícitamente, permitir operar
+  // El administrador suspende desde la nube: mientras no haya señal de suspensión, la app funciona
+  const explicitlySuspended = cached?.state.status === 'SUSPENDED' || cached?.state.status === 'CANCELLED';
+  if (!explicitlySuspended) {
+    console.log('[LicenseChecker] Sin verificación disponible — permitiendo operar (no hay suspensión explícita)');
+    return {
+      canOperate: true,
+      status: 'OFFLINE_GRACE',
+      currentPeriodEnd: null,
+      trialEndsAt: null,
+      planCode: cached?.state.planCode ?? null,
+      daysRemaining: 999,
+      source: 'grace',
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  // 6. La nube explícitamente suspendió esta tienda → bloquear
   return {
     canOperate: false,
-    status: 'NO_SUBSCRIPTION',
+    status: cached?.state.status ?? 'SUSPENDED',
     currentPeriodEnd: null,
     trialEndsAt: null,
     planCode: null,
     daysRemaining: 0,
-    source: 'no_config',
+    source: 'cache',
     checkedAt: new Date().toISOString(),
   };
 }

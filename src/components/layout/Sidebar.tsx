@@ -6,6 +6,7 @@ import { Store, ShoppingCart, DollarSign, FileText, Receipt, Package, BarChart3,
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { ShortcutsButton } from '@/components/shortcuts/ShortcutsModal';
+import { useFlags } from '@/hooks/useFlags';
 
 interface SidebarProps {
   user?: {
@@ -20,6 +21,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [promosExpanded, setPromosExpanded] = useState(false);
+  const { isOn } = useFlags();
 
   const isOwner = user?.role?.toUpperCase() === 'OWNER';
 
@@ -32,13 +34,15 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
     { icon: BarChart3, label: 'Reportes', href: '/reports' },
   ];
 
-  const promoItems = [
-    { label: 'Promociones', href: '/promotions', color: 'text-green-600 dark:text-green-400' },
-    { label: 'Cupones', href: '/coupons', color: 'text-green-600 dark:text-green-400' },
-    { label: 'Promos Categoría', href: '/category-promotions', color: 'text-purple-600 dark:text-purple-400' },
-    { label: 'Promos Pack', href: '/volume-promotions', color: 'text-orange-600 dark:text-orange-400' },
-    { label: 'Promos N-ésimo', href: '/nth-promotions', color: 'text-yellow-600 dark:text-yellow-400' },
+  const allPromoItems = [
+    { label: 'Promociones', href: '/promotions', color: 'text-green-600 dark:text-green-400', flag: 'ENABLE_PROMOTIONS' },
+    { label: 'Cupones', href: '/coupons', color: 'text-green-600 dark:text-green-400', flag: 'ALLOW_COUPONS' },
+    { label: 'Promos Categoría', href: '/category-promotions', color: 'text-purple-600 dark:text-purple-400', flag: 'ENABLE_CATEGORY_PROMOS' },
+    { label: 'Promos Pack', href: '/volume-promotions', color: 'text-orange-600 dark:text-orange-400', flag: 'ENABLE_VOLUME_PROMOS' },
+    { label: 'Promos N-ésimo', href: '/nth-promotions', color: 'text-yellow-600 dark:text-yellow-400', flag: 'ENABLE_NTH_PROMOS' },
   ];
+  // Filtrar por flags del plan activo
+  const promoItems = allPromoItems.filter(item => isOn(item.flag));
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -135,8 +139,8 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
           );
         })}
 
-        {/* Promociones Section - Only for Owner */}
-        {isOwner && (
+        {/* Promociones Section - Only for Owner with at least one promo flag active */}
+        {isOwner && promoItems.length > 0 && (
           <div className="pt-2">
             <button
               onClick={() => {

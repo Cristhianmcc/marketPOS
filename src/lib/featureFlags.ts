@@ -308,6 +308,7 @@ export async function syncFeatureFlagsFromPlan(storeId: string) {
       'ENABLE_CATEGORY_PROMOS': FeatureFlagKey.ENABLE_CATEGORY_PROMOS,
       'ENABLE_VOLUME_PROMOS': FeatureFlagKey.ENABLE_VOLUME_PROMOS,
       'ENABLE_NTH_PROMOS': FeatureFlagKey.ENABLE_NTH_PROMOS,
+      'ENABLE_SUNAT': FeatureFlagKey.ENABLE_SUNAT, // Solo BUSINESS y DEMO
       // ENABLE_ADVANCED_REPORTS y ENABLE_MULTI_BRANCH no están en el enum (futuro)
     };
 

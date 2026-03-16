@@ -350,6 +350,8 @@ export class MigrationRunner {
       `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ticket_website VARCHAR(255);`,
       // ticket_logo added for custom logo on receipt
       `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ticket_logo VARCHAR(500);`,
+      // cost_price added for purchase cost + margin feature
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2);`,
     ];
 
     const sql = patches.join('\n');

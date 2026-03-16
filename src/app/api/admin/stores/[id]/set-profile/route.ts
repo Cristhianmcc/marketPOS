@@ -18,7 +18,7 @@ import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
 import { BusinessProfile, FeatureFlagKey } from '@prisma/client';
-import { getProfileFlags, CORE_FLAGS } from '@/lib/businessProfiles';
+import { getProfileFlags } from '@/lib/businessProfiles';
 
 interface RouteContext {
   params: Promise<{ id: string }>;

@@ -286,9 +286,10 @@ model StoreProduct {
   storeId   String @map("store_id")
   productId String @map("product_id")
 
-  price    Decimal  @db.Decimal(10, 2)
-  stock    Decimal? @db.Decimal(10, 3) // null permitido (ej: kg sin control)
-  minStock Decimal? @map("min_stock") @db.Decimal(10, 3)
+  price     Decimal  @db.Decimal(10, 2)
+  costPrice Decimal? @map("cost_price") @db.Decimal(10, 2) // Precio de compra al proveedor (opcional)
+  stock     Decimal? @db.Decimal(10, 3) // null permitido (ej: kg sin control)
+  minStock  Decimal? @map("min_stock") @db.Decimal(10, 3)
 
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")

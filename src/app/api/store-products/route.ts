@@ -13,6 +13,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
+    if (!user.storeId) {
+      return NextResponse.json({ error: 'Sin tienda asignada' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get('productId');
 
@@ -49,6 +53,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!user.storeId) {
+      return NextResponse.json({ error: 'Sin tienda asignada' }, { status: 403 });
+    }
+
     const body = await req.json();
     
     const validation = ConfigureStoreProductSchema.safeParse(body);
@@ -80,6 +88,7 @@ export async function POST(req: NextRequest) {
       storeId: user.storeId,
       productId: data.productId,
       price: data.price,
+      costPrice: data.costPrice ?? null,
       stock: data.stock ?? null,
       minStock: data.minStock ?? null,
       active: data.active,

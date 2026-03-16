@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
-import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag, Download, Upload } from 'lucide-react';
+import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag, Download, Upload, FileArchive } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
 import { EditProductModal } from '@/components/inventory/EditProductModal';
 import { StockMovementModal } from '@/components/inventory/StockMovementModal';
@@ -30,6 +30,7 @@ interface Product {
 interface StoreProduct {
   id: string;
   price: number;
+  costPrice: number | null;
   stock: number | null;
   minStock: number | null;
   active: boolean;
@@ -75,7 +76,7 @@ export default function InventoryPage() {
   }>({ open: false });
 
   // ✅ MÓDULO F2: Feature flags para unidades avanzadas
-  const { isOn: isFlagOn } = useFlags();
+  const { isOn: isFlagOn, isDesktop } = useFlags();
   const advancedUnitsEnabled = isFlagOn('ENABLE_ADVANCED_UNITS');
   const conversionsEnabled = isFlagOn('ENABLE_CONVERSIONS');
   const sellUnitPricingEnabled = isFlagOn('ENABLE_SELLUNIT_PRICING'); // ✅ MÓDULO F2.3
@@ -244,12 +245,12 @@ export default function InventoryPage() {
                   Importar CSV
                 </button>
                 <a
-                  href="/api/reports/export/inventory"
+                  href={isDesktop ? '/api/reports/export/inventory/zip' : '/api/reports/export/inventory'}
                   download
                   className="h-10 px-4 border border-blue-300 bg-blue-50 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-2"
                 >
-                  <Download className="w-4 h-4" />
-                  Exportar CSV
+                  {isDesktop ? <FileArchive className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                  {isDesktop ? 'Exportar ZIP' : 'Exportar CSV'}
                 </a>
                 <button
                   onClick={() => setCreateModalOpen(true)}

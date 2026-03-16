@@ -30,8 +30,9 @@ export const PLAN_CAPABILITIES: Record<PlanCode, PlanCapabilities> = {
     ENABLE_CATEGORY_PROMOS: true,
     ENABLE_VOLUME_PROMOS: true,
     ENABLE_NTH_PROMOS: true,
+    ENABLE_SUNAT: true,          // DEMO activa SUNAT para que lo prueben
     ENABLE_ADVANCED_REPORTS: true,
-    ENABLE_MULTI_BRANCH: false, // Solo BUSINESS tiene multi-sucursal
+    ENABLE_MULTI_BRANCH: false,
   },
   STARTER: {
     ALLOW_FIADO: false,
@@ -40,6 +41,7 @@ export const PLAN_CAPABILITIES: Record<PlanCode, PlanCapabilities> = {
     ENABLE_CATEGORY_PROMOS: false,
     ENABLE_VOLUME_PROMOS: false,
     ENABLE_NTH_PROMOS: false,
+    ENABLE_SUNAT: false,         // Básico no incluye SUNAT
     ENABLE_ADVANCED_REPORTS: false,
     ENABLE_MULTI_BRANCH: false,
   },
@@ -50,6 +52,7 @@ export const PLAN_CAPABILITIES: Record<PlanCode, PlanCapabilities> = {
     ENABLE_CATEGORY_PROMOS: true,
     ENABLE_VOLUME_PROMOS: true,
     ENABLE_NTH_PROMOS: true,
+    ENABLE_SUNAT: false,         // Profesional no incluye SUNAT
     ENABLE_ADVANCED_REPORTS: false,
     ENABLE_MULTI_BRANCH: false,
   },
@@ -60,8 +63,9 @@ export const PLAN_CAPABILITIES: Record<PlanCode, PlanCapabilities> = {
     ENABLE_CATEGORY_PROMOS: true,
     ENABLE_VOLUME_PROMOS: true,
     ENABLE_NTH_PROMOS: true,
+    ENABLE_SUNAT: true,          // Empresarial incluye SUNAT
     ENABLE_ADVANCED_REPORTS: true,
-    ENABLE_MULTI_BRANCH: true, // Futuro
+    ENABLE_MULTI_BRANCH: true,
   },
 };
 

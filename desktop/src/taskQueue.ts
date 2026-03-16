@@ -89,11 +89,20 @@ export class TaskQueue {
       if (fs.existsSync(this.queuePath)) {
         const data = fs.readFileSync(this.queuePath, 'utf-8');
         const tasks: QueuedTask[] = JSON.parse(data);
+        const now = Date.now();
         
         for (const task of tasks) {
           // Reset processing tasks to pending on startup
           if (task.status === 'processing') {
             task.status = 'pending';
+          }
+          // Descartar completed >7 días y failed >30 días al cargar
+          if (task.status === 'completed') {
+            const age = now - new Date(task.completedAt ?? task.createdAt).getTime();
+            if (age > 7 * 24 * 60 * 60 * 1000) continue;
+          } else if (task.status === 'failed') {
+            const age = now - new Date(task.lastAttempt ?? task.createdAt).getTime();
+            if (age > 30 * 24 * 60 * 60 * 1000) continue;
           }
           this.tasks.set(task.id, task);
         }
@@ -107,6 +116,20 @@ export class TaskQueue {
 
   private saveQueue(): void {
     try {
+      const now = Date.now();
+      // Purga automática antes de guardar:
+      // - completed de más de 7 días → se borraron, ya se procesaron
+      // - failed de más de 30 días → ya no tienen sentido reintentarlos
+      for (const [id, task] of this.tasks) {
+        if (task.status === 'completed') {
+          const age = now - new Date(task.completedAt ?? task.createdAt).getTime();
+          if (age > 7 * 24 * 60 * 60 * 1000) this.tasks.delete(id);
+        } else if (task.status === 'failed') {
+          const age = now - new Date(task.lastAttempt ?? task.createdAt).getTime();
+          if (age > 30 * 24 * 60 * 60 * 1000) this.tasks.delete(id);
+        }
+      }
+
       const tasks = Array.from(this.tasks.values());
       const dir = path.dirname(this.queuePath);
       

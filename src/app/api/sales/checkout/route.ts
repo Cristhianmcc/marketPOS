@@ -150,12 +150,13 @@ async function executeCheckout(
         );
       }
 
-      // Validar cantidad según tipo
-      if (sp.product.unitType === 'UNIT' && !Number.isInteger(item.quantity)) {
+      // Validar cantidad según tipo: solo rechazar decimales si la unidad base no los permite
+      const baseUnitAllowsDecimals = sp.product.baseUnit?.allowDecimals ?? false;
+      if (!baseUnitAllowsDecimals && !Number.isInteger(item.quantity)) {
         throw new CheckoutError(
           'INVALID_QUANTITY',
           400,
-          `${sp.product.name}: cantidad debe ser entera para productos tipo UNIT`,
+          `${sp.product.name}: cantidad debe ser entera para esta unidad de medida`,
           { productId: sp.id, productName: sp.product.name, quantity: item.quantity }
         );
       }

@@ -18,6 +18,9 @@ export async function GET() {
     const session = await getSessionOrThrow();
 
     // 2. Verificar que la tienda esté activa
+    if (!session.storeId) {
+      return NextResponse.json({ code: 'NO_STORE', message: 'Sin tienda asignada' }, { status: 403 });
+    }
     await requireStoreActive(session.storeId);
 
     // 3. Obtener todos los flags
@@ -27,6 +30,7 @@ export async function GET() {
     return NextResponse.json({ 
       flags,
       storeId: session.storeId,
+      isDesktop: process.env.DESKTOP_MODE === 'true',
       timestamp: new Date().toISOString(),
     });
 

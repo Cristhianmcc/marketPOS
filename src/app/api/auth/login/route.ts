@@ -77,12 +77,21 @@ export async function POST(request: Request) {
     // PASO 1: SIEMPRE intentar login LOCAL primero
     // ========================================
     let localUser = null;
+    let localDbFailed = false;
     try {
       localUser = await userRepo.findByEmail(email);
       console.log('[Login] Local user lookup result:', localUser ? 'found' : 'not found');
     } catch (localDbError) {
       console.error('[Login] Error connecting to local DB:', localDbError);
-      // Si falla la conexión local, intentar cloud
+      localDbFailed = true;
+    }
+
+    // Si la BD local falló con excepción → postgres aún arrancando
+    if (localDbFailed) {
+      return NextResponse.json(
+        { error: 'El sistema aún está iniciando. Espera unos segundos e intenta de nuevo.' },
+        { status: 503 }
+      );
     }
 
     // Si encontramos usuario local, autenticar contra local
@@ -136,6 +145,26 @@ export async function POST(request: Request) {
     // ========================================
     console.log('[Login] User not found locally, attempting cloud authentication...');
     
+    // Antes de ir a la nube: si es superadmin con hash en env, autenticar sin internet
+    // Solo autentica offline si el hash coincide — si no, cae a la nube normalmente
+    const superadminEmailsEarly = (process.env.SUPERADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+    const superadminHashEarly = process.env.SUPERADMIN_PASSWORD_HASH || '';
+    if (superadminEmailsEarly.includes(email.toLowerCase()) && superadminHashEarly) {
+      const isValidSuperAdmin = await bcrypt.compare(password, superadminHashEarly);
+      if (isValidSuperAdmin) {
+        resetRateLimit('login', clientIP);
+        const displayName = email.split('@')[0];
+        await setSession({ userId: email, storeId: null, email, name: displayName, role: 'SUPERADMIN' });
+        return NextResponse.json({
+          success: true,
+          needsProvisioning: true,
+          user: { id: email, email, name: displayName, role: 'SUPERADMIN', storeId: null },
+          message: 'Autenticado como SuperAdmin (offline).',
+        });
+      }
+      // Hash no coincide → continuar hacia la nube para verificar
+    }
+
     const cloudPrisma = getCloudPrisma();
     if (!cloudPrisma) {
       return NextResponse.json(
@@ -145,11 +174,15 @@ export async function POST(request: Request) {
     }
 
     try {
-      // Buscar usuario en la nube
-        const cloudUser = await cloudPrisma.user.findUnique({
-          where: { email },
-          include: { store: true },
-        });
+      // Buscar usuario en la nube con timeout de 5 segundos
+      const cloudQueryPromise = cloudPrisma.user.findUnique({
+        where: { email },
+        include: { store: true },
+      });
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('CLOUD_TIMEOUT')), 5000)
+      );
+      const cloudUser = await Promise.race([cloudQueryPromise, timeoutPromise]);
 
         if (!cloudUser) {
           await cloudPrisma.$disconnect();
@@ -208,6 +241,12 @@ export async function POST(request: Request) {
       } catch (cloudError) {
         console.error('[Login] Cloud auth error:', cloudError);
         const errMsg = cloudError instanceof Error ? cloudError.message : String(cloudError);
+        if (errMsg === 'CLOUD_TIMEOUT' || errMsg.includes('CLOUD_TIMEOUT')) {
+          return NextResponse.json(
+            { error: 'Sin conexión a internet. Solo usuarios ya configurados en este equipo pueden iniciar sesión.' },
+            { status: 503 }
+          );
+        }
         return NextResponse.json(
           { error: `Error conectando a la nube: ${errMsg.substring(0, 100)}` },
           { status: 503 }

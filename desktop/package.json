@@ -103,6 +103,10 @@
       {
         "from": "resources/vc_redist.x64.exe",
         "to": "vc_redist.x64.exe"
+      },
+      {
+        "from": "resources/icon.ico",
+        "to": "resources/icon.ico"
       }
     ],
     "win": {
