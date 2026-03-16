@@ -46,6 +46,8 @@ interface UseFlagsReturn {
   refetch: () => Promise<void>;
   /** Todos los flags cargados */
   allFlags: Record<string, boolean>;
+  /** True si la app está corriendo en modo desktop (Electron) */
+  isDesktop: boolean;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -58,6 +60,7 @@ let globalFlagCache: FlagState = {
   error: null,
   lastFetched: null,
 };
+let globalIsDesktop = false;
 
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
@@ -87,6 +90,9 @@ async function fetchFlags(): Promise<Record<string, boolean>> {
 
   const data = await response.json();
   
+  // Guardar isDesktop globalmente
+  globalIsDesktop = data.isDesktop === true;
+
   // Convertir array a objeto { flagKey: enabled }
   const flagMap: Record<string, boolean> = {};
   if (Array.isArray(data.flags)) {
@@ -172,6 +178,7 @@ export function useFlags(): UseFlagsReturn {
     error: globalFlagCache.error,
     refetch,
     allFlags: globalFlagCache.flags,
+    isDesktop: globalIsDesktop,
   };
 }
 

@@ -484,7 +484,15 @@ function setupLicenseIpcHandlers(): void {
         return { canOperate: true, status: 'NO_SUBSCRIPTION', source: 'no_config' } as LicenseState;
       }
 
-      const localInfo = await res.json() as { storeId?: string };
+      const localInfo = await res.json() as {
+        storeId?: string;
+        canOperate?: boolean;
+        status?: string;
+        planCode?: string | null;
+        currentPeriodEnd?: string | null;
+        trialEndsAt?: string | null;
+        daysRemaining?: number;
+      };
       const storeId = localInfo?.storeId;
 
       if (!storeId) {
@@ -492,6 +500,22 @@ function setupLicenseIpcHandlers(): void {
       }
 
       const state = await checkLicense(storeId, _licenseServerUrl);
+
+      // Si la nube dice NO_SUBSCRIPTION pero la BD local dice que puede operar,
+      // la tienda fue creada localmente y no está registrada en la nube → usar BD local
+      if (!state.canOperate && state.status === 'NO_SUBSCRIPTION' && localInfo.canOperate) {
+        return {
+          canOperate: true,
+          status: (localInfo.status ?? 'ACTIVE') as LicenseState['status'],
+          planCode: localInfo.planCode ?? null,
+          daysRemaining: localInfo.daysRemaining ?? 0,
+          currentPeriodEnd: localInfo.currentPeriodEnd ?? null,
+          trialEndsAt: localInfo.trialEndsAt ?? null,
+          source: 'cache',
+          checkedAt: new Date().toISOString(),
+        } as LicenseState;
+      }
+
       return state;
     } catch (err) {
       console.error('[License] Error en license:check:', err);
@@ -1274,6 +1298,28 @@ app.whenReady().then(async () => {
     process.env.DATABASE_URL = pgResult.databaseUrl;
     console.log(`[App] PostgreSQL ready on port ${pgResult.config?.pg.port}`);
     console.log(`[App] DATABASE_URL set for local server`);
+
+    // D7.2: Auto-register TASK_AT_LOGON so PostgreSQL starts at Windows logon
+    // This eliminates the 3-4 min cold startup — runs silently, non-blocking
+    try {
+      const taskStatus = await getTaskStatus();
+      if (!taskStatus.registered) {
+        console.log('[App] Registering TASK_AT_LOGON for faster cold startup...');
+        const taskResult = await registerTaskScheduler();
+        if (taskResult.success) {
+          const cfg = loadRuntimeConfig();
+          if (cfg) {
+            cfg.runMode = 'TASK_AT_LOGON';
+            saveRuntimeConfig(cfg);
+            console.log('[App] TASK_AT_LOGON registered — PostgreSQL will pre-start at Windows logon');
+          }
+        } else {
+          console.warn('[App] TASK_AT_LOGON registration failed (non-critical):', taskResult.error);
+        }
+      }
+    } catch (e) {
+      console.warn('[App] TASK_AT_LOGON registration skipped (non-critical):', e);
+    }
     }
   }
   

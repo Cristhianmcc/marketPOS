@@ -16,9 +16,7 @@ dist
 dist-electron/
 pgsql/
 desktop/vendor/
-desktop/build-resources/server/
-desktop/build-resources/static/
-desktop/build-resources/prisma/
+desktop/build-resources/
 desktop/dist/
 desktop/resources/vc_redist.x64.exe
 
@@ -26,9 +24,11 @@ desktop/resources/vc_redist.x64.exe
 *.log
 build-debug.log
 build-log.txt
+build-log-*.txt
 build-output.log
 build-web.log
 build.log
+backups/
 
 # misc
 .DS_Store

@@ -27,6 +27,7 @@ export async function middleware(request: NextRequest) {
   });
 
   const isLoggedIn = session.isLoggedIn === true;
+  const hasStore = !!session.storeId;
 
   // Redirect to login if trying to access protected route without auth
   if (isProtectedRoute && !isLoggedIn) {
@@ -35,7 +36,13 @@ export async function middleware(request: NextRequest) {
 
   // Redirect to dashboard if trying to access login while already authenticated
   if (isAuthRoute && isLoggedIn) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL(hasStore ? '/' : '/admin/stores', request.url));
+  }
+
+  // Redirect to admin/stores if logged in but no store yet (fresh install / cloud-only auth)
+  // Allow /admin routes through so they can create/manage stores
+  if (isLoggedIn && !hasStore && !pathname.startsWith('/admin')) {
+    return NextResponse.redirect(new URL('/admin/stores', request.url));
   }
 
   // ✅ NOTA: Verificaciones de ARCHIVED store y billing se hacen en cada página/componente

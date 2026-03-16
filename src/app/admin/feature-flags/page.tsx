@@ -1,9 +1,20 @@
 'use client';
 // ✅ MÓDULO 15 - FASE 2: Feature Flags UI
-// OWNER y SUPERADMIN pueden activar/desactivar funcionalidades
+// OWNER puede ver y cambiar flags de rubro. Los flags de plan son solo lectura (gestionados por suscripción).
 
 import { useState, useEffect } from 'react';
 import { FeatureFlagKey } from '@prisma/client';
+
+// Flags gestionados exclusivamente por el plan de suscripción (SUPERADMIN via syncFeatureFlagsFromPlan)
+const PLAN_FLAGS = new Set([
+  'ALLOW_FIADO',
+  'ALLOW_COUPONS',
+  'ENABLE_PROMOTIONS',
+  'ENABLE_VOLUME_PROMOS',
+  'ENABLE_NTH_PROMOS',
+  'ENABLE_CATEGORY_PROMOS',
+  'ENABLE_SUNAT', // Solo BUSINESS y DEMO
+]);
 
 interface FeatureFlag {
   key: FeatureFlagKey;
@@ -92,9 +103,12 @@ export default function FeatureFlagsPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<FeatureFlagKey | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ flag: FeatureFlagKey; newValue: boolean } | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     loadFlags();
+    // Detectar si es superadmin
+    fetch('/api/admin/stores').then(r => { if (r.ok) setIsSuperAdmin(true); }).catch(() => {});
   }, []);
 
   const loadFlags = async () => {
@@ -205,6 +219,8 @@ export default function FeatureFlagsPage() {
               {flags.map((flag) => {
                 const info = FLAG_LABELS[flag.key];
                 const isSaving = saving === flag.key;
+                const isPlanFlag = PLAN_FLAGS.has(flag.key);
+                const isReadOnly = isPlanFlag && !isSuperAdmin;
 
                 return (
                   <tr key={flag.key} className="hover:bg-gray-50 transition-colors">
@@ -216,8 +232,16 @@ export default function FeatureFlagsPage() {
                           </div>
                         )}
                         <div>
-                          <div className="font-medium text-gray-900">{info.name}</div>
+                          <div className="font-medium text-gray-900">
+                            {info.name}
+                            {isPlanFlag && (
+                              <span className="ml-2 text-xs bg-purple-100 text-purple-700 rounded px-1.5 py-0.5">por plan</span>
+                            )}
+                          </div>
                           <div className="text-sm text-gray-500 mt-1">{info.description}</div>
+                          {isReadOnly && (
+                            <div className="text-xs text-amber-600 mt-1">Controlado por tu plan de suscripción</div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -233,19 +257,23 @@ export default function FeatureFlagsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleToggle(flag.key, !flag.enabled)}
-                        disabled={isSaving}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                          flag.enabled ? 'bg-blue-600' : 'bg-gray-200'
-                        } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            flag.enabled ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
+                      {isReadOnly ? (
+                        <span className="text-xs text-gray-400 italic">solo lectura</span>
+                      ) : (
+                        <button
+                          onClick={() => handleToggle(flag.key, !flag.enabled)}
+                          disabled={isSaving}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                            flag.enabled ? 'bg-blue-600' : 'bg-gray-200'
+                          } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              flag.enabled ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

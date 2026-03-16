@@ -34,10 +34,10 @@ export default function LoginPage() {
       }
 
       // Si necesita provisioning (autenticó en nube pero no hay usuarios locales)
-      // La sesión ya fue creada en el servidor como SUPERADMIN
+      // La sesión ya fue creada en el servidor como SUPERADMIN sin tienda
       if (data.needsProvisioning) {
-        // Redirigir al dashboard donde puede crear tiendas
-        router.push('/');
+        // Ir directo a crear tienda
+        router.push('/admin/stores');
         router.refresh();
         return;
       }
@@ -179,15 +179,18 @@ export default function LoginPage() {
             {/* Footer Links */}
             <div className="mt-8 text-center flex flex-col gap-4">
               <div className="text-xs text-text-secondary/60 dark:text-gray-600">
-                Versión 2.4.0 © 2024 Monterrial
+                Monterrial
               </div>
             </div>
           </div>
 
           {/* Right Side: Visual Hero */}
-          <div className="hidden md:flex md:w-1/2 bg-cover bg-center relative group">
-            {/* Background Image with Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/90 via-primary-dark/80 to-primary/70" />
+          <div
+            className="hidden md:flex md:w-1/2 bg-cover bg-center relative group"
+            style={{ backgroundImage: "url('/images/login-bg.jpg')" }}
+          >
+            {/* Overlay verde sobre la foto — opacidad ajustada para que se vea la imagen */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-emerald-700/70 to-emerald-900/85" />
             
             {/* Content Overlay */}
             <div className="absolute inset-0 flex flex-col justify-end p-12 text-white z-20">

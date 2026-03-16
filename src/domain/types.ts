@@ -2,7 +2,7 @@
 // Aligned with schema.prisma
 
 export type UnitType = 'UNIT' | 'KG';
-export type UserRole = 'OWNER' | 'CASHIER';
+export type UserRole = 'OWNER' | 'CASHIER' | 'SUPERADMIN';
 export type PaymentMethod = 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
 export type MovementType = 'SALE' | 'PURCHASE' | 'ADJUSTMENT';
 
@@ -25,6 +25,7 @@ export interface StoreProduct {
   storeId: string;
   productId: string;
   price: number;
+  costPrice: number | null;
   stock: number | null;
   minStock: number | null;
   active: boolean;

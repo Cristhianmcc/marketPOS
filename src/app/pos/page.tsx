@@ -231,7 +231,7 @@ export default function POSPage() {
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   // ✅ MÓDULO F1: Feature flags para unidades avanzadas
-  const { isOn: isFlagOn, isLoading: flagsLoading } = useFlags();
+  const { isOn: isFlagOn, isLoading: flagsLoading, isDesktop } = useFlags();
   const advancedUnitsEnabled = isFlagOn('ENABLE_ADVANCED_UNITS');
   const conversionsEnabled = isFlagOn('ENABLE_CONVERSIONS');
   // ✅ MÓDULO F3: Servicios
@@ -970,9 +970,28 @@ export default function POSPage() {
     const item = cart.find((i) => i.storeProduct.id === storeProductId);
     if (!item) return;
 
-    // Validar cantidad según tipo
-    if (item.storeProduct.product.unitType === 'UNIT' && !Number.isInteger(newQuantity)) {
-      toast.error('Cantidad debe ser entera para productos por unidad');
+    // ✅ F2.2: Si el item tiene conversión activa (+/-) opera en unidades de presentación
+    // El delta viene en unidad base, pero si hay sellUnit activo, actualizar en sellUnit
+    if (item.unitIdUsed && item.conversionFactorUsed && item.conversionFactorUsed > 1) {
+      // Calcular nueva cantidad en sellUnit (quantityOriginal) proporcional
+      const currentOriginal = item.quantityOriginal ?? 1;
+      const currentBase = item.quantityBase ?? item.quantity;
+      // Si newQuantity viene en base, convertir a original
+      const newOriginal = (newQuantity / currentBase) * currentOriginal;
+      const newBase = newOriginal * item.conversionFactorUsed;
+      if (newOriginal <= 0) { removeFromCart(storeProductId); return; }
+      setCart(prev => prev.map(i =>
+        i.storeProduct.id === storeProductId
+          ? { ...i, quantity: newBase, quantityOriginal: newOriginal, quantityBase: newBase }
+          : i
+      ));
+      return;
+    }
+
+    // Validar decimales según unidad base
+    const baseUnitAllowsDecimals = (item.storeProduct.product as unknown as { baseUnit?: { allowDecimals?: boolean } }).baseUnit?.allowDecimals ?? false;
+    if (!baseUnitAllowsDecimals && !Number.isInteger(newQuantity)) {
+      toast.error('Cantidad debe ser entera para esta unidad de medida');
       return;
     }
 
@@ -1276,8 +1295,8 @@ export default function POSPage() {
   };
 
   const handleConfirmPayment = async () => {
-    // ✅ MÓDULO S6: Guard offline - bloquear checkout sin conexión
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    // En desktop el servidor es local — no se necesita internet para vender
+    if (!isDesktop && typeof navigator !== 'undefined' && !navigator.onLine) {
       toast.error('Sin conexión a internet', {
         description: 'No puedes procesar ventas sin conexión. Verifica tu conexión e intenta nuevamente.',
         duration: 5000,
@@ -1338,7 +1357,9 @@ export default function POSPage() {
           // Producto normal
           return {
             storeProductId: item.storeProduct.id,
-            quantity: item.quantityBase ?? item.quantity, // ✅ F1: Usar quantityBase si hay conversión
+            // ✅ F2.2: Si hay conversión activa, enviar quantityOriginal (en sellUnit)
+            // El servidor normaliza a baseUnit internamente — evita doble conversión
+            quantity: item.unitIdUsed ? (item.quantityOriginal ?? item.quantity) : item.quantity,
             unitPrice: item.storeProduct.price,
             discountType: item.discountType,
             discountValue: item.discountValue,
@@ -1487,15 +1508,15 @@ export default function POSPage() {
       setSunatData(null); // ✅ Limpiar datos SUNAT
     } catch (error) {
       console.error('Checkout error:', error);
-      // ✅ MÓDULO S6: Detectar error de red/offline
-      if (!navigator.onLine) {
+      // Detectar error de red/offline (solo relevante en modo web)
+      if (!isDesktop && !navigator.onLine) {
         toast.error('Sin conexión a internet', {
           description: 'No se pudo procesar la venta. Verifica tu conexión e intenta nuevamente.',
           duration: 5000,
         });
       } else {
-        toast.error('Error de conexión', {
-          description: 'No se pudo contactar al servidor. Intenta nuevamente.',
+        toast.error('Error al procesar la venta', {
+          description: 'Hubo un error en el servidor. Intenta nuevamente.',
           duration: 4000,
         });
       }

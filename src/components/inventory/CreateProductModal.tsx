@@ -70,6 +70,8 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     content: '',
     barcode: '',
     price: '',
+    costPrice: '',
+    margin: '',
     stock: '',
     minStock: '',
     imageUrl: '',
@@ -192,6 +194,40 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     return () => clearTimeout(timeoutId);
   }, [formData.name, tab]);
 
+  // Cálculo automático: costo + % → precio
+  const handleCostOrMarginChange = (field: 'costPrice' | 'margin', value: string) => {
+    const updated = { ...formData, [field]: value };
+    const cost = parseFloat(field === 'costPrice' ? value : updated.costPrice);
+    const margin = parseFloat(field === 'margin' ? value : updated.margin);
+    if (!isNaN(cost) && cost > 0 && !isNaN(margin) && margin > 0) {
+      updated.price = (cost * (1 + margin / 100)).toFixed(2);
+    }
+    setFormData(updated);
+  };
+
+  // Cálculo automático: precio manual → recalcular %
+  const handlePriceChange = (value: string) => {
+    const cost = parseFloat(formData.costPrice);
+    const price = parseFloat(value);
+    let newMargin = formData.margin;
+    if (!isNaN(cost) && cost > 0 && !isNaN(price) && price > 0) {
+      newMargin = (((price - cost) / cost) * 100).toFixed(1);
+    }
+    setFormData({ ...formData, price: value, margin: newMargin });
+  };
+
+  // Info de ganancia
+  const profitInfo = (() => {
+    const cost = parseFloat(formData.costPrice);
+    const price = parseFloat(formData.price);
+    if (!isNaN(cost) && cost > 0 && !isNaN(price) && price > 0) {
+      const profit = price - cost;
+      const pct = ((profit / cost) * 100).toFixed(1);
+      return { profit: profit.toFixed(2), pct };
+    }
+    return null;
+  })();
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -262,13 +298,12 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       // Crear StoreProduct
       const stock = formData.stock && formData.stock.trim() !== '' ? parseFloat(formData.stock) : null;
       const minStock = formData.minStock && formData.minStock.trim() !== '' ? parseFloat(formData.minStock) : null;
+      const costPrice = formData.costPrice && formData.costPrice.trim() !== '' ? parseFloat(formData.costPrice) : null;
 
       const storeProductPayload = {
         productId: suggestion.id,
         price,
-        stock,
-        minStock,
-        active: true,
+        costPrice,
       };
 
       const storeRes = await fetch('/api/store-products', {
@@ -314,10 +349,12 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
 
         const stock = formData.stock && formData.stock.trim() !== '' ? parseFloat(formData.stock) : null;
         const minStock = formData.minStock && formData.minStock.trim() !== '' ? parseFloat(formData.minStock) : null;
+        const costPrice = formData.costPrice && formData.costPrice.trim() !== '' ? parseFloat(formData.costPrice) : null;
 
         const storeProductPayload = {
           productId: barcodeSuggestion.id,
           price,
+          costPrice,
           stock,
           minStock,
           active: true,
@@ -395,10 +432,12 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       // Paso 2: Configurar producto para la tienda
       const stock = formData.stock && formData.stock.trim() !== '' ? parseFloat(formData.stock) : null;
       const minStock = formData.minStock && formData.minStock.trim() !== '' ? parseFloat(formData.minStock) : null;
+      const costPrice = formData.costPrice && formData.costPrice.trim() !== '' ? parseFloat(formData.costPrice) : null;
 
       const storeProductPayload = {
         productId: productData.product.id,
         price,
+        costPrice,
         stock,
         minStock,
         active: true,
@@ -439,6 +478,8 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       content: '',
       barcode: '',
       price: '',
+      costPrice: '',
+      margin: '',
       stock: '',
       minStock: '',
       imageUrl: '',
@@ -746,6 +787,39 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
             <p className="text-sm font-medium text-[#1F2A37] mb-3">Configuración para tu tienda</p>
             
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                    Precio de compra (S/)
+                    <span className="text-xs text-gray-400 ml-1">Opcional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={formData.costPrice}
+                    onChange={(e) => handleCostOrMarginChange('costPrice', e.target.value)}
+                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                    placeholder="Ej: 1.80"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                    % Ganancia
+                    <span className="text-xs text-gray-400 ml-1">Opcional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={formData.margin}
+                    onChange={(e) => handleCostOrMarginChange('margin', e.target.value)}
+                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                    placeholder="Ej: 40"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-[#1F2A37] mb-2">
                   Precio de venta (S/) *
@@ -755,11 +829,18 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                   step="0.01"
                   min="0.01"
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  onChange={(e) => handlePriceChange(e.target.value)}
                   required
                   className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
                   placeholder="Ej: 2.50"
                 />
+                {profitInfo && (
+                  <p className={`text-xs mt-1 font-medium ${parseFloat(profitInfo.profit) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {parseFloat(profitInfo.profit) >= 0
+                      ? `💰 Ganarías S/ ${profitInfo.profit} por unidad (${profitInfo.pct}%)`
+                      : `⚠️ Estás vendiendo por debajo del costo (${profitInfo.pct}%)`}
+                  </p>
+                )}
               </div>
 
               <div>

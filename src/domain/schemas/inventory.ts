@@ -18,6 +18,7 @@ export const CreateProductSchema = z.object({
 export const ConfigureStoreProductSchema = z.object({
   productId: z.string().min(1, 'Product ID es requerido'),
   price: z.number().positive('Precio debe ser mayor a 0'),
+  costPrice: z.number().positive('Precio de compra debe ser mayor a 0').optional().nullable(),
   stock: z.number().nonnegative('Stock debe ser no negativo').optional().nullable(),
   minStock: z.number().nonnegative('Stock mínimo debe ser no negativo').optional().nullable(),
   active: z.boolean().default(true),

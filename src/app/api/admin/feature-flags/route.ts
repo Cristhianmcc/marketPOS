@@ -124,6 +124,23 @@ export async function PUT(request: NextRequest) {
           { status: 403 }
         );
       }
+
+      // OWNER no puede modificar flags de plan — solo el SUPERADMIN via syncFeatureFlagsFromPlan
+      const PLAN_FLAGS: FeatureFlagKey[] = [
+        FeatureFlagKey.ALLOW_FIADO,
+        FeatureFlagKey.ALLOW_COUPONS,
+        FeatureFlagKey.ENABLE_PROMOTIONS,
+        FeatureFlagKey.ENABLE_VOLUME_PROMOS,
+        FeatureFlagKey.ENABLE_NTH_PROMOS,
+        FeatureFlagKey.ENABLE_CATEGORY_PROMOS,
+        FeatureFlagKey.ENABLE_SUNAT, // Solo BUSINESS y DEMO
+      ];
+      if (PLAN_FLAGS.includes(key as FeatureFlagKey)) {
+        return NextResponse.json(
+          { code: 'FORBIDDEN', message: 'Este módulo es gestionado por el plan de suscripción. Contacta a soporte para cambiar tu plan.' },
+          { status: 403 }
+        );
+      }
     }
 
     // Actualizar flag

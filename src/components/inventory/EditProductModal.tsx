@@ -21,6 +21,7 @@ interface EditProductModalProps {
   storeProduct: {
     id: string;
     price: number;
+    costPrice: number | null;
     minStock: number | null;
     product: {
       id: string;
@@ -56,6 +57,8 @@ export function EditProductModal({
     barcode: storeProduct.product.barcode ?? '',
     category: storeProduct.product.category,
     price: storeProduct.price.toString(),
+    costPrice: storeProduct.costPrice !== null ? storeProduct.costPrice.toString() : '',
+    margin: '',
     minStock: storeProduct.minStock !== null ? storeProduct.minStock.toString() : '',
     imageUrl: storeProduct.product.imageUrl ?? '',
     baseUnitId: storeProduct.product.baseUnitId ?? '',
@@ -63,6 +66,9 @@ export function EditProductModal({
 
   // Restablecer form cuando cambia el producto
   useEffect(() => {
+    const cost = storeProduct.costPrice;
+    const price = storeProduct.price;
+    const initialMargin = cost && cost > 0 ? (((price - cost) / cost) * 100).toFixed(1) : '';
     setForm({
       name: storeProduct.product.name,
       brand: storeProduct.product.brand ?? '',
@@ -70,6 +76,8 @@ export function EditProductModal({
       barcode: storeProduct.product.barcode ?? '',
       category: storeProduct.product.category,
       price: storeProduct.price.toString(),
+      costPrice: cost !== null ? cost.toString() : '',
+      margin: initialMargin,
       minStock: storeProduct.minStock !== null ? storeProduct.minStock.toString() : '',
       imageUrl: storeProduct.product.imageUrl ?? '',
       baseUnitId: storeProduct.product.baseUnitId ?? '',
@@ -105,6 +113,39 @@ export function EditProductModal({
   const handleChange = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
   };
+
+  // Costo + % → precio
+  const handleCostOrMarginChange = (field: 'costPrice' | 'margin', value: string) => {
+    const updated = { ...form, [field]: value };
+    const cost = parseFloat(field === 'costPrice' ? value : updated.costPrice);
+    const margin = parseFloat(field === 'margin' ? value : updated.margin);
+    if (!isNaN(cost) && cost > 0 && !isNaN(margin) && margin > 0) {
+      updated.price = (cost * (1 + margin / 100)).toFixed(2);
+    }
+    setForm(updated);
+  };
+
+  // Precio manual → recalcular %
+  const handlePriceChange = (value: string) => {
+    const cost = parseFloat(form.costPrice);
+    const price = parseFloat(value);
+    let newMargin = form.margin;
+    if (!isNaN(cost) && cost > 0 && !isNaN(price) && price > 0) {
+      newMargin = (((price - cost) / cost) * 100).toFixed(1);
+    }
+    setForm(prev => ({ ...prev, price: value, margin: newMargin }));
+  };
+
+  const profitInfo = (() => {
+    const cost = parseFloat(form.costPrice);
+    const price = parseFloat(form.price);
+    if (!isNaN(cost) && cost > 0 && !isNaN(price) && price > 0) {
+      const profit = price - cost;
+      const pct = ((profit / cost) * 100).toFixed(1);
+      return { profit: profit.toFixed(2), pct };
+    }
+    return null;
+  })();
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -153,6 +194,7 @@ export function EditProductModal({
     try {
       const body: Record<string, string | number | null> = {
         price: priceNum,
+        costPrice: form.costPrice !== '' ? parseFloat(form.costPrice) : null,
         minStock: form.minStock !== '' ? Number(form.minStock) : null,
       };
 
@@ -390,6 +432,38 @@ export function EditProductModal({
           <div className="border-t border-gray-200 pt-4">
             <p className="text-sm font-medium text-[#1F2A37] mb-3">Configuración para tu tienda</p>
             <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                    Precio de compra (S/)
+                    <span className="text-xs text-gray-400 ml-1">Opcional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    className={inputClass}
+                    value={form.costPrice}
+                    onChange={e => handleCostOrMarginChange('costPrice', e.target.value)}
+                    placeholder="Ej: 1.80"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                    % Ganancia
+                    <span className="text-xs text-gray-400 ml-1">Opcional</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className={inputClass}
+                    value={form.margin}
+                    onChange={e => handleCostOrMarginChange('margin', e.target.value)}
+                    placeholder="Ej: 40"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-[#1F2A37] mb-2">Precio de venta (S/) *</label>
                 <input
@@ -398,10 +472,17 @@ export function EditProductModal({
                   min="0.01"
                   className={inputClass}
                   value={form.price}
-                  onChange={e => handleChange('price', e.target.value)}
+                  onChange={e => handlePriceChange(e.target.value)}
                   required
                   placeholder="Ej: 2.50"
                 />
+                {profitInfo && (
+                  <p className={`text-xs mt-1 font-medium ${parseFloat(profitInfo.profit) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {parseFloat(profitInfo.profit) >= 0
+                      ? `💰 Ganarías S/ ${profitInfo.profit} por unidad (${profitInfo.pct}%)`
+                      : `⚠️ Estás vendiendo por debajo del costo (${profitInfo.pct}%)`}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#1F2A37] mb-2">Stock mínimo (Opcional)</label>

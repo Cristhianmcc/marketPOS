@@ -7,6 +7,69 @@ import { toast, Toaster } from 'sonner';
 // ✅ MÓDULO V1: Tipos de perfiles de negocio
 type BusinessProfile = 'BODEGA' | 'FERRETERIA' | 'TALLER' | 'LAVANDERIA' | 'POLLERIA' | 'HOSTAL' | 'BOTICA' | 'ACCESORIOS';
 
+// Flags de rubro (NO son de plan) con sus perfiles por defecto
+// SUNAT ya NO aparece aquí — es un flag de plan (solo BUSINESS y DEMO lo activan automáticamente)
+const RUBRO_FLAG_OPTIONS = [
+  { key: 'ENABLE_ADVANCED_UNITS',   name: 'Unidades Avanzadas',          description: 'Vender por m², kg, ml fraccionados',         defaultProfiles: ['FERRETERIA'] },
+  { key: 'ENABLE_CONVERSIONS',      name: 'Conversiones de Unidades',    description: '1 caja = 12 unidades, etc.',                  defaultProfiles: ['FERRETERIA'] },
+  { key: 'ENABLE_SELLUNIT_PRICING', name: 'Precio por Presentación',     description: 'Precio especial por caja, docena, etc.',      defaultProfiles: ['FERRETERIA'] },
+  { key: 'ENABLE_SERVICES',         name: 'Servicios',                   description: 'Mano de obra, servicios sin inventario',      defaultProfiles: ['TALLER', 'LAVANDERIA', 'HOSTAL'] },
+  { key: 'ENABLE_WORK_ORDERS',      name: 'Órdenes de Trabajo',           description: 'Recepción, diagnóstico y seguimiento de trabajos', defaultProfiles: ['TALLER'] },
+  { key: 'ENABLE_RESERVATIONS',     name: 'Reservaciones',               description: 'Check-in/out y disponibilidad de habitaciones', defaultProfiles: ['HOSTAL'] },
+  { key: 'ENABLE_BATCH_EXPIRY',     name: 'Lotes y Vencimientos',        description: 'Trazabilidad de lotes, alertas, FIFO',        defaultProfiles: ['BOTICA'] },
+] as const;
+
+type RubroFlagKey = typeof RUBRO_FLAG_OPTIONS[number]['key'];
+
+function getDefaultRubroFlags(profile: BusinessProfile): RubroFlagKey[] {
+  return RUBRO_FLAG_OPTIONS
+    .filter(f => (f.defaultProfiles as readonly string[]).includes(profile))
+    .map(f => f.key);
+}
+
+// Qué módulos recomienda cada plan (además de los del rubro)
+const PLAN_INFO = {
+  DEMO: {
+    label: '🎉 Demo — Prueba gratuita 30 días',
+    description: 'Acceso completo a TODO. Ideal para que el cliente conozca el sistema antes de pagar.',
+    color: 'text-green-700',
+    // DEMO activa todo para que el cliente pueda probar cada módulo
+    extraFlags: ['ENABLE_ADVANCED_UNITS', 'ENABLE_CONVERSIONS', 'ENABLE_SELLUNIT_PRICING',
+                 'ENABLE_SERVICES', 'ENABLE_WORK_ORDERS', 'ENABLE_RESERVATIONS',
+                 'ENABLE_BATCH_EXPIRY'] as RubroFlagKey[],
+  },
+  STARTER: {
+    label: '📦 Básico — Solo ventas esenciales',
+    description: 'Vender, cobrar, gestionar inventario y ver reportes. Sin promociones ni fiado.',
+    color: 'text-gray-700',
+    extraFlags: [] as RubroFlagKey[], // Solo los del rubro, nada extra
+  },
+  PRO: {
+    label: '⭐ Profesional — Con promociones y fiado',
+    description: 'Todo del Básico más: fiado, cupones, promociones por volumen y categoría.',
+    color: 'text-blue-700',
+    extraFlags: [] as RubroFlagKey[], // Los del rubro + plan activa promos/fiado
+  },
+  BUSINESS: {
+    label: '🏢 Empresarial — Completo + SUNAT',
+    description: 'Todo el plan Profesional más facturación electrónica SUNAT (activada automáticamente por el plan).',
+    color: 'text-purple-700',
+    extraFlags: [] as RubroFlagKey[], // SUNAT se activa solo via syncFeatureFlagsFromPlan
+  },
+} as const;
+
+type PlanCode = keyof typeof PLAN_INFO;
+
+function getRecommendedRubroFlags(plan: PlanCode, profile: BusinessProfile): RubroFlagKey[] {
+  const profileFlags = getDefaultRubroFlags(profile);
+  const planExtras = PLAN_INFO[plan].extraFlags;
+  if (plan === 'DEMO') {
+    // DEMO: activa todo — los del rubro + todos los extras del plan
+    return [...new Set([...profileFlags, ...planExtras])] as RubroFlagKey[];
+  }
+  return [...new Set([...profileFlags, ...planExtras])] as RubroFlagKey[];
+}
+
 interface ProfileOption {
   profile: BusinessProfile;
   name: string;
@@ -52,6 +115,8 @@ export default function AdminStoresPage() {
     ownerEmail: '',
     ownerPassword: '',
     businessProfile: 'BODEGA' as BusinessProfile, // ✅ MÓDULO V1
+    planCode: 'DEMO' as PlanCode,
+    selectedRubroFlags: PLAN_INFO['DEMO'].extraFlags, // DEMO activa todos los módulos
   });
 
   useEffect(() => {
@@ -176,15 +241,21 @@ export default function AdminStoresPage() {
               userId: data.owner?.id 
             }),
           });
-          
-          if (switchRes.ok) {
-            // Seedear productos de ejemplo
-            const seedRes = await fetch('/api/setup/seed-products', { method: 'POST' });
-            if (seedRes.ok) {
-              const seedData = await seedRes.json();
+
+          // Seedear productos siempre (con storeId explícito, no depende de la sesión)
+          const seedRes = await fetch('/api/setup/seed-products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ storeId: data.store.id }),
+          });
+          if (seedRes.ok) {
+            const seedData = await seedRes.json();
+            if (seedData.productsCreated > 0) {
               toast.success(`${seedData.productsCreated} productos de ejemplo creados`);
             }
-            
+          }
+
+          if (switchRes.ok) {
             // Redirigir al dashboard principal
             router.push('/');
             router.refresh();
@@ -205,6 +276,8 @@ export default function AdminStoresPage() {
         ownerEmail: '',
         ownerPassword: '',
         businessProfile: 'BODEGA',
+        planCode: 'DEMO',
+        selectedRubroFlags: PLAN_INFO['DEMO'].extraFlags,
       });
       setShowForm(false);
     } catch (err) {
@@ -322,6 +395,41 @@ export default function AdminStoresPage() {
                   />
                 </div>
 
+                {/* Selector de Plan */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Plan *
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {(Object.keys(PLAN_INFO) as PlanCode[]).map((plan) => {
+                      const info = PLAN_INFO[plan];
+                      const isSelected = formData.planCode === plan;
+                      return (
+                        <button
+                          key={plan}
+                          type="button"
+                          onClick={() => {
+                            const newFlags = getRecommendedRubroFlags(plan, formData.businessProfile);
+                            setFormData({ ...formData, planCode: plan, selectedRubroFlags: newFlags });
+                          }}
+                          className={`p-3 rounded-lg border-2 text-left transition-all ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <div className={`text-sm font-semibold ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                            {info.label}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className={`text-xs mt-2 font-medium ${PLAN_INFO[formData.planCode].color}`}>
+                    {PLAN_INFO[formData.planCode].description}
+                  </p>
+                </div>
+
                 {/* ✅ MÓDULO V1: Selector de Perfil de Negocio */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -330,7 +438,15 @@ export default function AdminStoresPage() {
                   <select
                     required
                     value={formData.businessProfile}
-                    onChange={(e) => setFormData({ ...formData, businessProfile: e.target.value as BusinessProfile })}
+                    onChange={(e) => {
+                      const newProfile = e.target.value as BusinessProfile;
+                      const newFlags = getRecommendedRubroFlags(formData.planCode, newProfile);
+                      setFormData({
+                        ...formData,
+                        businessProfile: newProfile,
+                        selectedRubroFlags: newFlags,
+                      });
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                   >
                     {profiles.map(p => (
@@ -439,6 +555,57 @@ export default function AdminStoresPage() {
                       )}
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Módulos del Rubro (flags) */}
+              <div className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm font-semibold text-gray-700">Módulos del Rubro</h3>
+                  <span className="text-xs text-gray-400">Auto-seleccionado según plan + rubro — puedes ajustar</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  Los marcados con <span className="bg-blue-100 text-blue-700 rounded px-1">recomendado</span> son los que
+                  sugiere el plan <strong>{PLAN_INFO[formData.planCode].label.split('—')[0].trim()}</strong> para este rubro.
+                  Puedes activar módulos extra si el cliente los contrata por separado.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {RUBRO_FLAG_OPTIONS.map((flag) => {
+                    const isChecked = formData.selectedRubroFlags.includes(flag.key);
+                    const isRecommended = getRecommendedRubroFlags(formData.planCode, formData.businessProfile).includes(flag.key);
+                    return (
+                      <label
+                        key={flag.key}
+                        className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
+                          isChecked
+                            ? 'bg-blue-50 border-blue-300'
+                            : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...formData.selectedRubroFlags, flag.key]
+                              : formData.selectedRubroFlags.filter(k => k !== flag.key);
+                            setFormData({ ...formData, selectedRubroFlags: updated });
+                          }}
+                          className="mt-0.5 accent-blue-600"
+                        />
+                        <div className="min-w-0">
+                          <span className="text-sm font-medium text-gray-800">{flag.name}</span>
+                          {isRecommended && (
+                            <span className="ml-1 text-xs bg-blue-100 text-blue-700 rounded px-1">recomendado</span>
+                          )}
+                          {!isRecommended && isChecked && (
+                            <span className="ml-1 text-xs bg-amber-100 text-amber-700 rounded px-1">extra</span>
+                          )}
+                          <p className="text-xs text-gray-500">{flag.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 

@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import { 
   Upload, FileText, AlertCircle, CheckCircle, ArrowLeft, 
-  Download, X, RefreshCw, Wrench, ShoppingBag, FileSpreadsheet
+  Download, X, RefreshCw, Wrench, ShoppingBag, FileSpreadsheet, FileArchive, ImageIcon
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { useFlags } from '@/hooks/useFlags';
 
 interface ParsedConversion {
   unitCode: string;
@@ -43,6 +44,14 @@ interface AvailableUnit {
   symbol: string | null;
 }
 
+interface ZipPreviewData {
+  totalProducts: number;
+  productsWithZipImage: number;
+  productsWithExtUrl: number;
+  totalImages: number;
+  preview: { name: string; brand: string; category: string; price: string; stock: string; hasImage: boolean }[];
+}
+
 export default function ImportPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +63,11 @@ export default function ImportPage() {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [updateExisting, setUpdateExisting] = useState(false);
+  const [zipFile, setZipFile] = useState<File | null>(null);
+  const [zipPreview, setZipPreview] = useState<ZipPreviewData | null>(null);
+  const [zipFileBase64, setZipFileBase64] = useState<string>('');
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const { isDesktop } = useFlags();
 
   // Templates
   const templates = [
@@ -198,13 +212,70 @@ export default function ImportPage() {
     }
   };
 
+  const handleZipChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    if (!selectedFile.name.endsWith('.zip')) {
+      toast.error('Solo se permiten archivos ZIP');
+      return;
+    }
+    setZipFile(selectedFile);
+    setLoading(true);
+    try {
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+      setZipFileBase64(base64);
+
+      const res = await fetch('/api/inventory/import/zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'preview', fileBase64: base64 }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Error al leer el ZIP'); setLoading(false); return; }
+      setZipPreview(data);
+      toast.success(`${data.totalProducts} productos encontrados en el ZIP`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al procesar el ZIP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleZipImport = async () => {
+    if (!zipFileBase64) return;
+    setImporting(true);
+    try {
+      const res = await fetch('/api/inventory/import/zip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import', fileBase64: zipFileBase64, updateExisting }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Error en la importación'); setImporting(false); return; }
+      toast.success(`Importación exitosa: ${data.created} creados, ${data.updated} actualizados, ${data.skipped} omitidos`);
+      setTimeout(() => router.push('/inventory'), 1500);
+    } catch (err) {
+      console.error(err);
+      toast.error('Error de conexión');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const resetForm = () => {
     setFile(null);
     setPreview(null);
     setSummary(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setZipFile(null);
+    setZipPreview(null);
+    setZipFileBase64('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (zipInputRef.current) zipInputRef.current.value = '';
   };
 
   const formatMoney = (value: number) =>
@@ -224,14 +295,18 @@ export default function ImportPage() {
               <ArrowLeft className="w-4 h-4" />
               Volver al inventario
             </button>
-            <h1 className="text-2xl font-semibold text-gray-900">Importar desde CSV</h1>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              {zipPreview ? 'Importar ZIP con imágenes' : 'Importar inventario'}
+            </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Carga un archivo CSV con tus productos. Soporta unidades de medida y conversiones.
+              {zipPreview
+                ? 'Revisa el resumen y confirma la importación del ZIP.'
+                : 'Carga un archivo CSV o un ZIP exportado desde Monterrial POS.'}
             </p>
           </div>
 
           {/* Templates Section */}
-          {!preview && (
+          {!preview && !zipPreview && (
             <div className="mb-8">
               <h2 className="text-sm font-medium text-gray-700 mb-3">
                 Plantillas de ejemplo (descargar y editar):
@@ -265,9 +340,10 @@ export default function ImportPage() {
           )}
 
           {/* Upload Section */}
-          {!preview && (
+          {!preview && !zipPreview && (
             <div className="bg-white border border-gray-200 rounded-lg p-8">
               <div className="max-w-md mx-auto">
+                {/* CSV upload */}
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-400 transition-colors">
                   <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-sm text-gray-900 font-medium mb-2">
@@ -292,12 +368,12 @@ export default function ImportPage() {
                         Procesando...
                       </span>
                     ) : (
-                      'Seleccionar archivo'
+                      'Seleccionar CSV'
                     )}
                   </label>
                 </div>
 
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-xs font-medium text-gray-900 mb-2">Formato del CSV:</p>
                   <p className="text-xs text-gray-600 font-mono break-all">
                     name,category,barcode,brand,content,baseUnitCode,price,stock,minStock,conversions
@@ -309,6 +385,148 @@ export default function ImportPage() {
                     <li>• Separador: coma (,) o punto y coma (;)</li>
                   </ul>
                 </div>
+
+                {/* ZIP upload — solo en desktop */}
+                {isDesktop && (
+                  <div className="mt-6 border-t border-gray-200 pt-6">
+                    <p className="text-sm font-medium text-gray-900 mb-1 flex items-center gap-2">
+                      <FileArchive className="w-4 h-4 text-purple-600" />
+                      O importa un ZIP con imágenes
+                    </p>
+                    <p className="text-xs text-gray-500 mb-3">
+                      ZIP exportado desde Monterrial POS — incluye imágenes de cada producto
+                    </p>
+                    <div className="border-2 border-dashed border-purple-200 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
+                      <input
+                        ref={zipInputRef}
+                        type="file"
+                        accept=".zip"
+                        onChange={handleZipChange}
+                        className="hidden"
+                        id="zip-upload"
+                        disabled={loading}
+                      />
+                      <label
+                        htmlFor="zip-upload"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium cursor-pointer hover:bg-purple-700 transition-colors"
+                      >
+                        {loading ? (
+                          <><RefreshCw className="w-4 h-4 animate-spin" />Leyendo ZIP...</>
+                        ) : (
+                          <><FileArchive className="w-4 h-4" />Seleccionar ZIP</>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ZIP Preview Section */}
+          {zipPreview && !preview && (
+            <div className="space-y-6">
+              {/* File info */}
+              <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <FileArchive className="w-5 h-5 text-purple-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{zipFile?.name}</p>
+                    <p className="text-xs text-gray-500">{zipPreview.totalProducts} productos en el ZIP</p>
+                  </div>
+                </div>
+                <button onClick={resetForm} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg"><CheckCircle className="w-5 h-5 text-green-600" /></div>
+                  <div>
+                    <p className="text-2xl font-semibold text-gray-900">{zipPreview.totalProducts}</p>
+                    <p className="text-sm text-gray-500">Productos</p>
+                  </div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg"><ImageIcon className="w-5 h-5 text-purple-600" /></div>
+                  <div>
+                    <p className="text-2xl font-semibold text-gray-900">{zipPreview.productsWithZipImage}</p>
+                    <p className="text-sm text-gray-500">Con imagen local</p>
+                  </div>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={updateExisting}
+                      onChange={(e) => setUpdateExisting(e.target.checked)}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm text-gray-700">Actualizar existentes</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">Sobrescribir precio/stock si el producto ya existe</p>
+                </div>
+              </div>
+
+              {/* Preview table */}
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-200">
+                  <p className="text-sm font-medium text-gray-900">Vista previa (primeros {zipPreview.preview.length} productos)</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Precio</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Stock</th>
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Imagen</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {zipPreview.preview.map((row, i) => (
+                        <tr key={i}>
+                          <td className="px-4 py-2">
+                            <p className="text-sm text-gray-900">{row.name}</p>
+                            {row.brand && <p className="text-xs text-gray-500">{row.brand}</p>}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-600">{row.category}</td>
+                          <td className="px-4 py-2 text-right text-sm text-gray-900">{row.price}</td>
+                          <td className="px-4 py-2 text-right text-sm text-gray-600">{row.stock}</td>
+                          <td className="px-4 py-2 text-center">
+                            {row.hasImage
+                              ? <span className="inline-flex px-2 py-1 bg-purple-100 text-purple-700 rounded-md text-xs">Sí</span>
+                              : <span className="text-xs text-gray-400">—</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={resetForm}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cargar otro archivo
+                </button>
+                <button
+                  onClick={handleZipImport}
+                  disabled={importing}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {importing ? (
+                    <><RefreshCw className="w-4 h-4 animate-spin" />Importando...</>
+                  ) : (
+                    <><FileArchive className="w-4 h-4" />Importar {zipPreview.totalProducts} productos</>
+                  )}
+                </button>
               </div>
             </div>
           )}

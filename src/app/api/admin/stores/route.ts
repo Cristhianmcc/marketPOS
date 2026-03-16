@@ -5,8 +5,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin, generateTemporaryPassword } from '@/lib/superadmin';
-import { BusinessProfile } from '@prisma/client';
+import { BusinessProfile, PlanCode, FeatureFlagKey } from '@prisma/client';
 import { getProfileFlags } from '@/lib/businessProfiles';
+import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 
@@ -100,8 +101,16 @@ export async function POST(request: NextRequest) {
       ownerName, 
       ownerEmail, 
       ownerPassword,
-      businessProfile = 'BODEGA' // ✅ MÓDULO V1: Perfil de negocio
+      businessProfile = 'BODEGA', // ✅ MÓDULO V1: Perfil de negocio
+      planCode = 'DEMO',          // Plan inicial (default DEMO = trial 30 días)
+      selectedRubroFlags,         // Flags de rubro seleccionados manualmente
     } = body;
+
+    // Flags de rubro a activar: los enviados por el admin (o fallback al preset del perfil)
+    const validFlagKeys = Object.values(FeatureFlagKey);
+    const rubroFlagsToApply: FeatureFlagKey[] = Array.isArray(selectedRubroFlags)
+      ? selectedRubroFlags.filter((k: string) => validFlagKeys.includes(k as FeatureFlagKey)) as FeatureFlagKey[]
+      : getProfileFlags(businessProfile as BusinessProfile);
 
     // Validaciones
     if (!storeName || !ownerName || !ownerEmail || !ownerPassword) {
@@ -116,6 +125,15 @@ export async function POST(request: NextRequest) {
     if (!validProfiles.includes(businessProfile)) {
       return NextResponse.json(
         { code: 'VALIDATION_ERROR', message: `Perfil de negocio inválido: ${businessProfile}` },
+        { status: 400 }
+      );
+    }
+
+    // Validar plan
+    const validPlans = Object.values(PlanCode);
+    if (!validPlans.includes(planCode)) {
+      return NextResponse.json(
+        { code: 'VALIDATION_ERROR', message: `Plan inválido: ${planCode}` },
         { status: 400 }
       );
     }
@@ -176,35 +194,49 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 4. ✅ MÓDULO V1: Aplicar preset de flags según el perfil
-      const profileFlags = getProfileFlags(businessProfile as BusinessProfile);
-      
-      const flagUpserts = profileFlags.map(flagKey => 
+      // 4. Aplicar flags de rubro seleccionados por el admin
+      const flagUpserts = rubroFlagsToApply.map(flagKey => 
         tx.featureFlag.upsert({
-          where: {
-            storeId_key: {
-              storeId: store.id,
-              key: flagKey,
-            },
-          },
-          create: {
-            storeId: store.id,
-            key: flagKey,
-            enabled: true,
-          },
-          update: {
-            enabled: true,
-          },
+          where: { storeId_key: { storeId: store.id, key: flagKey } },
+          create: { storeId: store.id, key: flagKey, enabled: true },
+          update: { enabled: true },
         })
       );
       
       await Promise.all(flagUpserts);
 
-      // NOTA: NO se crea suscripción automáticamente.
-      // El SUPERADMIN decide si asignar DEMO (y por cuánto tiempo) o un plan pagado.
+      // 5. Crear suscripción con el plan elegido
+      const now = new Date();
+      const trialEnd = new Date(now);
+      trialEnd.setDate(trialEnd.getDate() + 30);
+      const periodEnd = new Date(now);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-      return { store, owner, flagsApplied: profileFlags.length };
+      await tx.subscription.create({
+        data: {
+          storeId: store.id,
+          planCode: planCode as PlanCode,
+          status: planCode === 'DEMO' ? 'TRIAL' : 'ACTIVE',
+          startAt: now,
+          trialEndsAt: planCode === 'DEMO' ? trialEnd : null,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          priceAmount: planCode === 'STARTER' ? 49 : planCode === 'PRO' ? 89 : planCode === 'BUSINESS' ? 149 : 0,
+          priceCurrency: 'PEN',
+          billingCycle: 'MONTHLY',
+        },
+      });
+
+      return { store, owner, flagsApplied: rubroFlagsToApply.length };
     });
+
+    // 6. Sincronizar flags según el plan (fuera de la transacción)
+    try {
+      await syncFeatureFlagsFromPlan(result.store.id);
+    } catch (flagError) {
+      console.error('[CreateStore] Error syncing flags from plan:', flagError);
+      // No bloqueamos — la tienda ya está creada
+    }
 
     return NextResponse.json({
       success: true,

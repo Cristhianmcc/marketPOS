@@ -32,17 +32,13 @@ export interface BusinessProfilePreset {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// FLAGS CORE (siempre disponibles para todos los perfiles)
+// FLAGS DE PLAN (gestionados EXCLUSIVAMENTE por syncFeatureFlagsFromPlan)
 // ══════════════════════════════════════════════════════════════════════════════
-
-export const CORE_FLAGS: FeatureFlagKey[] = [
-  'ALLOW_FIADO',
-  'ALLOW_COUPONS',
-  'ENABLE_PROMOTIONS',
-  'ENABLE_VOLUME_PROMOS',
-  'ENABLE_NTH_PROMOS',
-  'ENABLE_CATEGORY_PROMOS',
-] as FeatureFlagKey[];
+// IMPORTANTE: ALLOW_FIADO, ALLOW_COUPONS, ENABLE_PROMOTIONS, ENABLE_VOLUME_PROMOS,
+// ENABLE_NTH_PROMOS y ENABLE_CATEGORY_PROMOS son flags de PLAN, no de perfil.
+// Solo se activan cuando el SUPERADMIN asigna una suscripción (DEMO, PRO, BUSINESS).
+// Con plan STARTER quedan desactivados. NO incluirlos en los presets de perfil.
+export const CORE_FLAGS: FeatureFlagKey[] = [];
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PRESETS POR PERFIL
@@ -55,8 +51,8 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Tienda de abarrotes, productos de consumo masivo. Configuración base sin módulos especiales.',
     icon: '🏪',
     enabledFlags: [
-      ...CORE_FLAGS,
-      // Bodega no necesita flags multi-rubro
+      // Bodega no necesita flags de perfil. Los flags de plan (fiado, cupones, promos)
+      // los activa syncFeatureFlagsFromPlan() al asignar la suscripción.
     ],
     suggestedCategories: ['Bebidas', 'Snacks', 'Lácteos', 'Limpieza', 'Abarrotes', 'Congelados'],
   },
@@ -67,11 +63,10 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Venta de materiales por metro cuadrado, metro lineal, kg fraccionados. Conversiones de unidades.',
     icon: '🔧',
     enabledFlags: [
-      ...CORE_FLAGS,
-      'ENABLE_ADVANCED_UNITS' as FeatureFlagKey, // Unidades avanzadas (m², ml, kg)
-      'ENABLE_CONVERSIONS' as FeatureFlagKey,    // Conversiones automáticas (1 caja = 12 unidades)
-      'ENABLE_CATEGORY_PROMOS' as FeatureFlagKey, // Promos por categoría (opcional pero útil)
-      'ENABLE_VOLUME_PROMOS' as FeatureFlagKey,   // Promos por volumen (compra más, paga menos)
+      'ENABLE_ADVANCED_UNITS' as FeatureFlagKey,    // Unidades avanzadas (m², ml, kg)
+      'ENABLE_CONVERSIONS' as FeatureFlagKey,        // Conversiones automáticas (1 caja = 12 unidades)
+      'ENABLE_SELLUNIT_PRICING' as FeatureFlagKey,   // Precio especial por rollo/caja/pack
+      // NOTA: ENABLE_CATEGORY_PROMOS y ENABLE_VOLUME_PROMOS son flags de PLAN → los controla syncFeatureFlagsFromPlan
       // NOTA: ENABLE_SERVICES y ENABLE_WORK_ORDERS se activan en F3/F4
     ],
     suggestedCategories: [
@@ -98,7 +93,6 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Reparaciones con mano de obra, órdenes de trabajo con seguimiento. Mecánico, electrónico, etc.',
     icon: '🔩',
     enabledFlags: [
-      ...CORE_FLAGS,
       'ENABLE_SERVICES' as FeatureFlagKey,     // Servicios (mano de obra)
       'ENABLE_WORK_ORDERS' as FeatureFlagKey,  // Órdenes de trabajo
     ],
@@ -111,7 +105,6 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Servicios de lavado por prenda o kg. Sin inventario de productos, solo servicios.',
     icon: '🧺',
     enabledFlags: [
-      ...CORE_FLAGS,
       'ENABLE_SERVICES' as FeatureFlagKey, // Servicios (lavado, planchado)
     ],
     suggestedCategories: ['Lavado', 'Planchado', 'Tintorería', 'Express'],
@@ -123,8 +116,7 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Venta de combos, platos preparados. Configuración base con promociones.',
     icon: '🍗',
     enabledFlags: [
-      ...CORE_FLAGS,
-      // Pollería usa solo flags core (promociones, combos vía volume promos)
+      // Pollería no necesita flags de perfil. Promos/combos via plan.
     ],
     suggestedCategories: ['Pollos', 'Combos', 'Bebidas', 'Acompañamientos', 'Extras'],
   },
@@ -135,7 +127,6 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Gestión de reservaciones, check-in/check-out, disponibilidad de habitaciones.',
     icon: '🏨',
     enabledFlags: [
-      ...CORE_FLAGS,
       'ENABLE_RESERVATIONS' as FeatureFlagKey, // Reservaciones
       'ENABLE_SERVICES' as FeatureFlagKey,     // Servicios adicionales (lavandería, etc)
     ],
@@ -148,7 +139,6 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Control de lotes, fechas de vencimiento, trazabilidad. FIFO automático.',
     icon: '💊',
     enabledFlags: [
-      ...CORE_FLAGS,
       'ENABLE_BATCH_EXPIRY' as FeatureFlagKey, // Lotes y vencimientos
     ],
     suggestedCategories: ['Medicamentos', 'Genéricos', 'Cuidado Personal', 'Vitaminas', 'Bebés'],
@@ -160,8 +150,7 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     description: 'Tienda de celulares, accesorios tecnológicos. Configuración base.',
     icon: '📱',
     enabledFlags: [
-      ...CORE_FLAGS,
-      // Accesorios usa configuración base
+      // Accesorios no necesita flags de perfil. Flags de plan via suscripción.
     ],
     suggestedCategories: ['Celulares', 'Fundas', 'Cargadores', 'Audífonos', 'Cables', 'Reparación'],
   },
