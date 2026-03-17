@@ -3,6 +3,13 @@ import { getSession } from '@/lib/session';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { v2 as cloudinary } from 'cloudinary';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'catalog');
 const MAX_FILE_SIZE = {
@@ -11,6 +18,18 @@ const MAX_FILE_SIZE = {
 };
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function isDesktopMode(): boolean {
+  return process.env.DESKTOP_MODE === 'true';
+}
+
+function canUseCloudinary(): boolean {
+  return Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,22 +76,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ensure upload directory exists
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // Web (Render/prod): use Cloudinary so images are persistent and public.
+    // Desktop/offline/dev keeps local disk behavior.
+    if (!isDesktopMode() && canUseCloudinary()) {
+      const folder = `${process.env.CLOUDINARY_FOLDER || 'market-pos'}-catalog`;
+      const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
+        (resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder,
+              public_id: `${type}-${session.storeId}-${Date.now()}`,
+              overwrite: true,
+              transformation:
+                type === 'logo'
+                  ? [
+                      { width: 600, height: 600, crop: 'limit' },
+                      { quality: 'auto', fetch_format: 'auto' },
+                    ]
+                  : [
+                      { width: 1800, height: 900, crop: 'limit' },
+                      { quality: 'auto', fetch_format: 'auto' },
+                    ],
+            },
+            (error, result) => {
+              if (error || !result) reject(error ?? new Error('No result'));
+              else resolve({ secure_url: result.secure_url, public_id: result.public_id });
+            }
+          );
+          uploadStream.end(buffer);
+        }
+      );
+
+      return NextResponse.json({
+        success: true,
+        url: uploadResult.secure_url,
+        filename: uploadResult.public_id,
+      });
+    }
+
+    // Local fallback (desktop/dev)
     if (!existsSync(UPLOAD_DIR)) {
       await mkdir(UPLOAD_DIR, { recursive: true });
     }
 
-    // Generate unique filename
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
     const timestamp = Date.now();
     const filename = `${type}-${session.storeId}-${timestamp}.${ext}`;
     const filepath = join(UPLOAD_DIR, filename);
 
-    // Write file to disk
-    const bytes = await file.arrayBuffer();
-    await writeFile(filepath, Buffer.from(bytes));
+    await writeFile(filepath, buffer);
 
-    // Return URL path
     const url = `/uploads/catalog/${filename}`;
 
     return NextResponse.json({

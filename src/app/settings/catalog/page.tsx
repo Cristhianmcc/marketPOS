@@ -152,9 +152,10 @@ export default function CatalogSettingsPage() {
     process.env.NEXT_PUBLIC_CATALOG_API_BASE_URL ||
     `${window.location.protocol}//${window.location.host}`;
 
-  const catalogUrl =
-    settings?.catalogUrl ||
-    `${publicBaseUrl.replace(/\/+$/, '')}/c/${formData.slug}`;
+  const normalizedSlug = (formData.slug || '').trim().replace(/^\/+|\/+$/g, '');
+  const catalogUrl = normalizedSlug
+    ? `${publicBaseUrl.replace(/\/+$/, '')}/c/${normalizedSlug}`
+    : (settings?.catalogUrl || '');
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -169,7 +170,7 @@ export default function CatalogSettingsPage() {
             Configura cómo se verá tu tienda en línea para tus clientes.
           </p>
         </div>
-        {formData.slug ? (
+        {formData.slug && formData.enabled ? (
           <a
             href={catalogUrl}
             target="_blank"
@@ -253,7 +254,7 @@ export default function CatalogSettingsPage() {
                   />
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-2">
-                  {formData.slug ? (
+                  {formData.slug && formData.enabled ? (
                     <>
                       URL actual:{' '}
                       <span className="text-primary break-all">{catalogUrl}</span>
