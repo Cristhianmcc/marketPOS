@@ -369,10 +369,39 @@ export class MigrationRunner {
       `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ticket_logo VARCHAR(500);`,
       // cost_price added for purchase cost + margin feature
       `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2);`,
-      // social links for public catalog
+      // catalog_settings table for public catalog feature
+      `CREATE TABLE IF NOT EXISTS catalog_settings (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL UNIQUE,
+        enabled BOOLEAN NOT NULL DEFAULT false,
+        store_name VARCHAR(255) NOT NULL DEFAULT '',
+        store_slug VARCHAR(255) UNIQUE,
+        store_logo_path VARCHAR(500),
+        store_banner_path VARCHAR(500),
+        whatsapp_number VARCHAR(50) NOT NULL DEFAULT '',
+        facebook_url VARCHAR(255),
+        instagram_url VARCHAR(255),
+        tiktok_url VARCHAR(255),
+        catalog_status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+        catalog_url VARCHAR(500),
+        last_published_at TIMESTAMP,
+        last_sync_at TIMESTAMP,
+        sync_mode VARCHAR(20) NOT NULL DEFAULT 'manual',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      // social links for public catalog (in case table existed without them)
       `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS facebook_url VARCHAR(255);`,
       `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS instagram_url VARCHAR(255);`,
       `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS tiktok_url VARCHAR(255);`,
+      // catalog columns on store_products
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS publish_in_catalog BOOLEAN DEFAULT false;`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_title VARCHAR(255);`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_description TEXT;`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_image_path VARCHAR(500);`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_category VARCHAR(255);`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_visible BOOLEAN DEFAULT true;`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_updated_at TIMESTAMP;`,
     ];
 
     const sql = patches.join('\n');
