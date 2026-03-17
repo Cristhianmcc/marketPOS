@@ -9,9 +9,45 @@ export async function GET() {
   }
 
   try {
-    const settings = await prisma.catalogSettings.findUnique({
-      where: { storeId: session.storeId },
-    });
+    let settings: any = null;
+    try {
+      settings = await prisma.catalogSettings.findUnique({
+        where: { storeId: session.storeId },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Backward-compat: old desktop DBs may not yet have social columns.
+      if (
+        msg.includes('Unknown field') ||
+        msg.includes('facebookUrl') ||
+        msg.includes('instagramUrl') ||
+        msg.includes('tiktokUrl') ||
+        msg.includes('facebook_url') ||
+        msg.includes('instagram_url') ||
+        msg.includes('tiktok_url') ||
+        msg.includes('does not exist')
+      ) {
+        settings = await prisma.catalogSettings.findUnique({
+          where: { storeId: session.storeId },
+          select: {
+            id: true,
+            storeId: true,
+            enabled: true,
+            storeSlug: true,
+            whatsappNumber: true,
+            messageTemplate: true,
+            storeLogoPath: true,
+            storeBannerPath: true,
+            catalogStatus: true,
+            lastPublishedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        });
+      } else {
+        throw err;
+      }
+    }
 
     if (!settings) {
       // Default initial settings (keep fields expected by the UI)
@@ -33,6 +69,9 @@ export async function GET() {
     return NextResponse.json({
       ...settings,
       slug: settings.storeSlug,
+      facebookUrl: (settings as any).facebookUrl ?? '',
+      instagramUrl: (settings as any).instagramUrl ?? '',
+      tiktokUrl: (settings as any).tiktokUrl ?? '',
     });
   } catch (error) {
     console.error('Error fetching catalog settings:', error);
@@ -142,4 +181,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
