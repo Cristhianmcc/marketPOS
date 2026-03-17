@@ -153,6 +153,7 @@ export default function CatalogSettingsPage() {
     `${window.location.protocol}//${window.location.host}`;
 
   const normalizedSlug = (formData.slug || '').trim().replace(/^\/+|\/+$/g, '');
+  const catalogPath = normalizedSlug ? `/c/${normalizedSlug}` : '';
   const catalogUrl = normalizedSlug
     ? `${publicBaseUrl.replace(/\/+$/, '')}/c/${normalizedSlug}`
     : (settings?.catalogUrl || '');
@@ -172,7 +173,7 @@ export default function CatalogSettingsPage() {
         </div>
         {formData.slug && formData.enabled ? (
           <a
-            href={catalogUrl}
+            href={catalogPath}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"

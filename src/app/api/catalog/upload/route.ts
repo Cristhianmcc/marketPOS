@@ -102,47 +102,48 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Web (Render/prod): use Cloudinary so images are persistent and public.
-    // Desktop/offline/dev keeps local disk behavior.
-    if (!isDesktopMode() && canUseCloudinary()) {
-      try {
-        const folder = `${process.env.CLOUDINARY_FOLDER || 'market-pos'}-catalog`;
-        const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
-          (resolve, reject) => {
-            const uploadStream = cloudinary.uploader.upload_stream(
-              {
-                folder,
-                public_id: `${type}-${session.storeId}-${Date.now()}`,
-                overwrite: true,
-                transformation:
-                  type === 'logo'
-                    ? [
-                        { width: 600, height: 600, crop: 'limit' },
-                        { quality: 'auto', fetch_format: 'auto' },
-                      ]
-                    : [
-                        { width: 1800, height: 900, crop: 'limit' },
-                        { quality: 'auto', fetch_format: 'auto' },
-                      ],
-              },
-              (error, result) => {
-                if (error || !result) reject(error ?? new Error('No result'));
-                else resolve({ secure_url: result.secure_url, public_id: result.public_id });
-              }
-            );
-            uploadStream.end(buffer);
-          }
+    // Web/production: require Cloudinary for persistent public URLs.
+    if (!isDesktopMode()) {
+      if (!canUseCloudinary()) {
+        return NextResponse.json(
+          { error: 'Cloudinary no configurado en producción (faltan variables de entorno).' },
+          { status: 500 }
         );
-
-        return NextResponse.json({
-          success: true,
-          url: uploadResult.secure_url,
-          filename: uploadResult.public_id,
-        });
-      } catch (cloudinaryError) {
-        // If cloud upload fails in web, keep the flow working with local fallback.
-        console.error('[catalog/upload] Cloudinary failed, using local fallback:', cloudinaryError);
       }
+
+      const folder = `${process.env.CLOUDINARY_FOLDER || 'market-pos'}-catalog`;
+      const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
+        (resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder,
+              public_id: `${type}-${session.storeId}-${Date.now()}`,
+              overwrite: true,
+              transformation:
+                type === 'logo'
+                  ? [
+                      { width: 600, height: 600, crop: 'limit' },
+                      { quality: 'auto', fetch_format: 'auto' },
+                    ]
+                  : [
+                      { width: 1800, height: 900, crop: 'limit' },
+                      { quality: 'auto', fetch_format: 'auto' },
+                    ],
+            },
+            (error, result) => {
+              if (error || !result) reject(error ?? new Error('No result'));
+              else resolve({ secure_url: result.secure_url, public_id: result.public_id });
+            }
+          );
+          uploadStream.end(buffer);
+        }
+      );
+
+      return NextResponse.json({
+        success: true,
+        url: uploadResult.secure_url,
+        filename: uploadResult.public_id,
+      });
     }
 
     // Local fallback (desktop/dev)
