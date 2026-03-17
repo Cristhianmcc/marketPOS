@@ -33,6 +33,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!user.storeId) {
+      return NextResponse.json({ error: 'Usuario sin tienda asignada' }, { status: 403 });
+    }
+
     const body = await req.json();
     const validation = ImportProductSchema.safeParse(body);
 

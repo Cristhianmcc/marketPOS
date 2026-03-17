@@ -27,3 +27,7 @@ npm-debug.log*
 
 # Environment
 .env.local
+
+build-resources/
+.next/
+build-log.txt

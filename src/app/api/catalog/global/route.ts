@@ -23,6 +23,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (!user.storeId) {
+      return NextResponse.json({ error: 'Usuario sin tienda asignada' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const q = searchParams.get('q') || '';
     const category = searchParams.get('category') || '';

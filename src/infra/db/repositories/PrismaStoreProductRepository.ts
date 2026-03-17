@@ -20,6 +20,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: sp.stock !== null ? sp.stock.toNumber() : null,
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
+      publishInCatalog: sp.publishInCatalog,
       product: {
         id: sp.product.id,
         barcode: sp.product.barcode,
@@ -79,6 +80,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: sp.stock !== null ? sp.stock.toNumber() : null,
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
+      publishInCatalog: sp.publishInCatalog,
       product: {
         id: sp.product.id,
         barcode: sp.product.barcode,
@@ -124,6 +126,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: sp.stock !== null ? sp.stock.toNumber() : null,
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
+      publishInCatalog: sp.publishInCatalog,
       product: {
         id: sp.product.id,
         barcode: sp.product.barcode,
