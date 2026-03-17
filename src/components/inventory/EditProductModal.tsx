@@ -23,6 +23,7 @@ interface EditProductModalProps {
     price: number;
     costPrice: number | null;
     minStock: number | null;
+    publishInCatalog?: boolean;
     product: {
       id: string;
       name: string;
@@ -62,6 +63,7 @@ export function EditProductModal({
     minStock: storeProduct.minStock !== null ? storeProduct.minStock.toString() : '',
     imageUrl: storeProduct.product.imageUrl ?? '',
     baseUnitId: storeProduct.product.baseUnitId ?? '',
+    publishInCatalog: !!storeProduct.publishInCatalog,
   });
 
   // Restablecer form cuando cambia el producto
@@ -81,6 +83,7 @@ export function EditProductModal({
       minStock: storeProduct.minStock !== null ? storeProduct.minStock.toString() : '',
       imageUrl: storeProduct.product.imageUrl ?? '',
       baseUnitId: storeProduct.product.baseUnitId ?? '',
+      publishInCatalog: !!storeProduct.publishInCatalog,
     });
     setError('');
   }, [storeProduct]);
@@ -192,10 +195,11 @@ export function EditProductModal({
     }
 
     try {
-      const body: Record<string, string | number | null> = {
+      const body: Record<string, string | number | boolean | null> = {
         price: priceNum,
         costPrice: form.costPrice !== '' ? parseFloat(form.costPrice) : null,
         minStock: form.minStock !== '' ? Number(form.minStock) : null,
+        publishInCatalog: form.publishInCatalog,
       };
 
       // Solo enviar campos del producto si no es global
@@ -495,6 +499,22 @@ export function EditProductModal({
                   onChange={e => handleChange('minStock', e.target.value)}
                   placeholder="Para alertas de stock bajo"
                 />
+              </div>
+
+              {/* Mostrar en Catálogo */}
+              <div className="pt-2">
+                <label className="flex items-center gap-3 p-3 bg-green-50/50 border border-green-100 rounded-lg cursor-pointer hover:bg-green-50 transition-colors group">
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 rounded border-gray-300 text-[#16A34A] focus:ring-[#16A34A]"
+                    checked={form.publishInCatalog}
+                    onChange={e => setForm(prev => ({ ...prev, publishInCatalog: e.target.checked }))}
+                  />
+                  <div>
+                    <span className="block text-sm font-semibold text-[#1F2A37]">Mostrar en Catálogo Web</span>
+                    <span className="block text-[11px] text-gray-500">Los clientes podrán ver este producto en tu página pública.</span>
+                  </div>
+                </label>
               </div>
             </div>
           </div>

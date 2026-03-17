@@ -2,7 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Store, ShoppingCart, DollarSign, FileText, Receipt, Package, BarChart3, Tag, Settings, LogOut, ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { 
+  Store, 
+  ShoppingCart, 
+  DollarSign, 
+  FileText, 
+  Receipt, 
+  Package, 
+  BarChart3, 
+  Tag, 
+  Settings, 
+  LogOut, 
+  ChevronDown, 
+  ChevronRight, 
+  PanelLeftClose, 
+  PanelLeftOpen,
+  Globe
+} from 'lucide-react';
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { ShortcutsButton } from '@/components/shortcuts/ShortcutsModal';
@@ -31,6 +47,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
     { icon: FileText, label: 'Ventas', href: '/sales' },
     { icon: Receipt, label: 'Cuentas por Cobrar', href: '/receivables' },
     { icon: Package, label: 'Inventario', href: '/inventory' },
+    { icon: Globe, label: 'Catálogo Web', href: '/settings/catalog' },
     { icon: BarChart3, label: 'Reportes', href: '/reports' },
   ];
 

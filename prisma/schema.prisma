@@ -180,6 +180,10 @@ model Store {
   // ✅ MÓDULO D8: Cloud Backups
   cloudBackups CloudBackup[]
 
+  // ✅ MÓDULO CATÁLOGO
+  catalogSettings  CatalogSettings?
+  catalogSyncQueue CatalogSyncQueue[]
+
   @@map("stores")
 }
 
@@ -295,6 +299,15 @@ model StoreProduct {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // ✅ MÓDULO CATÁLOGO: Campos para publicación en catálogo web
+  publishInCatalog    Boolean   @default(false)  @map("publish_in_catalog")
+  catalogTitle        String?                    @map("catalog_title")
+  catalogDescription  String?                    @map("catalog_description") @db.Text
+  catalogImagePath    String?                    @map("catalog_image_path")
+  catalogCategory     String?                    @map("catalog_category")
+  catalogVisible      Boolean   @default(true)   @map("catalog_visible")
+  catalogUpdatedAt    DateTime?                  @map("catalog_updated_at")
+
   store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product ProductMaster @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -305,6 +318,7 @@ model StoreProduct {
   @@unique([storeId, productId])
   @@index([storeId])
   @@index([productId])
+  @@index([storeId, publishInCatalog]) // ✅ CATÁLOGO: filtro rápido por tienda
   @@map("store_products")
 }
 
@@ -1338,4 +1352,92 @@ model CloudBackup {
   @@index([storeId, createdAt(sort: Desc)])
   @@index([status])
   @@map("cloud_backups")
+}
+
+// ============================================================
+// ✅ MÓDULO CATÁLOGO WEB - Fase 1
+// Desacoplado del flujo de ventas. Solo lee productos y publica
+// cuando el usuario lo solicita manualmente.
+// ============================================================
+
+enum CatalogStatus {
+  DRAFT        // configurado pero no publicado
+  PUBLISHED    // publicado y visible
+  SYNC_PENDING // hay cambios pendientes de sincronizar
+  SYNC_ERROR   // último intento de sincronización falló
+  DISABLED     // desactivado por el usuario
+}
+
+enum CatalogSyncStatus {
+  PENDING
+  PROCESSING
+  DONE
+  ERROR
+}
+
+enum CatalogEntityType {
+  CATALOG_SETTINGS
+  PRODUCT
+  PRODUCT_IMAGE
+  CATALOG_PUBLISH
+  CATALOG_UNPUBLISH
+}
+
+enum CatalogAction {
+  CREATE
+  UPDATE
+  DELETE
+  PUBLISH
+  UNPUBLISH
+}
+
+// Configuración del catálogo web por tienda (1 por tienda)
+model CatalogSettings {
+  id      String @id @default(cuid())
+  storeId String @unique @map("store_id")
+
+  enabled      Boolean       @default(false)
+  storeName    String        @default("") @map("store_name")
+  storeSlug    String?       @unique @map("store_slug")
+  storeLogoPath   String?    @map("store_logo_path")
+  storeBannerPath String?    @map("store_banner_path")
+  whatsappNumber  String     @default("") @map("whatsapp_number")
+  facebookUrl     String?    @map("facebook_url")
+  instagramUrl    String?    @map("instagram_url")
+  tiktokUrl       String?    @map("tiktok_url")
+  catalogStatus   CatalogStatus @default(DRAFT) @map("catalog_status")
+  catalogUrl      String?    @map("catalog_url")
+  lastPublishedAt DateTime?  @map("last_published_at")
+  lastSyncAt      DateTime?  @map("last_sync_at")
+  syncMode        String     @default("manual") @map("sync_mode") // manual | auto
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@map("catalog_settings")
+}
+
+// Cola de sincronización local (funciona offline, se procesa cuando hay internet)
+model CatalogSyncQueue {
+  id         String            @id @default(cuid())
+  storeId    String            @map("store_id")
+  entityType CatalogEntityType @map("entity_type")
+  entityId   String            @map("entity_id")
+  action     CatalogAction
+  payload    Json
+  status     CatalogSyncStatus @default(PENDING)
+  retryCount Int               @default(0) @map("retry_count")
+  errorMessage String?         @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("catalog_sync_queue")
 }

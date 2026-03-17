@@ -1,5 +1,5 @@
 // ✅ MÓDULO S6: Service Worker para BodegaPOS PWA
-const CACHE_NAME = 'bodegapos-v1';
+const CACHE_NAME = 'bodegapos-v2';
 const STATIC_ASSETS = [
   '/',
   '/pos',
@@ -53,6 +53,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Ignorar esquemas no soportados por Cache (extensiones del navegador)
+  if (url.protocol === 'chrome-extension:' || url.protocol === 'moz-extension:') {
+    return;
+  }
+
   // Ignorar requests que no sean GET
   if (request.method !== 'GET') {
     return;
@@ -60,6 +65,11 @@ self.addEventListener('fetch', (event) => {
 
   // Ignorar APIs - siempre ir a red (checkout, auth, etc.)
   if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // No cachear el catálogo público (evita ver versiones antiguas)
+  if (url.pathname.startsWith('/c/')) {
     return;
   }
 

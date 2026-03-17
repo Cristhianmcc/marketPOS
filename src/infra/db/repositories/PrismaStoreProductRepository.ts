@@ -2,11 +2,36 @@ import { StoreProduct } from '@/domain/types';
 import { IStoreProductRepository } from '@/repositories/IStoreProductRepository';
 import { prisma } from '../prisma';
 
+const PRODUCT_SELECT = {
+  id: true,
+  barcode: true,
+  internalSku: true,
+  name: true,
+  brand: true,
+  content: true,
+  category: true,
+  unitType: true,
+  imageUrl: true,
+  isGlobal: true,
+} as const;
+
+const STORE_PRODUCT_SELECT = {
+  id: true,
+  storeId: true,
+  productId: true,
+  price: true,
+  costPrice: true,
+  stock: true,
+  minStock: true,
+  active: true,
+  product: { select: PRODUCT_SELECT },
+} as const;
+
 export class PrismaStoreProductRepository implements IStoreProductRepository {
   async findById(id: string): Promise<StoreProduct | null> {
     const sp = await prisma.storeProduct.findUnique({
       where: { id },
-      include: { product: true },
+      select: STORE_PRODUCT_SELECT,
     });
 
     if (!sp) return null;
@@ -20,6 +45,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: sp.stock !== null ? sp.stock.toNumber() : null,
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
+      publishInCatalog: (sp as any).publishInCatalog ?? false,
       product: {
         id: sp.product.id,
         barcode: sp.product.barcode,
@@ -64,7 +90,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
 
     const storeProducts = await prisma.storeProduct.findMany({
       where,
-      include: { product: true },
+      select: STORE_PRODUCT_SELECT,
       orderBy: { product: { name: 'asc' } },
       // ✅ MÓDULO 18.2: Limitar resultados para mejor rendimiento en búsquedas
       take: filters?.query ? 20 : undefined,
@@ -79,6 +105,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: sp.stock !== null ? sp.stock.toNumber() : null,
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
+      publishInCatalog: (sp as any).publishInCatalog ?? false,
       product: {
         id: sp.product.id,
         barcode: sp.product.barcode,
@@ -110,7 +137,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
   async findByStoreAndProduct(storeId: string, productId: string): Promise<StoreProduct | null> {
     const sp = await prisma.storeProduct.findFirst({
       where: { storeId, productId },
-      include: { product: true },
+      select: STORE_PRODUCT_SELECT,
     });
 
     if (!sp) return null;
@@ -124,6 +151,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: sp.stock !== null ? sp.stock.toNumber() : null,
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
+      publishInCatalog: (sp as any).publishInCatalog ?? false,
       product: {
         id: sp.product.id,
         barcode: sp.product.barcode,
@@ -150,7 +178,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         minStock: storeProduct.minStock,
         active: storeProduct.active,
       },
-      include: { product: true },
+      select: STORE_PRODUCT_SELECT,
     });
 
     return {
@@ -162,6 +190,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: created.stock?.toNumber() || null,
       minStock: created.minStock?.toNumber() || null,
       active: created.active,
+      publishInCatalog: (created as any).publishInCatalog ?? false,
       product: {
         id: created.product.id,
         barcode: created.product.barcode,
@@ -181,7 +210,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
     const updated = await prisma.storeProduct.update({
       where: { id },
       data: { price },
-      include: { product: true },
+      select: STORE_PRODUCT_SELECT,
     });
 
     return {
@@ -193,6 +222,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: updated.stock?.toNumber() || null,
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
+      publishInCatalog: (updated as any).publishInCatalog ?? false,
       product: {
         id: updated.product.id,
         barcode: updated.product.barcode,
@@ -212,7 +242,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
     const updated = await prisma.storeProduct.update({
       where: { id },
       data: { stock },
-      include: { product: true },
+      select: STORE_PRODUCT_SELECT,
     });
 
     return {
@@ -224,6 +254,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: updated.stock?.toNumber() || null,
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
+      publishInCatalog: (updated as any).publishInCatalog ?? false,
       product: {
         id: updated.product.id,
         barcode: updated.product.barcode,
@@ -243,7 +274,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
     const updated = await prisma.storeProduct.update({
       where: { id },
       data: { active },
-      include: { product: true },
+      select: STORE_PRODUCT_SELECT,
     });
 
     return {
@@ -255,6 +286,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       stock: updated.stock?.toNumber() || null,
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
+      publishInCatalog: (updated as any).publishInCatalog ?? false,
       product: {
         id: updated.product.id,
         barcode: updated.product.barcode,

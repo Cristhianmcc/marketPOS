@@ -84,6 +84,27 @@
   animation: slide-in 0.3s ease-out;
 }
 
+/* Reveal on scroll for catalog cards */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 420ms ease, transform 420ms ease;
+  will-change: opacity, transform;
+}
+
+.reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 /* ✅ MÓDULO S6: Animación para banner offline */
 @keyframes slide-down {
   from {

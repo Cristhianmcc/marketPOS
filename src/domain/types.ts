@@ -29,6 +29,7 @@ export interface StoreProduct {
   stock: number | null;
   minStock: number | null;
   active: boolean;
+  publishInCatalog?: boolean;
   product?: Product;
 }
 

@@ -1,0 +1,1 @@
+SELECT id, store_id, enabled, store_slug, store_name, catalog_status, whatsapp_number FROM catalog_settings;

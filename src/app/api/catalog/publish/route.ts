@@ -2,11 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { logAudit } from '@/lib/auditLog';
+import * as path from 'node:path';
+import { CatalogController } from '@/modules/catalog/backend/controllers/catalog.controller';
+import { CatalogMediaService } from '@/modules/catalog/backend/services/catalog-media.service';
+import { isCatalogApiAuthorized } from '@/modules/catalog/backend/routes/catalog-auth';
+import { CatalogPublishPayloadSchema } from '@/modules/catalog/backend/routes/catalog.schemas';
 import { z } from 'zod';
 
 const PublishProductSchema = z.object({
   productId: z.string().min(1, 'Product ID requerido'),
 });
+
+export const runtime = 'nodejs';
+
+function createCatalogController(req: NextRequest): CatalogController {
+  const uploadDir = path.resolve(process.cwd(), 'public', 'uploads', 'catalog');
+  const publicBaseUrl = process.env.PUBLIC_BASE_URL || new URL(req.url).origin;
+  const publicCatalogBaseUrl = process.env.PUBLIC_CATALOG_BASE_URL || publicBaseUrl;
+  const mediaService = new CatalogMediaService(uploadDir, publicBaseUrl);
+
+  return new CatalogController(mediaService, publicCatalogBaseUrl);
+}
 
 /**
  * POST /api/catalog/publish
@@ -16,6 +32,24 @@ const PublishProductSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
+    const body = await req.json();
+
+    // Modo nuevo: publicar catalogo web completo (desktop -> backend)
+    const catalogPayload = CatalogPublishPayloadSchema.safeParse(body);
+    if (catalogPayload.success) {
+      if (!isCatalogApiAuthorized(req)) {
+        return NextResponse.json(
+          { success: false, message: 'API key invalida.' },
+          { status: 401 },
+        );
+      }
+
+      const controller = createCatalogController(req);
+      const result = await controller.publish(catalogPayload.data);
+      return NextResponse.json(result);
+    }
+
+    // Modo legacy: catalogo global existente por ProductMaster
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
@@ -28,7 +62,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    if (!user.storeId) {
+      return NextResponse.json({ error: 'Usuario sin tienda asignada' }, { status: 403 });
+    }
+
     const validation = PublishProductSchema.safeParse(body);
 
     if (!validation.success) {

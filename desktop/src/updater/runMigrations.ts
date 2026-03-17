@@ -169,6 +169,23 @@ export class MigrationRunner {
   }
 
   /**
+   * Get the first migration folder name (used for baseline on existing DBs)
+   */
+  private getFirstMigrationName(schemaPath: string): string | null {
+    const migrationsPath = path.join(path.dirname(schemaPath), 'migrations');
+    if (!fs.existsSync(migrationsPath)) return null;
+
+    const migrationFolders = fs.readdirSync(migrationsPath)
+      .filter((f) => {
+        const fullPath = path.join(migrationsPath, f);
+        return fs.statSync(fullPath).isDirectory() && f.match(/^\d{4}_|^\d{14}_/);
+      })
+      .sort();
+
+    return migrationFolders.length > 0 ? migrationFolders[0] : null;
+  }
+
+  /**
    * Get DATABASE_URL from environment or .env file
    */
   private getDatabaseUrl(): string {
@@ -352,6 +369,10 @@ export class MigrationRunner {
       `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ticket_logo VARCHAR(500);`,
       // cost_price added for purchase cost + margin feature
       `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2);`,
+      // social links for public catalog
+      `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS facebook_url VARCHAR(255);`,
+      `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS instagram_url VARCHAR(255);`,
+      `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS tiktok_url VARCHAR(255);`,
     ];
 
     const sql = patches.join('\n');
@@ -424,7 +445,26 @@ export class MigrationRunner {
       console.log(`[MigrationRunner] Found ${migrationFolders.length} migration(s)`);
 
       // Run prisma migrate deploy
-      const output = await this.execPrismaMigrate(schemaPath, databaseUrl);
+      let output = '';
+      try {
+        output = await this.execPrismaMigrate(schemaPath, databaseUrl);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isP3005 = msg.includes('P3005') || msg.includes('database schema is not empty');
+
+        if (isP3005) {
+          const firstMigration = this.getFirstMigrationName(schemaPath);
+          if (firstMigration) {
+            console.warn(`[MigrationRunner] Detected existing DB. Baseline with migration: ${firstMigration}`);
+            await this.execPrismaMigrateResolve(schemaPath, databaseUrl, firstMigration);
+            output = await this.execPrismaMigrate(schemaPath, databaseUrl);
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
       
       // Parse output
       const applied = this.countAppliedMigrations(output);
@@ -670,6 +710,38 @@ export class MigrationRunner {
       
       throw err;
     }
+  }
+
+  /**
+   * Execute prisma migrate resolve --applied <migration>
+   * Used to baseline an existing database (avoid P3005)
+   */
+  private async execPrismaMigrateResolve(
+    schemaPath: string,
+    databaseUrl: string,
+    migrationName: string,
+  ): Promise<string> {
+    const prismaCliJs = this.getPrismaCliJsPath();
+    const prismaBin = prismaCliJs ? process.execPath : this.getPrismaBinary();
+    const isNpx = !prismaCliJs && prismaBin.includes('npx');
+
+    const args = isNpx
+      ? [`prisma@${this.prismaVersion}`, 'migrate', 'resolve', '--applied', migrationName, '--schema', schemaPath]
+      : ['migrate', 'resolve', '--applied', migrationName, '--schema', schemaPath];
+    const fullArgs = prismaCliJs ? [prismaCliJs, ...args] : args;
+
+    let cmd = isNpx
+      ? (process.platform === 'win32' ? 'npx.cmd' : 'npx')
+      : prismaBin;
+    let cmdArgs = fullArgs;
+    let useShell = false;
+
+    if (process.platform === 'win32' && cmd.toLowerCase().endsWith('.cmd')) {
+      useShell = true;
+    }
+
+    console.log(`[MigrationRunner] Running: ${cmd} ${cmdArgs.join(' ')}`);
+    return this.runPrismaProcess(cmd, cmdArgs, databaseUrl, !!prismaCliJs, useShell);
   }
 
   /**

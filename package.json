@@ -28,6 +28,7 @@
     "electron:pack": "electron-builder --dir",
     "desktop:dev": "npm run desktop:db && concurrently --kill-others \"npm run dev\" \"wait-on http://localhost:3000 && cd desktop && npm run dev\"",
     "desktop:build": "cross-env DESKTOP_BUILD=1 npm run build:only && cd desktop && npm run build",
+    "desktop:portable": "cross-env DESKTOP_BUILD=1 npm run build:only && cd desktop && npm run pack",
     "desktop:standalone": "cross-env DESKTOP_BUILD=1 npm run build:only",
     "desktop:db": "powershell -ExecutionPolicy Bypass -File scripts/desktop/db-init.ps1",
     "desktop:db:unix": "bash scripts/desktop/db-init.sh"

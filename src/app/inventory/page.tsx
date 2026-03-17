@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
-import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag, Download, Upload, FileArchive } from 'lucide-react';
+import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag, Download, Upload, FileArchive, CheckSquare, Square, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
 import { EditProductModal } from '@/components/inventory/EditProductModal';
 import { StockMovementModal } from '@/components/inventory/StockMovementModal';
@@ -34,6 +34,7 @@ interface StoreProduct {
   stock: number | null;
   minStock: number | null;
   active: boolean;
+  publishInCatalog?: boolean;
   product: Product;
 }
 
@@ -46,6 +47,8 @@ export default function InventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [lowStockFilter, setLowStockFilter] = useState(false);
   const [activeFilter, setActiveFilter] = useState<boolean | null>(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editPriceModal, setEditPriceModal] = useState<{
     open: boolean;
@@ -197,6 +200,46 @@ export default function InventoryPage() {
     Boolean
   );
 
+  const handleSelectProduct = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === products.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(products.map(p => p.id));
+    }
+  };
+
+  const handleBulkCatalogAction = async (action: 'publish' | 'unpublish') => {
+    if (selectedIds.length === 0) return;
+    
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/inventory/bulk-catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds: selectedIds, action }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message);
+        setSelectedIds([]);
+        loadProducts();
+      } else {
+        toast.error('Error al actualizar productos');
+      }
+    } catch (error) {
+      toast.error('Error de conexión');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const isOwner = user?.role === 'OWNER';
 
   return (
@@ -317,6 +360,44 @@ export default function InventoryPage() {
             </div>
           </div>
 
+          {/* Bulk Actions Bar */}
+          {selectedIds.length > 0 && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-semibold text-indigo-700">
+                  {selectedIds.length} productos seleccionados
+                </span>
+                <div className="h-4 w-px bg-indigo-200"></div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleBulkCatalogAction('publish')}
+                    disabled={bulkLoading}
+                    className="h-8 px-3 bg-indigo-600 text-white rounded-md text-xs font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    title="Añadir seleccionados al catálogo web"
+                  >
+                    {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
+                    Mostrar en Catálogo
+                  </button>
+                  <button
+                    onClick={() => handleBulkCatalogAction('unpublish')}
+                    disabled={bulkLoading}
+                    className="h-8 px-3 border border-indigo-200 bg-white text-indigo-700 rounded-md text-xs font-medium hover:bg-indigo-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    title="Quitar seleccionados del catálogo web"
+                  >
+                    {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <EyeOff className="w-3 h-3" />}
+                    Ocultar del Catálogo
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedIds([])}
+                className="text-xs text-indigo-500 hover:text-indigo-700 font-medium"
+              >
+                Descartar selección
+              </button>
+            </div>
+          )}
+
           {/* Table */}
           {loading ? (
             <div className="text-center py-12 text-gray-500">Cargando productos...</div>
@@ -342,6 +423,18 @@ export default function InventoryPage() {
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
+                      <th className="px-4 py-3 text-center w-8">
+                        <button 
+                          onClick={handleSelectAll}
+                          className="text-gray-400 hover:text-[#16A34A] transition-colors"
+                        >
+                          {selectedIds.length === products.length ? (
+                            <CheckSquare className="w-5 h-5 text-[#16A34A]" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
+                      </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                         Producto
                       </th>
@@ -379,20 +472,39 @@ export default function InventoryPage() {
                         sp.stock <= sp.minStock;
 
                       return (
-                        <tr key={sp.id} className="hover:bg-gray-50">
+                        <tr key={sp.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.includes(sp.id) ? 'bg-green-50/30' : ''}`}>
+                          <td className="px-4 py-3 text-center">
+                            <button 
+                              onClick={() => handleSelectProduct(sp.id)}
+                              className="text-gray-400 hover:text-[#16A34A] transition-colors"
+                            >
+                              {selectedIds.includes(sp.id) ? (
+                                <CheckSquare className="w-5 h-5 text-[#16A34A]" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                            </button>
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              {sp.product.imageUrl ? (
-                                <img
-                                  src={sp.product.imageUrl}
-                                  alt={sp.product.name}
-                                  className="w-12 h-12 rounded object-cover flex-shrink-0"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                  <Package className="w-6 h-6 text-gray-400" />
-                                </div>
-                              )}
+                              <div className="relative">
+                                {sp.product.imageUrl ? (
+                                  <img
+                                    src={sp.product.imageUrl}
+                                    alt={sp.product.name}
+                                    className="w-12 h-12 rounded object-cover flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                    <Package className="w-6 h-6 text-gray-400" />
+                                  </div>
+                                )}
+                                {sp.publishInCatalog && (
+                                  <div className="absolute -top-1 -right-1 bg-[#16A34A] text-white rounded-full p-0.5 border-2 border-white shadow-sm" title="Visible en catálogo">
+                                    <Globe className="w-2.5 h-2.5" />
+                                  </div>
+                                )}
+                              </div>
                               <div>
                                 <div className="text-sm font-medium text-[#1F2A37]">
                                   {sp.product.name}

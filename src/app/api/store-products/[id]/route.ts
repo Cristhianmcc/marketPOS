@@ -23,7 +23,10 @@ export async function PUT(
     const { id } = await context.params;
 
     const body = await req.json();
-    const { name, brand, content, barcode, category, price, costPrice, minStock, imageUrl, baseUnitId } = body;
+    const { 
+      name, brand, content, barcode, category, price, costPrice, minStock, imageUrl, baseUnitId,
+      publishInCatalog
+    } = body;
 
     // Verificar que el storeProduct pertenece a esta tienda
     const storeProduct = await prisma.storeProduct.findUnique({
@@ -77,10 +80,23 @@ export async function PUT(
     }
 
     // Actualizar campos del storeProduct
-    const spUpdates: Record<string, number | null> = {};
+    const spUpdates: any = {};
     if (price !== undefined)     spUpdates.price     = Number(price);
     if (costPrice !== undefined) spUpdates.costPrice = costPrice !== null && costPrice !== '' ? Number(costPrice) : null;
     if (minStock !== undefined)  spUpdates.minStock  = minStock !== '' && minStock !== null ? Number(minStock) : null;
+    
+    if (publishInCatalog !== undefined) {
+      const isPublished = Boolean(publishInCatalog);
+      spUpdates.publishInCatalog = isPublished;
+      spUpdates.catalogVisible = isPublished;
+
+      if (isPublished) {
+        spUpdates.catalogTitle = (name !== undefined ? String(name).trim() : storeProduct.product.name) || '';
+        spUpdates.catalogCategory = (category !== undefined ? String(category).trim() : storeProduct.product.category) || 'Otros';
+        spUpdates.catalogImagePath = imageUrl !== undefined ? imageUrl : storeProduct.product.imageUrl;
+        spUpdates.catalogUpdatedAt = new Date();
+      }
+    }
 
     const updated = await prisma.storeProduct.update({
       where: { id },
