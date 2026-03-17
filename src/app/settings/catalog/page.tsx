@@ -19,6 +19,7 @@ interface CatalogSettings {
   enabled: boolean;
   slug: string;
   whatsappNumber: string | null;
+  catalogUrl?: string | null;
   facebookUrl?: string | null;
   instagramUrl?: string | null;
   tiktokUrl?: string | null;
