@@ -76,7 +76,50 @@ export class CatalogProductRepository {
       });
 
       if (updated.count === 0) {
-        throw new Error(`Producto local no encontrado en tienda: ${product.localProductId}`);
+        // El producto no existe en la nube aún — crear ProductMaster + StoreProduct
+        const catalogSku = `CATALOG-${product.localProductId}`;
+        const pm = await this.db.productMaster.upsert({
+          where: { internalSku: catalogSku },
+          create: {
+            internalSku: catalogSku,
+            name: product.name,
+            category: product.category || 'Otros',
+            imageUrl: product.imageUrl || null,
+            isGlobal: false,
+            unitType: 'UNIT',
+          },
+          update: {
+            name: product.name,
+            category: product.category || 'Otros',
+            imageUrl: product.imageUrl || null,
+          },
+        });
+        await this.db.storeProduct.upsert({
+          where: { storeId_productId: { storeId, productId: pm.id } },
+          create: {
+            id: product.localProductId,
+            storeId,
+            productId: pm.id,
+            price: product.price,
+            publishInCatalog: true,
+            catalogTitle: product.name,
+            catalogDescription: product.description || null,
+            catalogCategory: product.category || null,
+            catalogImagePath: product.imageUrl,
+            catalogVisible: product.visible,
+            catalogUpdatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+          },
+          update: {
+            price: product.price,
+            publishInCatalog: true,
+            catalogTitle: product.name,
+            catalogDescription: product.description || null,
+            catalogCategory: product.category || null,
+            catalogImagePath: product.imageUrl,
+            catalogVisible: product.visible,
+            catalogUpdatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+          },
+        });
       }
     }
   }

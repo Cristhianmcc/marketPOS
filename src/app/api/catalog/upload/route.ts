@@ -23,6 +23,67 @@ function isDesktopMode(): boolean {
   return process.env.DESKTOP_MODE === 'true';
 }
 
+// ─── DESKTOP: parseador manual multipart (evita req.formData() que crashea en standalone) ───
+async function parseMultipartCatalogUpload(req: NextRequest): Promise<{
+  buffer: Buffer; filename: string; contentType: string; fieldName: string; type: string;
+} | null> {
+  const ct = req.headers.get('content-type') || '';
+  const bMatch = ct.match(/boundary="?([^\s";]+)"?/);
+  if (!bMatch) return null;
+
+  const raw = Buffer.from(await req.arrayBuffer());
+  const boundaryBuf = Buffer.from('--' + bMatch[1]);
+  const headerEndMark = Buffer.from('\r\n\r\n');
+
+  const positions: number[] = [];
+  let idx = 0;
+  while ((idx = raw.indexOf(boundaryBuf, idx)) !== -1) {
+    positions.push(idx);
+    idx += boundaryBuf.length;
+  }
+
+  let fileBuffer: Buffer | null = null;
+  let filename = 'upload.jpg';
+  let contentType = '';
+  let type = '';
+
+  for (let i = 0; i < positions.length - 1; i++) {
+    const start = positions[i] + boundaryBuf.length + 2;
+    const end = positions[i + 1] - 2;
+    const part = raw.subarray(start, end);
+    const hEnd = part.indexOf(headerEndMark);
+    if (hEnd === -1) continue;
+
+    const headers = part.subarray(0, hEnd).toString('utf-8');
+    const body = part.subarray(hEnd + 4);
+
+    const nameMatch = headers.match(/name="([^"]+)"/);
+    const fieldNameStr = nameMatch ? nameMatch[1] : '';
+
+    if (fieldNameStr === 'type') {
+      type = body.toString('utf-8').trim();
+    } else if (fieldNameStr === 'image') {
+      const fnMatch = headers.match(/filename="([^"]+)"/);
+      filename = fnMatch ? fnMatch[1] : 'upload.jpg';
+      const ctMatch = headers.match(/Content-Type:\s*(.+)/i);
+      contentType = ctMatch ? ctMatch[1].trim() : '';
+      fileBuffer = Buffer.from(body);
+    }
+  }
+
+  if (!fileBuffer) return null;
+  return { buffer: fileBuffer, filename, contentType, fieldName: 'image', type };
+}
+
+function inferMimeType(rawCT: string, filename: string): string {
+  const ct = (rawCT || '').toLowerCase().trim();
+  if (ct.startsWith('image/')) return ct;
+  const name = (filename || '').toLowerCase();
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
 function canUseCloudinary(): boolean {
   return Boolean(
     process.env.CLOUDINARY_CLOUD_NAME &&
@@ -101,19 +162,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get('image') as File;
-    const type = formData.get('type') as string;
+    let buffer: Buffer;
+    let type: string;
+    let mimeType: string;
+    let fileName: string;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No se proporciono archivo' }, { status: 400 });
+    // ─── DESKTOP: parseo manual de multipart (evita req.formData() que crashea en standalone) ───
+    if (isDesktopMode()) {
+      const parsed = await parseMultipartCatalogUpload(request);
+      if (!parsed || parsed.buffer.length === 0) {
+        return NextResponse.json({ error: 'No se proporciono archivo' }, { status: 400 });
+      }
+      buffer = parsed.buffer;
+      type = parsed.type;
+      mimeType = inferMimeType(parsed.contentType, parsed.filename);
+      fileName = parsed.filename;
+    } else {
+      // ─── WEB: formData normal ───────────────────────────────────────────────
+      const formData = await request.formData();
+      const file = formData.get('image') as File;
+      type = formData.get('type') as string;
+      if (!file) {
+        return NextResponse.json({ error: 'No se proporciono archivo' }, { status: 400 });
+      }
+      mimeType = file.type;
+      fileName = file.name;
+      buffer = Buffer.from(await file.arrayBuffer());
     }
 
     if (!['logo', 'banner'].includes(type)) {
       return NextResponse.json({ error: 'Tipo de archivo invalido' }, { status: 400 });
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!ALLOWED_TYPES.includes(mimeType)) {
       return NextResponse.json(
         { error: 'Tipo de archivo no permitido. Usa PNG, JPG o WebP' },
         { status: 400 }
@@ -121,17 +202,40 @@ export async function POST(request: NextRequest) {
     }
 
     const maxSize = MAX_FILE_SIZE[type as keyof typeof MAX_FILE_SIZE];
-    if (file.size > maxSize) {
+    if (buffer.length > maxSize) {
       return NextResponse.json(
         { error: `El archivo es demasiado grande. Maximo: ${maxSize / 1024 / 1024}MB` },
         { status: 400 }
       );
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // ─── Desktop: Cloudinary si está disponible, si no guardar local ─────────
+    if (isDesktopMode()) {
+      if (canUseCloudinary()) {
+        try {
+          const cloud = await tryCloudinaryUpload({
+            type: type as 'logo' | 'banner',
+            storeId: session.storeId,
+            buffer,
+          });
+          return NextResponse.json(cloud);
+        } catch (cloudError) {
+          console.error('[catalog/upload] Cloudinary failed en desktop, usando local:', cloudError);
+        }
+      }
+      // Sin Cloudinary o si falló: guardar local con nombre simulado
+      const fakeFile = { name: fileName } as File;
+      const local = await saveLocalFile({
+        file: fakeFile,
+        type: type as 'logo' | 'banner',
+        storeId: session.storeId,
+        buffer,
+      });
+      return NextResponse.json(local);
+    }
 
-    // In web mode, try Cloudinary first.
-    if (!isDesktopMode() && canUseCloudinary()) {
+    // ─── Web: Cloudinary primero, fallback local ──────────────────────────────
+    if (canUseCloudinary()) {
       try {
         const cloud = await tryCloudinaryUpload({
           type: type as 'logo' | 'banner',
@@ -144,9 +248,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Desktop mode, missing cloud config, or cloud failure: local fallback.
+    const fakeFile = { name: fileName } as File;
     const local = await saveLocalFile({
-      file,
+      file: fakeFile,
       type: type as 'logo' | 'banner',
       storeId: session.storeId,
       buffer,

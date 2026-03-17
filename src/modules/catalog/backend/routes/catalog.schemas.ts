@@ -4,7 +4,7 @@ export const CatalogPublishPayloadSchema = z.object({
   storeId: z.string().min(1),
   storeName: z.string().min(1),
   slug: z.string().min(1),
-  whatsappNumber: z.string().min(1),
+  whatsappNumber: z.string(),
   logoUrl: z.string().url().nullable(),
   bannerUrl: z.string().url().nullable(),
   products: z.array(

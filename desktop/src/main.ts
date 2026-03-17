@@ -206,10 +206,11 @@ function setupSecurityPolicies(): void {
           'Content-Security-Policy': [
             "default-src 'self' http://localhost:* http://127.0.0.1:*",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:*",
-            "style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:*",
-            "img-src 'self' data: https: http://localhost:* http://127.0.0.1:*",
+            "style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:* https://res.cloudinary.com",
+            "img-src 'self' data: https: http://localhost:* http://127.0.0.1:* https://res.cloudinary.com https://*.cloudinary.com",
             "font-src 'self' data:",
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.amazonaws.com wss://*",
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.amazonaws.com https://res.cloudinary.com https://*.cloudinary.com https://api.cloudinary.com wss://*",
+            "media-src 'self' http://localhost:* http://127.0.0.1:* https://res.cloudinary.com",
           ].join('; ')
         }
       });

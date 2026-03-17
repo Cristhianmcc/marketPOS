@@ -18,8 +18,8 @@ export async function GET() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
-      // Backward compat: old desktop DBs may not have social columns yet.
-      if (
+      // Backward compat: tabla o columnas faltantes en BD desktop antigua.
+      const isMissingColumn =
         msg.includes('Unknown field') ||
         msg.includes('facebookUrl') ||
         msg.includes('instagramUrl') ||
@@ -27,8 +27,28 @@ export async function GET() {
         msg.includes('facebook_url') ||
         msg.includes('instagram_url') ||
         msg.includes('tiktok_url') ||
-        msg.includes('does not exist')
-      ) {
+        msg.includes('does not exist');
+
+      const isMissingTable =
+        msg.includes('does not exist in the current database') ||
+        msg.includes("doesn't exist") ||
+        msg.includes('P2021') ||
+        msg.includes('catalog_settings') ||
+        msg.includes('no such table');
+
+      if (isMissingTable) {
+        // La tabla aún no existe en esta BD → devolver defaults vacíos
+        return NextResponse.json({
+          enabled: false,
+          slug: '',
+          whatsappNumber: '',
+          facebookUrl: '',
+          instagramUrl: '',
+          tiktokUrl: '',
+          storeLogoPath: '',
+          storeBannerPath: '',
+        });
+      } else if (isMissingColumn) {
         settings = await prisma.catalogSettings.findUnique({
           where: { storeId: session.storeId },
           select: {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Globe,
   ShoppingBag,
@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Upload,
   X,
+  CloudUpload,
+  AlertCircle,
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 
@@ -50,9 +52,103 @@ export default function CatalogSettingsPage() {
     storeBannerPath: '',
   });
 
+  // ── Estado sincronización de imágenes (solo desktop) ──────────────────
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [pendingImages, setPendingImages] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [cloudinaryOk, setCloudinaryOk] = useState(true);
+  const [publishing, setPublishing] = useState(false);
+
   useEffect(() => {
     fetchSettings();
   }, []);
+
+  // Detectar modo desktop y cargar conteo de pendientes
+  useEffect(() => {
+    fetch('/api/flags')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.isDesktop) {
+          setIsDesktop(true);
+          fetchPendingImages();
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchPendingImages = useCallback(async () => {
+    try {
+      const res = await fetch('/api/desktop/sync-catalog-images');
+      if (res.ok) {
+        const data = await res.json();
+        setPendingImages(data.pending ?? 0);
+        setCloudinaryOk(data.cloudinaryConfigured ?? true);
+      }
+    } catch {
+      // silencioso — puede no tener internet
+    }
+  }, []);
+
+  const handleSyncImages = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    const toastId = toast.loading('Subiendo imágenes a Cloudinary...');
+    try {
+      const res = await fetch('/api/desktop/sync-catalog-images', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Error al sincronizar imágenes', { id: toastId });
+        return;
+      }
+      if (data.synced === 0 && data.failed === 0) {
+        toast.success('No hay imágenes pendientes', { id: toastId });
+      } else if (data.failed > 0) {
+        toast.warning(
+          `${data.synced} imagen(es) subidas, ${data.failed} fallaron`,
+          { id: toastId }
+        );
+      } else {
+        toast.success(`${data.synced} imagen(es) subidas correctamente`, { id: toastId });
+      }
+      fetchPendingImages();
+    } catch {
+      toast.error('Error de conexión al sincronizar imágenes', { id: toastId });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handlePublish = async () => {
+    if (publishing) return;
+    setPublishing(true);
+    const toastId = toast.loading('Publicando catálogo en la web...');
+    try {
+      // Guardar configuración local primero
+      const saveRes = await fetch('/api/catalog/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!saveRes.ok) {
+        const err = await saveRes.json();
+        toast.error(err.error || 'Error al guardar configuración', { id: toastId });
+        return;
+      }
+      // Publicar en la nube
+      const pubRes = await fetch('/api/desktop/publish-catalog', { method: 'POST' });
+      const data = await pubRes.json();
+      if (!pubRes.ok) {
+        toast.error(data.error || 'Error al publicar en la web', { id: toastId });
+        return;
+      }
+      toast.success('¡Catálogo publicado correctamente!', { id: toastId });
+      fetchSettings();
+    } catch {
+      toast.error('Error de conexión al publicar', { id: toastId });
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -177,7 +273,7 @@ export default function CatalogSettingsPage() {
         </div>
         {formData.slug && formData.enabled ? (
           <a
-            href={catalogPath}
+            href={catalogUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
@@ -484,8 +580,105 @@ export default function CatalogSettingsPage() {
           </div>
         </form>
 
+        {/* ── Sincronización de imágenes (solo desktop) ──────────────── */}
+        {isDesktop && (
+          <div
+            className={`mt-6 p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center gap-4 ${
+              !cloudinaryOk
+                ? 'bg-red-50 border-red-200'
+                : pendingImages > 0
+                ? 'bg-amber-50 border-amber-200'
+                : 'bg-green-50 border-green-200'
+            }`}
+          >
+            <div className="flex items-start gap-3 flex-1">
+              {!cloudinaryOk ? (
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              ) : pendingImages > 0 ? (
+                <CloudUpload className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              ) : (
+                <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+              )}
+              <div>
+                {!cloudinaryOk ? (
+                  <>
+                    <h4 className="font-semibold text-red-900 text-sm">Cloudinary no configurado</h4>
+                    <p className="text-red-700 text-xs mt-1">
+                      Para mostrar imágenes en el catálogo web necesitas configurar las variables
+                      CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.
+                    </p>
+                  </>
+                ) : pendingImages > 0 ? (
+                  <>
+                    <h4 className="font-semibold text-amber-900 text-sm">
+                      {pendingImages} imagen{pendingImages !== 1 ? 'es' : ''} pendiente{pendingImages !== 1 ? 's' : ''} de sincronizar
+                    </h4>
+                    <p className="text-amber-700 text-xs mt-1">
+                      Estas imágenes están guardadas localmente. Sincronízalas antes de publicar
+                      para que aparezcan correctamente en el catálogo web.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-semibold text-green-900 text-sm">Imágenes sincronizadas</h4>
+                    <p className="text-green-700 text-xs mt-1">
+                      Todas las imágenes de productos del catálogo están en la nube.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+            {cloudinaryOk && (
+              <button
+                type="button"
+                onClick={handleSyncImages}
+                disabled={syncing}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex-shrink-0 disabled:opacity-50 bg-white border border-amber-300 text-amber-800 hover:bg-amber-50"
+              >
+                {syncing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <CloudUpload className="w-4 h-4" />
+                )}
+                {syncing ? 'Sincronizando...' : pendingImages > 0 ? 'Sincronizar imágenes' : 'Verificar imágenes'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Publicar en Web (solo desktop) */}
+        {isDesktop && (
+          <div className="mt-6 p-5 rounded-xl border-2 border-primary/30 bg-primary/5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <h4 className="font-semibold text-primary text-sm flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Publicar Catálogo en la Web
+                </h4>
+                <p className="text-muted-foreground text-xs mt-1">
+                  Sincroniza tu configuración y todos los productos marcados como “Mostrar en Catálogo”
+                  al sitio web público para que tus clientes puedan verlos.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handlePublish}
+                disabled={publishing}
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors flex-shrink-0 disabled:opacity-50"
+              >
+                {publishing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Globe className="w-4 h-4" />
+                )}
+                {publishing ? 'Publicando...' : 'Publicar en Web'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Sync Info */}
-        <div className="mt-8 bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
+        <div className="mt-4 bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
           <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />
           <div>
             <h4 className="font-semibold text-blue-900 text-sm">

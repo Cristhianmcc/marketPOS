@@ -26,17 +26,39 @@ export async function POST(req: NextRequest) {
       });
 
       for (const sp of products) {
-        await prisma.storeProduct.update({
-          where: { id: sp.id },
-          data: {
-            publishInCatalog: true,
-            catalogVisible: true,
-            catalogTitle: sp.product.name,
-            catalogCategory: sp.product.category,
-            catalogImagePath: sp.product.imageUrl,
-            catalogUpdatedAt: new Date()
+        try {
+          await prisma.storeProduct.update({
+            where: { id: sp.id },
+            data: {
+              publishInCatalog: true,
+              catalogVisible: true,
+              catalogTitle: sp.product.name,
+              catalogCategory: sp.product.category,
+              catalogImagePath: sp.product.imageUrl,
+              catalogUpdatedAt: new Date()
+            }
+          });
+        } catch (updateErr) {
+          const msg = updateErr instanceof Error ? updateErr.message : String(updateErr);
+          // Si fallan columnas de catálogo (BD antigua), intentar con solo publishInCatalog
+          const isMissingCol =
+            msg.includes('catalog') ||
+            msg.includes('Unknown column') ||
+            msg.includes('no such column') ||
+            msg.includes('publish_in_catalog');
+          if (isMissingCol) {
+            try {
+              await prisma.storeProduct.update({
+                where: { id: sp.id },
+                data: { publishInCatalog: true },
+              });
+            } catch {
+              // La BD es demasiado antigua — ignorar este producto y seguir
+            }
+          } else {
+            throw updateErr;
           }
-        });
+        }
       }
     } else {
       await prisma.storeProduct.updateMany({

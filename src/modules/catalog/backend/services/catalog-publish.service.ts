@@ -44,7 +44,6 @@ export class CatalogPublishService {
     if (!input.storeId?.trim()) throw new Error('storeId es obligatorio.');
     if (!input.storeName?.trim()) throw new Error('storeName es obligatorio.');
     if (!input.slug?.trim()) throw new Error('slug es obligatorio.');
-    if (!input.whatsappNumber?.trim()) throw new Error('whatsappNumber es obligatorio.');
     if (!Array.isArray(input.products) || input.products.length === 0) {
       throw new Error('El catalogo debe tener al menos un producto.');
     }
