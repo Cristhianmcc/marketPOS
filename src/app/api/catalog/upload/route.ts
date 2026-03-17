@@ -49,7 +49,8 @@ async function saveLocalFile(input: {
 
   return {
     success: true,
-    url: `/uploads/catalog/${filename}`,
+    // Serve through API route to avoid static-file runtime limitations in hosting providers.
+    url: `/api/catalog/media/local/${filename}`,
     filename,
   };
 }
@@ -156,7 +157,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(localResult);
   } catch (error) {
     console.error('Upload error:', error);
-    const message = error instanceof Error ? error.message : String(error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null
+          ? JSON.stringify(error)
+          : String(error);
     return NextResponse.json(
       { error: `Error al subir archivo: ${message}` },
       { status: 500 }

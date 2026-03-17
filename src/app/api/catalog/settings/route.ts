@@ -118,12 +118,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const publicBaseUrl =
+      process.env.PUBLIC_CATALOG_BASE_URL ||
+      process.env.NEXT_PUBLIC_CATALOG_BASE_URL ||
+      process.env.PUBLIC_BASE_URL ||
+      new URL(req.url).origin;
+
+    const normalizedSlug = (slug || '').replace(/^\/+|\/+$/g, '');
+    const computedCatalogUrl = normalizedSlug
+      ? `${publicBaseUrl.replace(/\/+$/, '')}/c/${normalizedSlug}`
+      : null;
+
     const baseUpdate = {
       enabled: !!enabled,
       storeSlug: slug || null,
       whatsappNumber: whatsappNumber || '',
       storeLogoPath: storeLogoPath || null,
       storeBannerPath: storeBannerPath || null,
+      catalogUrl: enabled ? computedCatalogUrl : null,
       catalogStatus: enabled ? 'PUBLISHED' : 'DRAFT',
     } as const;
 
