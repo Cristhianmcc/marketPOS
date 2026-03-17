@@ -121,7 +121,11 @@ export default function CatalogSettingsPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        toast.error(err.error || 'Error al subir imagen');
+        const msg =
+          typeof err?.error === 'string'
+            ? err.error
+            : err?.error?.message || err?.message || JSON.stringify(err);
+        toast.error(msg || 'Error al subir imagen');
         return;
       }
 
