@@ -169,10 +169,11 @@ export default function CatalogSettingsPage() {
             Configura cómo se verá tu tienda en línea para tus clientes.
           </p>
         </div>
-        {settings?.catalogUrl ? (
+        {formData.slug ? (
           <a
             href={catalogUrl}
             target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
           >
             Ver catálogo <ExternalLink className="w-4 h-4" />
@@ -252,7 +253,7 @@ export default function CatalogSettingsPage() {
                   />
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-2">
-                  {settings?.catalogUrl ? (
+                  {formData.slug ? (
                     <>
                       URL actual:{' '}
                       <span className="text-primary break-all">{catalogUrl}</span>
@@ -363,6 +364,9 @@ export default function CatalogSettingsPage() {
                       src={formData.storeLogoPath}
                       alt="Logo preview"
                       className="w-24 h-24 rounded-lg border border-gray-200 object-cover"
+                      onError={() =>
+                        setFormData((prev) => ({ ...prev, storeLogoPath: '' }))
+                      }
                     />
                     <button
                       type="button"
@@ -416,6 +420,9 @@ export default function CatalogSettingsPage() {
                       src={formData.storeBannerPath}
                       alt="Banner preview"
                       className="w-full h-24 rounded-lg border border-gray-200 object-cover"
+                      onError={() =>
+                        setFormData((prev) => ({ ...prev, storeBannerPath: '' }))
+                      }
                     />
                     <button
                       type="button"
