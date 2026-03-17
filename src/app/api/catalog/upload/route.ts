@@ -31,6 +31,29 @@ function canUseCloudinary(): boolean {
   );
 }
 
+async function saveLocalFile(input: {
+  file: File;
+  type: 'logo' | 'banner';
+  storeId: string;
+  buffer: Buffer;
+}) {
+  if (!existsSync(UPLOAD_DIR)) {
+    await mkdir(UPLOAD_DIR, { recursive: true });
+  }
+
+  const ext = input.file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const timestamp = Date.now();
+  const filename = `${input.type}-${input.storeId}-${timestamp}.${ext}`;
+  const filepath = join(UPLOAD_DIR, filename);
+  await writeFile(filepath, input.buffer);
+
+  return {
+    success: true,
+    url: `/uploads/catalog/${filename}`,
+    filename,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getSession();
@@ -82,64 +105,59 @@ export async function POST(request: NextRequest) {
     // Web (Render/prod): use Cloudinary so images are persistent and public.
     // Desktop/offline/dev keeps local disk behavior.
     if (!isDesktopMode() && canUseCloudinary()) {
-      const folder = `${process.env.CLOUDINARY_FOLDER || 'market-pos'}-catalog`;
-      const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
-        (resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder,
-              public_id: `${type}-${session.storeId}-${Date.now()}`,
-              overwrite: true,
-              transformation:
-                type === 'logo'
-                  ? [
-                      { width: 600, height: 600, crop: 'limit' },
-                      { quality: 'auto', fetch_format: 'auto' },
-                    ]
-                  : [
-                      { width: 1800, height: 900, crop: 'limit' },
-                      { quality: 'auto', fetch_format: 'auto' },
-                    ],
-            },
-            (error, result) => {
-              if (error || !result) reject(error ?? new Error('No result'));
-              else resolve({ secure_url: result.secure_url, public_id: result.public_id });
-            }
-          );
-          uploadStream.end(buffer);
-        }
-      );
+      try {
+        const folder = `${process.env.CLOUDINARY_FOLDER || 'market-pos'}-catalog`;
+        const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
+          (resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+              {
+                folder,
+                public_id: `${type}-${session.storeId}-${Date.now()}`,
+                overwrite: true,
+                transformation:
+                  type === 'logo'
+                    ? [
+                        { width: 600, height: 600, crop: 'limit' },
+                        { quality: 'auto', fetch_format: 'auto' },
+                      ]
+                    : [
+                        { width: 1800, height: 900, crop: 'limit' },
+                        { quality: 'auto', fetch_format: 'auto' },
+                      ],
+              },
+              (error, result) => {
+                if (error || !result) reject(error ?? new Error('No result'));
+                else resolve({ secure_url: result.secure_url, public_id: result.public_id });
+              }
+            );
+            uploadStream.end(buffer);
+          }
+        );
 
-      return NextResponse.json({
-        success: true,
-        url: uploadResult.secure_url,
-        filename: uploadResult.public_id,
-      });
+        return NextResponse.json({
+          success: true,
+          url: uploadResult.secure_url,
+          filename: uploadResult.public_id,
+        });
+      } catch (cloudinaryError) {
+        // If cloud upload fails in web, keep the flow working with local fallback.
+        console.error('[catalog/upload] Cloudinary failed, using local fallback:', cloudinaryError);
+      }
     }
 
     // Local fallback (desktop/dev)
-    if (!existsSync(UPLOAD_DIR)) {
-      await mkdir(UPLOAD_DIR, { recursive: true });
-    }
-
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const timestamp = Date.now();
-    const filename = `${type}-${session.storeId}-${timestamp}.${ext}`;
-    const filepath = join(UPLOAD_DIR, filename);
-
-    await writeFile(filepath, buffer);
-
-    const url = `/uploads/catalog/${filename}`;
-
-    return NextResponse.json({
-      success: true,
-      url,
-      filename,
+    const localResult = await saveLocalFile({
+      file,
+      type: type as 'logo' | 'banner',
+      storeId: session.storeId,
+      buffer,
     });
+    return NextResponse.json(localResult);
   } catch (error) {
     console.error('Upload error:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Error al subir archivo' },
+      { error: `Error al subir archivo: ${message}` },
       { status: 500 }
     );
   }
