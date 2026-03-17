@@ -10,13 +10,15 @@ export async function GET() {
 
   try {
     let settings: any = null;
+
     try {
       settings = await prisma.catalogSettings.findUnique({
         where: { storeId: session.storeId },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // Backward-compat: old desktop DBs may not yet have social columns.
+
+      // Backward compat: old desktop DBs may not have social columns yet.
       if (
         msg.includes('Unknown field') ||
         msg.includes('facebookUrl') ||
@@ -35,7 +37,6 @@ export async function GET() {
             enabled: true,
             storeSlug: true,
             whatsappNumber: true,
-            messageTemplate: true,
             storeLogoPath: true,
             storeBannerPath: true,
             catalogStatus: true,
@@ -50,7 +51,6 @@ export async function GET() {
     }
 
     if (!settings) {
-      // Default initial settings (keep fields expected by the UI)
       return NextResponse.json({
         enabled: false,
         slug: '',
@@ -58,14 +58,11 @@ export async function GET() {
         facebookUrl: '',
         instagramUrl: '',
         tiktokUrl: '',
-        messageTemplate:
-          'Hola, me gustaría hacer un pedido:\n\n*Productos:*\n{items}\n\n*Total: {total}*',
         storeLogoPath: '',
         storeBannerPath: '',
       });
     }
 
-    // Remap for the frontend (storeSlug -> slug)
     return NextResponse.json({
       ...settings,
       slug: settings.storeSlug,
@@ -98,15 +95,13 @@ export async function POST(req: NextRequest) {
       tiktokUrl,
     } = body;
 
-    // Basic validation
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
       return NextResponse.json(
-        { error: 'Slug inválido (solo letras minúsculas, números y guiones)' },
+        { error: 'Slug invalido (solo letras minusculas, numeros y guiones)' },
         { status: 400 },
       );
     }
 
-    // Check slug uniqueness
     if (slug) {
       const existing = await prisma.catalogSettings.findFirst({
         where: {
@@ -114,9 +109,10 @@ export async function POST(req: NextRequest) {
           NOT: { storeId: session.storeId },
         },
       });
+
       if (existing) {
         return NextResponse.json(
-          { error: 'Este slug ya está en uso por otra tienda' },
+          { error: 'Este slug ya esta en uso por otra tienda' },
           { status: 400 },
         );
       }
@@ -156,7 +152,7 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
 
-      // Backward-compat: allow saving without social fields if the DB/client isn't updated yet.
+      // Backward compat: if DB/client does not have social fields, save core fields.
       if (
         msg.includes('Unknown field') ||
         msg.includes('facebookUrl') ||
@@ -176,8 +172,9 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error updating catalog settings:', error);
     return NextResponse.json(
-      { error: 'Error al guardar la configuración' },
+      { error: 'Error al guardar la configuracion' },
       { status: 500 },
     );
   }
 }
+
