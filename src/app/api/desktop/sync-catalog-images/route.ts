@@ -91,11 +91,12 @@ export async function GET(_req: NextRequest) {
       },
     });
 
-    // Contar productos con imageUrl local
+    // Contar productos con imageUrl local cuyo catalogImagePath aún no es URL cloud
     const pendingProducts = await prisma.storeProduct.count({
       where: {
         product: { imageUrl: { startsWith: LOCAL_IMAGE_PREFIX } },
         publishInCatalog: true,
+        NOT: { catalogImagePath: { startsWith: 'http' } },
       },
     });
 
@@ -174,7 +175,6 @@ export async function POST(_req: NextRequest) {
     const entry = index[localId];
 
     if (!entry) {
-      // La entrada ya no existe en el índice (fue limpiada anteriormente)
       failed++;
       errors.push(`catalogImagePath sin índice: ${localId}`);
       continue;
@@ -196,10 +196,7 @@ export async function POST(_req: NextRequest) {
         data: { catalogImagePath: cloudUrl },
       });
 
-      // Limpiar archivo local y entrada del índice
-      try { fs.unlinkSync(filePath); } catch { /* no crítico */ }
-      delete index[localId];
-
+      // NO borrar archivo local — se necesita para mostrar offline en inventario
       synced++;
     } catch (err) {
       failed++;
@@ -207,7 +204,8 @@ export async function POST(_req: NextRequest) {
     }
   }
 
-  // ── 2. Sincronizar imageUrl de ProductMaster (para productos marcados en catálogo) ─
+  // ── 2. Productos con imageUrl local: subir a Cloudinary y guardar en catalogImagePath ─
+  // NO tocamos productMaster.imageUrl — se mantiene local para funcionar offline
   const productsWithLocalImage = await prisma.storeProduct.findMany({
     where: {
       publishInCatalog: true,
@@ -220,47 +218,42 @@ export async function POST(_req: NextRequest) {
     },
   });
 
-  // Deduplicar por product.id
   const seen = new Set<string>();
   for (const sp of productsWithLocalImage) {
     const prod = sp.product;
     if (!prod || seen.has(prod.id)) continue;
     seen.add(prod.id);
 
+    // Si catalogImagePath ya es URL de Cloudinary, ya está sincronizado
+    if (sp.catalogImagePath?.startsWith('http')) {
+      continue;
+    }
+
     const localId = prod.imageUrl!.replace(LOCAL_IMAGE_PREFIX, '');
     const entry = index[localId];
 
-    // Si el archivo ya fue subido en la sección 1, reusar la URL de catalogImagePath
-    if (!entry || !fs.existsSync(path.join(LOCAL_IMAGES_DIR, entry.filename))) {
-      const cloudUrl = sp.catalogImagePath?.startsWith('http') ? sp.catalogImagePath : null;
-      if (cloudUrl) {
-        try {
-          await prisma.productMaster.update({
-            where: { id: prod.id },
-            data: { imageUrl: cloudUrl },
-          });
-          synced++;
-          continue;
-        } catch {
-          // ignorar
-        }
-      }
+    if (!entry) {
       failed++;
-      errors.push(`Archivo no encontrado para producto: ${localId}`);
+      errors.push(`imageUrl sin índice: ${localId}`);
+      continue;
+    }
+
+    const filePath = path.join(LOCAL_IMAGES_DIR, entry.filename);
+    if (!fs.existsSync(filePath)) {
+      failed++;
+      errors.push(`Archivo no encontrado: ${entry.filename}`);
       continue;
     }
 
     try {
-      const buffer = fs.readFileSync(path.join(LOCAL_IMAGES_DIR, entry.filename));
+      const buffer = fs.readFileSync(filePath);
       const cloudUrl = await uploadBufferToCloudinary(buffer, folder);
 
-      await prisma.productMaster.update({
-        where: { id: prod.id },
-        data: { imageUrl: cloudUrl },
+      // Solo actualizar catalogImagePath, NO productMaster.imageUrl
+      await prisma.storeProduct.update({
+        where: { id: sp.id },
+        data: { catalogImagePath: cloudUrl },
       });
-
-      try { fs.unlinkSync(path.join(LOCAL_IMAGES_DIR, entry.filename)); } catch { /* no crítico */ }
-      delete index[localId];
 
       synced++;
     } catch (err) {
