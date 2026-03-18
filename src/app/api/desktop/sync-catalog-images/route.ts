@@ -214,6 +214,8 @@ export async function POST(_req: NextRequest) {
       product: { imageUrl: { startsWith: LOCAL_IMAGE_PREFIX } },
     },
     select: {
+      id: true,
+      catalogImagePath: true,
       product: { select: { id: true, imageUrl: true } },
     },
   });
@@ -228,21 +230,28 @@ export async function POST(_req: NextRequest) {
     const localId = prod.imageUrl!.replace(LOCAL_IMAGE_PREFIX, '');
     const entry = index[localId];
 
-    if (!entry) {
+    // Si el archivo ya fue subido en la sección 1, reusar la URL de catalogImagePath
+    if (!entry || !fs.existsSync(path.join(LOCAL_IMAGES_DIR, entry.filename))) {
+      const cloudUrl = sp.catalogImagePath?.startsWith('http') ? sp.catalogImagePath : null;
+      if (cloudUrl) {
+        try {
+          await prisma.productMaster.update({
+            where: { id: prod.id },
+            data: { imageUrl: cloudUrl },
+          });
+          synced++;
+          continue;
+        } catch {
+          // ignorar
+        }
+      }
       failed++;
-      errors.push(`imageUrl sin índice: ${localId}`);
-      continue;
-    }
-
-    const filePath = path.join(LOCAL_IMAGES_DIR, entry.filename);
-    if (!fs.existsSync(filePath)) {
-      failed++;
-      errors.push(`Archivo no encontrado: ${entry.filename}`);
+      errors.push(`Archivo no encontrado para producto: ${localId}`);
       continue;
     }
 
     try {
-      const buffer = fs.readFileSync(filePath);
+      const buffer = fs.readFileSync(path.join(LOCAL_IMAGES_DIR, entry.filename));
       const cloudUrl = await uploadBufferToCloudinary(buffer, folder);
 
       await prisma.productMaster.update({
@@ -250,7 +259,7 @@ export async function POST(_req: NextRequest) {
         data: { imageUrl: cloudUrl },
       });
 
-      try { fs.unlinkSync(filePath); } catch { /* no crítico */ }
+      try { fs.unlinkSync(path.join(LOCAL_IMAGES_DIR, entry.filename)); } catch { /* no crítico */ }
       delete index[localId];
 
       synced++;

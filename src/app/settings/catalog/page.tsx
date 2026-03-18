@@ -103,9 +103,10 @@ export default function CatalogSettingsPage() {
       if (data.synced === 0 && data.failed === 0) {
         toast.success('No hay imágenes pendientes', { id: toastId });
       } else if (data.failed > 0) {
+        console.error('[sync-images] Errors:', data.errors);
         toast.warning(
           `${data.synced} imagen(es) subidas, ${data.failed} fallaron`,
-          { id: toastId }
+          { id: toastId, description: data.errors?.[0] || '' }
         );
       } else {
         toast.success(`${data.synced} imagen(es) subidas correctamente`, { id: toastId });
