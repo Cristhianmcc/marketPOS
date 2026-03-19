@@ -14,10 +14,10 @@ cloudinary.config({
 const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'catalog');
 const MAX_FILE_SIZE = {
   logo: 2 * 1024 * 1024,
-  banner: 3 * 1024 * 1024,
+  banner: 8 * 1024 * 1024,
 };
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 function isDesktopMode(): boolean {
   return process.env.DESKTOP_MODE === 'true';
@@ -81,6 +81,7 @@ function inferMimeType(rawCT: string, filename: string): string {
   const name = (filename || '').toLowerCase();
   if (name.endsWith('.png')) return 'image/png';
   if (name.endsWith('.webp')) return 'image/webp';
+  if (name.endsWith('.gif')) return 'image/gif';
   return 'image/jpeg';
 }
 
@@ -119,6 +120,7 @@ async function tryCloudinaryUpload(input: {
   type: 'logo' | 'banner';
   storeId: string;
   buffer: Buffer;
+  mimeType: string;
 }) {
   const folder = `${process.env.CLOUDINARY_FOLDER || 'market-pos'}-catalog`;
   const uploadResult = await new Promise<{ secure_url: string; public_id: string }>(
@@ -134,6 +136,8 @@ async function tryCloudinaryUpload(input: {
                   { width: 600, height: 600, crop: 'limit' },
                   { quality: 'auto', fetch_format: 'auto' },
                 ]
+              : input.mimeType === 'image/gif'
+              ? [] // Sin transformación para GIF animados
               : [
                   { width: 1800, height: 900, crop: 'limit' },
                   { quality: 'auto', fetch_format: 'auto' },
@@ -217,6 +221,7 @@ export async function POST(request: NextRequest) {
             type: type as 'logo' | 'banner',
             storeId: session.storeId,
             buffer,
+            mimeType,
           });
           return NextResponse.json(cloud);
         } catch (cloudError) {
@@ -241,6 +246,7 @@ export async function POST(request: NextRequest) {
           type: type as 'logo' | 'banner',
           storeId: session.storeId,
           buffer,
+          mimeType,
         });
         return NextResponse.json(cloud);
       } catch (cloudError) {

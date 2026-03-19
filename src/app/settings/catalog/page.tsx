@@ -13,8 +13,10 @@ import {
   X,
   CloudUpload,
   AlertCircle,
+  ArrowLeft,
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 interface CatalogSettings {
   id: string;
@@ -36,6 +38,7 @@ const TikTokIcon = () => (
 );
 
 export default function CatalogSettingsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -263,7 +266,15 @@ export default function CatalogSettingsPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <Toaster position="top-right" richColors />
       <div className="flex items-center justify-between mb-8">
-        <div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.back()}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            title="Volver"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+          <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Globe className="w-6 h-6 text-primary" />
             Catálogo Web Público
@@ -271,6 +282,7 @@ export default function CatalogSettingsPage() {
           <p className="text-muted-foreground">
             Configura cómo se verá tu tienda en línea para tus clientes.
           </p>
+          </div>
         </div>
         {formData.slug && formData.enabled ? (
           <a
@@ -559,7 +571,7 @@ export default function CatalogSettingsPage() {
                           Haz clic para subir
                         </p>
                         <p className="text-xs text-gray-500">
-                          PNG, JPG hasta 3MB (ancho: 1200px)
+                          PNG, JPG, WebP, GIF hasta 8MB (ancho: 1500px)
                         </p>
                       </>
                     )}
