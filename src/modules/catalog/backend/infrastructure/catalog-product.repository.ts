@@ -44,7 +44,7 @@ export class CatalogProductRepository {
   ): Promise<void> {
     const localIds = products.map((p) => p.localProductId);
 
-    // Todo producto no incluido en el publish se oculta del catalogo.
+    // Ocultar productos que no están en este publish
     await this.db.storeProduct.updateMany({
       where: {
         storeId,
@@ -57,7 +57,15 @@ export class CatalogProductRepository {
       },
     });
 
-    for (const product of products) {
+    // Procesar en lotes de 200 para evitar timeout
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < products.length; i += BATCH_SIZE) {
+      const batch = products.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(product => this.upsertProduct(storeId, product)));
+    }
+  }
+
+  private async upsertProduct(storeId: string, product: CatalogPublishProductInput): Promise<void> {
       const updated = await this.db.storeProduct.updateMany({
         where: {
           id: product.localProductId,
@@ -121,6 +129,5 @@ export class CatalogProductRepository {
           },
         });
       }
-    }
   }
 }

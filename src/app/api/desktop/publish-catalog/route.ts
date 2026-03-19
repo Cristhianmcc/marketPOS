@@ -129,7 +129,7 @@ export async function POST(_req: NextRequest) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(25_000),
+      signal: AbortSignal.timeout(120_000),
     });
 
     if (!cloudRes.ok) {

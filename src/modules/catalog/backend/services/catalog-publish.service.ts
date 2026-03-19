@@ -12,11 +12,9 @@ export class CatalogPublishService {
 
     const catalogUrl = `${this.publicCatalogBaseUrl.replace(/\/+$/, '')}/c/${input.slug}`;
 
+    // 1. Upsert store settings (transacción corta)
     await prisma.$transaction(async (tx) => {
       const storeRepository = new CatalogStoreRepository(tx);
-      const productRepository = new CatalogProductRepository(tx);
-      const publicationRepository = new CatalogPublicationRepository(tx);
-
       await storeRepository.upsertPublished({
         storeId: input.storeId,
         storeName: input.storeName,
@@ -26,9 +24,15 @@ export class CatalogPublishService {
         bannerUrl: input.bannerUrl,
         catalogUrl,
       });
+    });
 
-      await productRepository.replaceStoreProducts(input.storeId, input.products);
+    // 2. Procesar productos en lotes (sin transacción única para evitar timeout)
+    const productRepository = new CatalogProductRepository(prisma);
+    await productRepository.replaceStoreProducts(input.storeId, input.products);
 
+    // 3. Registro de publicación
+    await prisma.$transaction(async (tx) => {
+      const publicationRepository = new CatalogPublicationRepository(tx);
       await publicationRepository.create({
         storeId: input.storeId,
         publicationType: 'publish',
