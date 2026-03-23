@@ -60,3 +60,6 @@ next-env.d.ts
 # prisma
 prisma/migrations
 prisma/schema.sql
+
+# archivos de importacion (demasiado grandes para GitHub)
+*.zip
