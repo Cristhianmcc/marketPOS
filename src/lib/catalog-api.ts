@@ -32,7 +32,11 @@ export async function getPublicCatalogBySlug(
   const data = await response.json().catch(() => null);
 
   if (!response.ok || !data?.success) {
-    throw new Error(data?.message || 'No se pudo cargar el catalogo.');
+    const error = new Error(data?.message || 'No se pudo cargar el catalogo.') as Error & {
+      status?: number;
+    };
+    error.status = response.status;
+    throw error;
   }
 
   return data as PublicCatalogResponse;

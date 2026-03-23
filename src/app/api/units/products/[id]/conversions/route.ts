@@ -84,10 +84,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
       include: {
         fromUnit: {
-          select: { id: true, sunatCode: true, displayName: true, symbol: true, allowDecimals: true },
+          select: { id: true, code: true, name: true, sunatCode: true, displayName: true, symbol: true, allowDecimals: true },
         },
         toUnit: {
-          select: { id: true, sunatCode: true, displayName: true, symbol: true, allowDecimals: true },
+          select: { id: true, code: true, name: true, sunatCode: true, displayName: true, symbol: true, allowDecimals: true },
         },
       },
       orderBy: { createdAt: 'desc' },

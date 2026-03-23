@@ -53,6 +53,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Solo manejar requests del mismo origen — no interceptar URLs externas (Cloudinary, etc.)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Ignorar esquemas no soportados por Cache (extensiones del navegador)
   if (url.protocol === 'chrome-extension:' || url.protocol === 'moz-extension:') {
     return;

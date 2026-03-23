@@ -9,6 +9,18 @@ import { useEffect } from 'react';
 export function ServiceWorkerRegistration() {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      // En modo desktop (Electron) no registrar el SW — causa conflictos con la CSP local
+      const isElectron =
+        navigator.userAgent.toLowerCase().includes('electron') ||
+        typeof (window as Record<string, unknown>).desktopAPI !== 'undefined';
+      if (isElectron) {
+        // Desregistrar SWs cacheados de sesiones anteriores
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(r => r.unregister());
+        });
+        return;
+      }
+
       // Registrar SW después de que la página cargue
       window.addEventListener('load', () => {
         navigator.serviceWorker

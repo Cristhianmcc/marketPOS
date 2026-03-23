@@ -44,7 +44,7 @@ export class CatalogProductRepository {
   ): Promise<void> {
     const localIds = products.map((p) => p.localProductId);
 
-    // Todo producto no incluido en el publish se oculta del catalogo.
+    // Ocultar productos que no están en este publish
     await this.db.storeProduct.updateMany({
       where: {
         storeId,
@@ -57,7 +57,15 @@ export class CatalogProductRepository {
       },
     });
 
-    for (const product of products) {
+    // Procesar en lotes de 200 para evitar timeout
+    const BATCH_SIZE = 200;
+    for (let i = 0; i < products.length; i += BATCH_SIZE) {
+      const batch = products.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(product => this.upsertProduct(storeId, product)));
+    }
+  }
+
+  private async upsertProduct(storeId: string, product: CatalogPublishProductInput): Promise<void> {
       const updated = await this.db.storeProduct.updateMany({
         where: {
           id: product.localProductId,
@@ -76,8 +84,50 @@ export class CatalogProductRepository {
       });
 
       if (updated.count === 0) {
-        throw new Error(`Producto local no encontrado en tienda: ${product.localProductId}`);
+        // El producto no existe en la nube aún — crear ProductMaster + StoreProduct
+        const catalogSku = `CATALOG-${product.localProductId}`;
+        const pm = await this.db.productMaster.upsert({
+          where: { internalSku: catalogSku },
+          create: {
+            internalSku: catalogSku,
+            name: product.name,
+            category: product.category || 'Otros',
+            imageUrl: product.imageUrl || null,
+            isGlobal: false,
+            unitType: 'UNIT',
+          },
+          update: {
+            name: product.name,
+            category: product.category || 'Otros',
+            imageUrl: product.imageUrl || null,
+          },
+        });
+        await this.db.storeProduct.upsert({
+          where: { storeId_productId: { storeId, productId: pm.id } },
+          create: {
+            id: product.localProductId,
+            storeId,
+            productId: pm.id,
+            price: product.price,
+            publishInCatalog: true,
+            catalogTitle: product.name,
+            catalogDescription: product.description || null,
+            catalogCategory: product.category || null,
+            catalogImagePath: product.imageUrl,
+            catalogVisible: product.visible,
+            catalogUpdatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+          },
+          update: {
+            price: product.price,
+            publishInCatalog: true,
+            catalogTitle: product.name,
+            catalogDescription: product.description || null,
+            catalogCategory: product.category || null,
+            catalogImagePath: product.imageUrl,
+            catalogVisible: product.visible,
+            catalogUpdatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+          },
+        });
       }
-    }
   }
 }

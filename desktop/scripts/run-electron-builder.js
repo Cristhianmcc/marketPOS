@@ -58,6 +58,7 @@ function runBuilder(extraArgs, label) {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: false,
+      shell: isWindows,
     });
 
     p.stdout.on('data', (d) => {

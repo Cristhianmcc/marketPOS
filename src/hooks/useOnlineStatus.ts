@@ -11,6 +11,12 @@ export function useOnlineStatus(): boolean {
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
+    // En modo desktop (Electron) la app es 100% local, nunca mostrar banner offline
+    if ((window as any).desktop?.isDesktop) {
+      setIsOnline(true);
+      return;
+    }
+
     // Actualizar con el valor real del navegador
     setIsOnline(navigator.onLine);
 

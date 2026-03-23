@@ -17,20 +17,27 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<{ slug: string }> },
 ) {
+  let slug = 'unknown';
   try {
-    const { slug } = await context.params;
+    const params = await context.params;
+    slug = params.slug;
     const controller = createCatalogController(req);
     const result = await controller.getPublicCatalogBySlug(slug);
     return NextResponse.json(result);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Error obteniendo catalogo publico.';
-    console.error(`[Catalog API Error] Slug: ${context.params}, Error:`, errorMessage);
+    console.error(`[Catalog API Error] Slug: ${slug}, Error:`, errorMessage);
+    const status =
+      errorMessage.toLowerCase().includes('no encontrado') ||
+      errorMessage.toLowerCase().includes('not found')
+        ? 404
+        : 500;
     return NextResponse.json(
       {
         success: false,
         message: errorMessage,
       },
-      { status: 404 },
+      { status },
     );
   }
 }

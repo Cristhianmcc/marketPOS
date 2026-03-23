@@ -369,10 +369,53 @@ export class MigrationRunner {
       `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS ticket_logo VARCHAR(500);`,
       // cost_price added for purchase cost + margin feature
       `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2);`,
-      // social links for public catalog
+      // CatalogStatus enum (PostgreSQL)
+      `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CatalogStatus') THEN CREATE TYPE "CatalogStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'SYNC_PENDING', 'SYNC_ERROR', 'DISABLED'); END IF; END $$;`,
+      // Fix catalog_status column type if table existed with VARCHAR(20)
+      `DO $$ BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'catalog_settings' AND column_name = 'catalog_status'
+            AND data_type = 'character varying'
+        ) THEN
+          ALTER TABLE catalog_settings ALTER COLUMN catalog_status DROP DEFAULT;
+          ALTER TABLE catalog_settings ALTER COLUMN catalog_status TYPE "CatalogStatus" USING catalog_status::"CatalogStatus";
+          ALTER TABLE catalog_settings ALTER COLUMN catalog_status SET DEFAULT 'DRAFT';
+        END IF;
+      END $$;`,
+      // catalog_settings table for public catalog feature
+      `CREATE TABLE IF NOT EXISTS catalog_settings (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL UNIQUE REFERENCES stores(id) ON DELETE CASCADE,
+        enabled BOOLEAN NOT NULL DEFAULT false,
+        store_name VARCHAR(255) NOT NULL DEFAULT '',
+        store_slug VARCHAR(255) UNIQUE,
+        store_logo_path VARCHAR(500),
+        store_banner_path VARCHAR(500),
+        whatsapp_number VARCHAR(50) NOT NULL DEFAULT '',
+        facebook_url VARCHAR(255),
+        instagram_url VARCHAR(255),
+        tiktok_url VARCHAR(255),
+        catalog_status "CatalogStatus" NOT NULL DEFAULT 'DRAFT',
+        catalog_url VARCHAR(500),
+        last_published_at TIMESTAMP(3),
+        last_sync_at TIMESTAMP(3),
+        sync_mode VARCHAR(20) NOT NULL DEFAULT 'manual',
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      // social links for public catalog (in case table existed without them)
       `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS facebook_url VARCHAR(255);`,
       `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS instagram_url VARCHAR(255);`,
       `ALTER TABLE catalog_settings ADD COLUMN IF NOT EXISTS tiktok_url VARCHAR(255);`,
+      // catalog columns on store_products
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS publish_in_catalog BOOLEAN DEFAULT false;`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_title VARCHAR(255);`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_description TEXT;`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_image_path VARCHAR(500);`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_category VARCHAR(255);`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_visible BOOLEAN DEFAULT true;`,
+      `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_updated_at TIMESTAMP(3);`,
     ];
 
     const sql = patches.join('\n');

@@ -199,6 +199,9 @@ function setupSecurityPolicies(): void {
 
   // Configurar Content Security Policy después de que la app esté lista
   app.whenReady().then(() => {
+    // Limpiar Service Workers cacheados de sesiones anteriores (evita CSP viejo)
+    session.defaultSession.clearStorageData({ storages: ['serviceworkers'] }).catch(() => {});
+
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       callback({
         responseHeaders: {
@@ -206,10 +209,11 @@ function setupSecurityPolicies(): void {
           'Content-Security-Policy': [
             "default-src 'self' http://localhost:* http://127.0.0.1:*",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:* http://127.0.0.1:*",
-            "style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:*",
-            "img-src 'self' data: https: http://localhost:* http://127.0.0.1:*",
+            "style-src 'self' 'unsafe-inline' http://localhost:* http://127.0.0.1:* https://res.cloudinary.com",
+            "img-src 'self' data: https: http://localhost:* http://127.0.0.1:* https://res.cloudinary.com https://*.cloudinary.com",
             "font-src 'self' data:",
-            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.amazonaws.com wss://*",
+            "connect-src 'self' http://localhost:* http://127.0.0.1:* https://*.amazonaws.com https://res.cloudinary.com https://*.cloudinary.com https://api.cloudinary.com wss://*",
+            "media-src 'self' http://localhost:* http://127.0.0.1:* https://res.cloudinary.com",
           ].join('; ')
         }
       });
@@ -230,13 +234,20 @@ let forceQuit = false; // true cuando el usuario elige "Salir" desde el tray
  * Al cerrar la ventana principal, la app se minimiza aquí.
  */
 function createTray(): void {
-  const iconPath = path.join(RESOURCES_PATH, 'resources', 'icon.ico');
+  // Usar icono redondo PNG para la bandeja del sistema
+  const trayIconPath = path.join(RESOURCES_PATH, 'resources', 'icon-tray.png');
+  const fallbackPath  = path.join(RESOURCES_PATH, 'resources', 'icon.ico');
   let trayIcon: Electron.NativeImage;
   try {
-    trayIcon = nativeImage.createFromPath(iconPath);
-    if (trayIcon.isEmpty()) throw new Error('empty icon');
+    trayIcon = nativeImage.createFromPath(trayIconPath);
+    if (trayIcon.isEmpty()) throw new Error('empty tray icon');
   } catch {
-    trayIcon = nativeImage.createEmpty();
+    try {
+      trayIcon = nativeImage.createFromPath(fallbackPath);
+      if (trayIcon.isEmpty()) throw new Error('empty fallback icon');
+    } catch {
+      trayIcon = nativeImage.createEmpty();
+    }
   }
 
   tray = new Tray(trayIcon);

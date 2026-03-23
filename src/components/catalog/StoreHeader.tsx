@@ -247,7 +247,7 @@ export function StoreHeader({ store, cartItemsCount, onCartClick }: StoreHeaderP
           <img
             src={store.bannerUrl}
             alt={store.name}
-            className="w-full h-28 md:h-36 object-cover"
+            className="w-full aspect-[5/1] object-cover"
           />
         </div>
       ) : (

@@ -14,6 +14,7 @@ dist
 
 # electron
 dist-electron/
+dist-electron-*/
 pgsql/
 desktop/vendor/
 desktop/build-resources/
@@ -29,6 +30,9 @@ build-output.log
 build-web.log
 build.log
 backups/
+
+# local catalog uploads (stored in Cloudinary for web, local disk for desktop)
+public/uploads/
 
 # misc
 .DS_Store

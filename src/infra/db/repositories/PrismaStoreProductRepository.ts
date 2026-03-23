@@ -2,6 +2,23 @@ import { StoreProduct } from '@/domain/types';
 import { IStoreProductRepository } from '@/repositories/IStoreProductRepository';
 import { prisma } from '../prisma';
 
+function mapProduct(p: any) {
+  return {
+    id: p.id,
+    barcode: p.barcode,
+    internalSku: p.internalSku,
+    name: p.name,
+    brand: p.brand,
+    content: p.content,
+    category: p.category,
+    unitType: p.unitType as 'UNIT' | 'KG',
+    baseUnitId: p.baseUnitId,
+    baseUnitDisplay: p.baseUnit?.symbol || p.baseUnit?.displayName || null,
+    imageUrl: p.imageUrl,
+    isGlobal: p.isGlobal,
+  };
+}
+
 const PRODUCT_SELECT = {
   id: true,
   barcode: true,
@@ -11,6 +28,8 @@ const PRODUCT_SELECT = {
   content: true,
   category: true,
   unitType: true,
+  baseUnitId: true,
+  baseUnit: { select: { symbol: true, displayName: true } },
   imageUrl: true,
   isGlobal: true,
 } as const;
@@ -46,18 +65,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
       publishInCatalog: (sp as any).publishInCatalog ?? false,
-      product: {
-        id: sp.product.id,
-        barcode: sp.product.barcode,
-        internalSku: sp.product.internalSku,
-        name: sp.product.name,
-        brand: sp.product.brand,
-        content: sp.product.content,
-        category: sp.product.category,
-        unitType: sp.product.unitType as 'UNIT' | 'KG',
-        imageUrl: sp.product.imageUrl,
-        isGlobal: sp.product.isGlobal, // ✅ MÓDULO 18.1
-      },
+      product: mapProduct(sp.product),
     };
   }
 
@@ -68,6 +76,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       category?: string;
       lowStock?: boolean;
       active?: boolean;
+      limit?: number;
+      offset?: number;
     }
   ): Promise<StoreProduct[]> {
     const where: any = { storeId };
@@ -88,12 +98,15 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       where.product = { ...where.product, category: filters.category };
     }
 
+    const take = filters?.query ? 20 : (filters?.limit ?? undefined);
+    const skip = filters?.offset ?? undefined;
+
     const storeProducts = await prisma.storeProduct.findMany({
       where,
       select: STORE_PRODUCT_SELECT,
       orderBy: { product: { name: 'asc' } },
-      // ✅ MÓDULO 18.2: Limitar resultados para mejor rendimiento en búsquedas
-      take: filters?.query ? 20 : undefined,
+      take,
+      skip,
     });
 
     let results = storeProducts.map((sp: any) => ({
@@ -106,18 +119,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
       publishInCatalog: (sp as any).publishInCatalog ?? false,
-      product: {
-        id: sp.product.id,
-        barcode: sp.product.barcode,
-        internalSku: sp.product.internalSku,
-        name: sp.product.name,
-        brand: sp.product.brand,
-        content: sp.product.content,
-        category: sp.product.category,
-        unitType: sp.product.unitType as 'UNIT' | 'KG',
-        imageUrl: sp.product.imageUrl,
-        isGlobal: sp.product.isGlobal, // ✅ MÓDULO 18.1
-      },
+      product: mapProduct(sp.product),
     }));
 
     // Filter low stock client-side (UNIT only and stock <= minStock)
@@ -152,19 +154,27 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
       publishInCatalog: (sp as any).publishInCatalog ?? false,
-      product: {
-        id: sp.product.id,
-        barcode: sp.product.barcode,
-        internalSku: sp.product.internalSku,
-        name: sp.product.name,
-        brand: sp.product.brand,
-        content: sp.product.content,
-        category: sp.product.category,
-        unitType: sp.product.unitType as 'UNIT' | 'KG',
-        imageUrl: sp.product.imageUrl,
-        isGlobal: sp.product.isGlobal, // ✅ MÓDULO 18.1
-      },
+      product: mapProduct(sp.product),
     };
+  }
+
+  async countByStoreId(
+    storeId: string,
+    filters?: { query?: string; category?: string; lowStock?: boolean; active?: boolean }
+  ): Promise<number> {
+    const where: any = { storeId };
+    if (filters?.active !== undefined) where.active = filters.active;
+    if (filters?.query) {
+      where.OR = [
+        { product: { name: { contains: filters.query, mode: 'insensitive' } } },
+        { product: { barcode: { contains: filters.query } } },
+        { product: { internalSku: { contains: filters.query } } },
+      ];
+    }
+    if (filters?.category) {
+      where.product = { ...where.product, category: filters.category };
+    }
+    return prisma.storeProduct.count({ where });
   }
 
   async create(storeProduct: Omit<StoreProduct, 'id'>): Promise<StoreProduct> {
@@ -191,18 +201,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: created.minStock?.toNumber() || null,
       active: created.active,
       publishInCatalog: (created as any).publishInCatalog ?? false,
-      product: {
-        id: created.product.id,
-        barcode: created.product.barcode,
-        internalSku: created.product.internalSku,
-        name: created.product.name,
-        brand: created.product.brand,
-        content: created.product.content,
-        category: created.product.category,
-        unitType: created.product.unitType as 'UNIT' | 'KG',
-        imageUrl: created.product.imageUrl,
-        isGlobal: created.product.isGlobal,
-      },
+      product: mapProduct(created.product),
     };
   }
 
@@ -223,18 +222,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
       publishInCatalog: (updated as any).publishInCatalog ?? false,
-      product: {
-        id: updated.product.id,
-        barcode: updated.product.barcode,
-        internalSku: updated.product.internalSku,
-        name: updated.product.name,
-        brand: updated.product.brand,
-        content: updated.product.content,
-        category: updated.product.category,
-        unitType: updated.product.unitType as 'UNIT' | 'KG',
-        imageUrl: updated.product.imageUrl,
-        isGlobal: updated.product.isGlobal,
-      },
+      product: mapProduct(updated.product),
     };
   }
 
@@ -255,18 +243,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
       publishInCatalog: (updated as any).publishInCatalog ?? false,
-      product: {
-        id: updated.product.id,
-        barcode: updated.product.barcode,
-        internalSku: updated.product.internalSku,
-        name: updated.product.name,
-        brand: updated.product.brand,
-        content: updated.product.content,
-        category: updated.product.category,
-        unitType: updated.product.unitType as 'UNIT' | 'KG',
-        imageUrl: updated.product.imageUrl,
-        isGlobal: updated.product.isGlobal,
-      },
+      product: mapProduct(updated.product),
     };
   }
 
@@ -287,18 +264,7 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
       publishInCatalog: (updated as any).publishInCatalog ?? false,
-      product: {
-        id: updated.product.id,
-        barcode: updated.product.barcode,
-        internalSku: updated.product.internalSku,
-        name: updated.product.name,
-        brand: updated.product.brand,
-        content: updated.product.content,
-        category: updated.product.category,
-        unitType: updated.product.unitType as 'UNIT' | 'KG',
-        imageUrl: updated.product.imageUrl,
-        isGlobal: updated.product.isGlobal,
-      },
+      product: mapProduct(updated.product),
     };
   }
 }

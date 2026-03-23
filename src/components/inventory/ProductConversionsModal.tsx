@@ -14,17 +14,21 @@ import { X, Plus, Trash2, RefreshCw, Scale, ToggleLeft, ToggleRight, Loader2 } f
 
 interface Unit {
   id: string;
-  code: string;
-  name: string;
+  code?: string;
+  name?: string;
+  sunatCode?: string;
+  displayName?: string;
   symbol: string | null;
-  isBase: boolean;
+  isBase?: boolean;
+  allowDecimals?: boolean;
 }
 
 interface Conversion {
   id: string;
   fromUnit: Unit;
   toUnit: Unit;
-  factor: number;
+  factorToBase: number;
+  factor?: number;
   active: boolean;
 }
 
@@ -87,7 +91,7 @@ export function ProductConversionsModal({
         const convData = await convRes.json();
         setConversions(convData.conversions || []);
         setBaseUnit(convData.baseUnit || null);
-        setLegacyUnitType(convData.baseUnitCode || 'UNIT');
+        setLegacyUnitType(convData.legacyUnitType || convData.baseUnitCode || 'UNIT');
       }
 
       // Cargar unidad base específica
@@ -160,7 +164,7 @@ export function ProductConversionsModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fromUnitId: newFromUnitId,
-          factor,
+          factorToBase: factor,
         }),
       });
 
@@ -286,7 +290,7 @@ export function ProductConversionsModal({
                   ))}
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  El stock se medirá en esta unidad. Actual: {legacyUnitType}
+                  El stock se medirá en esta unidad.{baseUnit ? ` Actual: ${baseUnit.symbol || baseUnit.displayName || baseUnit.name || legacyUnitType}` : ` Actual: ${legacyUnitType}`}
                 </p>
               </div>
 
@@ -322,10 +326,10 @@ export function ProductConversionsModal({
                       >
                         <div className="flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
-                            1 {conv.fromUnit.code} = {conv.factor} {conv.toUnit.code}
+                            1 {conv.fromUnit.symbol || conv.fromUnit.displayName || conv.fromUnit.code || conv.fromUnit.name} = {Number(conv.factorToBase ?? conv.factor)} {conv.toUnit.symbol || conv.toUnit.displayName || conv.toUnit.code || conv.toUnit.name}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {conv.fromUnit.name} → {conv.toUnit.name}
+                            {conv.fromUnit.displayName || conv.fromUnit.name} → {conv.toUnit.displayName || conv.toUnit.name}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">

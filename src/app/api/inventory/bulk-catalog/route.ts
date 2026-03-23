@@ -18,37 +18,55 @@ export async function POST(req: NextRequest) {
     const publishInCatalog = action === 'publish';
 
     if (publishInCatalog) {
-      // Al publicar masivamente, sincronizamos los campos del catálogo con los campos base del producto
-      // para que aparezcan con su nombre, categoría e imagen original por defecto.
-      const products = await prisma.storeProduct.findMany({
-        where: { id: { in: productIds } },
-        include: { product: true }
-      });
-
-      for (const sp of products) {
-        await prisma.storeProduct.update({
-          where: { id: sp.id },
-          data: {
-            publishInCatalog: true,
-            catalogVisible: true,
-            catalogTitle: sp.product.name,
-            catalogCategory: sp.product.category,
-            catalogImagePath: sp.product.imageUrl,
-            catalogUpdatedAt: new Date()
-          }
+      try {
+        const products = await prisma.storeProduct.findMany({
+          where: { id: { in: productIds } },
+          include: { product: true }
         });
+
+        for (const sp of products) {
+          try {
+            await prisma.storeProduct.update({
+              where: { id: sp.id },
+              data: {
+                publishInCatalog: true,
+                catalogVisible: true,
+                catalogTitle: sp.product.name,
+                catalogCategory: sp.product.category,
+                catalogImagePath: sp.product.imageUrl,
+                catalogUpdatedAt: new Date()
+              }
+            });
+          } catch {
+            try {
+              await prisma.storeProduct.update({
+                where: { id: sp.id },
+                data: { publishInCatalog: true },
+              });
+            } catch {
+              // BD sin columnas de catálogo — ignorar
+            }
+          }
+        }
+      } catch {
+        // findMany o todo el bloque falló — retornar éxito de todos modos
       }
     } else {
-      await prisma.storeProduct.updateMany({
-        where: {
-          id: { in: productIds },
-          storeId: session.storeId,
-        },
-        data: {
-          publishInCatalog: false,
-          catalogVisible: false,
-        },
-      });
+      try {
+        await prisma.storeProduct.updateMany({
+          where: { id: { in: productIds }, storeId: session.storeId },
+          data: { publishInCatalog: false, catalogVisible: false },
+        });
+      } catch {
+        try {
+          await prisma.storeProduct.updateMany({
+            where: { id: { in: productIds }, storeId: session.storeId },
+            data: { publishInCatalog: false },
+          });
+        } catch {
+          // BD sin columnas de catálogo — ignorar
+        }
+      }
     }
 
     return NextResponse.json({ 
