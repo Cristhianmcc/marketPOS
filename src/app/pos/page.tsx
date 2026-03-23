@@ -587,18 +587,23 @@ export default function POSPage() {
 
   // Búsqueda automática con debounce
   useEffect(() => {
+    const trimmed = query.trim();
+    // Si parece un código de barras (solo dígitos, ≥8 chars), buscar más rápido y auto-agregar
+    const looksLikeBarcode = /^\d{8,}$/.test(trimmed);
+    const delay = looksLikeBarcode ? 150 : 300;
+
     const delaySearch = setTimeout(() => {
-      if (query.trim().length >= 2) {
-        performSearch();
-      } else if (query.trim().length === 0) {
+      if (trimmed.length >= 2) {
+        performSearch(looksLikeBarcode); // auto-agrega si es barcode exacto
+      } else if (trimmed.length === 0) {
         setProducts([]);
       }
-    }, 300); // Esperar 300ms después de que el usuario deje de escribir
+    }, delay);
 
     return () => clearTimeout(delaySearch);
   }, [query]);
 
-  const performSearch = async () => {
+  const performSearch = async (autoAddIfExact = false) => {
     if (!query.trim()) {
       setProducts([]);
       return;
@@ -608,7 +613,22 @@ export default function POSPage() {
     try {
       const res = await fetch(`/api/inventory?query=${encodeURIComponent(query)}&active=true`);
       const data = await res.json();
-      setProducts(data.products || []);
+      const found: StoreProduct[] = data.products || [];
+
+      // Auto-agregar si hay match exacto por código de barras (scanner con foco en input)
+      if (autoAddIfExact && found.length === 1) {
+        const exactMatch = found[0].product.barcode === query.trim() ||
+                           found[0].product.internalSku === query.trim();
+        if (exactMatch) {
+          await addToCartRef.current?.(found[0]);
+          setQuery('');
+          setProducts([]);
+          searchInputRef.current?.focus();
+          return;
+        }
+      }
+
+      setProducts(found);
     } catch (error) {
       console.error('Error searching products:', error);
       toast.error('Error al buscar productos');
@@ -618,7 +638,7 @@ export default function POSPage() {
   };
 
   const handleSearch = () => {
-    performSearch();
+    performSearch(true); // auto-agrega si hay match exacto por barcode
   };
 
   // Verificar y aplicar promoción automática
@@ -1614,7 +1634,19 @@ export default function POSPage() {
                       placeholder="Buscar producto por nombre, código..."
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          // Si hay exactamente 1 resultado, agregar automáticamente y limpiar
+                          if (products.length === 1) {
+                            addToCart(products[0]);
+                            setQuery('');
+                            setProducts([]);
+                            searchInputRef.current?.focus();
+                          } else {
+                            handleSearch();
+                          }
+                        }
+                      }}
                       className="w-full h-12 md:h-14 pl-10 pr-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A] text-base md:text-sm"
                       style={{ fontSize: '16px' }}
                     />
@@ -1780,7 +1812,12 @@ export default function POSPage() {
                             </div>
                           </div>
                           <button
-                            onClick={() => addToCart(sp)}
+                            onClick={() => {
+                              addToCart(sp);
+                              setQuery('');
+                              setProducts([]);
+                              searchInputRef.current?.focus();
+                            }}
                             disabled={sp.stock !== null && sp.stock <= 0}
                             className="h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                           >

@@ -23,6 +23,7 @@ interface Product {
   barcode: string | null;
   internalSku: string;
   unitType: 'UNIT' | 'KG';
+  baseUnitId?: string | null;
   isGlobal: boolean; // ✅ MÓDULO 18.1
   imageUrl: string | null; // ✅ Imagen del producto
 }
@@ -49,6 +50,9 @@ export default function InventoryPage() {
   const [activeFilter, setActiveFilter] = useState<boolean | null>(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editPriceModal, setEditPriceModal] = useState<{
     open: boolean;
@@ -93,7 +97,7 @@ export default function InventoryPage() {
     if (user) {
       loadProducts();
     }
-  }, [user, searchQuery, categoryFilter, lowStockFilter, activeFilter]);
+  }, [user, searchQuery, categoryFilter, lowStockFilter, activeFilter, currentPage]);
 
   const fetchUser = async () => {
     try {
@@ -115,10 +119,14 @@ export default function InventoryPage() {
       if (categoryFilter) params.append('category', categoryFilter);
       if (lowStockFilter) params.append('lowStock', 'true');
       if (activeFilter !== null) params.append('active', activeFilter.toString());
+      if (!searchQuery) params.append('page', currentPage.toString());
+      params.append('limit', '20');
 
       const res = await fetch(`/api/inventory?${params.toString()}`);
       const data = await res.json();
       setProducts(data.products || []);
+      setTotalPages(data.totalPages || 1);
+      setTotalProducts(data.total || data.count || 0);
     } catch (error) {
       console.error('Error loading products:', error);
       toast.error('Error al cargar productos');
@@ -252,7 +260,7 @@ export default function InventoryPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-semibold text-[#1F2A37]">Gestión de Inventario</h1>
-              <p className="text-sm text-gray-500 mt-1">{products.length} productos en tu tienda</p>
+              <p className="text-sm text-gray-500 mt-1">{totalProducts} productos en tu tienda</p>
             </div>
             {isOwner && (
               <div className="flex gap-2">
@@ -314,7 +322,7 @@ export default function InventoryPage() {
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                   placeholder="Buscar por nombre, código..."
                   className="w-full h-10 pl-10 pr-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
                 />
@@ -322,7 +330,7 @@ export default function InventoryPage() {
 
               <select
                 value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
+                onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
                 className="h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
               >
                 <option value="">Todas las categorías</option>
@@ -338,7 +346,7 @@ export default function InventoryPage() {
                   type="checkbox"
                   id="lowStock"
                   checked={lowStockFilter}
-                  onChange={(e) => setLowStockFilter(e.target.checked)}
+                  onChange={(e) => { setLowStockFilter(e.target.checked); setCurrentPage(1); }}
                   className="w-4 h-4 text-[#16A34A] border-gray-300 rounded focus:ring-[#16A34A]"
                 />
                 <label htmlFor="lowStock" className="text-sm text-[#1F2A37]">
@@ -348,9 +356,10 @@ export default function InventoryPage() {
 
               <select
                 value={activeFilter === null ? '' : activeFilter.toString()}
-                onChange={(e) =>
-                  setActiveFilter(e.target.value === '' ? null : e.target.value === 'true')
-                }
+                onChange={(e) => {
+                  setActiveFilter(e.target.value === '' ? null : e.target.value === 'true');
+                  setCurrentPage(1);
+                }}
                 className="h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
               >
                 <option value="true">Activos</option>
@@ -492,6 +501,7 @@ export default function InventoryPage() {
                                   <img
                                     src={sp.product.imageUrl}
                                     alt={sp.product.name}
+                                    loading="lazy"
                                     className="w-12 h-12 rounded object-cover flex-shrink-0"
                                   />
                                 ) : (
@@ -526,7 +536,7 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-700">
-                              {sp.product.unitType === 'UNIT' ? 'Unidad' : 'KG'}
+                              {(sp.product as any).baseUnitDisplay || (sp.product.unitType === 'UNIT' ? 'Unidad' : 'KG')}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-medium text-[#1F2A37]">
@@ -640,6 +650,31 @@ export default function InventoryPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Paginación */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    Página {currentPage} de {totalPages} ({totalProducts} productos)
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ← Anterior
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Siguiente →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

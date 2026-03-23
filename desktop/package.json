@@ -107,6 +107,10 @@
       {
         "from": "resources/icon.ico",
         "to": "resources/icon.ico"
+      },
+      {
+        "from": "resources/icon-tray.png",
+        "to": "resources/icon-tray.png"
       }
     ],
     "win": {
