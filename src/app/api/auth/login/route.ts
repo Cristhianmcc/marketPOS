@@ -23,6 +23,28 @@ function getCloudPrisma() {
   });
 }
 
+async function authenticateThroughCloudApi(email: string, password: string) {
+  const cloudBaseUrl = process.env.CLOUD_URL?.trim().replace(/\/+$/, '');
+  if (!cloudBaseUrl) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+
+  try {
+    const response = await fetch(`${cloudBaseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+    const payload = await response.json().catch(() => ({}));
+    return { response, payload };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // ✅ MÓDULO S8: Rate limit por IP
@@ -167,6 +189,55 @@ export async function POST(request: Request) {
 
     const cloudPrisma = getCloudPrisma();
     if (!cloudPrisma) {
+      try {
+        const cloudAuth = await authenticateThroughCloudApi(email, password);
+        if (cloudAuth) {
+          const { response, payload } = cloudAuth;
+          if (!response.ok) {
+            return NextResponse.json(
+              { error: payload?.error || 'Credenciales no válidas en el servidor.' },
+              { status: response.status >= 400 && response.status < 500 ? response.status : 503 }
+            );
+          }
+
+          const cloudUser = payload?.user;
+          if (!cloudUser || !['OWNER', 'SUPERADMIN'].includes(cloudUser.role)) {
+            return NextResponse.json(
+              { error: 'Solo administradores (OWNER) pueden configurar nuevas instalaciones' },
+              { status: 403 }
+            );
+          }
+
+          resetRateLimit('login', clientIP);
+          await setSession({
+            userId: cloudUser.id,
+            storeId: null,
+            email: cloudUser.email,
+            name: cloudUser.name,
+            role: 'SUPERADMIN',
+          });
+
+          return NextResponse.json({
+            success: true,
+            needsProvisioning: true,
+            user: {
+              id: cloudUser.id,
+              email: cloudUser.email,
+              name: cloudUser.name,
+              role: 'SUPERADMIN',
+              storeId: null,
+            },
+            message: 'Autenticado por el servidor. Redirigiendo al dashboard...',
+          });
+        }
+      } catch (cloudApiError) {
+        console.error('[Login] Cloud API auth error:', cloudApiError);
+        return NextResponse.json(
+          { error: 'No se pudo conectar con el servidor de autenticación.' },
+          { status: 503 }
+        );
+      }
+
       return NextResponse.json(
         { error: 'Usuario no encontrado. Verifique sus credenciales.' },
         { status: 401 }

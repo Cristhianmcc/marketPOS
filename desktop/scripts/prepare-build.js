@@ -12,6 +12,27 @@ const ROOT_DIR = path.join(__dirname, '..', '..');
 const DESKTOP_DIR = path.join(__dirname, '..');
 const BUILD_RESOURCES = path.join(DESKTOP_DIR, 'build-resources');
 
+function readEnvValue(filePath, key) {
+  if (!fs.existsSync(filePath)) return '';
+  const line = fs.readFileSync(filePath, 'utf8')
+    .split(/\r?\n/)
+    .find((entry) => entry.trim().startsWith(`${key}=`));
+  if (!line) return '';
+  return line.slice(line.indexOf('=') + 1).trim().replace(/^['"]|['"]$/g, '');
+}
+
+function writePublicDesktopEnv() {
+  const cloudUrl = process.env.CLOUD_URL || readEnvValue(path.join(ROOT_DIR, '.env'), 'CLOUD_URL');
+  if (!cloudUrl) {
+    throw new Error('CLOUD_URL is required to authenticate a new desktop installation');
+  }
+
+  // CLOUD_URL is a public HTTPS endpoint. Database URLs, API keys and all
+  // other secrets must remain outside the desktop package.
+  fs.writeFileSync(path.join(BUILD_RESOURCES, '.env'), `CLOUD_URL=${cloudUrl}\n`, 'utf8');
+  console.log('Created desktop public environment (CLOUD_URL only)');
+}
+
 // Files to copy
 const COPY_TASKS = [
   {
@@ -159,6 +180,8 @@ function main() {
     
     console.log('');
   }
+
+  writePublicDesktopEnv();
   
   console.log('='.repeat(60));
   console.log('Build preparation complete!');

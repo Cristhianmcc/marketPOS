@@ -55,6 +55,10 @@
     ],
     "extraResources": [
       {
+        "from": "build-resources/.env",
+        "to": ".env"
+      },
+      {
         "from": "build-resources/server",
         "to": "server",
         "filter": [

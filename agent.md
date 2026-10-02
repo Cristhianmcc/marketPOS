@@ -150,6 +150,11 @@ El instalador de esta rama usa `com.monterrial.pos.sunatbeta`, el nombre
 nombres propios para el servicio y la tarea de PostgreSQL. Puede convivir con la
 aplicación principal sin reemplazar su acceso directo, `userData`, base embebida,
 imágenes ni respaldos locales.
+
+El paquete desktop no contiene credenciales de Supabase. `prepare-build.js` genera
+un `.env` público con solamente `CLOUD_URL`; cuando un usuario no existe en la base
+local, el login valida OWNER/SUPERADMIN contra `/api/auth/login` por HTTPS. No volver
+a empaquetar `CLOUD_DATABASE_URL`, `LICENSE_API_KEY` ni el `.env` completo.
 Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
 pruebas locales, la configuración externa debe suministrarse al proceso al
 arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.
