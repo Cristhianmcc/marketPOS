@@ -158,6 +158,12 @@ a empaquetar `CLOUD_DATABASE_URL`, `LICENSE_API_KEY` ni el `.env` completo.
 
 Los módulos nativos `usb` y `@serialport` deben permanecer en `asarUnpack`; Electron
 no puede cargar sus archivos `.node` directamente desde `app.asar`.
+
+En Windows afectado por `STATUS_BREAKPOINT (0x80000003)`, la Beta se inicia mediante
+`Abrir Monterrial POS SUNAT Beta.cmd`. El lanzador autorizado usa `--no-sandbox`,
+desactiva GPU y asigna el perfil aislado
+`%LOCALAPPDATA%/MonterrialPOS-SUNAT-Beta-Electron`. `extraFiles` lo incluye junto al
+ejecutable; esta excepción no debe aplicarse al producto principal.
 Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
 pruebas locales, la configuración externa debe suministrarse al proceso al
 arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.

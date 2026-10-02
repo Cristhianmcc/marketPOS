@@ -57,6 +57,12 @@
       "dist/**/*",
       "resources/**/*"
     ],
+    "extraFiles": [
+      {
+        "from": "resources/Abrir Monterrial POS SUNAT Beta.cmd",
+        "to": "Abrir Monterrial POS SUNAT Beta.cmd"
+      }
+    ],
     "extraResources": [
       {
         "from": "build-resources/.env",
