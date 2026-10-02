@@ -36,7 +36,12 @@ internal static class SunatBetaLauncher
             var startInfo = new ProcessStartInfo
             {
                 FileName = target,
-                Arguments = "--no-sandbox --disable-gpu --enable-logging",
+                Arguments = "--sunat-beta-isolated --no-sandbox --disable-gpu --enable-logging " +
+                    "--user-data-dir=\"" + Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        "monterrial-pos-sunat-beta",
+                        "isolated-test"
+                    ) + "\"",
                 WorkingDirectory = baseDir,
                 UseShellExecute = false
             };

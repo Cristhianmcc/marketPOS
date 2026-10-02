@@ -64,7 +64,11 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 // Si el usuario hace doble-click en el icono mientras ya está abierta,
 // la ventana existente se trae al frente inmediatamente.
 // ============================================================================
-if (!isPgDaemonMode) {
+// The explicit beta launcher uses an isolated Electron profile and may run next
+// to the installed production POS while SUNAT integration is being tested.
+const isIsolatedSunatBeta = process.argv.includes('--sunat-beta-isolated');
+
+if (!isPgDaemonMode && !isIsolatedSunatBeta) {
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) {
     // Ya hay una instancia corriendo — salir inmediatamente
