@@ -155,6 +155,9 @@ El paquete desktop no contiene credenciales de Supabase. `prepare-build.js` gene
 un `.env` público con solamente `CLOUD_URL`; cuando un usuario no existe en la base
 local, el login valida OWNER/SUPERADMIN contra `/api/auth/login` por HTTPS. No volver
 a empaquetar `CLOUD_DATABASE_URL`, `LICENSE_API_KEY` ni el `.env` completo.
+
+Los módulos nativos `usb` y `@serialport` deben permanecer en `asarUnpack`; Electron
+no puede cargar sus archivos `.node` directamente desde `app.asar`.
 Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
 pruebas locales, la configuración externa debe suministrarse al proceso al
 arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.

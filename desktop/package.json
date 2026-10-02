@@ -45,6 +45,10 @@
     "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
     "appId": "com.monterrial.pos.sunatbeta",
     "productName": "Monterrial POS SUNAT Beta",
+    "asarUnpack": [
+      "node_modules/usb/**/*",
+      "node_modules/@serialport/**/*"
+    ],
     "directories": {
       "output": "dist-electron",
       "buildResources": "resources"
