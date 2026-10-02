@@ -17,8 +17,9 @@ export interface CdrData {
   responseCode: string;      // Código de respuesta SUNAT (ej: "0000")
   description: string;        // Descripción del resultado
   notes: string[];            // Notas adicionales (observaciones)
-  isAccepted: boolean;        // true si código empieza con "0"
-  isRejected: boolean;        // true si código NO empieza con "0"
+  isAccepted: boolean;
+  isObserved: boolean;
+  isRejected: boolean;
 }
 
 /**
@@ -55,7 +56,7 @@ export async function parseCdr(cdrZipBase64: string): Promise<CdrData | null> {
     
     // Extraer notas (pueden ser múltiples)
     const notes: string[] = [];
-    const noteMatches = cdrXml.matchAll(/<cbc:Note[^>]*>([^<]+)<\/cbc:Note>/g);
+    const noteMatches = cdrXml.matchAll(/<(?:[A-Za-z_][\w.-]*:)?Note\b[^>]*>([^<]+)<\/(?:[A-Za-z_][\w.-]*:)?Note>/gi);
     for (const match of noteMatches) {
       notes.push(match[1].trim());
     }
@@ -65,12 +66,15 @@ export async function parseCdr(cdrZipBase64: string): Promise<CdrData | null> {
       return null;
     }
 
+    const accepted = isAcceptedBysunat(responseCode);
+
     return {
       responseCode,
       description: description || 'Sin descripción',
       notes,
-      isAccepted: responseCode.startsWith('0'),
-      isRejected: !responseCode.startsWith('0'),
+      isAccepted: accepted,
+      isObserved: accepted && notes.length > 0,
+      isRejected: !accepted,
     };
 
   } catch (error) {
@@ -89,10 +93,11 @@ export async function parseCdr(cdrZipBase64: string): Promise<CdrData | null> {
  */
 function extractXmlValue(xml: string, tagName: string): string | null {
   // Escapar caracteres especiales del tagName para regex
-  const escapedTag = tagName.replace(/:/g, '\\:');
-  
-  // Buscar tag con o sin atributos
-  const regex = new RegExp(`<${escapedTag}[^>]*>([^<]+)<\/${escapedTag}>`, 'i');
+  const localName = tagName.includes(':') ? tagName.split(':').pop()! : tagName;
+  const regex = new RegExp(
+    `<(?:[A-Za-z_][\\w.-]*:)?${localName}\\b[^>]*>([^<]+)<\\/(?:[A-Za-z_][\\w.-]*:)?${localName}>`,
+    'i'
+  );
   const match = xml.match(regex);
   
   return match ? match[1].trim() : null;
@@ -108,7 +113,7 @@ function extractXmlValue(xml: string, tagName: string): string | null {
  * @returns true si el documento fue aceptado
  */
 export function isAcceptedBysunat(responseCode: string): boolean {
-  return responseCode.startsWith('0');
+  return /^(0|00|0000)$/.test(responseCode.trim());
 }
 
 /**
@@ -123,10 +128,6 @@ export function getStatusMessage(responseCode: string): string {
   // Códigos comunes de SUNAT
   const messages: Record<string, string> = {
     '0000': 'Aceptado',
-    '0001': 'Aceptado con observaciones',
-    '0002': 'Aceptado con observaciones',
-    '0100': 'La Factura numero F001-00000001, ha sido aceptada',
-    '0200': 'La Boleta numero B001-00000001, ha sido aceptada',
     '2000': 'Rechazo - Error en el RUC del emisor',
     '2001': 'Rechazo - Error en el tipo de documento del emisor',
     '2002': 'Rechazo - Error en el número de documento del receptor',

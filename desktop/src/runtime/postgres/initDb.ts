@@ -50,11 +50,6 @@ export async function initializeCluster(config: PgRuntimeConfig): Promise<InitDb
     };
   }
   
-  // Ensure data directory exists
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-  
   // Check if already initialized
   const pgVersionPath = path.join(dataDir, 'PG_VERSION');
   if (fs.existsSync(pgVersionPath)) {
@@ -63,6 +58,20 @@ export async function initializeCluster(config: PgRuntimeConfig): Promise<InitDb
       success: true,
       message: 'Cluster already initialized',
     };
+  }
+
+  // Dejar que initdb cree el directorio de datos. En Windows, si Node lo crea
+  // primero, initdb puede fallar al aplicar sus permisos con "Permission denied".
+  if (fs.existsSync(dataDir)) {
+    const entries = fs.readdirSync(dataDir);
+    if (entries.length > 0) {
+      return {
+        success: false,
+        message: 'Data directory is not empty',
+        error: 'El directorio de PostgreSQL contiene archivos pero no tiene PG_VERSION',
+      };
+    }
+    fs.rmdirSync(dataDir);
   }
   
   // Create temporary password file

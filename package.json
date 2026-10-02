@@ -22,6 +22,7 @@
     "images:update": "tsx scripts/updateProductImages.ts",
     "images:upload": "tsx scripts/uploadImagesToCloudinary.ts",
     "sunat:worker": "tsx src/worker/sunatWorker.ts",
+    "sunat:test:local": "tsx scripts/test-sunat-beta-pipeline.ts",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:download-pg": "node electron/download-postgres.js",
     "electron:build": "npm run build && node electron/prepare-build.js && electron-builder --win --x64",

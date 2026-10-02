@@ -12,8 +12,8 @@ import * as path from 'path';
 // CONSTANTS
 // ============================================================================
 
-const TASK_NAME = 'Monterrial POS Postgres';
-const TASK_DESCRIPTION = 'Inicia PostgreSQL embebido para Monterrial POS';
+const TASK_NAME = 'Monterrial POS SUNAT Beta Postgres';
+const TASK_DESCRIPTION = 'Inicia PostgreSQL embebido para Monterrial POS SUNAT Beta';
 
 // ============================================================================
 // TYPES

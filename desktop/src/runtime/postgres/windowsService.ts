@@ -13,9 +13,9 @@ import * as fs from 'fs';
 // CONSTANTS
 // ============================================================================
 
-const SERVICE_NAME = 'MonterrialPOSPostgres';
-const SERVICE_DISPLAY_NAME = 'Monterrial POS PostgreSQL';
-const SERVICE_DESCRIPTION = 'Base de datos PostgreSQL embebida para Monterrial POS';
+const SERVICE_NAME = 'MonterrialPOSSunatBetaPostgres';
+const SERVICE_DISPLAY_NAME = 'Monterrial POS SUNAT Beta PostgreSQL';
+const SERVICE_DESCRIPTION = 'Base de datos PostgreSQL embebida para Monterrial POS SUNAT Beta';
 
 // ============================================================================
 // TYPES

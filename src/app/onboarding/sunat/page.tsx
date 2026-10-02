@@ -162,7 +162,7 @@ export default function SunatOnboardingPage() {
       
       toast.success('Datos fiscales guardados');
       await loadStatus();
-      setCurrentStep(1);
+      setCurrentStep(status?.env === 'BETA' ? 3 : 1);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -186,7 +186,7 @@ export default function SunatOnboardingPage() {
       toast.success('Credenciales guardadas');
       setSolPass(''); // Limpiar por seguridad
       await loadStatus();
-      setCurrentStep(2);
+      setCurrentStep(status?.env === 'BETA' ? 3 : 2);
     } catch (error: any) {
       toast.error(error.message);
     } finally {
@@ -559,6 +559,21 @@ export default function SunatOnboardingPage() {
           {/* Step 2: Certificado Digital */}
           {currentStep === 2 && (
             <div className="space-y-4">
+              {status?.env === 'BETA' && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
+                  <p className="text-sm text-green-800">
+                    Para BETA el sistema puede generar un certificado autofirmado de prueba.
+                    No necesitas comprar ni registrar todavía tu certificado digital real.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(3)}
+                    className="w-full py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+                  >
+                    Usar certificado de prueba BETA
+                  </button>
+                </div>
+              )}
               <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
                 <Info className="w-4 h-4 inline mr-1" />
                 El certificado digital (.pfx) es necesario para firmar los comprobantes electrónicos.

@@ -1,7 +1,8 @@
 /**
  * MÓDULO 18.8 — POST /api/onboarding/sunat/test-beta
  * 
- * Prueba el envío a SUNAT BETA con un comprobante dummy.
+ * Verifica localmente la configuración necesaria para SUNAT BETA.
+ * No envía un comprobante ni autentica contra el servicio remoto.
  * Solo funciona en ambiente BETA.
  */
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Verificar que tiene los pasos previos
-    if (!settings.stepFiscalData || !settings.stepSolCredentials || !settings.stepCertificate) {
+    if (!settings.stepFiscalData) {
       return NextResponse.json(
         { error: 'Completa los pasos anteriores primero' },
         { status: 409 }
@@ -69,20 +70,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 6. Verificar conectividad SUNAT BETA
-    // En lugar de enviar un comprobante real (que fallaría con RUC de prueba),
-    // validamos las credenciales y la configuración
+    // 6. Verificar localmente credenciales públicas y configuración BETA.
+    // La conectividad real se comprueba con la primera venta controlada.
     try {
       const { validateSolCredentials } = await import('@/lib/sunat/soap/sunatClient');
+      const { buildSolUser } = await import('@/lib/sunat/credentials/loadSolCredentials');
       
       // Construir usuario SOL completo: RUC + usuario
-      const solUserFull = `${settings.ruc}${settings.solUser}`;
+      const solUserFull = buildSolUser(settings.ruc || '', 'MODDATOS');
       
       // Validar formato de credenciales
       const credentialsValid = await validateSolCredentials({
         environment: 'BETA',
         solUser: solUserFull,
-        solPass: settings.solPass!,
+        solPass: 'MODDATOS',
       });
 
       if (!credentialsValid) {
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Error en prueba BETA: ' + testError.message,
-          hint: 'Verifica tus credenciales SOL',
+          hint: 'Verifica los datos fiscales y vuelve a ejecutar la prueba de firma',
         },
         { status: 409 }
       );

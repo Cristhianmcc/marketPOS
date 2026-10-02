@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Obtener configuración actual
     const settings = await prisma.sunatSettings.findUnique({
-      where: { storeId: user.storeId },
+      where: { storeId: user.storeId! },
     });
 
     if (!settings) {
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
     const previousEnv = settings.env;
     
     const updatedSettings = await prisma.sunatSettings.update({
-      where: { storeId: user.storeId },
+      where: { storeId: user.storeId! },
       data: { env },
     });
 
@@ -270,7 +270,7 @@ export async function GET(req: NextRequest) {
 
     // 2. Obtener configuración
     const settings = await prisma.sunatSettings.findUnique({
-      where: { storeId: user.storeId },
+      where: { storeId: user.storeId! },
     });
 
     if (!settings) {

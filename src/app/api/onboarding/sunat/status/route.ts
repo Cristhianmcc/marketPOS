@@ -107,8 +107,8 @@ export async function GET(req: NextRequest) {
     // 8. Calcular steps
     const steps = {
       fiscalData: settings.stepFiscalData,
-      solCredentials: settings.stepSolCredentials,
-      certificate: settings.stepCertificate,
+      solCredentials: settings.stepSolCredentials || settings.env === 'BETA',
+      certificate: settings.stepCertificate || settings.env === 'BETA',
       testSignedXml: settings.stepTestSign,
       testSunatBeta: settings.stepTestBeta,
     };

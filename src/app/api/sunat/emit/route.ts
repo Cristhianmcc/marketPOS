@@ -7,7 +7,7 @@
  * 1. Validar venta existe y no tiene FIADO
  * 2. Validar permisos (CASHIER→BOLETA, OWNER→BOLETA+FACTURA)
  * 3. Crear ElectronicDocument DRAFT
- * 4. Generar XML (firma pendiente para producción)
+ * 4. Generar y firmar el XML UBL
  * 5. Marcar como SIGNED
  * 6. Encolar job SUNAT (worker enviará asíncronamente)
  * 
@@ -27,6 +27,12 @@ import { auditSunatEmitRequested, auditSunatEmitSuccess, auditSunatEmitFailed } 
 import { validateFacturaData, validateBoletaData, isValidRuc, isValidDni } from '@/lib/sunat/validation/fiscalValidations';
 import { isSuperAdmin } from '@/lib/superadmin';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
+import { buildPayloadFromSale } from '@/lib/sunat/buildPayloadFromSale';
+import { getNextSunatNumber, generateFullNumber } from '@/domain/sunat/correlatives';
+import { generateInvoiceXML } from '@/lib/sunat/ubl/invoice';
+import { loadCertificate } from '@/lib/sunat/cert/loadCertificate';
+import { signXml, calculateXmlHash, verifyXmlSignature } from '@/lib/sunat/sign/signXmlCrypto';
+import type { CustomerDocType, SunatDocType } from '@prisma/client';
 
 /**
  * Genera emitKey para idempotencia
@@ -35,6 +41,25 @@ import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 function generateEmitKey(saleId: string, docType: string, customerDocNumber: string): string {
   const data = `${saleId}:${docType}:${customerDocNumber}`;
   return crypto.createHash('sha256').update(data).digest('hex').substring(0, 32);
+}
+
+function normalizeCustomerDocType(value: string): CustomerDocType {
+  const normalized = value.trim().toUpperCase();
+  const mapping: Record<string, CustomerDocType> = {
+    '0': 'OTHER',
+    '1': 'DNI',
+    '4': 'CE',
+    '6': 'RUC',
+    '7': 'PASSPORT',
+    DNI: 'DNI',
+    RUC: 'RUC',
+    CE: 'CE',
+    CARNET_EXTRANJERIA: 'CE',
+    PASSPORT: 'PASSPORT',
+    PASAPORTE: 'PASSPORT',
+    OTHER: 'OTHER',
+  };
+  return mapping[normalized] || 'OTHER';
 }
 
 export async function POST(req: NextRequest) {
@@ -193,13 +218,16 @@ export async function POST(req: NextRequest) {
     const emitKey = generateEmitKey(saleId, docType, customerDocNumber);
     
     // 6.1 Verificar si ya existe documento con esta combinación
-    const existingDoc = sale.electronicDocuments.find(
-      (d) => d.saleId === saleId && d.docType === docType
-    );
+    const sameTypeDocuments = sale.electronicDocuments
+      .filter((d) => d.saleId === saleId && d.docType === docType)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const existingDoc = sameTypeDocuments.find((d) =>
+      ['SIGNED', 'SENT', 'ACCEPTED', 'OBSERVED', 'DRAFT'].includes(d.status)
+    ) || sameTypeDocuments[0];
 
     if (existingDoc) {
       // Si ya existe, devolver el existente (idempotencia)
-      const isActive = ['SIGNED', 'SENT', 'ACCEPTED'].includes(existingDoc.status);
+      const isActive = ['SIGNED', 'SENT', 'ACCEPTED', 'OBSERVED'].includes(existingDoc.status);
       
       if (isActive) {
         console.log(`[SUNAT] Idempotencia: Documento existente ${existingDoc.fullNumber} para emitKey ${emitKey}`);
@@ -239,128 +267,139 @@ export async function POST(req: NextRequest) {
     }
 
     // 8. Determinar serie según docType
-    let series: string;
-    if (docType === 'BOLETA') {
-      series = settings.defaultBoletaSeries || 'B001';
-    } else {
-      series = settings.defaultFacturaSeries || 'F001';
-    }
+    const normalizedCustomerDocType = normalizeCustomerDocType(customerDocType);
+    const fiscalDocType = docType as SunatDocType;
 
-    // 9. Obtener siguiente número correlativo
-    const lastDoc = await prisma.electronicDocument.findFirst({
-      where: {
-        storeId: sale.storeId,
-        docType: docType,
-        series: series,
-      },
-      orderBy: {
-        number: 'desc',
+    // Construir el snapshot fiscal definitivo de la venta. Esta función
+    // distribuye descuentos y calcula base/IGV desde el total final cobrado.
+    const payload = await buildPayloadFromSale(prisma, {
+      saleId,
+      docType: fiscalDocType,
+      customer: {
+        docType: normalizedCustomerDocType,
+        docNumber: customerDocNumber,
+        name: customerName,
+        address: customerAddress,
       },
     });
 
-    const nextNumber = (lastDoc?.number || 0) + 1;
-    const fullNumber = `${series}-${String(nextNumber).padStart(8, '0')}`;
+    // Reusar un DRAFT interrumpido. Para uno nuevo, reservar correlativo y
+    // crear el documento en una sola transacción evita colisiones entre cajas.
+    const electronicDoc = existingDoc?.status === 'DRAFT'
+      ? existingDoc
+      : await prisma.$transaction(async (tx) => {
+          const series = docType === 'BOLETA'
+            ? (settings.defaultBoletaSeries || 'B001')
+            : (settings.defaultFacturaSeries || 'F001');
+          const number = await getNextSunatNumber(tx, sale.storeId, fiscalDocType);
+          const fullNumber = generateFullNumber(series, number);
 
-    // 10. Auditar inicio
+          return tx.electronicDocument.create({
+            data: {
+              storeId: sale.storeId,
+              saleId: sale.id,
+              docType: fiscalDocType,
+              series,
+              number,
+              fullNumber,
+              status: 'DRAFT',
+              issueDate: sale.createdAt,
+              currency: 'PEN',
+              taxable: payload.totals.subtotal,
+              igv: payload.totals.tax,
+              total: payload.totals.total,
+              customerDocType: normalizedCustomerDocType,
+              customerDocNumber,
+              customerName,
+              customerAddress: customerAddress || null,
+            },
+          });
+        });
+
     await auditSunatEmitRequested(
       user.userId,
       user.storeId!,
       saleId,
       docType,
-      fullNumber,
+      electronicDoc.fullNumber,
       customerDocType,
       customerDocNumber
     );
 
-    // 11. Crear documento electrónico DRAFT
-    // Calcular taxable e IGV (18%)
-    const totalNum = Number(sale.total);
-    const taxable = totalNum / 1.18;  // Base imponible
-    const igv = totalNum - taxable;    // IGV
-
-    const electronicDoc = await prisma.electronicDocument.create({
-      data: {
-        storeId: sale.storeId,
-        saleId: sale.id,
-        docType: docType,
-        series: series,
-        number: nextNumber,
-        fullNumber: fullNumber,
-        status: 'DRAFT',
-        issueDate: new Date(),
-        currency: 'PEN',
-        taxable: taxable,
-        igv: igv,
-        total: sale.total,
-        customerDocType: customerDocType as any,
-        customerDocNumber: customerDocNumber,
-        customerName: customerName,
-        customerAddress: customerAddress || null,
-      },
-    });
-
-    // 12. Generar XML (versión mock para BETA - firma pendiente)
-    const xmlContent = generateMockSignedXml({
-      ruc: settings.ruc || '',
-      businessName: settings.razonSocial || '',
-      docType: docType,
-      fullNumber: fullNumber,
+    payload.metadata = {
+      ...payload.metadata,
+      documentId: electronicDoc.id,
+      series: electronicDoc.series,
+      number: electronicDoc.number,
+      fullNumber: electronicDoc.fullNumber,
       issueDate: electronicDoc.issueDate,
-      customerDocType: customerDocType,
-      customerDocNumber: customerDocNumber,
-      customerName: customerName,
-      customerAddress: customerAddress || '',
-      items: sale.items.map((item) => ({
-        description: item.storeProduct?.product?.name || item.productName || 'Producto',
-        quantity: Number(item.quantity),
-        unitPrice: Number(item.unitPrice),
-        total: Number(item.subtotal),
-      })),
-      currency: electronicDoc.currency,
-      total: Number(electronicDoc.total),
-    });
+    };
 
-    const hash = `mock_hash_${Date.now()}`;
+    let signedXml: string;
+    let hash: string;
+    try {
+      const unsignedXml = generateInvoiceXML(payload, electronicDoc.id);
+      const certificate = await loadCertificate(prisma, sale.storeId);
+      const signed = signXml(unsignedXml, certificate, electronicDoc.id);
 
-    // 13. Actualizar a SIGNED (en producción, aquí iría firma digital)
-    await prisma.electronicDocument.update({
-      where: { id: electronicDoc.id },
-      data: {
-        xmlSigned: xmlContent,
-        hash: hash,
-        status: 'SIGNED',
-      },
-    });
+      if (!verifyXmlSignature(signed.signedXml, certificate)) {
+        throw new Error('La firma XML generada no pudo verificarse');
+      }
 
-    // 14. Encolar job para worker
-    const job = await prisma.sunatJob.create({
-      data: {
-        storeId: sale.storeId,
-        document: { connect: { id: electronicDoc.id } },
-        type: 'SEND_CPE',
-        status: 'QUEUED',
-        attempts: 0,
-        nextRunAt: new Date(),
-      },
-    });
+      signedXml = signed.signedXml;
+      hash = calculateXmlHash(signedXml);
+    } catch (signingError) {
+      await prisma.electronicDocument.update({
+        where: { id: electronicDoc.id },
+        data: {
+          status: 'ERROR',
+          sunatMessage: signingError instanceof Error
+            ? signingError.message.substring(0, 1000)
+            : 'Error generando o firmando el XML',
+        },
+      });
+      throw signingError;
+    }
 
-    // 15. Auditar éxito
+    // Guardar firma y job de forma atómica. El worker nunca verá un trabajo
+    // encolado cuyo documento todavía no tenga XML firmado.
+    const [, job] = await prisma.$transaction([
+      prisma.electronicDocument.update({
+        where: { id: electronicDoc.id },
+        data: {
+          xmlSigned: signedXml,
+          hash,
+          status: 'SIGNED',
+          sunatMessage: null,
+        },
+      }),
+      prisma.sunatJob.create({
+        data: {
+          storeId: sale.storeId,
+          documentId: electronicDoc.id,
+          type: 'SEND_CPE',
+          status: 'QUEUED',
+          attempts: 0,
+          nextRunAt: new Date(),
+        },
+      }),
+    ]);
+
     await auditSunatEmitSuccess(
       user.userId,
       user.storeId!,
       saleId,
       docType,
-      fullNumber,
+      electronicDoc.fullNumber,
       electronicDoc.id,
       job.id
     );
 
-    // 16. Respuesta
     return NextResponse.json({
       success: true,
       document: {
         id: electronicDoc.id,
-        fullNumber: fullNumber,
+        fullNumber: electronicDoc.fullNumber,
         status: 'SIGNED',
         queuedAt: new Date(),
       },
@@ -368,7 +407,7 @@ export async function POST(req: NextRequest) {
         id: job.id,
         status: job.status,
       },
-      message: 'Comprobante creado y encolado para envío a SUNAT',
+      message: 'Comprobante firmado y encolado para envío a SUNAT',
     });
 
   } catch (error: any) {
@@ -379,157 +418,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-/**
- * Genera XML mock firmado (BETA)
- * En producción, usar firma digital con certificado SUNAT
- */
-function generateMockSignedXml(data: {
-  ruc: string;
-  businessName: string;
-  docType: string;
-  fullNumber: string;
-  issueDate: Date;
-  customerDocType: string;
-  customerDocNumber: string;
-  customerName: string;
-  customerAddress: string;
-  items: Array<{
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }>;
-  currency: string;
-  total: number;
-}): string {
-  const dateStr = data.issueDate.toISOString().split('T')[0];
-  const timeStr = data.issueDate.toISOString().split('T')[1].slice(0, 8);
-  const docTypeCode = data.docType === 'BOLETA' ? '03' : '01';
-  
-  // Calcular totales
-  const totalNum = typeof data.total === 'number' ? data.total : Number(data.total);
-  const taxable = totalNum / 1.18;
-  const igv = totalNum - taxable;
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
-         xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
-         xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2">
-  <ext:UBLExtensions>
-    <ext:UBLExtension>
-      <ext:ExtensionContent>
-        <ds:Signature Id="signatureId">
-          <ds:SignedInfo>
-            <ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-            <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
-            <ds:Reference URI="">
-              <ds:Transforms>
-                <ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
-              </ds:Transforms>
-              <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-              <ds:DigestValue>MOCK_DIGEST_VALUE</ds:DigestValue>
-            </ds:Reference>
-          </ds:SignedInfo>
-          <ds:SignatureValue>MOCK_SIGNATURE_BETA_${Date.now()}</ds:SignatureValue>
-          <ds:KeyInfo>
-            <ds:X509Data>
-              <ds:X509Certificate>MOCK_CERTIFICATE</ds:X509Certificate>
-            </ds:X509Data>
-          </ds:KeyInfo>
-        </ds:Signature>
-      </ext:ExtensionContent>
-    </ext:UBLExtension>
-  </ext:UBLExtensions>
-  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
-  <cbc:CustomizationID>2.0</cbc:CustomizationID>
-  <cbc:ID>${data.fullNumber}</cbc:ID>
-  <cbc:IssueDate>${dateStr}</cbc:IssueDate>
-  <cbc:IssueTime>${timeStr}</cbc:IssueTime>
-  <cbc:InvoiceTypeCode listID="0101" listAgencyName="PE:SUNAT" listName="Tipo de Documento" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${docTypeCode}</cbc:InvoiceTypeCode>
-  <cbc:DocumentCurrencyCode listID="ISO 4217 Alpha" listAgencyName="United Nations Economic Commission for Europe" listName="Currency">${data.currency}</cbc:DocumentCurrencyCode>
-  <cac:AccountingSupplierParty>
-    <cac:Party>
-      <cac:PartyIdentification>
-        <cbc:ID schemeID="6" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${data.ruc}</cbc:ID>
-      </cac:PartyIdentification>
-      <cac:PartyName>
-        <cbc:Name><![CDATA[${data.businessName}]]></cbc:Name>
-      </cac:PartyName>
-      <cac:PartyLegalEntity>
-        <cbc:RegistrationName><![CDATA[${data.businessName}]]></cbc:RegistrationName>
-      </cac:PartyLegalEntity>
-    </cac:Party>
-  </cac:AccountingSupplierParty>
-  <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyIdentification>
-        <cbc:ID schemeID="${data.customerDocType === 'DNI' ? '1' : '6'}" schemeName="Documento de Identidad" schemeAgencyName="PE:SUNAT" schemeURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06">${data.customerDocNumber}</cbc:ID>
-      </cac:PartyIdentification>
-      <cac:PartyLegalEntity>
-        <cbc:RegistrationName><![CDATA[${data.customerName}]]></cbc:RegistrationName>
-      </cac:PartyLegalEntity>
-    </cac:Party>
-  </cac:AccountingCustomerParty>
-  <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${data.currency}">${igv.toFixed(2)}</cbc:TaxAmount>
-    <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${data.currency}">${taxable.toFixed(2)}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${data.currency}">${igv.toFixed(2)}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        <cac:TaxScheme>
-          <cbc:ID>1000</cbc:ID>
-          <cbc:Name>IGV</cbc:Name>
-          <cbc:TaxTypeCode>VAT</cbc:TaxTypeCode>
-        </cac:TaxScheme>
-      </cac:TaxCategory>
-    </cac:TaxSubtotal>
-  </cac:TaxTotal>
-  <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${data.currency}">${taxable.toFixed(2)}</cbc:LineExtensionAmount>
-    <cbc:TaxInclusiveAmount currencyID="${data.currency}">${totalNum.toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${data.currency}">${totalNum.toFixed(2)}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
-  ${data.items.map((item, idx) => {
-    const itemTotal = typeof item.total === 'number' ? item.total : Number(item.total);
-    const itemTaxable = itemTotal / 1.18;
-    const itemIgv = itemTotal - itemTaxable;
-    return `<cac:InvoiceLine>
-    <cbc:ID>${idx + 1}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="NIU" unitCodeListID="UN/ECE rec 20" unitCodeListAgencyName="United Nations Economic Commission for Europe">${item.quantity}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="${data.currency}">${itemTotal.toFixed(2)}</cbc:LineExtensionAmount>
-    <cac:PricingReference>
-      <cac:AlternativeConditionPrice>
-        <cbc:PriceAmount currencyID="${data.currency}">${item.unitPrice.toFixed(2)}</cbc:PriceAmount>
-        <cbc:PriceTypeCode listName="Tipo de Precio" listAgencyName="PE:SUNAT" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo16">01</cbc:PriceTypeCode>
-      </cac:AlternativeConditionPrice>
-    </cac:PricingReference>
-    <cac:TaxTotal>
-      <cbc:TaxAmount currencyID="${data.currency}">${itemIgv.toFixed(2)}</cbc:TaxAmount>
-      <cac:TaxSubtotal>
-        <cbc:TaxableAmount currencyID="${data.currency}">${itemTaxable.toFixed(2)}</cbc:TaxableAmount>
-        <cbc:TaxAmount currencyID="${data.currency}">${itemIgv.toFixed(2)}</cbc:TaxAmount>
-        <cac:TaxCategory>
-          <cbc:Percent>18</cbc:Percent>
-          <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">10</cbc:TaxExemptionReasonCode>
-          <cac:TaxScheme>
-            <cbc:ID>1000</cbc:ID>
-            <cbc:Name>IGV</cbc:Name>
-            <cbc:TaxTypeCode>VAT</cbc:TaxTypeCode>
-          </cac:TaxScheme>
-        </cac:TaxCategory>
-      </cac:TaxSubtotal>
-    </cac:TaxTotal>
-    <cac:Item>
-      <cbc:Description><![CDATA[${item.description}]]></cbc:Description>
-    </cac:Item>
-    <cac:Price>
-      <cbc:PriceAmount currencyID="${data.currency}">${(item.unitPrice / 1.18).toFixed(2)}</cbc:PriceAmount>
-    </cac:Price>
-  </cac:InvoiceLine>`;
-  }).join('\n  ')}
-</Invoice>`;
 }

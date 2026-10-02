@@ -1,6 +1,7 @@
 // Carga y gestión de certificados digitales PFX
 import forge from 'node-forge';
 import { PrismaClient } from '@prisma/client';
+import { generateBetaCertificate } from './generateBetaCertificate';
 
 export interface Certificate {
   privateKey: forge.pki.rsa.PrivateKey;
@@ -41,12 +42,27 @@ export async function loadCertificate(
     const settings = await prisma.sunatSettings.findUnique({
       where: { storeId },
       select: {
+        env: true,
+        ruc: true,
         certPfxBase64: true,
         certPassword: true,
       },
     });
 
     if (!settings?.certPfxBase64 || !settings?.certPassword) {
+      if (settings?.env === 'BETA' && settings.ruc) {
+        const generated = generateBetaCertificate(settings.ruc);
+        await prisma.sunatSettings.update({
+          where: { storeId },
+          data: {
+            certPfxBase64: generated.pfxBase64,
+            certPassword: generated.password,
+            stepCertificate: true,
+          },
+        });
+        return parsePfxCertificate(generated.pfxBase64, generated.password);
+      }
+
       throw new CertificateError(
         'Certificado digital no configurado. Configure SUNAT_CERT_PFX y SUNAT_CERT_PASSWORD en ENV o en SunatSettings.',
         'CERT_NOT_CONFIGURED'
@@ -197,6 +213,15 @@ export function validateCertificateForSunat(cert: Certificate): boolean {
     }
 
     return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isSelfSignedCertificate(cert: Certificate): boolean {
+  try {
+    return cert.certificate.isIssuer(cert.certificate) &&
+      cert.certificate.verify(cert.certificate);
   } catch {
     return false;
   }

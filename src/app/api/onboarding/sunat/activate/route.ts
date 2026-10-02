@@ -69,8 +69,8 @@ export async function PATCH(req: NextRequest) {
       const missingSteps = [];
       
       if (!settings.stepFiscalData) missingSteps.push('Datos fiscales');
-      if (!settings.stepSolCredentials) missingSteps.push('Credenciales SOL');
-      if (!settings.stepCertificate) missingSteps.push('Certificado digital');
+      if (env === 'PROD' && !settings.stepSolCredentials) missingSteps.push('Credenciales SOL');
+      if (env === 'PROD' && !settings.stepCertificate) missingSteps.push('Certificado digital');
       if (!settings.stepTestSign) missingSteps.push('Test de firma');
       
       // stepTestBeta no es requerido - la primera venta será el test real
@@ -88,6 +88,43 @@ export async function PATCH(req: NextRequest) {
 
     // 7. Para PROD, requiere confirmación typed
     if (env === 'PROD' && enabled) {
+      if (!settings.certPfxBase64 || !settings.certPassword) {
+        return NextResponse.json(
+          { error: 'Producción requiere un certificado digital real', code: 'PROD_CERT_REQUIRED' },
+          { status: 409 }
+        );
+      }
+
+      try {
+        const {
+          parsePfxCertificate,
+          extractRucFromCertificate,
+          isSelfSignedCertificate,
+        } = await import('@/lib/sunat/cert/loadCertificate');
+        const certificate = parsePfxCertificate(settings.certPfxBase64, settings.certPassword);
+        if (isSelfSignedCertificate(certificate)) {
+          return NextResponse.json(
+            { error: 'El certificado de prueba BETA no puede utilizarse en producción', code: 'BETA_CERT_IN_PROD' },
+            { status: 409 }
+          );
+        }
+        const certificateRuc = extractRucFromCertificate(certificate);
+        if (certificateRuc && settings.ruc && certificateRuc !== settings.ruc) {
+          return NextResponse.json(
+            { error: 'El RUC del certificado no coincide con el emisor', code: 'CERT_RUC_MISMATCH' },
+            { status: 409 }
+          );
+        }
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error: error instanceof Error ? error.message : 'Certificado digital inválido',
+            code: 'PROD_CERT_INVALID',
+          },
+          { status: 409 }
+        );
+      }
+
       // Verificar si es SUPERADMIN o tiene permiso especial
       const superAdmin = isSuperAdmin(user.email);
       

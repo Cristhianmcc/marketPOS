@@ -46,6 +46,15 @@ export interface SunatLineItem {
   
   /** Subtotal de la línea (quantity * unitPrice - descuentos aplicados) */
   lineSubtotal: number;
+
+  /** Base imponible final de la línea, sin IGV */
+  taxableAmount?: number;
+
+  /** IGV de la línea */
+  taxAmount?: number;
+
+  /** Valor unitario final sin IGV */
+  unitValue?: number;
   
   /** Descuentos aplicados a esta línea (opcional, para referencia en PDF) */
   discountsApplied?: number;
@@ -73,6 +82,9 @@ export interface SunatTotals {
   
   /** IGV (18% en Perú) */
   tax: number;
+
+  /** Total de descuentos sin IGV representados en las líneas */
+  allowanceTotal?: number;
   
   /** Total del comprobante (subtotal + tax) */
   total: number;

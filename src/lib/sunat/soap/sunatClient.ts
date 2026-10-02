@@ -19,6 +19,7 @@
 // no funciona correctamente con ESM/tsx
 import * as soap from 'soap';
 import * as path from 'path';
+import * as fs from 'fs';
 import {
   SUNAT_ENDPOINTS,
   SUNAT_TIMEOUTS,
@@ -26,7 +27,21 @@ import {
 } from '../config/endpoints';
 
 // Ruta al WSDL local (evita problemas de auth con imports del WSDL)
-const LOCAL_WSDL_PATH = path.join(__dirname, '..', 'wsdl', 'billService-local.wsdl');
+function resolveLocalWsdlPath(): string {
+  const candidates = [
+    process.env.SUNAT_WSDL_PATH,
+    path.join(process.cwd(), 'sunat', 'wsdl', 'billService-local.wsdl'),
+    path.join(process.cwd(), 'src', 'lib', 'sunat', 'wsdl', 'billService-local.wsdl'),
+    path.join(process.cwd(), '.next', 'server', 'wsdl', 'billService-local.wsdl'),
+    path.join(__dirname, '..', 'wsdl', 'billService-local.wsdl'),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  const found = candidates.find(candidate => fs.existsSync(candidate));
+  if (!found) {
+    throw new Error('No se encontró billService-local.wsdl en los recursos de SUNAT');
+  }
+  return found;
+}
 
 /**
  * Configuración del cliente SOAP.
@@ -86,8 +101,9 @@ export async function sendBill(
     
     // Usar WSDL local para evitar problemas de autenticación con imports
     // El endpoint se configura según el ambiente (BETA o PROD)
-    const client = await soap.createClientAsync(LOCAL_WSDL_PATH, {
+    const client = await soap.createClientAsync(resolveLocalWsdlPath(), {
       endpoint: endpoints.billService,
+      wsdl_options: { timeout: SUNAT_TIMEOUTS.connection },
     });
 
     // Configurar autenticación WS-Security para las llamadas SOAP
@@ -101,7 +117,7 @@ export async function sendBill(
     };
 
     // Enviar documento
-    const [result] = await client.sendBillAsync(params);
+    const [result] = await client.sendBillAsync(params, { timeout: SUNAT_TIMEOUTS.response });
 
     // SUNAT responde con applicationResponse (CDR en Base64)
     if (result && result.applicationResponse) {
@@ -156,8 +172,9 @@ export async function sendSummary(
     const endpoints = SUNAT_ENDPOINTS[config.environment];
     
     // Usar WSDL local para evitar problemas de autenticación con imports
-    const client = await soap.createClientAsync(LOCAL_WSDL_PATH, {
+    const client = await soap.createClientAsync(resolveLocalWsdlPath(), {
       endpoint: endpoints.billService,
+      wsdl_options: { timeout: SUNAT_TIMEOUTS.connection },
     });
 
     const wsSecurity = new soap.WSSecurity(config.solUser, config.solPass);
@@ -168,7 +185,7 @@ export async function sendSummary(
       contentFile: zipBase64,
     };
 
-    const [result] = await client.sendSummaryAsync(params);
+    const [result] = await client.sendSummaryAsync(params, { timeout: SUNAT_TIMEOUTS.response });
 
     // SUNAT responde con ticket para consultar luego
     if (result && result.ticket) {
@@ -220,8 +237,9 @@ export async function getStatus(
     
     // Usar WSDL local para evitar problemas de autenticación con imports
     // El mismo WSDL local tiene getStatus
-    const client = await soap.createClientAsync(LOCAL_WSDL_PATH, {
+    const client = await soap.createClientAsync(resolveLocalWsdlPath(), {
       endpoint: endpoints.billService,
+      wsdl_options: { timeout: SUNAT_TIMEOUTS.connection },
     });
 
     const wsSecurity = new soap.WSSecurity(config.solUser, config.solPass);
@@ -231,7 +249,7 @@ export async function getStatus(
       ticket,
     };
 
-    const [result] = await client.getStatusAsync(params);
+    const [result] = await client.getStatusAsync(params, { timeout: SUNAT_TIMEOUTS.query });
 
     if (!result) {
       return {

@@ -44,21 +44,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!settings.certPfxBase64 || !settings.certPassword) {
-      return NextResponse.json(
-        { error: 'Certificado no configurado', code: 'CERT_NOT_CONFIGURED' },
-        { status: 409 }
-      );
-    }
-
     // 4. Intentar firmar un XML dummy
     try {
       // Importar los módulos de firma y certificado
-      const { signXml } = await import('@/lib/sunat/sign/signXml');
-      const { parsePfxCertificate } = await import('@/lib/sunat/cert/loadCertificate');
+      const { signXml, verifyXmlSignature } = await import('@/lib/sunat/sign/signXmlCrypto');
+      const { loadCertificate } = await import('@/lib/sunat/cert/loadCertificate');
       
       // Parsear certificado
-      const cert = parsePfxCertificate(settings.certPfxBase64!, settings.certPassword!);
+      const cert = await loadCertificate(prisma, user.storeId!);
       
       // XML dummy para prueba (incluye ext:ExtensionContent para la firma)
       const dummyXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +68,9 @@ export async function POST(req: NextRequest) {
 </Invoice>`;
 
       const result = signXml(dummyXml, cert, 'TEST-00000001');
+      if (!verifyXmlSignature(result.signedXml, cert)) {
+        throw new Error('La firma generada no pudo verificarse criptográficamente');
+      }
 
       // Verificar que se firmó (debe contener la firma)
       if (!result.signedXml || !result.signedXml.includes('<ds:Signature')) {

@@ -77,8 +77,8 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
 
   // AccountingSupplierParty (Emisor)
   const supplierParty = doc.ele('cac:AccountingSupplierParty');
-  const supplierPartyIdentification = supplierParty.ele('cac:Party')
-    .ele('cac:PartyIdentification');
+  const supplier = supplierParty.ele('cac:Party');
+  const supplierPartyIdentification = supplier.ele('cac:PartyIdentification');
   supplierPartyIdentification.ele('cbc:ID', {
     schemeID: '6', // RUC
     schemeName: 'Documento de Identidad',
@@ -86,24 +86,26 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
   }).txt(issuer.ruc);
 
-  const supplierPartyName = supplierParty.ele('cac:Party').ele('cac:PartyName');
+  const supplierPartyName = supplier.ele('cac:PartyName');
   supplierPartyName.ele('cbc:Name').txt(issuer.razonSocial);
 
   // Dirección del emisor
   if (issuer.address) {
-    const supplierAddress = supplierParty.ele('cac:Party').ele('cac:PostalAddress');
-    supplierAddress.ele('cbc:ID').txt(issuer.ubigeo || '150101'); // Default Lima
+    const supplierAddress = supplier.ele('cac:PostalAddress');
+    if (issuer.ubigeo) {
+      supplierAddress.ele('cbc:ID').txt(issuer.ubigeo);
+    }
     supplierAddress.ele('cbc:StreetName').txt(issuer.address);
     supplierAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
   }
 
-  const supplierLegalEntity = supplierParty.ele('cac:Party').ele('cac:PartyLegalEntity');
+  const supplierLegalEntity = supplier.ele('cac:PartyLegalEntity');
   supplierLegalEntity.ele('cbc:RegistrationName').txt(issuer.razonSocial);
 
   // AccountingCustomerParty (Cliente)
   const customerParty = doc.ele('cac:AccountingCustomerParty');
-  const customerPartyIdentification = customerParty.ele('cac:Party')
-    .ele('cac:PartyIdentification');
+  const customerNode = customerParty.ele('cac:Party');
+  const customerPartyIdentification = customerNode.ele('cac:PartyIdentification');
   
   const customerDocType = mapCustomerDocTypeToSunat(customer.docType);
   customerPartyIdentification.ele('cbc:ID', {
@@ -113,15 +115,19 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
   }).txt(customer.docNumber);
 
-  const customerLegalEntity = customerParty.ele('cac:Party').ele('cac:PartyLegalEntity');
+  const customerLegalEntity = customerNode.ele('cac:PartyLegalEntity');
   customerLegalEntity.ele('cbc:RegistrationName').txt(customer.name);
 
   // Dirección del cliente (opcional)
   if (customer.address) {
-    const customerAddress = customerParty.ele('cac:Party').ele('cac:PostalAddress');
+    const customerAddress = customerNode.ele('cac:PostalAddress');
     customerAddress.ele('cbc:StreetName').txt(customer.address);
     customerAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
   }
+
+  const paymentTerms = doc.ele('cac:PaymentTerms');
+  paymentTerms.ele('cbc:ID').txt('FormaPago');
+  paymentTerms.ele('cbc:PaymentMeansID').txt('Contado');
 
   // TaxTotal (IGV)
   const taxTotal = doc.ele('cac:TaxTotal');
@@ -146,6 +152,10 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     .txt(formatUBLAmount(totals.subtotal));
   legalMonetaryTotal.ele('cbc:TaxInclusiveAmount', { currencyID: currency })
     .txt(formatUBLAmount(totals.total));
+  if (totals.allowanceTotal && totals.allowanceTotal > 0) {
+    legalMonetaryTotal.ele('cbc:AllowanceTotalAmount', { currencyID: currency })
+      .txt(formatUBLAmount(totals.allowanceTotal));
+  }
   legalMonetaryTotal.ele('cbc:PayableAmount', { currencyID: currency })
     .txt(formatUBLAmount(totals.total));
 
@@ -159,32 +169,47 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     const unitCode = item.unitSunatCode || mapUnitTypeToUBL(item.unitType);
     invoiceLine.ele('cbc:InvoicedQuantity', { unitCode }).txt(quantity);
     
+    const lineTaxable = item.taxableAmount ?? item.lineSubtotal / 1.18;
+    const lineTax = item.taxAmount ?? item.lineSubtotal - lineTaxable;
+    const unitValue = item.unitValue ?? (item.quantity > 0 ? lineTaxable / item.quantity : 0);
+
     invoiceLine.ele('cbc:LineExtensionAmount', { currencyID: currency })
-      .txt(formatUBLAmount(item.lineSubtotal));
+      .txt(formatUBLAmount(lineTaxable));
 
     // PricingReference (Precio unitario con IGV)
     const pricingReference = invoiceLine.ele('cac:PricingReference');
     const alternativeConditionPrice = pricingReference.ele('cac:AlternativeConditionPrice');
-    const priceWithTax = item.unitPrice * 1.18; // Agregar IGV
     alternativeConditionPrice.ele('cbc:PriceAmount', { currencyID: currency })
-      .txt(formatUBLAmount(priceWithTax));
+      .txt(formatUBLAmount(item.unitPrice));
     alternativeConditionPrice.ele('cbc:PriceTypeCode', {
       listName: 'Tipo de Precio',
       listAgencyName: 'PE:SUNAT',
       listURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo16'
     }).txt('01'); // 01 = Precio unitario (incluye IGV)
 
+    if (item.discountsApplied && item.discountsApplied > 0) {
+      const discountGross = item.discountsApplied;
+      const discountNet = discountGross / 1.18;
+      const baseNet = lineTaxable + discountNet;
+      const allowance = invoiceLine.ele('cac:AllowanceCharge');
+      allowance.ele('cbc:ChargeIndicator').txt('false');
+      allowance.ele('cbc:AllowanceChargeReasonCode').txt('00');
+      allowance.ele('cbc:MultiplierFactorNumeric')
+        .txt(baseNet > 0 ? (discountNet / baseNet).toFixed(5) : '0.00000');
+      allowance.ele('cbc:Amount', { currencyID: currency }).txt(formatUBLAmount(discountNet));
+      allowance.ele('cbc:BaseAmount', { currencyID: currency }).txt(formatUBLAmount(baseNet));
+    }
+
     // TaxTotal del item
     const itemTaxTotal = invoiceLine.ele('cac:TaxTotal');
-    const itemTax = item.lineSubtotal * 0.18; // IGV
     itemTaxTotal.ele('cbc:TaxAmount', { currencyID: currency })
-      .txt(formatUBLAmount(itemTax));
+      .txt(formatUBLAmount(lineTax));
 
     const itemTaxSubtotal = itemTaxTotal.ele('cac:TaxSubtotal');
     itemTaxSubtotal.ele('cbc:TaxableAmount', { currencyID: currency })
-      .txt(formatUBLAmount(item.lineSubtotal));
+      .txt(formatUBLAmount(lineTaxable));
     itemTaxSubtotal.ele('cbc:TaxAmount', { currencyID: currency })
-      .txt(formatUBLAmount(itemTax));
+      .txt(formatUBLAmount(lineTax));
 
     const itemTaxCategory = itemTaxSubtotal.ele('cac:TaxCategory');
     itemTaxCategory.ele('cbc:Percent').txt(getIGVPercentage().toString());
@@ -205,7 +230,7 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     // Price (Precio unitario sin IGV)
     const price = invoiceLine.ele('cac:Price');
     price.ele('cbc:PriceAmount', { currencyID: currency })
-      .txt(formatUBLAmount(item.unitPrice));
+      .txt(formatUBLAmount(unitValue));
   });
 
   // Convertir a XML string

@@ -234,7 +234,11 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
     }
 
     // Actualizar documento según respuesta SUNAT
-    const newStatus: SunatStatus = cdr.isAccepted ? 'ACCEPTED' : 'REJECTED';
+    const newStatus: SunatStatus = cdr.isObserved
+      ? 'OBSERVED'
+      : cdr.isAccepted
+        ? 'ACCEPTED'
+        : 'REJECTED';
 
     await prisma.electronicDocument.update({
       where: { id: documentId },
@@ -242,7 +246,9 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
         status: newStatus,
         cdrZip: sendResult.cdrZipBase64,
         sunatCode: cdr.responseCode,
-        sunatMessage: cdr.description,
+        sunatMessage: cdr.notes.length > 0
+          ? `${cdr.description} | ${cdr.notes.join(' | ')}`
+          : cdr.description,
         sunatResponseAt: new Date(),
       },
     });
@@ -512,19 +518,24 @@ async function processQueryTicket(job: any, document: any, settings: any): Promi
       // Procesar CDR si existe
       let cdrDescription = 'Aceptado';
       let cdrCode = statusCode;
+      let cdrObserved = false;
       
       if (statusResult.cdrZipBase64) {
         const cdr = await parseCdr(statusResult.cdrZipBase64);
         if (cdr) {
           cdrDescription = cdr.description;
           cdrCode = cdr.responseCode;
+          cdrObserved = cdr.isObserved;
+          if (cdr.notes.length > 0) {
+            cdrDescription = `${cdrDescription}. Observaciones: ${cdr.notes.join(' | ')}`;
+          }
         }
       }
 
       await prisma.electronicDocument.update({
         where: { id: documentId },
         data: {
-          status: 'ACCEPTED',
+          status: cdrObserved ? 'OBSERVED' : 'ACCEPTED',
           cdrZip: statusResult.cdrZipBase64,
           sunatCode: cdrCode,
           sunatMessage: cdrDescription,
@@ -551,7 +562,7 @@ async function processQueryTicket(job: any, document: any, settings: any): Promi
         success: true,
         jobId,
         documentId,
-        message: `Documento aceptado: ${cdrDescription}`,
+        message: `Documento ${cdrObserved ? 'observado' : 'aceptado'}: ${cdrDescription}`,
       };
     }
 

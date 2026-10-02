@@ -1,5 +1,5 @@
 {
-  "name": "monterrial-pos-desktop",
+  "name": "monterrial-pos-sunat-beta",
   "version": "0.1.0",
   "description": "Monterrial POS Desktop Application",
   "author": "Monterrial",
@@ -43,8 +43,8 @@
   },
   "build": {
     "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-    "appId": "com.monterrial.pos.desktop",
-    "productName": "Monterrial POS",
+    "appId": "com.monterrial.pos.sunatbeta",
+    "productName": "Monterrial POS SUNAT Beta",
     "directories": {
       "output": "dist-electron",
       "buildResources": "resources"
@@ -81,10 +81,6 @@
         "filter": [
           "**/*"
         ]
-      },
-      {
-        "from": "build-resources/.env",
-        "to": ".env"
       },
       {
         "from": "vendor/postgres",
@@ -132,7 +128,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Monterrial POS",
+      "shortcutName": "Monterrial POS SUNAT Beta",
       "installerIcon": "resources/icon.ico",
       "uninstallerIcon": "resources/icon.ico",
       "installerHeaderIcon": "resources/icon.ico",

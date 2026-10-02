@@ -213,7 +213,7 @@ export class PrinterManager {
       `);
 
       // Inject logo as base64 directly from disk (avoids HTTP timing issues in hidden print window)
-      const localImagesDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS', 'local-images');
+      const localImagesDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS-SUNAT-Beta', 'local-images');
       const indexPath = path.join(localImagesDir, 'index.json');
       if (fs.existsSync(indexPath)) {
         try {

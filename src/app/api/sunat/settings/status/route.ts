@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     // 3. Obtener configuración de la tienda del usuario
     const settings = await prisma.sunatSettings.findUnique({
       where: {
-        storeId: user.storeId,
+        storeId: user.storeId!,
       },
     });
 

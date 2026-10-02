@@ -130,10 +130,35 @@ medicación y emite el comprobante SUNAT en una petición posterior.
 ### Fiscal
 
 Construcción de payload -> XML UBL -> firma -> ZIP -> job -> SOAP -> CDR/estado.
-El worker se ejecuta con `npm run sunat:worker`, separado del servidor web;
-no se encontró arranque de ese worker en `desktop/src`. Confirmar operación real
-antes de asegurar envío automático desde escritorio. El procesamiento tiene
-lock condicional y reintentos; no fue validado contra SUNAT durante esta revisión.
+En la rama `feature/sunat-beta`, Electron inicia `desktop/src/sunatProcessor.ts`,
+que consulta cada diez segundos el endpoint local
+`/api/sunat/jobs/process-pending`. El endpoint exige un token aleatorio generado
+al arrancar el servidor local, procesa como máximo tres trabajos `SEND_CPE` BETA
+y usa el lock/reintentos de `processSunatJob.ts`. Resúmenes, bajas y producción
+siguen fuera de este procesador automático.
+
+La emisión principal reserva el correlativo mediante `SunatSettings`, genera UBL,
+firma XMLDSig RSA-SHA256, verifica la firma y crea el job en una transacción. BETA
+usa las credenciales oficiales de prueba y puede generar un PFX autofirmado por
+tienda; al activar PROD se exige un certificado real y se rechaza el certificado
+autofirmado de prueba. Los WSDL locales se copian al servidor standalone durante
+`desktop/scripts/prepare-build.js`.
+
+El instalador de esta rama usa `com.monterrial.pos.sunatbeta`, el nombre
+`Monterrial POS SUNAT Beta` y una base en
+`%LOCALAPPDATA%/MonterrialPOS-SUNAT-Beta`. También usa
+nombres propios para el servicio y la tarea de PostgreSQL. Puede convivir con la
+aplicación principal sin reemplazar su acceso directo, `userData`, base embebida,
+imágenes ni respaldos locales.
+Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
+pruebas locales, la configuración externa debe suministrarse al proceso al
+arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.
+
+Límites comprobados: el cálculo actual solo representa operaciones gravadas al
+18 % y precios finales con IGV. No hay clasificación persistida para exoneradas,
+inafectas, gratuitas, ISC o bolsas. La prueba local cubre UBL, firma, ZIP y CDR,
+pero aún falta una emisión controlada contra SUNAT BETA y validación con los XSD
+oficiales antes de considerar lista la salida a producción.
 
 ### Escritorio y persistencia
 
@@ -159,7 +184,8 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/typescript/bin/tsc -p desktop/tsconfig.json --noEmit --incremental false` | Tipos Electron; pasó |
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
 | `node scripts/audit-pos-isolated.cjs` | Dos pruebas con dependencias simuladas; actualmente falla en ambos controles de autorización |
-| `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; no se ejecutó en la auditoría |
+| `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
+| `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
 | `npm run build` | **Modifica esquema con `prisma db push`** antes de compilar |
 | `npm run desktop:build` | Standalone + preparación + tsc + empaquetado Windows |
 | `npm run desktop:portable` | Empaquetado en directorio (`--dir`), no instalador portable de un solo EXE |

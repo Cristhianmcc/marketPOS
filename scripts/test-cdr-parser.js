@@ -10,15 +10,12 @@ const { isAcceptedBysunat, getStatusMessage } = require('../src/lib/sunat/cdr/pa
 // Test 1: isAcceptedBysunat
 console.log('Test 1: Validación de códigos de respuesta\n');
 
-console.log('Códigos ACEPTADOS (empiezan con "0"):\n');
+console.log('Códigos ACEPTADOS (solo 0, 00 y 0000):\n');
 
 const acceptedCodes = [
-  { code: '0000', description: 'Aceptado sin observaciones' },
-  { code: '0001', description: 'Aceptado con observación 1' },
-  { code: '0002', description: 'Aceptado con observación 2' },
-  { code: '0100', description: 'Factura aceptada' },
-  { code: '0200', description: 'Boleta aceptada' },
-  { code: '0300', description: 'NC aceptada' },
+  { code: '0', description: 'Aceptado' },
+  { code: '00', description: 'Aceptado' },
+  { code: '0000', description: 'Aceptado' },
 ];
 
 acceptedCodes.forEach(({ code, description }) => {
@@ -32,9 +29,11 @@ acceptedCodes.forEach(({ code, description }) => {
   console.log(`   ✅ ${code} → ACEPTADO (${description})`);
 });
 
-console.log('\nCódigos RECHAZADOS (NO empiezan con "0"):\n');
+console.log('\nCódigos RECHAZADOS (cualquier otro código):\n');
 
 const rejectedCodes = [
+  { code: '0001', description: 'No es código de aceptación' },
+  { code: '0100', description: 'No es código de aceptación' },
   { code: '2000', description: 'Error en RUC del emisor' },
   { code: '2001', description: 'Error en tipo de documento' },
   { code: '2100', description: 'ZIP dañado' },
@@ -63,7 +62,6 @@ console.log('Test 2: Mensajes descriptivos de códigos\n');
 
 const testMessages = [
   { code: '0000', mustInclude: 'Aceptado' },
-  { code: '0001', mustInclude: 'observaciones' },
   { code: '2000', mustInclude: 'RUC' },
   { code: '2100', mustInclude: 'ZIP' },
   { code: '2200', mustInclude: 'Firma' },

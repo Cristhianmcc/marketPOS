@@ -47,6 +47,7 @@ import {
 import { initCloudBackupSync, getCloudBackupSync } from './sync';
 // D9 - License Checker
 import { checkLicense, LicenseState } from './licenseChecker';
+import { SunatProcessor } from './sunatProcessor';
 
 // ============================================================================
 // CONSTANTES Y CONFIGURACIÓN
@@ -94,6 +95,7 @@ const USER_DATA_PATH = app.getPath('userData');
 // Instancia del servidor local (solo producción)
 let localServer: LocalServer | null = null;
 let serverUrl: string = DEV_SERVER_URL;
+let sunatProcessor: SunatProcessor | null = null;
 
 // Contador de reinicios del servidor para respawn automático
 let serverRestartCount = 0;
@@ -111,13 +113,14 @@ interface ServerState {
   port: number;
   url: string;
   databaseUrl: string;
+  internalToken: string;
   startedAt: string;
 }
 
 function saveServerState(state: ServerState): void {
   const stateFile = path.join(USER_DATA_PATH, 'server-state.json');
   try {
-    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), { mode: 0o600 });
   } catch (e) {
     console.warn('[App] No se pudo guardar server-state.json:', e);
   }
@@ -128,7 +131,7 @@ function loadServerState(): ServerState | null {
   try {
     if (!fs.existsSync(stateFile)) return null;
     const raw = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
-    if (!raw.url || !raw.port || !raw.databaseUrl) return null;
+    if (!raw.url || !raw.port || !raw.databaseUrl || !raw.internalToken) return null;
     return raw as ServerState;
   } catch {
     return null;
@@ -251,11 +254,11 @@ function createTray(): void {
   }
 
   tray = new Tray(trayIcon);
-  tray.setToolTip('Monterrial POS');
+  tray.setToolTip('Monterrial POS SUNAT Beta');
 
   const buildMenu = () => Menu.buildFromTemplate([
     {
-      label: 'Abrir Monterrial POS',
+      label: 'Abrir Monterrial POS SUNAT Beta',
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -332,7 +335,7 @@ function createMainWindow(): void {
     // Configuración de ventana
     frame: true,
     autoHideMenuBar: true,
-    title: 'Monterrial POS',
+    title: 'Monterrial POS SUNAT Beta',
     backgroundColor: '#ffffff',
   });
 
@@ -447,8 +450,18 @@ async function respawnServer(): Promise<void> {
   try {
     localServer = await startLocalServer(RESOURCES_PATH, app.isPackaged);
     serverUrl = localServer.url;
+    sunatProcessor?.stop();
+    sunatProcessor = new SunatProcessor(serverUrl, localServer.internalToken);
+    sunatProcessor.start();
     setLicenseServerUrl(serverUrl);
     attachServerCrashWatcher(localServer);
+    saveServerState({
+      port: localServer.port,
+      url: localServer.url,
+      databaseUrl: process.env.DATABASE_URL || '',
+      internalToken: localServer.internalToken,
+      startedAt: new Date().toISOString(),
+    });
     // Restablecer contador si el servidor arrancó OK
     serverRestartCount = 0;
     console.log('[App] Servidor reiniciado correctamente');
@@ -1245,6 +1258,8 @@ app.whenReady().then(async () => {
         onlineMonitor.start();
         onlineMonitor.onStatusChange((isOnline) => { if (isOnline) syncLocalImages(serverUrl); });
         initTaskQueue({ serverUrl }).start();
+        sunatProcessor = new SunatProcessor(serverUrl, savedState.internalToken);
+        sunatProcessor.start();
         initPrinterManager(serverUrl);
         initEscposPrintManager(serverUrl);
         initRasterPrintManager(serverUrl);
@@ -1409,6 +1424,10 @@ app.whenReady().then(async () => {
       const taskQueue = initTaskQueue({ serverUrl });
       taskQueue.start();
       console.log('[App] TaskQueue initialized');
+
+      sunatProcessor = new SunatProcessor(serverUrl, localServer.internalToken);
+      sunatProcessor.start();
+      console.log('[App] SUNAT BETA processor initialized');
       
       // Inicializar PrinterManager (D6)
       initPrinterManager(serverUrl);
@@ -1426,6 +1445,7 @@ app.whenReady().then(async () => {
         port: localServer.port,
         url: localServer.url,
         databaseUrl: process.env.DATABASE_URL || '',
+        internalToken: localServer.internalToken,
         startedAt: new Date().toISOString(),
       });
 
@@ -1435,7 +1455,7 @@ app.whenReady().then(async () => {
       // Notificar al usuario cuando el sistema esté listo (solo en arranque automático oculto)
       if (process.argv.includes('--hidden') && Notification.isSupported()) {
         new Notification({
-          title: 'Monterrial POS listo',
+          title: 'Monterrial POS SUNAT Beta listo',
           body: 'El sistema está listo. Haz clic en el ícono de la bandeja para abrir.',
         }).show();
       }
@@ -1552,6 +1572,9 @@ app.on('window-all-closed', async () => {
   if (taskQueue) {
     taskQueue.destroy();
   }
+
+  sunatProcessor?.stop();
+  sunatProcessor = null;
   
   // Detener backup scheduler
   const scheduler = getBackupScheduler();

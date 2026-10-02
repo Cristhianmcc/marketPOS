@@ -145,7 +145,7 @@ export class BackupScheduler {
 
     // Default: Documents/MonterrialPOS/Backups/{storeName}
     const documentsPath = app.getPath('documents');
-    return path.join(documentsPath, 'MonterrialPOS', 'Backups', sanitizedStoreName);
+    return path.join(documentsPath, 'MonterrialPOS-SUNAT-Beta', 'Backups', sanitizedStoreName);
   }
 
   private ensureBackupDir(storeName: string): string {

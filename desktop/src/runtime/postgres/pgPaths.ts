@@ -5,7 +5,6 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import { execFileSync } from 'child_process';
 import { app, shell } from 'electron';
 
@@ -14,17 +13,17 @@ import { app, shell } from 'electron';
 // ============================================================================
 
 /**
- * Get the Monterrial POS user data directory
- * Location: Documents/MonterrialPOS/
+ * Get the isolated SUNAT Beta runtime directory.
+ * LocalAppData avoids permission restrictions commonly applied to Documents.
  */
 export function getMarketPOSDir(): string {
-  const documentsDir = path.join(os.homedir(), 'Documents');
-  return path.join(documentsDir, 'MonterrialPOS');
+  const localAppData = process.env.LOCALAPPDATA || app.getPath('userData');
+  return path.join(localAppData, 'MonterrialPOS-SUNAT-Beta');
 }
 
 /**
  * Get the PostgreSQL data directory
- * Location: Documents/MonterrialPOS/pg/data
+ * Location: LocalAppData/MonterrialPOS-SUNAT-Beta/pg/data
  */
 export function getPgDataDir(): string {
   return path.join(getMarketPOSDir(), 'pg', 'data');
@@ -32,7 +31,7 @@ export function getPgDataDir(): string {
 
 /**
  * Get the PostgreSQL logs directory
- * Location: Documents/MonterrialPOS/logs
+ * Location: LocalAppData/MonterrialPOS-SUNAT-Beta/logs
  */
 export function getLogsDir(): string {
   return path.join(getMarketPOSDir(), 'logs');
@@ -47,7 +46,7 @@ export function getPgLogPath(): string {
 
 /**
  * Get the config directory
- * Location: Documents/MonterrialPOS/config
+ * Location: LocalAppData/MonterrialPOS-SUNAT-Beta/config
  */
 export function getConfigDir(): string {
   return path.join(getMarketPOSDir(), 'config');
@@ -130,7 +129,7 @@ export function getPsqlPath(): string {
 export function ensureDirectories(): void {
   const dirs = [
     getMarketPOSDir(),
-    getPgDataDir(),
+    path.dirname(getPgDataDir()),
     getLogsDir(),
     getConfigDir(),
   ];

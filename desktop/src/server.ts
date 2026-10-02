@@ -11,6 +11,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as os from 'os';
+import * as crypto from 'crypto';
 
 // ============================================================================
 // CONFIGURACIÓN
@@ -28,6 +29,7 @@ const HEALTH_CHECK_INTERVAL = 1000;
 export interface LocalServer {
   port: number;
   url: string;
+  internalToken: string;
   process: ChildProcess;
   kill: () => Promise<void>;
 }
@@ -432,9 +434,10 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   // ⚠️ IMPORTANTE: DATABASE_URL de process.env tiene prioridad sobre .env
   // porque ensurePostgres() lo configura dinámicamente con el puerto correcto
   const databaseUrl = process.env.DATABASE_URL;
+  const internalToken = crypto.randomBytes(32).toString('hex');
   
   // Directorio de datos de la app
-  const monterrialDataDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS');
+  const monterrialDataDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS-SUNAT-Beta');
 
   // Configurar entorno
   const env: Record<string, string> = {
@@ -444,6 +447,8 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
     PORT: port.toString(),
     HOSTNAME: '127.0.0.1',
     DESKTOP_MODE: 'true',
+    ENABLE_SUNAT: 'true',
+    DESKTOP_INTERNAL_TOKEN: internalToken,
     MONTERRIAL_DATA_DIR: monterrialDataDir,
   };
   
@@ -498,6 +503,7 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   return {
     port,
     url,
+    internalToken,
     process: serverProcess,
     kill: () => {
       return new Promise<void>((resolve) => {

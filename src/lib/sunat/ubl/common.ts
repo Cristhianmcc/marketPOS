@@ -56,8 +56,9 @@ export function mapCustomerDocTypeToSunat(docType: string): string {
     PASSPORT: '7',
     CARNET_EXTRANJERIA: '4',
     PASAPORTE: '7',
+    OTHER: '0',
   };
-  return mapping[docType] || '1'; // Default DNI
+  return mapping[docType] || '0';
 }
 
 /**

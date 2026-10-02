@@ -41,17 +41,9 @@ const COPY_TASKS = [
     name: 'Prisma schema (server copy)'
   },
   {
-    from: path.join(ROOT_DIR, '.env'),
-    to: path.join(BUILD_RESOURCES, '.env'),
-    name: '.env file',
-    isFile: true
-  },
-  // Also copy .env to server directory
-  {
-    from: path.join(ROOT_DIR, '.env'),
-    to: path.join(BUILD_RESOURCES, 'server', '.env'),
-    name: '.env file (server copy)',
-    isFile: true
+    from: path.join(ROOT_DIR, 'src', 'lib', 'sunat', 'wsdl'),
+    to: path.join(BUILD_RESOURCES, 'server', 'sunat', 'wsdl'),
+    name: 'SUNAT local WSDL files'
   },
   // Copy ALL @prisma packages at once to avoid missing sub-package errors
   {

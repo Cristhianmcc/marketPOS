@@ -16,7 +16,7 @@ import { PrismaClient } from '@prisma/client';
 export interface SolCredentials {
   solUser: string;
   solPass: string;
-  source: 'ENV' | 'DB';
+  source: 'BETA' | 'ENV' | 'DB';
 }
 
 export class SolCredentialsError extends Error {
@@ -39,28 +39,37 @@ export async function loadSolCredentials(
   prisma: PrismaClient,
   storeId: string
 ): Promise<SolCredentials> {
-  // 1. Intentar cargar desde ENV (recomendado para producción)
-  const envUser = process.env.SUNAT_SOL_USER;
-  const envPass = process.env.SUNAT_SOL_PASS;
-
-  if (envUser && envPass) {
-    return {
-      solUser: envUser,
-      solPass: envPass,
-      source: 'ENV',
-    };
-  }
-
-  // 2. Cargar desde SunatSettings
   const settings = await prisma.sunatSettings.findUnique({
     where: { storeId },
     select: {
       solUser: true,
       solPass: true,
       ruc: true,
+      env: true,
     },
   });
 
+  if (settings?.env === 'BETA' && settings.ruc) {
+    return {
+      solUser: buildSolUser(settings.ruc, 'MODDATOS'),
+      solPass: 'MODDATOS',
+      source: 'BETA',
+    };
+  }
+
+  // 1. Intentar cargar desde ENV (recomendado para producción)
+  const envUser = process.env.SUNAT_SOL_USER;
+  const envPass = process.env.SUNAT_SOL_PASS;
+
+  if (envUser && envPass) {
+    return {
+      solUser: settings?.ruc ? buildSolUser(settings.ruc, envUser) : envUser,
+      solPass: envPass,
+      source: 'ENV',
+    };
+  }
+
+  // 2. Cargar desde SunatSettings
   if (!settings?.solUser || !settings?.solPass) {
     throw new SolCredentialsError(
       'Credenciales SOL no configuradas. Configure SUNAT_SOL_USER y SUNAT_SOL_PASS en ENV o en SunatSettings.',
@@ -69,7 +78,7 @@ export async function loadSolCredentials(
   }
 
   return {
-    solUser: settings.solUser,
+    solUser: settings.ruc ? buildSolUser(settings.ruc, settings.solUser) : settings.solUser,
     solPass: settings.solPass,
     source: 'DB',
   };
@@ -82,7 +91,7 @@ export async function loadSolCredentials(
 export async function hasSolCredentials(
   prisma: PrismaClient,
   storeId: string
-): Promise<{ available: boolean; source?: 'ENV' | 'DB' }> {
+): Promise<{ available: boolean; source?: 'BETA' | 'ENV' | 'DB' }> {
   // Verificar ENV primero
   if (process.env.SUNAT_SOL_USER && process.env.SUNAT_SOL_PASS) {
     return { available: true, source: 'ENV' };
@@ -94,8 +103,14 @@ export async function hasSolCredentials(
     select: {
       solUser: true,
       solPass: true,
+      env: true,
+      ruc: true,
     },
   });
+
+  if (settings?.env === 'BETA' && settings.ruc) {
+    return { available: true, source: 'BETA' };
+  }
 
   if (settings?.solUser && settings?.solPass) {
     return { available: true, source: 'DB' };
@@ -126,7 +141,7 @@ export function buildSolUser(ruc: string, user: string): string {
  */
 export function sanitizeCredentialsForLog(credentials: SolCredentials): {
   solUserMasked: string;
-  source: 'ENV' | 'DB';
+  source: 'BETA' | 'ENV' | 'DB';
 } {
   // Mostrar solo primeros 4 caracteres del usuario
   const masked = credentials.solUser.length > 4 
