@@ -6,7 +6,6 @@
 import { spawn, execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import {
   getPgDataDir,
   getInitDbPath,
@@ -75,8 +74,9 @@ export async function initializeCluster(config: PgRuntimeConfig): Promise<InitDb
   }
   
   // Create temporary password file
-  const tempDir = os.tmpdir();
-  const pwfilePath = path.join(tempDir, `pg_pw_${Date.now()}.txt`);
+  // Keep the short-lived initdb password file beside the isolated PostgreSQL
+  // logs. The low-integrity beta process cannot write to the system TEMP dir.
+  const pwfilePath = path.join(getLogsDir(), `.pg_pw_${Date.now()}.txt`);
   
   try {
     writePasswordFile(pwfilePath, config.pg.password);

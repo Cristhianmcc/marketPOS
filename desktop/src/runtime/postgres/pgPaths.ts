@@ -17,15 +17,18 @@ import { app, shell } from 'electron';
  * It follows the same Documents-based layout as the production desktop app.
  */
 export function getMarketPOSDir(): string {
-  if (process.platform === 'win32') {
-    return path.join('C:\\tmp', 'MonterrialPOS-SUNAT-Beta');
+  if (app.isPackaged && process.argv.includes('--sunat-beta-isolated')) {
+    // The portable beta is launched from the isolated worktree. That tree is
+    // explicitly writable by the low-integrity test process, unlike protected
+    // user folders and C:\\tmp in the Codex Windows environment.
+    return path.resolve(process.resourcesPath, '..', '..', '..', '..', '.sunat-beta-runtime');
   }
-  return path.join(app.getPath('temp'), 'MonterrialPOS-SUNAT-Beta');
+  return path.join(app.getPath('userData'), 'runtime');
 }
 
 /**
  * Get the PostgreSQL data directory
- * Test location on Windows: C:/tmp/MonterrialPOS-SUNAT-Beta/pg/data
+ * Isolated portable location: <worktree>/.sunat-beta-runtime/pg/data
  */
 export function getPgDataDir(): string {
   return path.join(getMarketPOSDir(), 'pg', 'data');
@@ -33,7 +36,7 @@ export function getPgDataDir(): string {
 
 /**
  * Get the PostgreSQL logs directory
- * Test location on Windows: C:/tmp/MonterrialPOS-SUNAT-Beta/logs
+ * Isolated portable location: <worktree>/.sunat-beta-runtime/logs
  */
 export function getLogsDir(): string {
   return path.join(getMarketPOSDir(), 'logs');
@@ -48,7 +51,7 @@ export function getPgLogPath(): string {
 
 /**
  * Get the config directory
- * Test location on Windows: C:/tmp/MonterrialPOS-SUNAT-Beta/config
+ * Isolated portable location: <worktree>/.sunat-beta-runtime/config
  */
 export function getConfigDir(): string {
   return path.join(getMarketPOSDir(), 'config');
