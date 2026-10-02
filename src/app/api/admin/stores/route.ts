@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!isSuperAdmin(session.email)) {
+    if (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email)) {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isSuperAdmin(session.email)) {
+    if (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email)) {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'No tienes permisos' },
         { status: 403 }

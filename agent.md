@@ -157,6 +157,11 @@ un `.env` público con solamente `CLOUD_URL`; cuando un usuario no existe en la 
 local, el login valida OWNER/SUPERADMIN contra `/api/auth/login` por HTTPS. No volver
 a empaquetar `CLOUD_DATABASE_URL`, `LICENSE_API_KEY` ni el `.env` completo.
 
+En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
+firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
+heredado. Esto permite que el administrador validado por el servicio cloud use el
+panel sin empaquetar su correo ni otros secretos en el ejecutable.
+
 Los módulos nativos `usb` y `@serialport` deben permanecer en `asarUnpack`; Electron
 no puede cargar sus archivos `.node` directamente desde `app.asar`.
 
