@@ -5,7 +5,6 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import { execFileSync } from 'child_process';
 import { app, shell } from 'electron';
 
@@ -18,13 +17,15 @@ import { app, shell } from 'electron';
  * It follows the same Documents-based layout as the production desktop app.
  */
 export function getMarketPOSDir(): string {
-  const documentsDir = path.join(os.homedir(), 'Documents');
-  return path.join(documentsDir, 'MonterrialPOS-SUNAT-Beta');
+  if (process.platform === 'win32') {
+    return path.join('C:\\tmp', 'MonterrialPOS-SUNAT-Beta');
+  }
+  return path.join(app.getPath('temp'), 'MonterrialPOS-SUNAT-Beta');
 }
 
 /**
  * Get the PostgreSQL data directory
- * Location: LocalAppData/MonterrialPOS-SUNAT-Beta/pg/data
+ * Test location on Windows: C:/tmp/MonterrialPOS-SUNAT-Beta/pg/data
  */
 export function getPgDataDir(): string {
   return path.join(getMarketPOSDir(), 'pg', 'data');
@@ -32,13 +33,10 @@ export function getPgDataDir(): string {
 
 /**
  * Get the PostgreSQL logs directory
- * Location: LocalAppData/MonterrialPOS-SUNAT-Beta/logs
+ * Test location on Windows: C:/tmp/MonterrialPOS-SUNAT-Beta/logs
  */
 export function getLogsDir(): string {
-  // Keep the database in Documents for compatibility, but place this
-  // transient process log in Electron userData. Windows can protect
-  // Documents from writes made by unsigned portable executables.
-  return path.join(app.getPath('userData'), 'postgres-logs');
+  return path.join(getMarketPOSDir(), 'logs');
 }
 
 /**
@@ -50,7 +48,7 @@ export function getPgLogPath(): string {
 
 /**
  * Get the config directory
- * Location: LocalAppData/MonterrialPOS-SUNAT-Beta/config
+ * Test location on Windows: C:/tmp/MonterrialPOS-SUNAT-Beta/config
  */
 export function getConfigDir(): string {
   return path.join(getMarketPOSDir(), 'config');

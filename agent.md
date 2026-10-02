@@ -145,8 +145,9 @@ autofirmado de prueba. Los WSDL locales se copian al servidor standalone durante
 `desktop/scripts/prepare-build.js`.
 
 El instalador de esta rama usa `com.monterrial.pos.sunatbeta`, el nombre
-`Monterrial POS SUNAT Beta` y mantiene su base aislada en
-`Documents/MonterrialPOS-SUNAT-Beta`, siguiendo el flujo del instalador original. También usa
+`Monterrial POS SUNAT Beta`. Para las pruebas ejecutadas dentro del entorno aislado, mantiene
+una base descartable propia en `C:/tmp/MonterrialPOS-SUNAT-Beta`; la base Beta anterior de
+`Documents/MonterrialPOS-SUNAT-Beta` no se mueve ni se elimina. También usa
 nombres propios para el servicio y la tarea de PostgreSQL. Puede convivir con la
 aplicación principal sin reemplazar su acceso directo, `userData`, base embebida,
 imágenes ni respaldos locales.
@@ -167,9 +168,9 @@ desactiva GPU, asigna el perfil aislado
 el bloqueo de instancia única. `extraFiles` lo incluye junto al
 ejecutable; esta excepción no debe aplicarse al producto principal.
 
-La base Beta continúa en `Documents/MonterrialPOS-SUNAT-Beta`. Solo el log transitorio de
-`pg_ctl` se guarda bajo el `userData` de Electron para evitar bloqueos de escritura sobre
-Documentos; este cambio no mueve ni recrea la base existente.
+La base y el log de esta ejecución Beta usan `C:/tmp/MonterrialPOS-SUNAT-Beta`. Es una base
+vacía y descartable para pruebas; no debe tratarse como almacenamiento definitivo ni incluir
+datos reales de clientes.
 
 Para equipos donde Windows no ejecuta `.cmd` o `.lnk`, `desktop/launcher/SunatBetaLauncher.cs`
 genera `Iniciar Monterrial POS SUNAT Beta.exe`, un lanzador gráfico que aplica los mismos
