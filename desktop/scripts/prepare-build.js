@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const DESKTOP_DIR = path.join(__dirname, '..');
@@ -31,6 +32,30 @@ function writePublicDesktopEnv() {
   // other secrets must remain outside the desktop package.
   fs.writeFileSync(path.join(BUILD_RESOURCES, '.env'), `CLOUD_URL=${cloudUrl}\n`, 'utf8');
   console.log('Created desktop public environment (CLOUD_URL only)');
+}
+
+function buildWindowsLauncher() {
+  if (process.platform !== 'win32') return;
+
+  const windowsDir = process.env.WINDIR || 'C:\\Windows';
+  const compilers = [
+    path.join(windowsDir, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe'),
+    path.join(windowsDir, 'Microsoft.NET', 'Framework', 'v4.0.30319', 'csc.exe'),
+  ];
+  const compiler = compilers.find((candidate) => fs.existsSync(candidate));
+  if (!compiler) throw new Error('C# compiler not found for SUNAT Beta launcher');
+
+  const source = path.join(DESKTOP_DIR, 'launcher', 'SunatBetaLauncher.cs');
+  const output = path.join(BUILD_RESOURCES, 'Iniciar Monterrial POS SUNAT Beta.exe');
+  execFileSync(compiler, [
+    '/nologo',
+    '/target:winexe',
+    '/platform:x64',
+    '/reference:System.Windows.Forms.dll',
+    `/out:${output}`,
+    source,
+  ], { stdio: 'inherit' });
+  console.log('Built native SUNAT Beta launcher');
 }
 
 // Files to copy
@@ -182,6 +207,7 @@ function main() {
   }
 
   writePublicDesktopEnv();
+  buildWindowsLauncher();
   
   console.log('='.repeat(60));
   console.log('Build preparation complete!');

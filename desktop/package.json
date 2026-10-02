@@ -61,6 +61,10 @@
       {
         "from": "resources/Abrir Monterrial POS SUNAT Beta.cmd",
         "to": "Abrir Monterrial POS SUNAT Beta.cmd"
+      },
+      {
+        "from": "build-resources/Iniciar Monterrial POS SUNAT Beta.exe",
+        "to": "Iniciar Monterrial POS SUNAT Beta.exe"
       }
     ],
     "extraResources": [

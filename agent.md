@@ -164,6 +164,11 @@ En Windows afectado por `STATUS_BREAKPOINT (0x80000003)`, la Beta se inicia medi
 desactiva GPU y asigna el perfil aislado
 `%LOCALAPPDATA%/MonterrialPOS-SUNAT-Beta-Electron`. `extraFiles` lo incluye junto al
 ejecutable; esta excepción no debe aplicarse al producto principal.
+
+Para equipos donde Windows no ejecuta `.cmd` o `.lnk`, `desktop/launcher/SunatBetaLauncher.cs`
+genera `Iniciar Monterrial POS SUNAT Beta.exe`, un lanzador gráfico que aplica los mismos
+argumentos sin depender de asociaciones de scripts. `prepare-build.js` lo compila con el
+compilador C# de Windows y `extraFiles` lo coloca junto a la aplicación.
 Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
 pruebas locales, la configuración externa debe suministrarse al proceso al
 arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.
