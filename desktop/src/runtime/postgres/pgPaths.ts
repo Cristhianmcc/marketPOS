@@ -5,6 +5,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 import { execFileSync } from 'child_process';
 import { app, shell } from 'electron';
 
@@ -14,11 +15,11 @@ import { app, shell } from 'electron';
 
 /**
  * Get the isolated SUNAT Beta runtime directory.
- * LocalAppData avoids permission restrictions commonly applied to Documents.
+ * It follows the same Documents-based layout as the production desktop app.
  */
 export function getMarketPOSDir(): string {
-  const localAppData = process.env.LOCALAPPDATA || app.getPath('userData');
-  return path.join(localAppData, 'MonterrialPOS-SUNAT-Beta');
+  const documentsDir = path.join(os.homedir(), 'Documents');
+  return path.join(documentsDir, 'MonterrialPOS-SUNAT-Beta');
 }
 
 /**

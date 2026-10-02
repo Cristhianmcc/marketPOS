@@ -145,8 +145,8 @@ autofirmado de prueba. Los WSDL locales se copian al servidor standalone durante
 `desktop/scripts/prepare-build.js`.
 
 El instalador de esta rama usa `com.monterrial.pos.sunatbeta`, el nombre
-`Monterrial POS SUNAT Beta` y una base en
-`%LOCALAPPDATA%/MonterrialPOS-SUNAT-Beta`. También usa
+`Monterrial POS SUNAT Beta` y mantiene su base aislada en
+`Documents/MonterrialPOS-SUNAT-Beta`, siguiendo el flujo del instalador original. También usa
 nombres propios para el servicio y la tarea de PostgreSQL. Puede convivir con la
 aplicación principal sin reemplazar su acceso directo, `userData`, base embebida,
 imágenes ni respaldos locales.
