@@ -28,8 +28,26 @@ export async function buildPayloadFromDocument(
     include: {
       sale: {
         include: {
-          items: true
-        }
+          items: {
+            select: {
+              id: true,
+              productName: true,
+              productContent: true,
+              unitType: true,
+              quantity: true,
+              unitPrice: true,
+              subtotal: true,
+              discountAmount: true,
+              unitSunatCode: true,
+              unitSunatCodeUsed: true,
+              // PH8: pharma snapshot
+              commercialName: true,
+              genericName: true,
+              concentration: true,
+              pharmaceuticalForm: true,
+            },
+          },
+        },
       },
       sunatSettings: true
     }
@@ -76,9 +94,15 @@ export async function buildPayloadFromDocument(
   if (doc.sale && doc.sale.items.length > 0) {
     // Usar datos del Sale si están disponibles
     items = doc.sale.items.map((item, index) => {
-      let description = item.productName;
-      if (item.productContent) {
-        description += ` ${item.productContent}`;
+      // ✅ PH8: Descripción enriquecida para farmacia
+      let description: string;
+      if (item.commercialName) {
+        description = item.commercialName;
+        if (item.concentration) description += ` ${item.concentration}`;
+        if (item.pharmaceuticalForm) description += ` ${item.pharmaceuticalForm}`;
+      } else {
+        description = item.productName;
+        if (item.productContent) description += ` ${item.productContent}`;
       }
 
       return {
@@ -88,8 +112,8 @@ export async function buildPayloadFromDocument(
         unitPrice: Number(item.unitPrice),
         lineSubtotal: Number(item.subtotal),
         discountsApplied: Number(item.discountAmount || 0),
+        unitSunatCode: item.unitSunatCodeUsed || item.unitSunatCode || undefined,
         unitType: item.unitType,
-        // SKU y barcode se tomarían de storeProduct si se incluye en la query
       };
     });
   } else {

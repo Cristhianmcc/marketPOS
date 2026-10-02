@@ -9,6 +9,7 @@ interface StoreData {
   ruc: string | null;
   address: string | null;
   phone: string | null;
+  businessProfile?: string;
 }
 
 interface SettingsData {
@@ -16,6 +17,11 @@ interface SettingsData {
   ticketFooter: string | null;
   ticketLogo: string | null;
   taxRate: number;
+  // Farmacéuticos
+  expiryAlertDays?: number;
+  fefoEnabled?: boolean;
+  expiredBatchPolicy?: string;
+  showExpiredWarnings?: boolean;
 }
 
 export default function SettingsPage() {
@@ -36,6 +42,11 @@ export default function SettingsPage() {
     ticketFooter: '',
     ticketLogo: '',
     taxRate: 0,
+    // Farmacéuticos
+    expiryAlertDays: 60,
+    fefoEnabled: false,
+    expiredBatchPolicy: 'BLOCK_EXPIRED',
+    showExpiredWarnings: true,
   });
 
   const [logoUploading, setLogoUploading] = useState(false);
@@ -67,6 +78,11 @@ export default function SettingsPage() {
         ticketFooter: data.settings?.ticketFooter || '',
         ticketLogo: data.settings?.ticketLogo || '',
         taxRate: data.settings?.taxRate || 0,
+        // Farmacéuticos
+        expiryAlertDays: data.settings?.expiryAlertDays ?? 60,
+        fefoEnabled: data.settings?.fefoEnabled ?? false,
+        expiredBatchPolicy: data.settings?.expiredBatchPolicy ?? 'BLOCK_EXPIRED',
+        showExpiredWarnings: data.settings?.showExpiredWarnings ?? true,
       });
     } catch (err) {
       setError('Error al cargar configuración');
@@ -220,6 +236,82 @@ export default function SettingsPage() {
                 </p>
               </div>
             </div>
+
+            {/* ✅ MÓDULO PH: Configuración farmacéutica — solo visible en FARMACIA/BOTICA */}
+            {(store?.businessProfile === 'FARMACIA' || store?.businessProfile === 'BOTICA') && (
+              <div className="border-t pt-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  🧪 Configuración Farmacéutica
+                </h2>
+                <p className="text-gray-500 text-sm mb-4">Parámetros de lotes, vencimientos y FEFO para tu farmacia.</p>
+                <div className="space-y-5">
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Días de alerta de vencimiento
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={formData.expiryAlertDays}
+                        onChange={(e) => setFormData({ ...formData, expiryAlertDays: parseInt(e.target.value) || 60 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Producto aparece como "Por vencer" cuando queden menos de estos días.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Política para lotes vencidos
+                      </label>
+                      <select
+                        value={formData.expiredBatchPolicy}
+                        onChange={(e) => setFormData({ ...formData, expiredBatchPolicy: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="BLOCK_EXPIRED">Bloquear venta de lotes vencidos</option>
+                        <option value="ALLOW_EXPIRED">Permitir venta de lotes vencidos</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Con "Bloquear", si todos los lotes están vencidos el cajero no puede vender.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={formData.fefoEnabled}
+                        onChange={(e) => setFormData({ ...formData, fefoEnabled: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">Activar FEFO en ventas</p>
+                        <p className="text-xs text-gray-500">First Expired First Out — se descuenta primero el lote que vence antes.</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={formData.showExpiredWarnings}
+                        onChange={(e) => setFormData({ ...formData, showExpiredWarnings: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">Mostrar advertencias de vencimiento en POS</p>
+                        <p className="text-xs text-gray-500">El cajero verá un aviso si el lote a vender vence en menos de {formData.expiryAlertDays} días.</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Botones */}
             <div className="border-t pt-6 flex gap-3">

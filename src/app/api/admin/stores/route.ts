@@ -6,7 +6,7 @@ import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin, generateTemporaryPassword } from '@/lib/superadmin';
 import { BusinessProfile, PlanCode, FeatureFlagKey } from '@prisma/client';
-import { getProfileFlags } from '@/lib/businessProfiles';
+import { getProfileFlags, getDefaultCategoriesForProfile } from '@/lib/businessProfiles';
 import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
@@ -227,6 +227,21 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // 5. Crear categorías predeterminadas según perfil de negocio
+      const defaultCats = getDefaultCategoriesForProfile(businessProfile as BusinessProfile);
+      await tx.category.createMany({
+        data: defaultCats.map((cat) => ({
+          storeId: store.id,
+          name: cat.name,
+          slug: cat.slug,
+          color: cat.color,
+          icon: cat.icon,
+          sortOrder: cat.sortOrder,
+          active: true,
+        })),
+        skipDuplicates: true,
+      });
+
       return { store, owner, flagsApplied: rubroFlagsToApply.length };
     });
 
@@ -254,8 +269,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error creating store:', error);
+    const detail = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { code: 'INTERNAL_ERROR', message: 'Error al crear tienda' },
+      { code: 'INTERNAL_ERROR', message: 'Error al crear tienda', detail },
       { status: 500 }
     );
   }

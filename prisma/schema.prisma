@@ -36,6 +36,7 @@ enum PaymentMethod {
   PLIN
   CARD
   FIADO
+  MIXED
 }
 
 enum ReceivableStatus {
@@ -128,6 +129,7 @@ enum BusinessProfile {
   POLLERIA
   HOSTAL
   BOTICA
+  FARMACIA    // Farmacia: más completa que botica, con campos clínicos y FEFO
   ACCESORIOS
 }
 
@@ -184,6 +186,19 @@ model Store {
   catalogSettings  CatalogSettings?
   catalogSyncQueue CatalogSyncQueue[]
 
+  // ✅ MÓDULO PH2: Lotes y vencimiento
+  productBatches   ProductBatch[]
+
+  // ✅ MÓDULO PH9: Proveedores y Órdenes de Compra
+  suppliers        Supplier[]
+  purchaseOrders   PurchaseOrder[]
+
+  // ✅ MÓDULO PH10: Pacientes
+  patients         Patient[]
+
+  // ✅ MÓDULO PH11: Libro de Controlados
+  controlledEntries ControlledBookEntry[]
+
   @@map("stores")
 }
 
@@ -223,6 +238,12 @@ model User {
   // ✅ MÓDULO D8: Cloud Backups subidos por usuario
   cloudBackupsUploaded CloudBackup[]
 
+  // ✅ MÓDULO PH9: Órdenes de compra creadas
+  purchaseOrdersCreated PurchaseOrder[]
+
+  // ✅ MÓDULO PH11: Entradas de controlados dispensadas
+  controlledEntriesDispensed ControlledBookEntry[]
+
   @@index([storeId])
   @@map("users")
 }
@@ -257,6 +278,18 @@ model ProductMaster {
   // ✅ MÓDULO F2: Unidad base del producto
   baseUnitId String? @map("base_unit_id")
 
+  // ✅ MÓDULO PH1: Campos farmacéuticos (opcionales — solo visibles si ENABLE_PHARMA_FIELDS ON)
+  commercialName       String?  @map("commercial_name")       // nombre comercial
+  genericName          String?  @map("generic_name")          // principio activo / DCI
+  concentration        String?                                 // 500 mg, 250 mg/5ml
+  pharmaceuticalForm   String?  @map("pharmaceutical_form")   // tabletas, cápsulas, jarabe, crema
+  presentation         String?                                 // caja x 20, frasco 120 ml
+  laboratory           String?                                 // laboratorio fabricante
+  sanitaryRegistry     String?  @map("sanitary_registry")     // registro sanitario (opcional)
+  requiresPrescription Boolean  @default(false) @map("requires_prescription")
+  medicineCategory     String?  @map("medicine_category")     // analgésico, antibiótico, etc.
+  barcodeSecondary     String?  @map("barcode_secondary")     // código de barras secundario
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -281,6 +314,9 @@ model ProductMaster {
   @@index([createdByStoreId])
   @@index([normalizedName])
   @@index([fingerprint])
+  @@index([barcodeSecondary])
+  @@index([commercialName])
+  @@index([genericName])
   @@map("products_master")
 }
 
@@ -314,6 +350,8 @@ model StoreProduct {
   saleItems      SaleItem[]
   movements      Movement[]
   workOrderItems WorkOrderItem[] // ✅ MÓDULO F2: Items de órdenes de trabajo
+  batches        ProductBatch[]  // ✅ MÓDULO PH2: Lotes y vencimiento
+  purchaseOrderItems PurchaseOrderItem[] // ✅ MÓDULO PH9: Items de órdenes de compra
 
   @@unique([storeId, productId])
   @@index([storeId])
@@ -382,9 +420,10 @@ model Sale {
   couponDiscount    Decimal     @default(0) @map("coupon_discount") @db.Decimal(10, 2)
   totalBeforeCoupon Decimal     @default(0) @map("total_before_coupon") @db.Decimal(10, 2)
 
-  paymentMethod PaymentMethod @map("payment_method")
-  amountPaid    Decimal?      @map("amount_paid") @db.Decimal(10, 2) // efectivo
-  changeAmount  Decimal?      @map("change_amount") @db.Decimal(10, 2) // vuelto
+  paymentMethod  PaymentMethod @map("payment_method")
+  amountPaid     Decimal?      @map("amount_paid") @db.Decimal(10, 2) // efectivo
+  changeAmount   Decimal?      @map("change_amount") @db.Decimal(10, 2) // vuelto
+  paymentDetails Json?         @map("payment_details") // Desglose de pago mixto: { splits: [{ method, amount }] }
 
   printedAt DateTime? @map("printed_at")
 
@@ -404,6 +443,9 @@ model Sale {
 
   // ✅ MÓDULO 18: Documento electrónico asociado
   electronicDocuments ElectronicDocument[]
+
+  // ✅ MÓDULO PH: Historial de dispensación a pacientes
+  patientMedications  PatientMedication[]
 
   @@unique([storeId, saleNumber])
   @@index([storeId, createdAt])
@@ -425,6 +467,7 @@ model SaleItem {
 
   quantity  Decimal @db.Decimal(10, 3)
   unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+  costPrice Decimal? @map("cost_price") @db.Decimal(10, 2) // Snapshot del costo al momento de la venta
   subtotal  Decimal @db.Decimal(10, 2)
 
   // Descuentos (Módulo 14)
@@ -467,6 +510,17 @@ model SaleItem {
   pricingMode          PricingMode? @map("pricing_mode")
   sellUnitPriceApplied Decimal?     @map("sell_unit_price_applied") @db.Decimal(10, 2)
 
+  // ✅ MÓDULO PH3: FEFO — snapshot JSON de lotes consumidos
+  // Ejemplo: [{batchNumber:"L001",qty:10,expiry:"2026-05-01"},{...}]
+  batchBreakdown Json? @map("batch_breakdown")
+
+  // ✅ MÓDULO PH8: Snapshot farmacéutico para ticket y SUNAT
+  commercialName     String? @map("commercial_name")      // Nombre comercial
+  genericName        String? @map("generic_name")          // Principio activo / DCI
+  concentration      String? @map("ph_concentration")      // 500 mg, 250 mg/5ml
+  pharmaceuticalForm String? @map("pharmaceutical_form")   // tabletas, cápsulas, jarabe
+  unitSunatCodeUsed  String? @map("unit_sunat_code_used")  // NIU, KGM, LTR, MLT, ZZ — código SUNAT efectivo
+
   sale         Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct? @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
   service      Service?      @relation(fields: [serviceId], references: [id], onDelete: SetNull)
@@ -492,16 +546,50 @@ model Movement {
   createdById String? @map("created_by")
   isDemo      Boolean @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
 
+  // ✅ MÓDULO PH2: Movimiento asociado a un lote
+  batchId String? @map("batch_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  store        Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeProduct StoreProduct  @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
+  createdBy    User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  batch        ProductBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+  @@index([storeProductId, createdAt])
+  @@index([batchId])
+  @@map("movements")
+}
+
+// ✅ MÓDULO PH2: Lotes y vencimientos
+model ProductBatch {
+  id             String   @id @default(cuid())
+  storeId        String   @map("store_id")
+  storeProductId String   @map("store_product_id")
+
+  batchNumber       String    @map("batch_number")
+  expiryDate        DateTime  @map("expiry_date")
+  purchaseDate      DateTime? @map("purchase_date")
+  quantityInitial   Decimal   @map("quantity_initial")  @db.Decimal(18, 6)
+  quantityAvailable Decimal   @map("quantity_available") @db.Decimal(18, 6)
+  unitCost          Decimal?  @map("unit_cost")          @db.Decimal(10, 2)
+  active            Boolean   @default(true)
+  notes             String?
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
   storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  movements    Movement[]
 
-  @@index([storeId, createdAt])
-  @@index([storeProductId, createdAt])
-  @@map("movements")
+  @@unique([storeId, storeProductId, batchNumber, expiryDate])
+  @@index([storeId, storeProductId])
+  @@index([expiryDate])
+  @@index([storeId, active])
+  @@map("product_batches")
 }
 
 // Configuración por tienda (ticket, impuestos, etc.)
@@ -522,6 +610,14 @@ model StoreSettings {
   onboardingStep        Int           @default(0) @map("onboarding_step") // 0-6
   onboardingDismissedAt DateTime?     @map("onboarding_dismissed_at")
   defaultPaymentMethod  PaymentMethod @default(CASH) @map("default_payment_method")
+
+  // ✅ MÓDULO PH3: Política de lotes vencidos y FEFO
+  expiredBatchPolicy String  @default("BLOCK_EXPIRED") @map("expired_batch_policy") @db.VarChar(20)
+  fefoEnabled        Boolean @default(false)            @map("fefo_enabled")
+
+  // ✅ MÓDULO PH4: Alertas de vencimiento
+  expiryAlertDays     Int     @default(60)   @map("expiry_alert_days")
+  showExpiredWarnings Boolean @default(true) @map("show_expired_warnings")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -818,6 +914,15 @@ enum FeatureFlagKey {
   ENABLE_RESERVATIONS
   ENABLE_BATCH_EXPIRY
   ENABLE_SELLUNIT_PRICING
+  // ✅ MÓDULO PH0: Feature Flags farmacéuticos
+  ENABLE_FEFO_SALES          // Ventas FEFO: el que vence antes sale primero
+  ENABLE_PHARMA_FIELDS       // Campos farmacéuticos: principio activo, concentración, forma
+  ENABLE_MEDICINE_SEARCH     // Búsqueda por DCI / principio activo
+  ENABLE_RESTRICTED_PRODUCTS // Productos controlados (requieren registro sanitario)
+  // ✅ MÓDULO PH9-11: Proveedores, Pacientes, Controlados
+  ENABLE_SUPPLIERS           // Módulo de proveedores y órdenes de compra
+  ENABLE_PATIENTS            // Historial de pacientes con alergias e interacciones
+  ENABLE_CONTROLLED_BOOK     // Libro de controlados DIGEMID
 }
 
 model FeatureFlag {
@@ -1440,4 +1545,247 @@ model CatalogSyncQueue {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("catalog_sync_queue")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO PH9 — PROVEEDORES Y ÓRDENES DE COMPRA
+// ═══════════════════════════════════════════════════════════════
+
+model Supplier {
+  id      String @id @default(cuid())
+  storeId String @map("store_id")
+
+  name        String
+  ruc         String?           // RUC del proveedor
+  contactName String?           @map("contact_name")
+  phone       String?
+  email       String?
+  address     String?
+  notes       String?
+  active      Boolean           @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+
+  @@index([storeId, active])
+  @@index([storeId, name])
+  @@map("suppliers")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT          // Borrador — se puede editar
+  SENT           // Enviada al proveedor
+  PARTIAL        // Recepción parcial
+  RECEIVED       // Recepción completa
+  CANCELLED      // Cancelada
+}
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  storeId     String              @map("store_id")
+  supplierId  String              @map("supplier_id")
+  createdById String              @map("created_by_id")
+
+  orderNumber Int                 @map("order_number") // correlativo por tienda
+  status      PurchaseOrderStatus @default(DRAFT)
+  notes       String?
+  totalAmount Decimal             @default(0) @map("total_amount") @db.Decimal(10, 2)
+
+  expectedDate DateTime?          @map("expected_date")
+  receivedAt   DateTime?          @map("received_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplier  Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdBy User      @relation(fields: [createdById], references: [id])
+  items     PurchaseOrderItem[]
+
+  @@unique([storeId, orderNumber])
+  @@index([storeId, status])
+  @@index([supplierId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String @id @default(cuid())
+  purchaseOrderId String @map("purchase_order_id")
+  storeProductId  String @map("store_product_id")
+
+  quantityOrdered  Decimal  @map("quantity_ordered")  @db.Decimal(10, 2)
+  quantityReceived Decimal  @default(0) @map("quantity_received") @db.Decimal(10, 2)
+  unitCost         Decimal  @map("unit_cost") @db.Decimal(10, 2)
+
+  // Datos de lote (se llenan al recepcionar)
+  batchNumber String?   @map("batch_number")
+  expiryDate  DateTime? @map("expiry_date")
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  storeProduct  StoreProduct  @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_items")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO PH10 — PACIENTES E HISTORIAL MÉDICO
+// ═══════════════════════════════════════════════════════════════
+
+model Patient {
+  id      String @id @default(cuid())
+  storeId String @map("store_id")
+
+  dni         String            // DNI del paciente
+  name        String
+  phone       String?
+  birthDate   DateTime?         @map("birth_date")
+  gender      String?           // M / F
+  address     String?
+  allergies   String?           @db.Text // Alergias conocidas (texto libre o JSON)
+  conditions  String?           @db.Text // Condiciones crónicas
+  notes       String?           @db.Text
+  active      Boolean           @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  store               Store                @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  medicationHistory   PatientMedication[]
+  controlledEntries   ControlledBookEntry[]
+  drugInteractionLogs DrugInteractionLog[]
+
+  @@unique([storeId, dni])
+  @@index([storeId, name])
+  @@index([storeId, active])
+  @@map("patients")
+}
+
+// Historial de medicamentos dispensados a un paciente
+model PatientMedication {
+  id        String @id @default(cuid())
+  patientId String @map("patient_id")
+  saleId    String @map("sale_id")
+
+  productName    String  @map("product_name")
+  genericName    String? @map("generic_name")
+  concentration  String?
+  quantity       Decimal @db.Decimal(10, 2)
+  prescribedBy   String? @map("prescribed_by")  // Nombre del médico
+  dosage         String?                         // Posología: "1 cada 8h"
+  consultReason  String? @map("consult_reason")  // Motivo de consulta / dispensación
+  notes          String?
+
+  dispensedAt DateTime @default(now()) @map("dispensed_at")
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, dispensedAt])
+  @@index([patientId, genericName])
+  @@index([saleId])
+  @@map("patient_medications")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO PH11 — LIBRO DE CONTROLADOS (DIGEMID)
+// ═══════════════════════════════════════════════════════════════
+
+model ControlledBookEntry {
+  id      String @id @default(cuid())
+  storeId String @map("store_id")
+
+  // Datos de la venta
+  saleId         String   @map("sale_id")
+  saleNumber     Int      @map("sale_number")
+  saleDate       DateTime @map("sale_date")
+
+  // Producto controlado
+  productName    String   @map("product_name")
+  genericName    String?  @map("generic_name")
+  concentration  String?
+  laboratory     String?
+  batchNumber    String?  @map("batch_number")
+  quantity       Decimal  @db.Decimal(10, 2)
+
+  // Receta médica
+  prescriptionNumber String  @map("prescription_number")
+  prescribedBy       String? @map("prescribed_by")  // Médico que recetó
+  cmpNumber          String? @map("cmp_number")      // Colegiatura del médico
+
+  // Paciente
+  patientId   String? @map("patient_id")
+  patientName String  @map("patient_name")
+  patientDni  String  @map("patient_dni")
+
+  // Dispensador (farmacéutico)
+  dispensedById   String @map("dispensed_by_id")
+  dispensedByName String @map("dispensed_by_name")
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  patient     Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  dispensedBy User     @relation(fields: [dispensedById], references: [id])
+
+  @@index([storeId, saleDate])
+  @@index([storeId, patientDni])
+  @@index([storeId, productName])
+  @@index([storeId, prescriptionNumber])
+  @@map("controlled_book_entries")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MÓDULO PH12 — INTERACCIONES MEDICAMENTOSAS
+// ═══════════════════════════════════════════════════════════════
+
+enum InteractionSeverity {
+  LOW        // Monitorear
+  MODERATE   // Precaución — alertar al dispensador
+  HIGH       // Contraindicado — bloquear o advertir fuertemente
+}
+
+model DrugInteraction {
+  id String @id @default(cuid())
+
+  drugA     String              @map("drug_a")     // Principio activo A (genericName)
+  drugB     String              @map("drug_b")     // Principio activo B (genericName)
+  severity  InteractionSeverity
+  description String            @db.Text            // Descripción de la interacción
+  recommendation String?        @db.Text            // Recomendación clínica
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([drugA, drugB])
+  @@index([drugA])
+  @@index([drugB])
+  @@map("drug_interactions")
+}
+
+// Log de alertas de interacción generadas durante ventas
+model DrugInteractionLog {
+  id        String @id @default(cuid())
+  storeId   String @map("store_id")
+  saleId    String? @map("sale_id")
+  patientId String? @map("patient_id")
+
+  drugA          String              @map("drug_a")
+  drugB          String              @map("drug_b")
+  severity       InteractionSeverity
+  description    String              @db.Text
+  action         String              // ACKNOWLEDGED, CANCELLED, OVERRIDDEN
+  acknowledgedBy String?             @map("acknowledged_by") // userId
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+  @@index([patientId])
+  @@map("drug_interaction_logs")
 }

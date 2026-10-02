@@ -40,9 +40,14 @@ export async function GET(
       );
     }
 
-    const cashTotal = await shiftRepo.getCashSalesTotal(shiftId);
+    const [cashTotal, salesByMethod, profitData, profitByProduct] = await Promise.all([
+      shiftRepo.getCashSalesTotal(shiftId),
+      shiftRepo.getSalesByMethod(shiftId),
+      shiftRepo.getShiftProfit(shiftId),
+      shiftRepo.getShiftProfitByProduct(shiftId),
+    ]);
 
-    return NextResponse.json({ cashTotal });
+    return NextResponse.json({ cashTotal, byMethod: salesByMethod.byMethod, mixedInfo: salesByMethod.mixedInfo, profit: profitData, profitByProduct });
   } catch (error) {
     console.error('Error getting shift cash total:', error);
     return NextResponse.json(

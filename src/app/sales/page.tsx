@@ -1,13 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import { formatMoney } from '@/lib/money';
 import { Search, Printer } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import SunatStatusBadge, { SunatStatus } from '@/components/sunat/SunatStatusBadge'; // ✅ MÓDULO 18.5
 import SunatActions from '@/components/sunat/SunatActions'; // ✅ MÓDULO 18.5
+
+interface SaleItem {
+  id: string;
+  quantity: number;
+  isService?: boolean;
+  serviceName?: string | null;
+  productName?: string | null;
+  productContent?: string | null;
+  storeProduct?: {
+    product: {
+      name: string;
+    };
+  } | null;
+}
 
 interface Sale {
   id: string;
@@ -22,12 +36,17 @@ interface Sale {
   couponCode?: string | null;
   couponDiscount?: number;
   total: number;
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED';
+  paymentDetails?: { splits: { method: string; amount: number }[] } | null;
   createdAt: string;
   printedAt: string | null;
+  items: SaleItem[];
   user: {
     name: string;
   };
+  // ✅ MÓDULO PH4: Paciente/receptor
+  patientName?: string | null;
+  patientDni?: string | null;
 }
 
 // ✅ MÓDULO 18.5: Datos de documento electrónico SUNAT
@@ -45,7 +64,16 @@ interface ElectronicDocumentData {
 }
 
 export default function SalesPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Cargando...</div>}>
+      <SalesPageContent />
+    </Suspense>
+  );
+}
+
+function SalesPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,16 +84,41 @@ export default function SalesPage() {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [userRole, setUserRole] = useState<string>('');
   const [userId, setUserId] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalSales, setTotalSales] = useState(0);
+  // Inicializar directamente desde la URL para evitar condición de carrera
+  const [shiftFilter] = useState<string | null>(() => searchParams.get('turno'));
   
   // ✅ MÓDULO 18.5: Datos de documentos electrónicos SUNAT
   const [documentsData, setDocumentsData] = useState<Record<string, ElectronicDocumentData>>({});
   const [sunatEnabled, setSunatEnabled] = useState(false);
+  // ✅ MÓDULO PH4: Columna de paciente
+  const [patientsEnabled, setPatientsEnabled] = useState(false);
+  const [expandedSales, setExpandedSales] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadUserInfo();
     checkSunatStatus(); // ✅ MÓDULO 18.5
-    fetchSales();
+    checkPatientsFlag(); // ✅ MÓDULO PH4
+    fetchSales(1);
   }, []);
+
+  useEffect(() => {
+    fetchSales();
+  }, [currentPage]);
+
+  const checkPatientsFlag = async () => {
+    try {
+      const res = await fetch('/api/flags');
+      if (res.ok) {
+        const data = await res.json();
+        setPatientsEnabled(data.flags?.ENABLE_PATIENTS === true);
+      }
+    } catch {
+      // Si falla, no mostrar la columna
+    }
+  };
 
   const checkSunatStatus = async () => {
     try {
@@ -92,16 +145,22 @@ export default function SalesPage() {
     }
   };
 
-  const fetchSales = async () => {
+  const fetchSales = async (page = currentPage) => {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (searchQuery) params.append('query', searchQuery);
       if (fromDate) params.append('from', fromDate);
       if (toDate) params.append('to', toDate);
+      if (shiftFilter) params.append('shiftId', shiftFilter);
+      params.append('page', page.toString());
+      params.append('limit', '20');
 
       const res = await fetch(`/api/sales?${params.toString()}`);
       const data = await res.json();
       setSales(data.sales || []);
+      setTotalPages(data.totalPages || 1);
+      setTotalSales(data.total || 0);
       
       // ✅ MÓDULO 18.5: Cargar datos SUNAT para cada venta
       if (sunatEnabled && data.sales) {
@@ -137,7 +196,8 @@ export default function SalesPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchSales();
+    setCurrentPage(1);
+    fetchSales(1);
   };
 
   const canCancelSale = (sale: Sale): boolean => {
@@ -197,14 +257,22 @@ export default function SalesPage() {
     setSelectedSale(null);
   };
 
-  const getPaymentMethodLabel = (method: string) => {
-    const labels: Record<string, string> = {
-      CASH: 'Efectivo',
-      YAPE: 'Yape',
-      PLIN: 'Plin',
-      CARD: 'Tarjeta',
-    };
-    return labels[method] || method;
+  const methodLabels: Record<string, string> = {
+    CASH: 'Efectivo',
+    YAPE: 'Yape',
+    PLIN: 'Plin',
+    CARD: 'Tarjeta',
+    MIXED: 'Mixto',
+    FIADO: 'Fiado',
+  };
+
+  const getPaymentMethodLabel = (method: string, paymentDetails?: { splits: { method: string; amount: number }[] } | null) => {
+    if (method === 'MIXED' && paymentDetails?.splits?.length) {
+      return paymentDetails.splits
+        .map(s => methodLabels[s.method] || s.method)
+        .join('/');
+    }
+    return methodLabels[method] || method;
   };
 
   return (
@@ -239,6 +307,23 @@ export default function SalesPage() {
         )}
 
         <div className="bg-white rounded-lg shadow">
+          {/* Banner de filtro por turno */}
+          {shiftFilter && (
+            <div className="flex items-center justify-between px-6 py-3 bg-blue-50 border-b border-blue-200">
+              <span className="text-sm text-blue-800 font-medium">
+                📋 Mostrando ventas del turno seleccionado
+              </span>
+              <button
+                onClick={() => {
+                  router.replace('/sales');
+                  router.refresh();
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 underline"
+              >
+                Ver todas las ventas
+              </button>
+            </div>
+          )}
           {/* Filters */}
           <div className="p-6 border-b border-gray-200">
             <form onSubmit={handleSearch} className="space-y-4">
@@ -301,7 +386,8 @@ export default function SalesPage() {
                       setSearchQuery('');
                       setFromDate('');
                       setToDate('');
-                      setTimeout(fetchSales, 0);
+                      setCurrentPage(1);
+                      setTimeout(() => fetchSales(1), 0);
                     }}
                     className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
                   >
@@ -323,22 +409,25 @@ export default function SalesPage() {
                 No se encontraron ventas
               </div>
             ) : (
+              <>
               <table className="w-full table-auto">
                 <colgroup>
-                  <col style={{width: '5%'}} /> {/* N° Ticket */}
-                  <col style={{width: '8%'}} /> {/* Fecha */}
-                  <col style={{width: '5%'}} /> {/* Promociones */}
-                  <col style={{width: '5%'}} /> {/* Cat. Promos */}
-                  <col style={{width: '5%'}} /> {/* Pack */}
-                  <col style={{width: '5%'}} /> {/* N-ésimo */}
-                  <col style={{width: '5%'}} /> {/* Descuentos */}
-                  <col style={{width: '6%'}} /> {/* Cupón */}
-                  <col style={{width: '7%'}} /> {/* Total */}
+                  <col style={{width: '4%'}} /> {/* N° Ticket */}
+                  <col style={{width: '7%'}} /> {/* Fecha */}
+                  <col style={{width: '18%'}} /> {/* Productos */}
+                  <col style={{width: '4%'}} /> {/* Promociones */}
+                  <col style={{width: '4%'}} /> {/* Cat. Promos */}
+                  <col style={{width: '4%'}} /> {/* Pack */}
+                  <col style={{width: '4%'}} /> {/* N-ésimo */}
+                  <col style={{width: '4%'}} /> {/* Descuentos */}
+                  <col style={{width: '5%'}} /> {/* Cupón */}
+                  <col style={{width: '6%'}} /> {/* Total */}
                   <col style={{width: '5%'}} /> {/* Pago */}
-                  <col style={{width: '8%'}} /> {/* Cajero */}
-                  <col style={{width: '5%'}} /> {/* Estado */}
-                  {sunatEnabled && <col style={{width: '14%'}} />} {/* SUNAT */}
-                  <col style={{width: sunatEnabled ? '17%' : '20%'}} /> {/* Acciones */}
+                  <col style={{width: '7%'}} /> {/* Cajero */}
+                  <col style={{width: '4%'}} /> {/* Estado */}
+                  {patientsEnabled && <col style={{width: '8%'}} />} {/* Paciente */}
+                  {sunatEnabled && <col style={{width: '12%'}} />} {/* SUNAT */}
+                  <col style={{width: sunatEnabled ? '12%' : '14%'}} /> {/* Acciones */}
                 </colgroup>
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -347,6 +436,9 @@ export default function SalesPage() {
                     </th>
                     <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Fecha
+                    </th>
+                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                      Productos
                     </th>
                     <th className="px-2 py-3 text-right text-xs font-medium text-blue-600 uppercase">
                       2x1
@@ -378,6 +470,11 @@ export default function SalesPage() {
                     <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                       Estado
                     </th>
+                    {patientsEnabled && (
+                      <th className="px-2 py-3 text-left text-xs font-medium text-teal-600 uppercase">
+                        Paciente
+                      </th>
+                    )}
                     {sunatEnabled && (
                       <th className="px-2 py-3 text-center text-xs font-medium text-indigo-600 uppercase">
                         SUNAT
@@ -404,6 +501,49 @@ export default function SalesPage() {
                           hour: '2-digit',
                           minute: '2-digit',
                         }).replace(',', '')}
+                      </td>
+                      <td className="px-2 py-3 text-xs text-gray-700">
+                        {sale.items && sale.items.length > 0 ? (() => {
+                          const isExpanded = expandedSales.has(sale.id);
+                          const visibleItems = isExpanded ? sale.items : sale.items.slice(0, 3);
+                          const hiddenCount = sale.items.length - 3;
+                          return (
+                            <div>
+                              <div className={`space-y-0.5 ${isExpanded && sale.items.length > 8 ? 'max-h-[200px] overflow-y-auto pr-1' : ''}`}>
+                                {visibleItems.map((item) => {
+                                  const isFreeItem = !item.storeProduct && !item.isService && !!item.productName;
+                                  const name = item.isService
+                                    ? (item.serviceName ?? 'Servicio')
+                                    : isFreeItem
+                                      ? item.productName!
+                                      : (item.storeProduct?.product?.name ?? '?');
+                                  return (
+                                    <div key={item.id} className="truncate max-w-[220px]" title={name}>
+                                      <span className="font-medium">{name}</span>
+                                      <span className="text-gray-400 ml-1">x{Number(item.quantity)}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {hiddenCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedSales(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(sale.id)) next.delete(sale.id);
+                                    else next.add(sale.id);
+                                    return next;
+                                  })}
+                                  className="text-blue-500 hover:text-blue-700 hover:underline cursor-pointer text-xs mt-0.5"
+                                >
+                                  {isExpanded ? `▲ Ver menos (${sale.items.length} productos)` : `+${hiddenCount} más...`}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })() : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-2 py-3 text-xs text-right text-blue-600">
                         {sale.promotionsTotal && sale.promotionsTotal > 0 ? (
@@ -458,7 +598,7 @@ export default function SalesPage() {
                         )}
                       </td>
                       <td className="px-2 py-3 text-xs text-gray-600">
-                        {getPaymentMethodLabel(sale.paymentMethod)}
+                        {getPaymentMethodLabel(sale.paymentMethod, sale.paymentDetails)}
                       </td>
                       <td className="px-2 py-3 text-xs text-gray-600 truncate">
                         {sale.user.name}
@@ -473,6 +613,22 @@ export default function SalesPage() {
                         </span>
                       </td>
                       
+                      {/* ✅ MÓDULO PH4: Columna Paciente */}
+                      {patientsEnabled && (
+                        <td className="px-2 py-3 text-xs text-teal-700">
+                          {sale.patientName ? (
+                            <div>
+                              <div className="font-medium truncate max-w-[80px]">{sale.patientName}</div>
+                              {sale.patientDni && (
+                                <div className="text-gray-400">{sale.patientDni}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                      )}
+
                       {/* ✅ MÓDULO 18.5: Columna SUNAT */}
                       {sunatEnabled && (
                         <td className="px-2 py-3">
@@ -536,6 +692,32 @@ export default function SalesPage() {
                   )})}
                 </tbody>
               </table>
+
+              {/* Paginación */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    Página {currentPage} de {totalPages} ({totalSales} ventas)
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ← Anterior
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Siguiente →
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </div>
         </div>

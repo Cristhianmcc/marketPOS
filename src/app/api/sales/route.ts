@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
+import { isFeatureEnabled } from '@/lib/featureFlags';
+import { FeatureFlagKey } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,29 +65,53 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const sales = await prisma.sale.findMany({
-      where,
-      include: {
-        items: {
-          include: {
-            storeProduct: {
-              include: {
-                product: true,
+    const pageParam = searchParams.get('page');
+    const limitParam = searchParams.get('limit');
+    const page = Math.max(1, parseInt(pageParam || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam || '20', 10)));
+    const skip = (page - 1) * limit;
+
+    // ✅ MÓDULO PH4: Verificar si el módulo de pacientes está activo
+    const patientsEnabled = await isFeatureEnabled(session.storeId as string, FeatureFlagKey.ENABLE_PATIENTS);
+
+    const [total, sales] = await Promise.all([
+      prisma.sale.count({ where }),
+      prisma.sale.findMany({
+        where,
+        include: {
+          items: {
+            include: {
+              storeProduct: {
+                include: {
+                  product: true,
+                },
               },
             },
           },
-        },
-        user: {
-          select: {
-            name: true,
+          user: {
+            select: {
+              name: true,
+            },
           },
+          // ✅ MÓDULO PH4: Incluir paciente si el módulo está activo
+          ...(patientsEnabled ? {
+            patientMedications: {
+              take: 1,
+              include: {
+                patient: {
+                  select: { id: true, name: true, dni: true },
+                },
+              },
+            },
+          } : {}),
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 100, // Limit to last 100 sales
-    });
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: limit,
+      }),
+    ]);
 
     // Calculate promotionsTotal and categoryPromotionsTotal for each sale
     const salesWithPromotions = sales.map(sale => {
@@ -111,10 +137,18 @@ export async function GET(request: NextRequest) {
         categoryPromotionsTotal,
         volumePromotionsTotal,
         nthPromotionsTotal,
+        // ✅ MÓDULO PH4: Paciente/receptor de la venta
+        patientName: (sale as any).patientMedications?.[0]?.patient?.name || null,
+        patientDni: (sale as any).patientMedications?.[0]?.patient?.dni || null,
       };
     });
 
-    return NextResponse.json({ sales: salesWithPromotions });
+    return NextResponse.json({
+      sales: salesWithPromotions,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error('Error fetching sales:', error);
     return NextResponse.json(

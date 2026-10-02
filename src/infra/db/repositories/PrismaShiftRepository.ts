@@ -73,8 +73,11 @@ export class PrismaShiftRepository implements IShiftRepository {
     storeId: string,
     userId: string | null,
     from?: Date,
-    to?: Date
-  ): Promise<ShiftWithUsers[]> {
+    to?: Date,
+    page: number = 1,
+    limit: number = 15,
+    search?: string
+  ): Promise<{ shifts: ShiftWithUsers[]; total: number }> {
     const where: Prisma.ShiftWhereInput = {
       storeId,
       closedAt: { not: null }, // Solo turnos cerrados en historial
@@ -92,42 +95,57 @@ export class PrismaShiftRepository implements IShiftRepository {
       if (to) where.openedAt.lte = to;
     }
 
-    const shifts = await prisma.shift.findMany({
-      where,
-      include: {
-        openedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        closedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: { openedAt: 'desc' },
-    });
+    // Búsqueda por nombre de cajero
+    if (search) {
+      where.openedBy = {
+        name: { contains: search, mode: 'insensitive' },
+      };
+    }
 
-    return shifts.map((s) => ({
-      id: s.id,
-      storeId: s.storeId,
-      openedById: s.openedById,
-      closedById: s.closedById,
-      openedAt: s.openedAt,
-      closedAt: s.closedAt,
-      openingCash: s.openingCash.toNumber(),
-      closingCash: s.closingCash?.toNumber() || null,
-      expectedCash: s.expectedCash?.toNumber() || null,
-      difference: s.difference?.toNumber() || null,
-      notes: s.notes,
-      openedBy: s.openedBy,
-      closedBy: s.closedBy,
-    }));
+    const [shifts, total] = await Promise.all([
+      prisma.shift.findMany({
+        where,
+        include: {
+          openedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          closedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { openedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.shift.count({ where }),
+    ]);
+
+    return {
+      shifts: shifts.map((s) => ({
+        id: s.id,
+        storeId: s.storeId,
+        openedById: s.openedById,
+        closedById: s.closedById,
+        openedAt: s.openedAt,
+        closedAt: s.closedAt,
+        openingCash: s.openingCash.toNumber(),
+        closingCash: s.closingCash?.toNumber() || null,
+        expectedCash: s.expectedCash?.toNumber() || null,
+        difference: s.difference?.toNumber() || null,
+        notes: s.notes,
+        openedBy: s.openedBy,
+        closedBy: s.closedBy,
+      })),
+      total,
+    };
   }
 
   async hasOpenShift(storeId: string, userId: string): Promise<boolean> {
@@ -171,8 +189,165 @@ export class PrismaShiftRepository implements IShiftRepository {
 
     const cashPaymentsTotal = paymentsResult._sum.amount?.toNumber() || 0;
 
-    // Total = Ventas CASH + Pagos FIADO CASH
-    return cashSalesTotal + cashPaymentsTotal;
+    // 3. Porción CASH de ventas MIXED durante este turno
+    let mixedCashTotal = 0;
+    const mixedSales = await prisma.sale.findMany({
+      where: {
+        shiftId,
+        paymentMethod: 'MIXED',
+        total: { gt: 0 },
+        paymentDetails: { not: Prisma.DbNull },
+      },
+      select: { paymentDetails: true },
+    });
+    for (const sale of mixedSales) {
+      const details = sale.paymentDetails as any;
+      if (details?.splits && Array.isArray(details.splits)) {
+        for (const split of details.splits) {
+          if (split.method === 'CASH' && typeof split.amount === 'number') {
+            mixedCashTotal += split.amount;
+          }
+        }
+      }
+    }
+
+    // Total = Ventas CASH + Pagos FIADO CASH + Porción CASH de MIXED
+    return cashSalesTotal + cashPaymentsTotal + mixedCashTotal;
+  }
+
+  async getSalesByMethod(shiftId: string): Promise<{ byMethod: Record<string, { total: number; count: number }>; mixedInfo: { count: number; total: number; details: string[]; splitTotals: Record<string, number> } }> {
+    // 1. Agrupar ventas NO mixtas por método
+    const groups = await prisma.sale.groupBy({
+      by: ['paymentMethod'],
+      where: {
+        shiftId,
+        total: { gt: 0 },
+        paymentMethod: { not: 'MIXED' },
+      },
+      _sum: { total: true },
+      _count: { _all: true },
+    });
+
+    const result: Record<string, { total: number; count: number }> = {};
+    for (const g of groups) {
+      result[g.paymentMethod] = {
+        total: g._sum.total?.toNumber() || 0,
+        count: g._count._all,
+      };
+    }
+
+    // 2. Desglosar ventas MIXED: sumar cada split al método correspondiente
+    const mixedSales = await prisma.sale.findMany({
+      where: {
+        shiftId,
+        paymentMethod: 'MIXED',
+        total: { gt: 0 },
+        paymentDetails: { not: Prisma.DbNull },
+      },
+      select: { paymentDetails: true, total: true },
+    });
+
+    let mixedTotal = 0;
+    const mixedMethodCombos: string[] = [];
+    const splitTotals: Record<string, number> = {};
+    const methodLabel: Record<string, string> = { CASH: 'Efectivo', YAPE: 'Yape', PLIN: 'Plin', CARD: 'Tarjeta' };
+
+    for (const sale of mixedSales) {
+      mixedTotal += sale.total.toNumber();
+      const details = sale.paymentDetails as any;
+      if (details?.splits && Array.isArray(details.splits)) {
+        const combo = details.splits
+          .filter((s: any) => s.amount > 0)
+          .map((s: any) => methodLabel[s.method] || s.method)
+          .join('/');
+        if (combo) mixedMethodCombos.push(combo);
+
+        for (const split of details.splits) {
+          if (split.method && typeof split.amount === 'number' && split.amount > 0) {
+            if (!result[split.method]) {
+              result[split.method] = { total: 0, count: 0 };
+            }
+            result[split.method].total = Math.round((result[split.method].total + split.amount) * 100) / 100;
+            result[split.method].count += 1;
+            // Acumular totales de splits para mostrar desglose en Mixto
+            const label = methodLabel[split.method] || split.method;
+            splitTotals[label] = Math.round(((splitTotals[label] ?? 0) + split.amount) * 100) / 100;
+          }
+        }
+      }
+    }
+
+    return {
+      byMethod: result,
+      mixedInfo: {
+        count: mixedSales.length,
+        total: Math.round(mixedTotal * 100) / 100,
+        details: mixedMethodCombos,
+        splitTotals,
+      },
+    };
+  }
+
+  async getShiftProfit(shiftId: string): Promise<{ totalSales: number; totalCost: number; profit: number }> {
+    const result = await prisma.$queryRaw<Array<{ total_sales: any; total_cost: any }>>(
+      Prisma.sql`
+        SELECT 
+          COALESCE(SUM(si.total_line), 0) as total_sales,
+          COALESCE(SUM(si.cost_price * si.quantity), 0) as total_cost
+        FROM sale_items si
+        INNER JOIN sales s ON s.id = si.sale_id
+        WHERE s.shift_id = ${shiftId}
+          AND s.total > 0
+      `
+    );
+    const totalSales = Number(result[0]?.total_sales || 0);
+    const totalCost = Number(result[0]?.total_cost || 0);
+    return { totalSales, totalCost, profit: totalSales - totalCost };
+  }
+
+  async getShiftProfitByProduct(shiftId: string): Promise<Array<{
+    productName: string;
+    quantity: number;
+    unitCost: number;
+    unitPrice: number;
+    totalCost: number;
+    totalRevenue: number;
+    profit: number;
+  }>> {
+    const rows = await prisma.$queryRaw<Array<{
+      product_name: string;
+      qty: any;
+      unit_cost: any;
+      unit_price: any;
+      total_cost: any;
+      total_revenue: any;
+    }>>(
+      Prisma.sql`
+        SELECT 
+          si.product_name as product_name,
+          SUM(si.quantity) as qty,
+          ROUND(AVG(si.cost_price), 2) as unit_cost,
+          ROUND(AVG(si.unit_price), 2) as unit_price,
+          COALESCE(SUM(si.cost_price * si.quantity), 0) as total_cost,
+          COALESCE(SUM(si.total_line), 0) as total_revenue
+        FROM sale_items si
+        INNER JOIN sales s ON s.id = si.sale_id
+        WHERE s.shift_id = ${shiftId}
+          AND s.total > 0
+          AND si.cost_price IS NOT NULL
+        GROUP BY si.product_name
+        ORDER BY SUM(si.total_line) DESC
+      `
+    );
+    return rows.map(r => ({
+      productName: r.product_name,
+      quantity: Number(r.qty),
+      unitCost: Number(r.unit_cost),
+      unitPrice: Number(r.unit_price),
+      totalCost: Number(r.total_cost),
+      totalRevenue: Number(r.total_revenue),
+      profit: Number(r.total_revenue) - Number(r.total_cost),
+    }));
   }
 
   private toDomain(shift: any): Shift {

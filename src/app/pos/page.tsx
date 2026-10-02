@@ -37,8 +37,11 @@ import {
 interface StoreProduct {
   id: string;
   price: number;
+  costPrice: number | null;
   stock: number | null;
   active: boolean;
+  // ✅ MÓDULO PH3: Info de lotes/vencimiento
+  batchInfo?: { nearestExpiry: string; hasExpired: boolean } | null;
   product: {
     id: string;
     name: string;
@@ -49,6 +52,14 @@ interface StoreProduct {
     barcode: string | null;
     internalSku: string;
     imageUrl?: string | null;
+    // ✅ MÓDULO PH5: Campos farmacéuticos
+    commercialName?: string | null;
+    genericName?: string | null;
+    concentration?: string | null;
+    pharmaceuticalForm?: string | null;
+    presentation?: string | null;
+    laboratory?: string | null;
+    requiresPrescription?: boolean;
   };
 }
 
@@ -94,6 +105,14 @@ interface CartItem {
   // ✅ MÓDULO F3: Servicios
   isService?: boolean;           // true si es servicio
   service?: Service;             // Datos del servicio
+  // Venta libre (producto no registrado)
+  isFreeItem?: boolean;          // true si es venta libre sin storeProduct
+  freeItemName?: string;         // Descripción del producto
+  // ✅ MÓDULO PH6: Control Rx
+  rxConfirmed?: boolean;         // true si la venta Rx fue confirmada
+  rxObservation?: string | null;
+  rxPatientName?: string | null;
+  rxPrescriptionNumber?: string | null;
 }
 
 interface Customer {
@@ -111,6 +130,26 @@ interface OperationalLimits {
   maxReceivableBalance: number | null;
 }
 
+// ✅ MÓDULO PH4: Paciente / receptor de medicamentos
+interface PatientRecord {
+  id: string;
+  dni: string;
+  name: string;
+  phone: string | null;
+  birthDate: string | null;
+  gender: string | null;
+}
+
+interface MedicationHistoryEntry {
+  id: string;
+  productName: string;
+  genericName: string | null;
+  concentration: string | null;
+  quantity: number;
+  consultReason: string | null;
+  dispensedAt: string;
+}
+
 export default function POSPage() {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<StoreProduct[]>([]);
@@ -123,14 +162,26 @@ export default function POSPage() {
   const [showSaleCompleteModal, setShowSaleCompleteModal] = useState(false);
   const [completedSale, setCompletedSale] = useState<{ id: string; total: number } | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO'>('CASH');
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED'>('CASH');
   const [amountPaid, setAmountPaid] = useState('');
+  // ✅ Pago Mixto: splits de pago
+  const [mixedSplits, setMixedSplits] = useState<{ method: 'CASH' | 'YAPE' | 'PLIN' | 'CARD'; amount: string }[]>([
+    { method: 'CASH', amount: '' },
+    { method: 'YAPE', amount: '' },
+  ]);
+  // Venta libre (producto no registrado en inventario)
+  const [showFreeItemModal, setShowFreeItemModal] = useState(false);
+  const [freeItemName, setFreeItemName] = useState('');
+  const [freeItemPrice, setFreeItemPrice] = useState('');
+  const [freeItemQty, setFreeItemQty] = useState('1');
   
   // ✅ OPTIMIZACIÓN: useRef para barcode scanner (evita re-renders en cada tecla)
   const barcodeBufferRef = useRef('');
   const lastKeyTimeRef = useRef(0);
   // ✅ Ref para que el barcode scanner siempre use la versión más reciente de addToCart
   const addToCartRef = useRef<((sp: StoreProduct) => Promise<void>) | null>(null);
+  // ✅ FIX: Dedup para evitar doble agregado por scanner (debounce + Enter race condition)
+  const lastScanAddRef = useRef(0);
   
   // ✅ OPTIMIZACIÓN: AudioContext reutilizable
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -146,6 +197,23 @@ export default function POSPage() {
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // ✅ MÓDULO PH4: Estados para modal de paciente/receptor
+  const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
+  const [showPatientModal, setShowPatientModal] = useState(false);
+  const [patientDniSearch, setPatientDniSearch] = useState('');
+  const [patientSearchResult, setPatientSearchResult] = useState<PatientRecord | null>(null);
+  const [searchingPatient, setSearchingPatient] = useState(false);
+  const [patientNotFound, setPatientNotFound] = useState(false);
+  const [patientConsultReason, setPatientConsultReason] = useState('');
+  const [showNewPatientForm, setShowNewPatientForm] = useState(false);
+  const [newPatientName, setNewPatientName] = useState('');
+  const [newPatientPhone, setNewPatientPhone] = useState('');
+  const [newPatientBirthDate, setNewPatientBirthDate] = useState('');
+  const [newPatientGender, setNewPatientGender] = useState('');
+  const [creatingPatient, setCreatingPatient] = useState(false);
+  const [patientHistory, setPatientHistory] = useState<MedicationHistoryEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Función para reproducir sonido de beep tipo supermercado (optimizada)
   const playBeep = useCallback(() => {
@@ -189,6 +257,13 @@ export default function POSPage() {
   // ✅ MÓDULO 17.4: Estado de Demo Mode
   const [is_demo_store, setis_demo_store] = useState(false);
 
+  // ✅ MÓDULO PH6: estado modal Rx
+  const [showRxModal, setShowRxModal] = useState(false);
+  const [rxPendingProduct, setRxPendingProduct] = useState<StoreProduct | null>(null);
+  const [rxObservation, setRxObservation] = useState('');
+  const [rxPatientName, setRxPatientName] = useState('');
+  const [rxPrescriptionNumber, setRxPrescriptionNumber] = useState('');
+
   // Estados para descuentos
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountItemId, setDiscountItemId] = useState<string | null>(null);
@@ -227,6 +302,11 @@ export default function POSPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedCartItemIndex, setSelectedCartItemIndex] = useState<number>(0);
 
+  // Auto-focus en el input de búsqueda al montar la página
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
   // ✅ MÓDULO 17.3: Estado para drawer móvil
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
@@ -236,6 +316,14 @@ export default function POSPage() {
   const conversionsEnabled = isFlagOn('ENABLE_CONVERSIONS');
   // ✅ MÓDULO F3: Servicios
   const servicesEnabled = isFlagOn('ENABLE_SERVICES');
+  // ✅ MÓDULO PH5: Búsqueda farmacéutica avanzada
+  const medicineSearchEnabled = isFlagOn('ENABLE_MEDICINE_SEARCH');
+  // ✅ MÓDULO PH6: Control de productos Rx / restringidos
+  const restrictedProductsEnabled = isFlagOn('ENABLE_RESTRICTED_PRODUCTS');
+  // ✅ MÓDULO PH3: Control de lotes / vencimiento
+  const batchExpiryEnabled = isFlagOn('ENABLE_BATCH_EXPIRY');
+  // ✅ MÓDULO PH4: Paciente / receptor de medicamentos
+  const patientsEnabled = isFlagOn('ENABLE_PATIENTS');
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
   const [posTab, setPosTab] = useState<'products' | 'services'>('products');
@@ -263,6 +351,7 @@ export default function POSPage() {
     const fakeStoreProduct: StoreProduct = {
       id: `service-${service.id}`, // Prefijo para diferenciar
       price: Number(service.price),
+      costPrice: null,
       stock: null, // Servicios no tienen stock
       active: true,
       product: {
@@ -304,7 +393,38 @@ export default function POSPage() {
     toast.success(`Servicio "${service.name}" agregado`);
   }, []);
 
-  // ✅ MÓDULO F1: Actualizar unidad de un item del carrito
+  // Venta libre: agregar producto sin storeProductId
+  const addFreeItemToCart = useCallback((name: string, price: number, qty: number) => {
+    const freeId = `free-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const fakeStoreProduct: StoreProduct = {
+      id: freeId,
+      price,
+      costPrice: null,
+      stock: null,
+      active: true,
+      product: {
+        id: freeId,
+        name,
+        brand: null,
+        content: '(Venta libre)',
+        category: 'Otros',
+        unitType: 'UNIT',
+        barcode: null,
+        internalSku: '',
+        imageUrl: null,
+      },
+    };
+
+    setCart(prev => [...prev, {
+      storeProduct: fakeStoreProduct,
+      quantity: qty,
+      isFreeItem: true,
+      freeItemName: name,
+    }]);
+
+    toast.success(`"${name}" agregado al carrito`);
+  }, []);
+
   const updateItemUnit = useCallback((
     storeProductId: string,
     newQuantity: number,
@@ -338,6 +458,9 @@ export default function POSPage() {
         addToCart(products[0]);
         setProducts([]);
         setQuery('');
+        // Mantener focus para escaneo continuo
+      } else if (query.trim() === '' && cart.length > 0 && currentShift) {
+        handleCheckout();
       }
     },
     incrementSelectedItem: () => {
@@ -393,6 +516,11 @@ export default function POSPage() {
     selectCard: () => {
       setPaymentMethod('CARD');
     },
+    confirmPayment: () => {
+      if (showPaymentModal && !processing) {
+        handleConfirmPayment();
+      }
+    },
   };
 
   // ✅ MÓDULO 17.1: Activar atajos de teclado
@@ -400,6 +528,7 @@ export default function POSPage() {
     enabled: true,
     isCheckoutModalOpen: showPaymentModal,
     hasOpenShift: !!currentShift,
+    barcodeBufferRef,
   });
 
   // ✅ MÓDULO 17.3: Activar hotkeys (desktop only)
@@ -460,7 +589,7 @@ export default function POSPage() {
         // Buscar producto por código de barras
         const barcodeToSearch = barcodeBufferRef.current;
         try {
-          const res = await fetch(`/api/store-products?barcode=${encodeURIComponent(barcodeToSearch)}`);
+          const res = await fetch(`/api/inventory?query=${encodeURIComponent(barcodeToSearch)}&active=true`);
           if (res.ok) {
             const data = await res.json();
             if (data.products && data.products.length > 0) {
@@ -620,10 +749,14 @@ export default function POSPage() {
         const exactMatch = found[0].product.barcode === query.trim() ||
                            found[0].product.internalSku === query.trim();
         if (exactMatch) {
+          // Dedup: evitar doble agregado si debounce y Enter disparan ambos
+          const now = Date.now();
+          if (now - lastScanAddRef.current < 500) return;
+          lastScanAddRef.current = now;
           await addToCartRef.current?.(found[0]);
           setQuery('');
           setProducts([]);
-          searchInputRef.current?.focus();
+          // Mantener focus para escaneo continuo con pistola
           return;
         }
       }
@@ -920,22 +1053,18 @@ export default function POSPage() {
     }
   };
 
-  const addToCart = async (sp: StoreProduct) => {
-    // Validar stock antes de agregar
-    if (sp.stock !== null && sp.stock <= 0) {
-      toast.error(`${sp.product.name}: sin stock disponible`);
-      return;
-    }
-    
+  // ✅ MÓDULO PH6: ejecutar el add real (después de confirmación Rx si aplica)
+  const executeAddToCart = async (
+    sp: StoreProduct,
+    rx?: { observation: string; patientName: string; prescriptionNumber: string }
+  ) => {
     const existing = cart.find((item) => item.storeProduct.id === sp.id);
-    
+
     if (existing) {
-      // 🔊 Reproducir sonido al agregar más cantidad
       playBeep();
       await updateQuantity(sp.id, existing.quantity + 1);
     } else {
-      // ✅ Validar límite de items por venta
-      if (operationalLimits?.maxItemsPerSale !== null && 
+      if (operationalLimits?.maxItemsPerSale !== null &&
           operationalLimits?.maxItemsPerSale !== undefined) {
         const currentTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
         if (currentTotalItems >= operationalLimits.maxItemsPerSale) {
@@ -943,34 +1072,35 @@ export default function POSPage() {
           return;
         }
       }
-      
-      const newItem: CartItem = { storeProduct: sp, quantity: 1 };
-      
-      // ✅ MÓDULO 18.2: OPTIMISTIC UI - Mostrar item inmediatamente
+
+      const newItem: CartItem = {
+        storeProduct: sp,
+        quantity: 1,
+        rxConfirmed: rx ? true : undefined,
+        rxObservation: rx?.observation || null,
+        rxPatientName: rx?.patientName || null,
+        rxPrescriptionNumber: rx?.prescriptionNumber || null,
+      };
+
       setCart(prev => [...prev, newItem]);
-      
-      // 🔊 Reproducir sonido de beep inmediatamente
       playBeep();
       toast.success(`${sp.product.name} agregado al carrito`);
-      
-      // Advertencia si el stock es bajo (inmediato)
+
       if (sp.stock !== null && sp.stock <= 5) {
         toast.warning(`Advertencia: Solo quedan ${sp.stock} unidades`, { duration: 3000 });
       }
-      
-      // ✅ Verificar promociones en background y actualizar
+
       checkAllPromotionsUnified(newItem).then(itemWithPromo => {
-        setCart(prev => prev.map(item => 
-          item.storeProduct.id === sp.id ? itemWithPromo : item
+        setCart(prev => prev.map(item =>
+          item.storeProduct.id === sp.id ? { ...itemWithPromo, rxConfirmed: newItem.rxConfirmed, rxObservation: newItem.rxObservation, rxPatientName: newItem.rxPatientName, rxPrescriptionNumber: newItem.rxPrescriptionNumber } : item
         ));
-        
-        // Notificar promociones aplicadas
+
         const messages = [];
         if (itemWithPromo.promotionName) messages.push(`Promo: ${itemWithPromo.promotionName}`);
         if (itemWithPromo.categoryPromoName) messages.push(`Cat: ${itemWithPromo.categoryPromoName}`);
         if (itemWithPromo.volumePromoName) messages.push(`Pack: ${itemWithPromo.volumePromoName}`);
         if (itemWithPromo.nthPromoName) messages.push(`Nth: ${itemWithPromo.nthPromoName}`);
-        
+
         if (messages.length > 0) {
           toast.success(`🎉 ${messages.join(' + ')} aplicado!`, { duration: 2000 });
         }
@@ -978,6 +1108,31 @@ export default function POSPage() {
         console.error('Error checking promotions:', err);
       });
     }
+  };
+
+  const addToCart = async (sp: StoreProduct) => {
+    // Validar stock antes de agregar
+    if (sp.stock !== null && sp.stock <= 0) {
+      toast.error(`${sp.product.name}: sin stock disponible`);
+      return;
+    }
+
+    // ✅ MÓDULO PH6: productos Rx requieren confirmación
+    if (restrictedProductsEnabled && sp.product.requiresPrescription) {
+      const alreadyInCart = cart.find((item) => item.storeProduct.id === sp.id);
+      if (!alreadyInCart) {
+        setRxPendingProduct(sp);
+        setRxObservation('');
+        setRxPatientName('');
+        setRxPrescriptionNumber('');
+        setShowRxModal(true);
+        return; // esperar confirmación
+      }
+    }
+
+    const existing = cart.find((item) => item.storeProduct.id === sp.id);
+    
+    await executeAddToCart(sp);
   };
 
   // Mantener siempre la referencia actualizada de addToCart para el barcode scanner
@@ -1314,6 +1469,120 @@ export default function POSPage() {
     }
   };
 
+  // ✅ MÓDULO PH4: Handlers para modal de paciente/receptor
+  const handleSearchPatientByDni = async () => {
+    const dni = patientDniSearch.trim();
+    if (!dni) return;
+    setSearchingPatient(true);
+    setPatientNotFound(false);
+    setPatientSearchResult(null);
+    setShowNewPatientForm(false);
+    try {
+      const res = await fetch(`/api/patients?query=${encodeURIComponent(dni)}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const found = (data.patients || []).find((p: PatientRecord) => p.dni === dni);
+      if (found) {
+        setPatientSearchResult(found);
+        // Cargar historial de dispensaciones
+        setLoadingHistory(true);
+        try {
+          const histRes = await fetch(`/api/patients?id=${found.id}`);
+          if (histRes.ok) {
+            const histData = await histRes.json();
+            setPatientHistory(histData.patient?.medicationHistory || []);
+          }
+        } catch { /* historial no crítico */ } finally {
+          setLoadingHistory(false);
+        }
+      } else {
+        setPatientNotFound(true);
+        setNewPatientName('');
+        setNewPatientPhone('');
+        setNewPatientBirthDate('');
+        setNewPatientGender('');
+        setShowNewPatientForm(true);
+      }
+    } catch {
+      toast.error('Error al buscar paciente');
+    } finally {
+      setSearchingPatient(false);
+    }
+  };
+
+  const handleCreatePatient = async () => {
+    if (!newPatientName.trim() || !patientDniSearch.trim()) {
+      toast.error('DNI y nombre son obligatorios');
+      return;
+    }
+    setCreatingPatient(true);
+    try {
+      // Convertir DD/MM/AAAA → YYYY-MM-DD para la API
+      let birthDateIso: string | null = null;
+      if (newPatientBirthDate.trim()) {
+        const parts = newPatientBirthDate.trim().split('/');
+        if (parts.length === 3) {
+          birthDateIso = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        }
+      }
+      const res = await fetch('/api/patients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dni: patientDniSearch.trim(),
+          name: newPatientName.trim(),
+          phone: newPatientPhone || null,
+          birthDate: birthDateIso,
+          gender: newPatientGender || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Si ya existe (409) úsalo directamente
+        if (res.status === 409 && data.patient) {
+          setSelectedPatient(data.patient);
+          setShowPatientModal(false);
+          toast.success(`Paciente registrado: ${data.patient.name}`);
+          return;
+        }
+        throw new Error(data.error || 'Error al crear');
+      }
+      setSelectedPatient(data.patient);
+      setShowPatientModal(false);
+      toast.success(`Paciente registrado: ${data.patient.name}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al crear paciente');
+    } finally {
+      setCreatingPatient(false);
+    }
+  };
+
+  const handleConfirmPatient = () => {
+    if (patientSearchResult) {
+      setSelectedPatient(patientSearchResult);
+      setShowPatientModal(false);
+      toast.success(`Receptor: ${patientSearchResult.name}`);
+    }
+  };
+
+  const handleClearPatient = () => {
+    setSelectedPatient(null);
+    setPatientConsultReason('');
+  };
+
+  const openPatientModal = () => {
+    setPatientDniSearch(selectedPatient?.dni || '');
+    setPatientSearchResult(selectedPatient || null);
+    setPatientHistory([]);
+    setPatientNotFound(false);
+    setShowNewPatientForm(false);
+    setNewPatientName('');
+    setNewPatientPhone('');
+    setNewPatientBirthDate('');
+    setNewPatientGender('');
+    setShowPatientModal(true);
+  };
+
   const handleConfirmPayment = async () => {
     // En desktop el servidor es local — no se necesita internet para vender
     if (!isDesktop && typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -1328,17 +1597,37 @@ export default function POSPage() {
 
     // Validaciones según método de pago
     if (paymentMethod === 'CASH') {
-      const paid = parseFloat(amountPaid);
-      if (isNaN(paid) || paid <= 0) {
-        toast.error('Ingresa un monto válido');
+      // Campo opcional: si está vacío se asume pago exacto (sin vuelto)
+      if (amountPaid) {
+        const paid = parseFloat(amountPaid);
+        if (isNaN(paid) || paid <= 0) {
+          toast.error('Ingresa un monto válido');
+          return;
+        }
+        // ✅ Redondear ambos valores para evitar problemas de precisión decimal
+        const totalRounded = Math.round(total * 100) / 100;
+        const paidRounded = Math.round(paid * 100) / 100;
+        
+        if (paidRounded < totalRounded) {
+          toast.error('El monto pagado es menor al total');
+          return;
+        }
+      }
+    } else if (paymentMethod === 'MIXED') {
+      // Validar splits de pago mixto
+      const validSplits = mixedSplits.filter(s => parseFloat(s.amount) > 0);
+      if (validSplits.length < 2) {
+        toast.error('Pago mixto requiere al menos 2 métodos con monto');
         return;
       }
-      // ✅ Redondear ambos valores para evitar problemas de precisión decimal
+      const splitsTotal = validSplits.reduce((sum, s) => sum + Math.round(parseFloat(s.amount) * 100) / 100, 0);
       const totalRounded = Math.round(total * 100) / 100;
-      const paidRounded = Math.round(paid * 100) / 100;
-      
-      if (paidRounded < totalRounded) {
-        toast.error('El monto pagado es menor al total');
+      if (Math.round(splitsTotal * 100) / 100 < totalRounded) {
+        toast.error(`Falta S/ ${(totalRounded - splitsTotal).toFixed(2)} para cubrir el total`);
+        return;
+      }
+      if (!currentShift) {
+        toast.error('Debes abrir un turno para pago mixto');
         return;
       }
     } else if (paymentMethod === 'FIADO') {
@@ -1374,6 +1663,15 @@ export default function POSPage() {
               unitPrice: Number(item.service.price),
             };
           }
+          // Venta libre (producto no registrado en inventario)
+          if (item.isFreeItem) {
+            return {
+              productName: item.freeItemName || item.storeProduct.product.name,
+              quantity: item.quantity,
+              unitPrice: item.storeProduct.price,
+              isFreeItem: true,
+            };
+          }
           // Producto normal
           return {
             storeProductId: item.storeProduct.id,
@@ -1385,6 +1683,10 @@ export default function POSPage() {
             discountValue: item.discountValue,
             // ✅ MÓDULO F1: Campos de unidades avanzadas
             saleUnitId: item.unitIdUsed,
+            // ✅ MÓDULO PH6: Campos Rx para validación server-side
+            ...(item.rxPatientName && { rxPatientName: item.rxPatientName }),
+            ...(item.rxObservation && { rxObservation: item.rxObservation }),
+            ...(item.rxPrescriptionNumber && { rxPrescriptionNumber: item.rxPrescriptionNumber }),
           };
         }),
         paymentMethod,
@@ -1392,14 +1694,30 @@ export default function POSPage() {
         couponCode: appliedCoupon?.code, // ✅ Cupón (Módulo 14.2-A)
       };
 
-      // Solo enviar amountPaid si es CASH
+      // Solo enviar amountPaid si es CASH; si está vacío se usa el total (pago exacto)
       if (paymentMethod === 'CASH') {
-        checkoutData.amountPaid = parseFloat(amountPaid);
+        checkoutData.amountPaid = amountPaid ? parseFloat(amountPaid) : total;
+      }
+
+      // ✅ Pago Mixto: enviar splits
+      if (paymentMethod === 'MIXED') {
+        const validSplits = mixedSplits
+          .filter(s => parseFloat(s.amount) > 0)
+          .map(s => ({ method: s.method, amount: Math.round(parseFloat(s.amount) * 100) / 100 }));
+        checkoutData.paymentSplits = validSplits;
       }
 
       // Para FIADO, enviar customerId
       if (paymentMethod === 'FIADO') {
         checkoutData.customerId = selectedCustomer!.id;
+      }
+
+      // ✅ MÓDULO PH4: Enviar paciente/receptor si está seleccionado
+      if (patientsEnabled && selectedPatient) {
+        checkoutData.patientId = selectedPatient.id;
+        if (patientConsultReason.trim()) {
+          checkoutData.consultReason = patientConsultReason.trim();
+        }
       }
 
       const res = await fetch('/api/sales/checkout', {
@@ -1467,6 +1785,15 @@ export default function POSPage() {
             description: `Cliente: ${selectedCustomer!.name} - Total: S/ ${data.total.toFixed(2)}`,
             duration: 5000,
           });
+        } else if (paymentMethod === 'MIXED') {
+          const splitDesc = mixedSplits
+            .filter(s => parseFloat(s.amount) > 0)
+            .map(s => `${s.method === 'CASH' ? 'Efectivo' : s.method === 'YAPE' ? 'Yape' : s.method === 'PLIN' ? 'Plin' : 'Tarjeta'}: S/ ${parseFloat(s.amount).toFixed(2)}`)
+            .join(' + ');
+          toast.success(`¡Venta completada! Total: S/ ${data.total.toFixed(2)}`, {
+            description: `Pago mixto: ${splitDesc}`,
+            duration: 5000,
+          });
         } else {
           toast.success(`¡Venta completada! Total: S/ ${data.total.toFixed(2)}`);
         }
@@ -1516,16 +1843,60 @@ export default function POSPage() {
       // Show sale complete modal
       setCompletedSale({ id: data.saleId, total: data.total });
       setShowSaleCompleteModal(true);
-      
+
+      // ✅ MÓDULO PH6: Auditar productos Rx vendidos (fire-and-forget)
+      const rxItems = cart.filter(
+        (item) => !item.isService && item.storeProduct.product.requiresPrescription && item.rxConfirmed
+      );
+      for (const item of rxItems) {
+        fetch('/api/rx-audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            saleId: data.saleId,
+            productId: item.storeProduct.product.id,
+            observation: item.rxObservation,
+            patientName: item.rxPatientName,
+            prescriptionNumber: item.rxPrescriptionNumber,
+          }),
+        }).catch(() => {}); // tolerante a fallos
+      }
+
       // ✅ MÓDULO 18.2: Prefetch del ticket para carga instantánea
       // Precargar datos del ticket mientras el usuario ve el modal
       fetch(`/api/sales/${data.saleId}`).catch(() => {});
-      
+
+      // ✅ MÓDULO PH4: Fallback client-side para registrar dispensación
+      // Garantiza registro aunque el fire-and-forget del servidor falle
+      if (patientsEnabled && selectedPatient) {
+        const patientItems = cart
+          .filter((i) => !i.isService && i.storeProduct)
+          .map((i) => ({
+            productName: i.storeProduct.product.name,
+            genericName: (i.storeProduct.product as any).genericName || null,
+            concentration: (i.storeProduct.product as any).concentration || null,
+            quantity: i.quantity,
+          }));
+        fetch('/api/patients/medication', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: selectedPatient.id,
+            saleId: data.saleId,
+            consultReason: patientConsultReason || null,
+            items: patientItems,
+          }),
+        }).catch(() => {});
+      }
+
       clearCart();
       setProducts([]);
       setQuery('');
       setSelectedCustomer(null);
       setSunatData(null); // ✅ Limpiar datos SUNAT
+      // ✅ MÓDULO PH4: Limpiar paciente seleccionado
+      setSelectedPatient(null);
+      setPatientConsultReason('');
     } catch (error) {
       console.error('Checkout error:', error);
       // Detectar error de red/offline (solo relevante en modo web)
@@ -1623,26 +1994,67 @@ export default function POSPage() {
                   <span>Finalizar</span>
                 </div>
                 
-                {/* Campo de búsqueda normal */}
-                <div className="flex gap-2">
-                  <div className="flex-1 relative">
+                {/* Campo de búsqueda + botones */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       ref={searchInputRef}
                       id="product-search"
                       type="text"
+                      autoFocus
                       placeholder="Buscar producto por nombre, código..."
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          // Si hay exactamente 1 resultado, agregar automáticamente y limpiar
+                          e.stopPropagation(); // Evitar que usePosShortcuts duplique la acción
+                          const currentQuery = query.trim();
+
+                          // Barcode rápido: si parece código de barras, buscar directo sin esperar debounce
+                          if (/^\d{8,}$/.test(currentQuery)) {
+                            const barcodeQuery = currentQuery;
+                            setQuery('');
+                            setProducts([]);
+                            // Búsqueda directa por barcode (no depende del estado products)
+                            fetch(`/api/inventory?query=${encodeURIComponent(barcodeQuery)}&active=true`)
+                              .then(res => res.ok ? res.json() : null)
+                              .then(data => {
+                                const found = data?.products || [];
+                                if (found.length === 1) {
+                                  addToCart(found[0]);
+                                } else if (found.length > 1) {
+                                  setProducts(found);
+                                  setQuery(barcodeQuery);
+                                } else {
+                                  toast.error(`Código no encontrado: ${barcodeQuery}`);
+                                }
+                              })
+                              .catch(() => toast.error('Error al buscar producto'));
+                            return;
+                          }
+
                           if (products.length === 1) {
+                            // Dedup: evitar doble agregado si debounce ya lo hizo
+                            const now = Date.now();
+                            if (now - lastScanAddRef.current < 500) {
+                              setQuery('');
+                              setProducts([]);
+                              return;
+                            }
+                            lastScanAddRef.current = now;
                             addToCart(products[0]);
                             setQuery('');
                             setProducts([]);
-                            searchInputRef.current?.focus();
-                          } else {
+                            // Mantener focus para escaneo continuo con pistola
+                          } else if (products.length > 1) {
+                            handleSearch();
+                          } else if (currentQuery === '' && cart.length > 0 && currentShift) {
+                            // Input vacío + carrito con productos → abrir checkout
+                            handleCheckout();
+                          } else if (currentQuery.length >= 2) {
+                            // Texto que no es barcode, sin resultados aún → buscar manualmente
                             handleSearch();
                           }
                         }
@@ -1658,6 +2070,20 @@ export default function POSPage() {
                   >
                     {loading ? 'Buscando...' : 'Buscar'}
                   </button>
+                </div>
+                {/* Venta libre: producto no registrado en inventario */}
+                <button
+                  onClick={() => {
+                    setFreeItemName('');
+                    setFreeItemPrice('');
+                    setFreeItemQty('1');
+                    setShowFreeItemModal(true);
+                  }}
+                  title="Vender producto sin registrar en inventario"
+                  className="w-full h-10 px-4 bg-white border border-[#16A34A] text-[#16A34A] rounded-md font-medium hover:bg-[#16A34A] hover:text-white transition-colors touch-manipulation flex items-center justify-center gap-2 text-sm"
+                >
+                  <span className="text-lg font-bold">+</span> Venta libre (producto no registrado)
+                </button>
                 </div>
               </div>
 
@@ -1776,15 +2202,38 @@ export default function POSPage() {
                         )}
                         
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-[#1F2A37]">
-                            {sp.product.name}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-medium text-[#1F2A37]">{sp.product.name}</span>
+                            {/* ✅ MÓDULO PH5: Badge Rx */}
+                            {medicineSearchEnabled && sp.product.requiresPrescription && (
+                              <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">
+                                Rx
+                              </span>
+                            )}
                             {sp.product.brand && (
-                              <span className="ml-2 text-sm text-gray-500">• {sp.product.brand}</span>
+                              <span className="text-sm text-gray-500">• {sp.product.brand}</span>
                             )}
                             {sp.product.content && (
-                              <span className="ml-2 text-sm text-gray-500">• {sp.product.content}</span>
+                              <span className="text-sm text-gray-500">• {sp.product.content}</span>
                             )}
                           </div>
+                          {/* ✅ MÓDULO PH5: Info farmacéutica */}
+                          {medicineSearchEnabled && (sp.product.commercialName || sp.product.genericName || sp.product.concentration || sp.product.presentation) && (
+                            <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
+                              {sp.product.commercialName && (
+                                <span>Comercial: <span className="font-medium text-gray-700">{sp.product.commercialName}</span></span>
+                              )}
+                              {sp.product.genericName && (
+                                <span>Genérico: <span className="font-medium text-gray-700">{sp.product.genericName}</span></span>
+                              )}
+                              {sp.product.concentration && (
+                                <span className="font-medium text-indigo-600">{sp.product.concentration}</span>
+                              )}
+                              {sp.product.presentation && (
+                                <span>{sp.product.presentation}</span>
+                              )}
+                            </div>
+                          )}
                           <div className="mt-1 text-sm text-gray-500">
                             {sp.product.barcode || sp.product.internalSku}
                             {sp.stock !== null && (
@@ -1800,6 +2249,27 @@ export default function POSPage() {
                                 {sp.stock > 0 && sp.stock <= 5 && ' (Bajo)'}
                               </span>
                             )}
+                            {/* ✅ MÓDULO PH3: Badge de vencimiento */}
+                            {batchExpiryEnabled && sp.batchInfo && (() => {
+                              const expiry = new Date(sp.batchInfo.nearestExpiry);
+                              const now = new Date();
+                              const daysUntil = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                              if (sp.batchInfo.hasExpired || daysUntil <= 0) {
+                                return (
+                                  <span className="ml-2 inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">
+                                    <AlertTriangle className="w-3 h-3" /> Vencido
+                                  </span>
+                                );
+                              }
+                              if (daysUntil <= 60) {
+                                return (
+                                  <span className="ml-2 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700">
+                                    <AlertTriangle className="w-3 h-3" /> Vence en {daysUntil}d
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -1949,6 +2419,7 @@ export default function POSPage() {
                     { value: 'PLIN', label: 'Plin', icon: '📲' },
                     { value: 'CARD', label: 'Tarjeta', icon: '💳' },
                     { value: 'FIADO', label: 'Fiado', icon: '📝' },
+                    { value: 'MIXED', label: 'Mixto', icon: '🔀' },
                   ].map((method) => (
                     <button
                       key={method.value}
@@ -1959,6 +2430,12 @@ export default function POSPage() {
                         }
                         if (method.value === 'FIADO') {
                           setSelectedCustomer(null);
+                        }
+                        if (method.value === 'MIXED') {
+                          setMixedSplits([
+                            { method: 'CASH', amount: '' },
+                            { method: 'YAPE', amount: '' },
+                          ]);
                         }
                       }}
                       disabled={!currentShift && method.value !== 'FIADO'}
@@ -1989,7 +2466,12 @@ export default function POSPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0.00"
                     autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmPayment()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !processing) {
+                        e.stopPropagation();
+                        handleConfirmPayment();
+                      }
+                    }}
                   />
                   
                   {/* Vuelto */}
@@ -2015,11 +2497,123 @@ export default function POSPage() {
               )}
 
               {/* Mensaje para otros métodos */}
-              {paymentMethod !== 'CASH' && paymentMethod !== 'FIADO' && (
+              {paymentMethod !== 'CASH' && paymentMethod !== 'FIADO' && paymentMethod !== 'MIXED' && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-800">
                     ✓ Pago con <strong>{paymentMethod}</strong>
                   </p>
+                </div>
+              )}
+
+              {/* ✅ Pago Mixto: inputs de splits */}
+              {paymentMethod === 'MIXED' && (
+                <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Dividir pago
+                  </label>
+                  <div className="space-y-2">
+                    {mixedSplits.map((split, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <select
+                          value={split.method}
+                          onChange={(e) => {
+                            const updated = [...mixedSplits];
+                            updated[idx] = { ...updated[idx], method: e.target.value as any };
+                            setMixedSplits(updated);
+                          }}
+                          className="w-28 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        >
+                          <option value="CASH">Efectivo</option>
+                          <option value="YAPE">Yape</option>
+                          <option value="PLIN">Plin</option>
+                          <option value="CARD">Tarjeta</option>
+                        </select>
+                        <div className="relative flex-1">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">S/</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={split.amount}
+                            onChange={(e) => {
+                              const updated = [...mixedSplits];
+                              updated[idx] = { ...updated[idx], amount: e.target.value };
+                              setMixedSplits(updated);
+                            }}
+                            className="w-full pl-7 pr-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            placeholder="0.00"
+                            autoFocus={idx === 0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !processing) {
+                                e.stopPropagation();
+                                // Si hay siguiente split, enfocarlo; si no, confirmar
+                                const nextInput = document.getElementById(`mixed-split-${idx + 1}`);
+                                if (nextInput) {
+                                  nextInput.focus();
+                                } else {
+                                  handleConfirmPayment();
+                                }
+                              }
+                            }}
+                            id={`mixed-split-${idx}`}
+                          />
+                        </div>
+                        {mixedSplits.length > 2 && (
+                          <button
+                            onClick={() => setMixedSplits(mixedSplits.filter((_, i) => i !== idx))}
+                            className="text-red-400 hover:text-red-600 p-1"
+                            title="Quitar"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {mixedSplits.length < 4 && (
+                    <button
+                      onClick={() => {
+                        const usedMethods = mixedSplits.map(s => s.method);
+                        const available = (['CASH', 'YAPE', 'PLIN', 'CARD'] as const).find(m => !usedMethods.includes(m));
+                        setMixedSplits([...mixedSplits, { method: available || 'CASH', amount: '' }]);
+                      }}
+                      className="mt-2 text-xs text-purple-600 hover:text-purple-800 font-medium"
+                    >
+                      + Agregar otro método
+                    </button>
+                  )}
+
+                  {/* Resumen de pago mixto */}
+                  {(() => {
+                    const totalVenta = getCartTotal(cart, globalDiscount, appliedCoupon);
+                    const totalSplits = mixedSplits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+                    const totalSplitsRounded = Math.round(totalSplits * 100) / 100;
+                    const totalVentaRounded = Math.round(totalVenta * 100) / 100;
+                    const diff = totalSplitsRounded - totalVentaRounded;
+
+                    return (
+                      <div className="mt-3 pt-2 border-t border-purple-200 space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Suma de pagos:</span>
+                          <span className={`font-medium ${totalSplitsRounded >= totalVentaRounded ? 'text-green-700' : 'text-red-600'}`}>
+                            {formatMoney(totalSplitsRounded)}
+                          </span>
+                        </div>
+                        {totalSplitsRounded > 0 && totalSplitsRounded < totalVentaRounded && (
+                          <div className="text-xs text-red-600">
+                            ⚠️ Falta: {formatMoney(totalVentaRounded - totalSplitsRounded)}
+                          </div>
+                        )}
+                        {diff > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-green-700">Vuelto:</span>
+                            <span className="font-bold text-green-700">{formatMoney(diff)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -2056,6 +2650,47 @@ export default function POSPage() {
                       className="w-full py-2 px-3 border-2 border-dashed border-orange-300 rounded-lg text-orange-600 hover:border-orange-400 text-sm"
                     >
                       + Seleccionar Cliente
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* ✅ MÓDULO PH4: Receptor de medicamentos (farmacia/ONG) */}
+              {patientsEnabled && (
+                <div className="bg-teal-50 rounded-lg p-3 border border-teal-200">
+                  <label className="block text-sm font-medium text-teal-800 mb-2">
+                    Receptor / Paciente
+                  </label>
+                  {selectedPatient ? (
+                    <div className="flex justify-between items-start bg-white p-2 rounded border border-teal-200">
+                      <div>
+                        <div className="font-medium text-gray-900 text-sm">{selectedPatient.name}</div>
+                        <div className="text-xs text-gray-500">DNI: {selectedPatient.dni}</div>
+                        {patientConsultReason && (
+                          <div className="text-xs text-teal-600 mt-0.5">Motivo: {patientConsultReason}</div>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1 ml-2 flex-shrink-0">
+                        <button
+                          onClick={openPatientModal}
+                          className="text-teal-600 hover:text-teal-800 text-xs"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={handleClearPatient}
+                          className="text-red-400 hover:text-red-600 text-xs"
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={openPatientModal}
+                      className="w-full py-2 px-3 border-2 border-dashed border-teal-300 rounded-lg text-teal-600 hover:border-teal-400 text-sm"
+                    >
+                      + Registrar receptor
                     </button>
                   )}
                 </div>
@@ -2133,9 +2768,120 @@ export default function POSPage() {
         </div>
       )}
 
+      {/* Modal Venta Libre */}
+      {showFreeItemModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Venta libre</h2>
+            <p className="text-sm text-gray-500 mb-4">Producto no registrado en inventario</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Descripción del producto <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={freeItemName}
+                  onChange={(e) => setFreeItemName(e.target.value)}
+                  placeholder="Ej: Uniforme talla M"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+                  onKeyDown={(e) => e.key === 'Enter' && document.getElementById('freeItemPrice')?.focus()}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Precio (S/) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="freeItemPrice"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={freeItemPrice}
+                    onChange={(e) => setFreeItemPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+                    onKeyDown={(e) => e.key === 'Enter' && document.getElementById('freeItemQty')?.focus()}
+                  />
+                </div>
+                <div className="w-24">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cantidad
+                  </label>
+                  <input
+                    id="freeItemQty"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={freeItemQty}
+                    onChange={(e) => setFreeItemQty(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const name = freeItemName.trim();
+                        const price = parseFloat(freeItemPrice);
+                        const qty = Math.max(1, parseInt(freeItemQty) || 1);
+                        if (!name) { toast.error('Ingresa una descripción'); return; }
+                        if (!price || price <= 0) { toast.error('Ingresa un precio válido'); return; }
+                        addFreeItemToCart(name, price, qty);
+                        setShowFreeItemModal(false);
+                        setTimeout(() => searchInputRef.current?.focus(), 50);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => {
+                  setShowFreeItemModal(false);
+                  setTimeout(() => searchInputRef.current?.focus(), 50);
+                }}
+                className="flex-1 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const name = freeItemName.trim();
+                  const price = parseFloat(freeItemPrice);
+                  const qty = Math.max(1, parseInt(freeItemQty) || 1);
+                  if (!name) { toast.error('Ingresa una descripción'); return; }
+                  if (!price || price <= 0) { toast.error('Ingresa un precio válido'); return; }
+                  addFreeItemToCart(name, price, qty);
+                  setShowFreeItemModal(false);
+                  setTimeout(() => searchInputRef.current?.focus(), 50);
+                }}
+                className="flex-1 py-2.5 bg-[#16A34A] text-white rounded-lg font-medium hover:bg-[#15803d] transition-colors"
+              >
+                Agregar al carrito
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sale Complete Modal */}
       {showSaleCompleteModal && completedSale && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          tabIndex={-1}
+          ref={(el) => el?.focus()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              setShowSaleCompleteModal(false);
+              setCompletedSale(null);
+              searchInputRef.current?.focus();
+            }
+          }}
+        >
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -2184,13 +2930,72 @@ export default function POSPage() {
                       } else {
                         // Mode is HTML or not properly configured
                         console.log('[POS] ESC/POS not configured, mode:', config.mode);
-                        toast.info('Abriendo vista previa (configure impresora en Ajustes)');
                       }
                     } catch (err) {
                       console.error('[POS] ESC/POS print error:', err);
-                      toast.error('Error de impresión ESC/POS');
                     }
                   }
+
+                  // ✅ Print Service local: intentar impresión directa vía servicio local
+                  try {
+                    const statusRes = await fetch('http://127.0.0.1:12121/status', { signal: AbortSignal.timeout(1500) });
+                    if (statusRes.ok) {
+                      // Servicio activo → obtener datos de la venta y enviar
+                      toast.info('Enviando a impresora...');
+                      const saleRes = await fetch(`/api/sales/${completedSale.id}`);
+                      if (saleRes.ok) {
+                        const { sale } = await saleRes.json();
+                        const createdAt = new Date(sale.createdAt);
+                        const printData = {
+                          store: {
+                            name: sale.store?.name || 'Mi Tienda',
+                            ruc: sale.store?.ruc || undefined,
+                            address: sale.store?.address || undefined,
+                            phone: sale.store?.phone || undefined,
+                            slogan: sale.store?.settings?.ticketFooter || undefined,
+                          },
+                          saleNumber: String(sale.saleNumber),
+                          date: createdAt.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+                          time: createdAt.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+                          items: sale.items.map((it: { productName: string; quantity: number; unitPrice: number; subtotal: number; totalLine: number; discountAmount?: number; unitSymbol?: string }) => ({
+                            name: it.productName,
+                            quantity: Number(it.quantity),
+                            unitPrice: Number(it.unitPrice),
+                            subtotal: Number(it.totalLine),
+                            discount: it.discountAmount ? Number(it.discountAmount) : undefined,
+                            unit: it.unitSymbol || undefined,
+                          })),
+                          subtotal: Number(sale.subtotal),
+                          totalDiscount: Number(sale.discountTotal || 0),
+                          total: Number(sale.total),
+                          payment: {
+                            method: sale.paymentMethod,
+                            amountPaid: sale.amountPaid ? Number(sale.amountPaid) : undefined,
+                            change: sale.changeAmount ? Number(sale.changeAmount) : undefined,
+                            customerName: sale.customer?.name || undefined,
+                          },
+                          cashierName: sale.user?.name || undefined,
+                        };
+                        const printRes = await fetch('http://127.0.0.1:12121/print', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(printData),
+                        });
+                        const printResult = await printRes.json();
+                        if (printResult.success) {
+                          toast.success('Ticket impreso correctamente');
+                          fetch(`/api/sales/${completedSale.id}/mark-printed`, { method: 'POST' }).catch(() => {});
+                          return;
+                        } else {
+                          toast.error(printResult.error || 'Error al imprimir');
+                        }
+                      }
+                    }
+                  } catch {
+                    // Print service no disponible → fallback silencioso a web
+                    console.log('[POS] Print service no disponible, usando vista web');
+                  }
+
                   // Fallback: Open receipt in browser/new window
                   window.open(`/receipt/${completedSale.id}`, '_blank');
                 }}
@@ -2206,10 +3011,12 @@ export default function POSPage() {
                 onClick={() => {
                   setShowSaleCompleteModal(false);
                   setCompletedSale(null);
+                  searchInputRef.current?.focus();
                 }}
-                className="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center gap-2"
               >
                 Nueva Venta
+                <span className="px-1.5 py-0.5 bg-gray-300 rounded text-xs font-mono">Enter</span>
               </button>
             </div>
           </div>
@@ -2653,6 +3460,315 @@ export default function POSPage() {
           </div>
         );
       })()}
+
+      {/* ✅ MÓDULO PH6: Modal de confirmación de venta Rx */}
+      {showRxModal && rxPendingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            {/* Header */}
+            <div className="mb-4 flex items-start gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
+                <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Producto con receta médica</h3>
+                <p className="mt-0.5 text-sm text-gray-600">
+                  <span className="font-medium">{rxPendingProduct.product.name}</span> requiere receta médica.
+                  ¿Confirmar la venta?
+                </p>
+              </div>
+            </div>
+
+            {/* Campos opcionales */}
+            <div className="mb-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">
+                  Nombre del paciente <span className="text-gray-400">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={rxPatientName}
+                  onChange={(e) => setRxPatientName(e.target.value)}
+                  placeholder="Ej. Juan Pérez"
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">
+                  Número de receta <span className="text-gray-400">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={rxPrescriptionNumber}
+                  onChange={(e) => setRxPrescriptionNumber(e.target.value)}
+                  placeholder="Ej. RX-2026-001"
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700">
+                  Observación <span className="text-gray-400">(opcional)</span>
+                </label>
+                <textarea
+                  value={rxObservation}
+                  onChange={(e) => setRxObservation(e.target.value)}
+                  placeholder="Ej. Receta presentada en físico"
+                  rows={2}
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Acciones */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRxModal(false);
+                  setRxPendingProduct(null);
+                }}
+                className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const sp = rxPendingProduct;
+                  const rx = {
+                    observation: rxObservation,
+                    patientName: rxPatientName,
+                    prescriptionNumber: rxPrescriptionNumber,
+                  };
+                  setShowRxModal(false);
+                  setRxPendingProduct(null);
+                  executeAddToCart(sp, rx);
+                }}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Confirmar venta Rx
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MÓDULO PH4: Modal Receptor / Paciente */}
+      {showPatientModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Receptor / Paciente</h3>
+              <button
+                onClick={() => setShowPatientModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Búsqueda por DNI */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  DNI <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={patientDniSearch}
+                    onChange={(e) => {
+                      setPatientDniSearch(e.target.value);
+                      setPatientSearchResult(null);
+                      setPatientNotFound(false);
+                      setShowNewPatientForm(false);
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearchPatientByDni()}
+                    placeholder="Ej. 12345678"
+                    maxLength={20}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSearchPatientByDni}
+                    disabled={searchingPatient || !patientDniSearch.trim()}
+                    className="px-3 py-2 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700 disabled:opacity-50"
+                  >
+                    {searchingPatient ? '...' : 'Buscar'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Paciente encontrado */}
+              {patientSearchResult && (
+                <div className="space-y-2">
+                  {/* Datos del paciente */}
+                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-teal-900">{patientSearchResult.name}</div>
+                      <div className="text-xs text-teal-700 mt-0.5">DNI: {patientSearchResult.dni}</div>
+                      {patientSearchResult.phone && (
+                        <div className="text-xs text-teal-600">Tel: {patientSearchResult.phone}</div>
+                      )}
+                    </div>
+                    {patientHistory.length > 0 && (
+                      <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-medium">
+                        {patientHistory.length} visita{patientHistory.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Historial de dispensaciones */}
+                  {loadingHistory && (
+                    <div className="text-xs text-gray-400 text-center py-2">Cargando historial...</div>
+                  )}
+                  {!loadingHistory && patientHistory.length > 0 && (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-200">
+                        <span className="text-xs font-medium text-gray-600">Últimas dispensaciones</span>
+                      </div>
+                      <div className="max-h-36 overflow-y-auto divide-y divide-gray-100">
+                        {patientHistory.map((entry) => (
+                          <div key={entry.id} className="px-2 py-1.5 text-xs">
+                            <div className="flex justify-between items-start gap-1">
+                              <span className="font-medium text-gray-800 truncate">
+                                {entry.genericName || entry.productName}
+                                {entry.concentration && (
+                                  <span className="text-gray-500"> {entry.concentration}</span>
+                                )}
+                              </span>
+                              <span className="text-gray-400 flex-shrink-0">
+                                {new Date(entry.dispensedAt).toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'2-digit' })}
+                              </span>
+                            </div>
+                            {entry.consultReason && (
+                              <div className="text-gray-500 mt-0.5 italic">↳ {entry.consultReason}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!loadingHistory && patientHistory.length === 0 && (
+                    <div className="text-xs text-gray-400 text-center py-1">Sin dispensaciones previas</div>
+                  )}
+                </div>
+              )}
+
+              {/* Paciente no encontrado — formulario de registro */}
+              {patientNotFound && showNewPatientForm && (
+                <div className="space-y-3 border border-dashed border-gray-300 rounded-lg p-3">
+                  <p className="text-xs text-gray-500">
+                    No se encontró el DNI. Completa los datos para registrar al paciente.
+                  </p>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Nombre completo <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newPatientName}
+                      onChange={(e) => setNewPatientName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Apellidos y nombres"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
+                      <input
+                        type="text"
+                        value={newPatientPhone}
+                        onChange={(e) => setNewPatientPhone(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="Opcional"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Género</label>
+                      <select
+                        value={newPatientGender}
+                        onChange={(e) => setNewPatientGender(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      >
+                        <option value="">—</option>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Fecha de nac.</label>
+                      <input
+                        type="text"
+                        value={newPatientBirthDate}
+                        onChange={(e) => setNewPatientBirthDate(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        placeholder="DD/MM/AAAA"
+                        maxLength={10}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <p className="text-xs text-gray-400">Ej: 15/08/1990</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Motivo de consulta</label>
+                    <input
+                      type="text"
+                      value={patientConsultReason}
+                      onChange={(e) => setPatientConsultReason(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="Ej: dolor de cabeza, fiebre... (opcional)"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Motivo de consulta para paciente ya encontrado */}
+              {patientSearchResult && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Motivo de consulta</label>
+                  <input
+                    type="text"
+                    value={patientConsultReason}
+                    onChange={(e) => setPatientConsultReason(e.target.value)}
+                    className="w-full px-3 py-2 border border-teal-200 rounded-lg text-sm"
+                    placeholder="Ej: dolor de cabeza, fiebre... (opcional)"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-4 border-t bg-gray-50">
+              <button
+                onClick={() => setShowPatientModal(false)}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Cancelar
+              </button>
+              {patientSearchResult ? (
+                <button
+                  onClick={handleConfirmPatient}
+                  className="flex-1 py-2 px-4 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+                >
+                  Seleccionar
+                </button>
+              ) : showNewPatientForm ? (
+                <button
+                  onClick={handleCreatePatient}
+                  disabled={creatingPatient || !newPatientName.trim()}
+                  className="flex-1 py-2 px-4 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                >
+                  {creatingPatient ? 'Guardando...' : 'Registrar y seleccionar'}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
     </AuthLayout>
   );
 }

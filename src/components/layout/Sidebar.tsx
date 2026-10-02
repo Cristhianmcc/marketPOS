@@ -17,7 +17,8 @@ import {
   ChevronRight, 
   PanelLeftClose, 
   PanelLeftOpen,
-  Globe
+  Globe,
+  Pill
 } from 'lucide-react';
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -37,6 +38,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [promosExpanded, setPromosExpanded] = useState(false);
+  const [pharmaExpanded, setPharmaExpanded] = useState(false);
   const { isOn } = useFlags();
 
   const isOwner = user?.role?.toUpperCase() === 'OWNER';
@@ -60,6 +62,15 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
   ];
   // Filtrar por flags del plan activo
   const promoItems = allPromoItems.filter(item => isOn(item.flag));
+
+  const allPharmaItems = [
+    { label: 'Proveedores', href: '/suppliers', color: 'text-teal-600 dark:text-teal-400', flag: 'ENABLE_SUPPLIERS' },
+    { label: 'Órdenes de Compra', href: '/purchase-orders', color: 'text-teal-600 dark:text-teal-400', flag: 'ENABLE_SUPPLIERS' },
+    { label: 'Pacientes', href: '/patients', color: 'text-purple-600 dark:text-purple-400', flag: 'ENABLE_PATIENTS' },
+    { label: 'Libro Controlados', href: '/controlled-book', color: 'text-red-600 dark:text-red-400', flag: 'ENABLE_CONTROLLED_BOOK' },
+    { label: 'Interacciones', href: '/drug-interactions', color: 'text-amber-600 dark:text-amber-400', flag: 'ENABLE_PATIENTS' },
+  ];
+  const pharmaItems = allPharmaItems.filter(item => isOn(item.flag));
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -199,6 +210,58 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
                       `}
                     >
                       <Tag className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Farmacia Section - Only for Owner with at least one pharma flag active */}
+        {isOwner && pharmaItems.length > 0 && (
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                if (collapsed && onToggle) { onToggle(); setPharmaExpanded(true); }
+                else setPharmaExpanded(!pharmaExpanded);
+              }}
+              title={collapsed ? 'Farmacia' : undefined}
+              className={`
+                flex items-center rounded-lg font-medium text-sm transition-all duration-200 w-full
+                ${collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'justify-between px-3 py-2.5'}
+                text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white
+              `}
+            >
+              <div className={`flex items-center ${collapsed ? '' : 'gap-3'}`}>
+                <Pill className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span>Farmacia</span>}
+              </div>
+              {!collapsed && (pharmaExpanded ? (
+                <ChevronDown className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <ChevronRight className="w-4 h-4 flex-shrink-0" />
+              ))}
+            </button>
+
+            {pharmaExpanded && !collapsed && (
+              <div className="ml-4 mt-1 space-y-1 border-l-2 border-border-light dark:border-border-dark pl-2">
+                {pharmaItems.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`
+                        flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200
+                        ${active
+                          ? 'bg-primary/10 dark:bg-primary/20 font-semibold ' + item.color
+                          : 'text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white'
+                        }
+                      `}
+                    >
+                      <Pill className="w-4 h-4 flex-shrink-0" />
                       <span className="truncate">{item.label}</span>
                     </Link>
                   );

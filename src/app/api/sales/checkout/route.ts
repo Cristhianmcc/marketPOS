@@ -42,15 +42,33 @@ interface CheckoutItem {
   isService?: boolean;
   serviceId?: string;
   serviceName?: string; // Para snapshot
+  // Venta libre (producto no registrado en inventario)
+  isFreeItem?: boolean;
+  productName?: string; // Nombre del producto libre
+  // ✅ MÓDULO PH5: Receta médica (solo si requiresPrescription)
+  rxPatientName?: string;
+  rxPrescriptionNumber?: string;
+  rxObservation?: string;
+}
+
+interface PaymentSplit {
+  method: 'CASH' | 'YAPE' | 'PLIN' | 'CARD';
+  amount: number;
 }
 
 interface CheckoutBody {
   items: CheckoutItem[];
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED';
   amountPaid?: number;
   customerId?: string; // ✅ Para ventas FIADO
   discountTotal?: number; // Descuento global (Módulo 14)
   couponCode?: string; // ✅ Cupón (Módulo 14.2-A)
+  patientId?: string; // ✅ Paciente para historial de medicamentos y libro de controlados
+  prescribedBy?: string; // ✅ Médico que prescribe (para libro de controlados)
+  cmpNumber?: string; // ✅ Número CMP del médico
+  consultReason?: string; // ✅ Motivo de consulta / dispensación
+  // ✅ Pago Mixto: desglose de pagos
+  paymentSplits?: PaymentSplit[];
 }
 
 interface ErrorResponse {
@@ -75,11 +93,12 @@ async function executeCheckout(
   session: { storeId: string; userId: string },
   items: CheckoutItem[],
   shiftId: string | null, // ✅ Puede ser null para FIADO
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO',
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED',
   amountPaid?: number,
   customerId?: string, // ✅ Para FIADO
   discountTotal?: number, // Módulo 14: descuento global
-  couponCode?: string // ✅ Módulo 14.2-A: cupón
+  couponCode?: string, // ✅ Módulo 14.2-A: cupón
+  paymentSplits?: PaymentSplit[] // ✅ Pago Mixto: desglose
 ): Promise<{ sale: any; saleItems: any[]; receivable?: any }> {
   return await prisma.$transaction(async (tx) => {
     // 1. Verificar si la tienda está en Demo Mode
@@ -89,9 +108,10 @@ async function executeCheckout(
     });
     const isDemoMode = store?.isDemoStore ?? false;
 
-    // ✅ MÓDULO F3: Separar items de productos y servicios
-    const productItems = items.filter(i => !i.isService && i.storeProductId);
+    // ✅ MÓDULO F3: Separar items de productos, servicios y ventas libres
+    const productItems = items.filter(i => !i.isService && !i.isFreeItem && i.storeProductId);
     const serviceItems = items.filter(i => i.isService && i.serviceId);
+    const freeItems = items.filter(i => i.isFreeItem && i.productName);
 
     // ✅ F3: Validar servicios existen y están activos
     let validatedServices: Array<{ id: string; name: string; price: any; taxable: boolean }> = [];
@@ -206,7 +226,27 @@ async function executeCheckout(
       }
     }
 
-    // 2. Obtener promociones activas de la tienda
+    // 2. ✅ MÓDULO PH5: Validación Rx server-side (requiresPrescription)
+    const enableRestrictedProducts = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_RESTRICTED_PRODUCTS);
+    if (enableRestrictedProducts) {
+      for (const item of productItems) {
+        const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
+        if (sp.product.requiresPrescription) {
+          // Debe venir rxPatientName o rxObservation en el item
+          const hasRxInfo = item.rxPatientName?.trim() || item.rxObservation?.trim() || item.rxPrescriptionNumber?.trim();
+          if (!hasRxInfo) {
+            throw new CheckoutError(
+              'RX_REQUIRED',
+              422,
+              `${sp.product.name} requiere receta médica. Registre los datos del paciente antes de vender.`,
+              { productId: sp.id, productName: sp.product.name }
+            );
+          }
+        }
+      }
+    }
+
+    // 3. Obtener promociones activas de la tienda
     // ✅ MÓDULO 15: Feature Flag ENABLE_PROMOTIONS
     const enablePromotions = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_PROMOTIONS);
     
@@ -241,6 +281,10 @@ async function executeCheckout(
     
     // ✅ MÓDULO F2.3: Verificar si precios por unidad de venta están habilitados
     const enableSellUnitPricing = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_SELLUNIT_PRICING);
+
+    // ✅ MÓDULO PH3: Verificar FEFO y batch expiry flags
+    const enableFEFO = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_FEFO_SALES);
+    const enableBatchExpiry = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_BATCH_EXPIRY);
     
     const itemsWithDiscounts = await Promise.all(productItems.map(async (item) => {
       const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
@@ -492,6 +536,96 @@ async function executeCheckout(
       };
     }));
 
+    // ✅ MÓDULO PH3: FEFO — asignar lotes por orden de vencimiento
+    // Estructura: storeProductId → lista de lotes a consumir
+    interface BatchConsumed {
+      batchId: string;
+      batchNumber: string;
+      quantity: number;
+      expiryDate: Date;
+    }
+    const fefoAllocation = new Map<string, BatchConsumed[]>();
+
+    if (enableFEFO && enableBatchExpiry) {
+      // Leer política de lotes vencidos de la configuración de la tienda
+      const storeSettings = await tx.storeSettings.findUnique({
+        where: { storeId: session.storeId },
+        select: { expiredBatchPolicy: true },
+      });
+      const blockExpired = (storeSettings?.expiredBatchPolicy ?? 'BLOCK_EXPIRED') === 'BLOCK_EXPIRED';
+      const now = new Date();
+
+      for (const item of itemsWithDiscounts) {
+        if (!item.storeProductId) continue;
+
+        // Obtener todos los lotes activos con stock disponible, ordenados por vencimiento (FEFO)
+        const activeBatches = await tx.productBatch.findMany({
+          where: {
+            storeProductId: item.storeProductId,
+            storeId: session.storeId,
+            active: true,
+            quantityAvailable: { gt: 0 },
+          },
+          orderBy: { expiryDate: 'asc' },
+        });
+
+        if (activeBatches.length === 0) continue; // Producto sin lotes: usar flujo normal
+
+        // Filtrar vencidos según política
+        const usableBatches = blockExpired
+          ? activeBatches.filter((b) => b.expiryDate > now)
+          : activeBatches;
+
+        const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
+
+        // Si política BLOCK_EXPIRED y todos están vencidos
+        if (blockExpired && usableBatches.length === 0) {
+          throw new CheckoutError(
+            'EXPIRED_BATCH_ONLY',
+            409,
+            `${sp.product.name}: solo hay lotes vencidos disponibles`,
+            { productId: sp.id, productName: sp.product.name }
+          );
+        }
+
+        // Verificar stock total disponible en lotes usables
+        const totalAvailable = usableBatches.reduce(
+          (sum, b) => sum + b.quantityAvailable.toNumber(),
+          0
+        );
+        if (totalAvailable < item.quantityBase) {
+          throw new CheckoutError(
+            'INSUFFICIENT_BATCH_STOCK',
+            409,
+            `${sp.product.name}: stock insuficiente en lotes (disponible en lotes: ${totalAvailable})`,
+            {
+              productId: sp.id,
+              productName: sp.product.name,
+              requested: item.quantityBase,
+              available: totalAvailable,
+            }
+          );
+        }
+
+        // Distribuir cantidad a consumir entre lotes (FEFO: primero el que vence antes)
+        let remaining = item.quantityBase;
+        const consumed: BatchConsumed[] = [];
+        for (const batch of usableBatches) {
+          if (remaining <= 0) break;
+          const take = Math.min(batch.quantityAvailable.toNumber(), remaining);
+          consumed.push({
+            batchId: batch.id,
+            batchNumber: batch.batchNumber,
+            quantity: take,
+            expiryDate: batch.expiryDate,
+          });
+          remaining -= take;
+        }
+
+        fefoAllocation.set(item.storeProductId, consumed);
+      }
+    }
+
     // ✅ MÓDULO F3: Procesar servicios (sin promociones, sin stock)
     const servicesWithTotals = serviceItems.map((item) => {
       const service = validatedServices.find((s) => s.id === item.serviceId)!;
@@ -502,15 +636,28 @@ async function executeCheckout(
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         subtotalItem,
-        totalLine: subtotalItem, // Sin descuentos en servicios
+        totalLine: subtotalItem,
         taxable: service.taxable,
       };
     });
 
-    // 4. Calcular totales (productos + servicios)
+    // Venta libre: productos sin stock ni ID registrado
+    const freeItemsWithTotals = freeItems.map((item) => {
+      const subtotalItem = item.quantity * item.unitPrice;
+      return {
+        productName: item.productName!,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotalItem,
+        totalLine: subtotalItem,
+      };
+    });
+
+    // 4. Calcular totales (productos + servicios + ventas libres)
     const productsSubtotal = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
     const servicesSubtotal = servicesWithTotals.reduce((sum, item) => sum + item.subtotalItem, 0);
-    const subtotalBeforeDiscounts = productsSubtotal + servicesSubtotal;
+    const freeItemsSubtotal = freeItemsWithTotals.reduce((sum, item) => sum + item.subtotalItem, 0);
+    const subtotalBeforeDiscounts = productsSubtotal + servicesSubtotal + freeItemsSubtotal;
     const promotionsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.promotionDiscount, 0);
     const categoryPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.categoryPromoDiscount, 0);
     const volumePromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.volumePromoDiscount, 0); // ✅ Módulo 14.2-C1
@@ -679,7 +826,7 @@ async function executeCheckout(
       await validateReceivableBalance(session.storeId, customerId, total);
     }
 
-    // 5. Validar y calcular changeAmount si es efectivo
+    // 5. Validar y calcular changeAmount si es efectivo o mixto
     let changeAmount: number | null = null;
     if (paymentMethod === 'CASH' && amountPaid !== undefined) {
       // ✅ Validar que el monto pagado es suficiente
@@ -714,6 +861,29 @@ async function executeCheckout(
         );
       }
       changeAmount = amountPaidRounded - totalRounded;
+    } else if (paymentMethod === 'MIXED' && paymentSplits && paymentSplits.length >= 2) {
+      // ✅ Pago Mixto: validar que la suma de los splits cubre el total
+      const totalRounded = Math.round(total * 100) / 100;
+      const splitsTotal = paymentSplits.reduce((sum, s) => sum + Math.round(s.amount * 100) / 100, 0);
+      const splitsTotalRounded = Math.round(splitsTotal * 100) / 100;
+
+      if (splitsTotalRounded < totalRounded) {
+        throw new CheckoutError(
+          'AMOUNT_INSUFFICIENT',
+          409,
+          'La suma de los pagos es menor al total de la venta',
+          {
+            total: totalRounded.toFixed(2),
+            splitsTotal: splitsTotalRounded.toFixed(2),
+            missing: (totalRounded - splitsTotalRounded).toFixed(2),
+          }
+        );
+      }
+      // El vuelto solo aplica si hay parte en CASH y sobra dinero
+      const cashSplit = paymentSplits.find(s => s.method === 'CASH');
+      if (cashSplit && splitsTotalRounded > totalRounded) {
+        changeAmount = splitsTotalRounded - totalRounded;
+      }
     }
 
     // 3b. Para FIADO: amountPaid y changeAmount deben ser null
@@ -788,6 +958,13 @@ async function executeCheckout(
       saleData.amountPaid = null;
       saleData.changeAmount = null;
       saleData.customerId = customerId;
+    } else if (paymentMethod === 'MIXED' && paymentSplits) {
+      // ✅ Pago Mixto: guardar desglose en paymentDetails
+      const splitsTotal = paymentSplits.reduce((sum, s) => sum + s.amount, 0);
+      saleData.shiftId = shiftId;
+      saleData.amountPaid = new Prisma.Decimal(splitsTotal);
+      saleData.changeAmount = changeAmount !== null ? new Prisma.Decimal(changeAmount) : null;
+      saleData.paymentDetails = { splits: paymentSplits };
     } else {
       // Para otros métodos: shiftId requerido
       saleData.shiftId = shiftId;
@@ -814,6 +991,7 @@ async function executeCheckout(
             unitSymbol: sp.product.baseUnit?.symbol ?? (sp.product.unitType === 'KG' ? 'kg' : 'und'),
             quantity: new Prisma.Decimal(item.quantityBase), // ✅ V2: Usar quantityBase para inventario
             unitPrice: new Prisma.Decimal(item.unitPrice),
+            costPrice: sp.costPrice ?? null, // Snapshot del costo al momento de la venta
             subtotal: new Prisma.Decimal(item.subtotalItem),
             // ✅ MÓDULO F2: Snapshot de conversión de unidades
             unitCodeUsed: item.unitCodeUsed || null,
@@ -847,6 +1025,22 @@ async function executeCheckout(
             totalLine: new Prisma.Decimal(item.totalLine),
             // ✅ F3: No es servicio
             isService: false,
+            // ✅ MÓDULO PH8: Snapshot farmacéutico
+            commercialName: sp.product.commercialName || null,
+            genericName: sp.product.genericName || null,
+            concentration: sp.product.concentration || null,
+            pharmaceuticalForm: sp.product.pharmaceuticalForm || null,
+            unitSunatCodeUsed: sp.product.baseUnit?.sunatCode ?? (sp.product.unitType === 'KG' ? 'KGM' : 'NIU'),
+            // ✅ MÓDULO PH3: snapshot de lotes consumidos (FEFO)
+            batchBreakdown: (() => {
+              const alloc = fefoAllocation.get(item.storeProductId!);
+              if (!alloc || alloc.length === 0) return undefined;
+              return alloc.map((bc) => ({
+                batchNumber: bc.batchNumber,
+                qty: bc.quantity,
+                expiry: bc.expiryDate.toISOString().split('T')[0],
+              }));
+            })(),
           },
         });
       })
@@ -866,6 +1060,7 @@ async function executeCheckout(
             // ✅ SUNAT: Servicios usan ZZ (mutuo acuerdo)
             unitSunatCode: 'ZZ',
             unitSymbol: 'serv',
+            unitSunatCodeUsed: 'ZZ', // ✅ PH8: Código SUNAT para servicios
             quantity: new Prisma.Decimal(item.quantity),
             unitPrice: new Prisma.Decimal(item.unitPrice),
             subtotal: new Prisma.Decimal(item.subtotalItem),
@@ -881,26 +1076,105 @@ async function executeCheckout(
       })
     );
 
-    const saleItems = [...productSaleItems, ...serviceSaleItems];
+    // Crear SaleItems para ventas libres
+    const freeItemSaleItems = await Promise.all(
+      freeItemsWithTotals.map((item) =>
+        tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            isService: false,
+            productName: item.productName,
+            productContent: '(Venta libre)',
+            unitType: 'UNIT',
+            unitSunatCode: 'NIU',
+            unitSymbol: 'und',
+            unitSunatCodeUsed: 'NIU',
+            quantity: new Prisma.Decimal(item.quantity),
+            unitPrice: new Prisma.Decimal(item.unitPrice),
+            subtotal: new Prisma.Decimal(item.subtotalItem),
+            totalLine: new Prisma.Decimal(item.totalLine),
+            promotionDiscount: new Prisma.Decimal(0),
+            categoryPromoDiscount: new Prisma.Decimal(0),
+            volumePromoDiscount: new Prisma.Decimal(0),
+            nthPromoDiscount: new Prisma.Decimal(0),
+            discountAmount: new Prisma.Decimal(0),
+          },
+        })
+      )
+    );
 
-    // 7. Crear Movements (sin cambios - usa subtotal original) - SOLO PRODUCTOS
+    const saleItems = [...productSaleItems, ...serviceSaleItems, ...freeItemSaleItems];
+
+    // 7. Crear Movements — SOLO PRODUCTOS
+    // Si FEFO está activo y el item tiene asignación de lotes: un movement por lote consumido.
+    // Si no, un único movement por item (flujo original).
     await Promise.all(
       itemsWithDiscounts.map((item) => {
+        const batchAlloc = fefoAllocation.get(item.storeProductId!);
+        if (batchAlloc && batchAlloc.length > 0) {
+          // ✅ FEFO: un movement por lote, con batchId
+          return Promise.all(
+            batchAlloc.map((bc) =>
+              tx.movement.create({
+                data: {
+                  storeId: session.storeId,
+                  storeProductId: item.storeProductId!,
+                  batchId: bc.batchId,
+                  type: 'SALE',
+                  quantity: new Prisma.Decimal(-bc.quantity),
+                  unitPrice: new Prisma.Decimal(item.unitPrice),
+                  total: new Prisma.Decimal(
+                    item.quantityBase > 0
+                      ? (bc.quantity / item.quantityBase) * item.subtotalItem
+                      : 0
+                  ),
+                  notes: `Venta #${nextSaleNumber} - Lote ${bc.batchNumber}`,
+                  createdById: session.userId,
+                  isDemo: isDemoMode,
+                },
+              })
+            )
+          );
+        }
+        // Flujo normal (sin FEFO o producto sin lotes)
         return tx.movement.create({
           data: {
             storeId: session.storeId,
-            storeProductId: item.storeProductId!, // ✅ F3: Siempre existe en productItems
+            storeProductId: item.storeProductId!,
             type: 'SALE',
-            quantity: new Prisma.Decimal(-item.quantityBase), // ✅ V2: Usar quantityBase para inventario
+            quantity: new Prisma.Decimal(-item.quantityBase),
             unitPrice: new Prisma.Decimal(item.unitPrice),
-            total: new Prisma.Decimal(item.subtotalItem), // Usa subtotal sin descuento para movements
+            total: new Prisma.Decimal(item.subtotalItem),
             notes: `Venta #${nextSaleNumber}`,
             createdById: session.userId,
-            isDemo: isDemoMode, // ✅ Marcar movement como demo si está en Demo Mode
+            isDemo: isDemoMode,
           },
         });
       })
     );
+
+    // 7b. ✅ MÓDULO PH3: Actualizar quantityAvailable en lotes consumidos por FEFO
+    if (fefoAllocation.size > 0) {
+      const batchUpdates: Array<{ id: string; newQty: number }> = [];
+      for (const [, consumed] of fefoAllocation) {
+        for (const bc of consumed) {
+          const batch = await tx.productBatch.findUnique({
+            where: { id: bc.batchId },
+            select: { quantityAvailable: true },
+          });
+          const current = batch?.quantityAvailable.toNumber() ?? 0;
+          batchUpdates.push({ id: bc.batchId, newQty: Math.max(0, current - bc.quantity) });
+        }
+      }
+      await Promise.all(
+        batchUpdates.map((u) =>
+          tx.productBatch.update({
+            where: { id: u.id },
+            data: { quantityAvailable: new Prisma.Decimal(u.newQty) },
+          })
+        )
+      );
+    }
 
     // 8. Actualizar stock
     await Promise.all(
@@ -1073,7 +1347,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body: CheckoutBody = await req.json();
-    const { items, paymentMethod, amountPaid, customerId, discountTotal, couponCode } = body;
+    const { items, paymentMethod, amountPaid, customerId, discountTotal, couponCode, patientId, prescribedBy, cmpNumber, consultReason, paymentSplits } = body;
 
     // Validaciones básicas
     if (!items || items.length === 0) {
@@ -1085,17 +1359,36 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar paymentMethod
-    if (!paymentMethod || !['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO'].includes(paymentMethod)) {
+    if (!paymentMethod || !['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO', 'MIXED'].includes(paymentMethod)) {
       const error: ErrorResponse = {
         code: 'INVALID_PAYMENT_METHOD',
         message: 'Método de pago inválido',
-        details: { allowedMethods: ['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO'] },
+        details: { allowedMethods: ['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO', 'MIXED'] },
       };
       return NextResponse.json(error, { status: 400 });
     }
 
     // Validar amountPaid según método de pago
-    if (paymentMethod === 'CASH') {
+    if (paymentMethod === 'MIXED') {
+      // Validar paymentSplits para pago mixto
+      if (!paymentSplits || !Array.isArray(paymentSplits) || paymentSplits.length < 2) {
+        const error: ErrorResponse = {
+          code: 'SPLITS_REQUIRED',
+          message: 'Pago mixto requiere al menos 2 métodos de pago',
+        };
+        return NextResponse.json(error, { status: 400 });
+      }
+      const validSplitMethods = ['CASH', 'YAPE', 'PLIN', 'CARD'];
+      for (const split of paymentSplits) {
+        if (!validSplitMethods.includes(split.method) || typeof split.amount !== 'number' || split.amount <= 0) {
+          const error: ErrorResponse = {
+            code: 'INVALID_SPLIT',
+            message: 'Cada split debe tener un método válido (CASH, YAPE, PLIN, CARD) y un monto mayor a 0',
+          };
+          return NextResponse.json(error, { status: 400 });
+        }
+      }
+    } else if (paymentMethod === 'CASH') {
       if (amountPaid === undefined || amountPaid === null || typeof amountPaid !== 'number') {
         const error: ErrorResponse = {
           code: 'AMOUNT_REQUIRED',
@@ -1149,6 +1442,16 @@ export async function POST(req: NextRequest) {
             code: 'INVALID_ITEM_FORMAT',
             message: 'Formato de servicio inválido',
             details: { requiredFields: ['serviceId', 'quantity', 'unitPrice'] },
+          };
+          return NextResponse.json(error, { status: 400 });
+        }
+      } else if (item.isFreeItem) {
+        // Venta libre: no tiene storeProductId, requiere productName
+        if (!item.productName || typeof item.quantity !== 'number' || typeof item.unitPrice !== 'number') {
+          const error: ErrorResponse = {
+            code: 'INVALID_ITEM_FORMAT',
+            message: 'Formato de venta libre inválido',
+            details: { requiredFields: ['productName', 'quantity', 'unitPrice'] },
           };
           return NextResponse.json(error, { status: 400 });
         }
@@ -1218,7 +1521,8 @@ export async function POST(req: NextRequest) {
           amountPaid,
           customerId,
           discountTotal,
-          couponCode
+          couponCode,
+          paymentSplits
         );
         break; // Éxito, salir del bucle
       } catch (error: any) {
@@ -1307,6 +1611,84 @@ export async function POST(req: NextRequest) {
       }).catch(err => {
         console.error('[AuditLog] Failed to log RECEIVABLE_CREATED:', err);
       });
+    }
+
+    // ✅ FARMACIA: Registrar PatientMedication + ControlledBookEntry (fire-and-forget)
+    if (patientId || items.some(i => i.rxPrescriptionNumber)) {
+      (async () => {
+        try {
+          // Obtener info de productos vendidos
+          const productIds = items.filter(i => i.storeProductId).map(i => i.storeProductId!);
+          const soldProducts = await prisma.storeProduct.findMany({
+            where: { id: { in: productIds }, storeId: session.storeId },
+            include: { product: { select: { name: true, genericName: true, concentration: true, laboratory: true, requiresPrescription: true } } },
+          });
+
+          const userName = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } });
+          let patientInfo: { name: string; dni: string } | null = null;
+          if (patientId) {
+            const p = await prisma.patient.findFirst({ where: { id: patientId, storeId: session.storeId }, select: { name: true, dni: true } });
+            patientInfo = p;
+          }
+
+          // Registrar PatientMedication
+          if (patientId) {
+            const medEntries = items.filter(i => i.storeProductId).map(item => {
+              const sp = soldProducts.find(p => p.id === item.storeProductId);
+              if (!sp) return null;
+              return {
+                patientId,
+                saleId: result.sale.id,
+                productName: sp.product.name,
+                genericName: sp.product.genericName || null,
+                concentration: sp.product.concentration || null,
+                quantity: new Prisma.Decimal(item.quantity),
+                prescribedBy: prescribedBy || item.rxPatientName || null,
+                dosage: null as string | null,
+                consultReason: consultReason?.trim() || null,
+              };
+            }).filter(Boolean);
+
+            if (medEntries.length > 0) {
+              await prisma.patientMedication.createMany({ data: medEntries as any });
+            }
+          }
+
+          // Registrar ControlledBookEntry
+          const enableControlled = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_CONTROLLED_BOOK);
+          if (enableControlled) {
+            const controlledEntries = items.filter(i => i.storeProductId).map(item => {
+              const sp = soldProducts.find(p => p.id === item.storeProductId);
+              if (!sp || !sp.product.requiresPrescription) return null;
+              return {
+                storeId: session.storeId,
+                saleId: result.sale.id,
+                saleNumber: result.sale.saleNumber,
+                saleDate: new Date(),
+                productName: sp.product.name,
+                genericName: sp.product.genericName || null,
+                concentration: sp.product.concentration || null,
+                laboratory: sp.product.laboratory || null,
+                quantity: new Prisma.Decimal(item.quantity),
+                prescriptionNumber: item.rxPrescriptionNumber || null,
+                prescribedBy: prescribedBy || null,
+                cmpNumber: cmpNumber || null,
+                patientId: patientId || null,
+                patientName: patientInfo?.name || item.rxPatientName || null,
+                patientDni: patientInfo?.dni || null,
+                dispensedById: session.userId,
+                dispensedByName: userName?.name || null,
+              };
+            }).filter(Boolean);
+
+            if (controlledEntries.length > 0) {
+              await prisma.controlledBookEntry.createMany({ data: controlledEntries as any });
+            }
+          }
+        } catch (err) {
+          console.error('[Farmacia] Error registrando datos post-venta:', err);
+        }
+      })();
     }
 
     return NextResponse.json(

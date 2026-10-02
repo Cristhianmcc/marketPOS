@@ -16,6 +16,17 @@ function mapProduct(p: any) {
     baseUnitDisplay: p.baseUnit?.symbol || p.baseUnit?.displayName || null,
     imageUrl: p.imageUrl,
     isGlobal: p.isGlobal,
+    // ✅ MÓDULO PH5: Campos farmacéuticos
+    commercialName: p.commercialName ?? null,
+    genericName: p.genericName ?? null,
+    concentration: p.concentration ?? null,
+    pharmaceuticalForm: p.pharmaceuticalForm ?? null,
+    presentation: p.presentation ?? null,
+    laboratory: p.laboratory ?? null,
+    sanitaryRegistry: p.sanitaryRegistry ?? null,
+    requiresPrescription: p.requiresPrescription ?? false,
+    medicineCategory: p.medicineCategory ?? null,
+    barcodeSecondary: p.barcodeSecondary ?? null,
   };
 }
 
@@ -32,6 +43,17 @@ const PRODUCT_SELECT = {
   baseUnit: { select: { symbol: true, displayName: true } },
   imageUrl: true,
   isGlobal: true,
+  // ✅ MÓDULO PH5: Campos farmacéuticos
+  commercialName: true,
+  genericName: true,
+  concentration: true,
+  pharmaceuticalForm: true,
+  presentation: true,
+  laboratory: true,
+  sanitaryRegistry: true,
+  requiresPrescription: true,
+  medicineCategory: true,
+  barcodeSecondary: true,
 } as const;
 
 const STORE_PRODUCT_SELECT = {
@@ -91,6 +113,10 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
         { product: { name: { contains: filters.query, mode: 'insensitive' } } },
         { product: { barcode: { contains: filters.query } } },
         { product: { internalSku: { contains: filters.query } } },
+        // ✅ MÓDULO PH1: Búsqueda por campos farmacéuticos
+        { product: { commercialName: { contains: filters.query, mode: 'insensitive' } } },
+        { product: { genericName: { contains: filters.query, mode: 'insensitive' } } },
+        { product: { barcodeSecondary: { contains: filters.query } } },
       ];
     }
 
@@ -165,11 +191,23 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
     const where: any = { storeId };
     if (filters?.active !== undefined) where.active = filters.active;
     if (filters?.query) {
-      where.OR = [
-        { product: { name: { contains: filters.query, mode: 'insensitive' } } },
+      const baseORConditions = [
+        { product: { name: { contains: filters.query, mode: 'insensitive' as const } } },
         { product: { barcode: { contains: filters.query } } },
         { product: { internalSku: { contains: filters.query } } },
       ];
+      // ✅ MÓDULO PH5: Búsqueda farmacéutica avanzada (solo si flag activo)
+      const pharmaORConditions = (filters as any)?.pharmaSearch
+        ? [
+            { product: { commercialName: { contains: filters.query, mode: 'insensitive' as const } } },
+            { product: { genericName: { contains: filters.query, mode: 'insensitive' as const } } },
+            { product: { barcodeSecondary: { contains: filters.query } } },
+            { product: { concentration: { contains: filters.query, mode: 'insensitive' as const } } },
+            { product: { pharmaceuticalForm: { contains: filters.query, mode: 'insensitive' as const } } },
+            { product: { laboratory: { contains: filters.query, mode: 'insensitive' as const } } },
+          ]
+        : [];
+      where.OR = [...baseORConditions, ...pharmaORConditions];
     }
     if (filters?.category) {
       where.product = { ...where.product, category: filters.category };

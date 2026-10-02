@@ -43,6 +43,12 @@ interface SaleItem {
   // ✅ MÓDULO F2.3: Precio por unidad de venta
   pricingMode: 'BASE_UNIT' | 'SELL_UNIT_OVERRIDE' | null;
   sellUnitPriceApplied: number | null;
+  // ✅ MÓDULO PH8: Snapshot farmacéutico
+  commercialName: string | null;
+  genericName: string | null;
+  concentration: string | null;
+  pharmaceuticalForm: string | null;
+  unitSunatCodeUsed: string | null;
 }
 
 interface Sale {
@@ -59,9 +65,10 @@ interface Sale {
   couponValue: number | null;
   couponDiscount: number;
   total: number;
-  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO';
+  paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED';
   amountPaid: number | null;
   changeAmount: number | null;
+  paymentDetails: any | null; // Desglose de pago mixto
   createdAt: string;
   printedAt: string | null;
   customerId: string | null;
@@ -132,16 +139,65 @@ export default function ReceiptPage() {
   };
 
   const handlePrint = async () => {
-    // Mark as printed
+    // ✅ Intentar impresión directa via print service local
+    if (sale) {
+      try {
+        const statusRes = await fetch('http://127.0.0.1:12121/status', { signal: AbortSignal.timeout(1500) });
+        if (statusRes.ok) {
+          const createdAt = new Date(sale.createdAt);
+          const printData = {
+            store: {
+              name: sale.store?.name || 'Mi Tienda',
+              ruc: sale.store?.ruc || undefined,
+              address: sale.store?.address || undefined,
+              phone: sale.store?.phone || undefined,
+              slogan: sale.store?.settings?.ticketFooter || undefined,
+            },
+            saleNumber: String(sale.saleNumber),
+            date: createdAt.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+            time: createdAt.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+            items: sale.items.map((it) => ({
+              name: it.productName,
+              quantity: Number(it.quantity),
+              unitPrice: Number(it.unitPrice),
+              subtotal: Number(it.totalLine),
+              discount: it.discountAmount ? Number(it.discountAmount) : undefined,
+              unit: it.unitSymbol || undefined,
+            })),
+            subtotal: Number(sale.subtotal),
+            totalDiscount: Number(sale.discountTotal || 0),
+            total: Number(sale.total),
+            payment: {
+              method: sale.paymentMethod,
+              amountPaid: sale.amountPaid ? Number(sale.amountPaid) : undefined,
+              change: sale.changeAmount ? Number(sale.changeAmount) : undefined,
+              customerName: sale.customer?.name || undefined,
+            },
+            cashierName: sale.user?.name || undefined,
+          };
+          const printRes = await fetch('http://127.0.0.1:12121/print', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(printData),
+          });
+          const result = await printRes.json();
+          if (result.success) {
+            fetch(`/api/sales/${params.id}/mark-printed`, { method: 'POST' }).catch(() => {});
+            alert('Ticket impreso correctamente');
+            return;
+          }
+        }
+      } catch {
+        // Print service no disponible → fallback a window.print()
+      }
+    }
+
+    // Fallback: imprimir via navegador
     try {
-      await fetch(`/api/sales/${params.id}/mark-printed`, {
-        method: 'POST',
-      });
+      await fetch(`/api/sales/${params.id}/mark-printed`, { method: 'POST' });
     } catch (error) {
       console.error('Error marking as printed:', error);
     }
-
-    // Print
     window.print();
   };
 
@@ -302,9 +358,26 @@ export default function ReceiptPage() {
               return (
                 <div key={item.id} className="item">
                   <div className="item-name">
-                    {item.productName}
-                    {item.productContent && ` ${item.productContent}`}
+                    {/* ✅ PH8: Si hay nombre comercial, mostrar nombre pharma enriquecido */}
+                    {item.commercialName ? (
+                      <>
+                        {item.commercialName}
+                        {item.concentration && ` ${item.concentration}`}
+                        {item.pharmaceuticalForm && ` ${item.pharmaceuticalForm}`}
+                      </>
+                    ) : (
+                      <>
+                        {item.productName}
+                        {item.productContent && ` ${item.productContent}`}
+                      </>
+                    )}
                   </div>
+                  {/* ✅ PH8: Mostrar principio activo en línea secundaria */}
+                  {item.genericName && (
+                    <div className="item-generic" style={{ fontSize: '10px', color: '#6b7280' }}>
+                      ({item.genericName})
+                    </div>
+                  )}
                   <div className="item-line">
                     <span>
                       {getQuantityDisplay()} x {formatMoney(item.unitPrice)}
@@ -430,6 +503,7 @@ export default function ReceiptPage() {
                     sale.paymentMethod === 'YAPE' ? 'Yape' :
                     sale.paymentMethod === 'PLIN' ? 'Plin' :
                     sale.paymentMethod === 'CARD' ? 'Tarjeta' :
+                    sale.paymentMethod === 'MIXED' ? 'Mixto' :
                     'Fiado'
                   }
                 </div>
@@ -442,6 +516,21 @@ export default function ReceiptPage() {
                     <div style={{ textAlign: 'center', fontSize: '11px', marginTop: '10px', padding: '8px 0' }}>
                       Cliente debe pagar en caja posteriormente
                     </div>
+                  </>
+                ) : sale.paymentMethod === 'MIXED' && sale.paymentDetails ? (
+                  <>
+                    {((sale.paymentDetails as any)?.splits || []).map((split: any, idx: number) => (
+                      <div key={idx} className="payment-row">
+                        <span>{split.method === 'CASH' ? 'Efectivo' : split.method === 'YAPE' ? 'Yape' : split.method === 'PLIN' ? 'Plin' : 'Tarjeta'}:</span>
+                        <span>{formatMoney(split.amount)}</span>
+                      </div>
+                    ))}
+                    {sale.changeAmount && Number(sale.changeAmount) > 0 && (
+                      <div className="payment-row">
+                        <span>Vuelto:</span>
+                        <span>{formatMoney(sale.changeAmount!)}</span>
+                      </div>
+                    )}
                   </>
                 ) : sale.paymentMethod === 'CASH' ? (
                   <>

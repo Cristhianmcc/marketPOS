@@ -8,6 +8,7 @@ import { formatMoney } from '@/lib/money';
 interface StoreProduct {
   id: string;
   price: number;
+  costPrice: number | null;
   stock: number | null;
   active: boolean;
   product: {
@@ -126,6 +127,8 @@ export default function MobileCartDrawer({
 
   // Total final
   const total = Math.max(0, subtotal - totalDiscounts - couponDiscount);
+
+
 
   return (
     <>

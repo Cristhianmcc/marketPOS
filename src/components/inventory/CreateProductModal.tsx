@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, AlertTriangle, Upload, Loader2 } from 'lucide-react';
+import { X, AlertTriangle, Upload, Loader2, FlaskConical, Calendar } from 'lucide-react';
+import { useFlags } from '@/hooks/useFlags';
 
 interface CreateProductModalProps {
   isOpen: boolean;
@@ -42,6 +43,15 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
   const [loadingFuzzy, setLoadingFuzzy] = useState(false); // ✅ MÓDULO 18.2
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   
+  // ✅ MÓDULO PH1: Flag farmacéutico
+  const { isOn: isFlagOn } = useFlags();
+  const pharmaFieldsEnabled = isFlagOn('ENABLE_PHARMA_FIELDS');
+  // ✅ MÓDULO PH2: Flag de lotes y vencimiento
+  const batchExpiryEnabled = isFlagOn('ENABLE_BATCH_EXPIRY');
+
+  // ✅ MÓDULO PH2: Estado del lote inicial
+  const [batchData, setBatchData] = useState({ batchNumber: 'L001', expiryDate: '', quantity: '' });
+
   // ✅ MÓDULO F5: Categorías dinámicas según perfil de negocio
   const [dynamicCategories, setDynamicCategories] = useState<string[]>([]);
   const [businessProfile, setBusinessProfile] = useState<string>('BODEGA');
@@ -75,6 +85,17 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     stock: '',
     minStock: '',
     imageUrl: '',
+    // ✅ MÓDULO PH1: Campos farmacéuticos
+    commercialName: '',
+    genericName: '',
+    concentration: '',
+    pharmaceuticalForm: '',
+    presentation: '',
+    laboratory: '',
+    sanitaryRegistry: '',
+    requiresPrescription: false,
+    medicineCategory: '',
+    barcodeSecondary: '',
   });
 
   // Categorías por defecto (fallback)
@@ -413,6 +434,19 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
         brand: formData.brand || null,
         content: formData.content || null,
         imageUrl: formData.imageUrl || null,
+        // ✅ MÓDULO PH1: Campos farmacéuticos
+        ...(pharmaFieldsEnabled && {
+          commercialName: formData.commercialName || null,
+          genericName: formData.genericName || null,
+          concentration: formData.concentration || null,
+          pharmaceuticalForm: formData.pharmaceuticalForm || null,
+          presentation: formData.presentation || null,
+          laboratory: formData.laboratory || null,
+          sanitaryRegistry: formData.sanitaryRegistry || null,
+          requiresPrescription: formData.requiresPrescription,
+          medicineCategory: formData.medicineCategory || null,
+          barcodeSecondary: formData.barcodeSecondary || null,
+        }),
       };
 
       const productRes = await fetch('/api/products', {
@@ -430,7 +464,18 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       }
 
       // Paso 2: Configurar producto para la tienda
-      const stock = formData.stock && formData.stock.trim() !== '' ? parseFloat(formData.stock) : null;
+      // En modo farmacia con lote+fecha, el stock viene del lote (batch API suma el stock)
+      // Sin fecha de vencimiento o sin lote, el stock va directo al StoreProduct
+      const batchQty = batchData.quantity ? parseFloat(batchData.quantity) : 0;
+      const willCreateBatch = batchExpiryEnabled && batchData.expiryDate && !isNaN(batchQty) && batchQty > 0;
+      let stock: number | null;
+      if (batchExpiryEnabled) {
+        // Si vamos a crear lote con fecha, el batch API suma el stock → crear con 0
+        // Si no hay fecha pero hay cantidad, asignar stock directo
+        stock = willCreateBatch ? 0 : (!isNaN(batchQty) && batchQty > 0 ? batchQty : 0);
+      } else {
+        stock = formData.stock && formData.stock.trim() !== '' ? parseFloat(formData.stock) : null;
+      }
       const minStock = formData.minStock && formData.minStock.trim() !== '' ? parseFloat(formData.minStock) : null;
       const costPrice = formData.costPrice && formData.costPrice.trim() !== '' ? parseFloat(formData.costPrice) : null;
 
@@ -450,10 +495,27 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       });
 
       if (!storeRes.ok) {
-        const storeData = await storeRes.json();
-        setError(storeData.error || 'Error al configurar producto en tienda');
+        const storeErrData = await storeRes.json();
+        setError(storeErrData.error || 'Error al configurar producto en tienda');
         setLoading(false);
         return;
+      }
+
+      const storeData = await storeRes.json();
+
+      // ✅ MÓDULO PH2: Crear lote inicial si está en modo farmacia con fecha de vencimiento
+      if (willCreateBatch) {
+        await fetch('/api/batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            storeProductId: storeData.storeProduct.id,
+            batchNumber: batchData.batchNumber.trim() || 'L001',
+            expiryDate: new Date(batchData.expiryDate + 'T00:00:00').toISOString(),
+            quantity: batchQty,
+            unitCost: costPrice,
+          }),
+        });
       }
 
       onSuccess();
@@ -483,7 +545,19 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
       stock: '',
       minStock: '',
       imageUrl: '',
+      // ✅ MÓDULO PH1
+      commercialName: '',
+      genericName: '',
+      concentration: '',
+      pharmaceuticalForm: '',
+      presentation: '',
+      laboratory: '',
+      sanitaryRegistry: '',
+      requiresPrescription: false,
+      medicineCategory: '',
+      barcodeSecondary: '',
     });
+    setBatchData({ batchNumber: 'L001', expiryDate: '', quantity: '' }); // ✅ MÓDULO PH2
     setError('');
     setSuggestions([]);
     setShowDuplicateWarning(false);
@@ -783,6 +857,144 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
             />
           </div>
 
+          {/* ✅ MÓDULO PH1: Sección farmacéutica — solo si ENABLE_PHARMA_FIELDS ON */}
+          {pharmaFieldsEnabled && (
+            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/40 space-y-4">
+              <div className="flex items-center gap-2 mb-1">
+                <FlaskConical className="w-4 h-4 text-blue-600" />
+                <p className="text-sm font-semibold text-blue-800">Datos farmacéuticos</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Nombre comercial</label>
+                  <input
+                    type="text"
+                    value={formData.commercialName}
+                    onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    placeholder="Ej: Amoxidal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Principio activo (DCI)</label>
+                  <input
+                    type="text"
+                    value={formData.genericName}
+                    onChange={(e) => setFormData({ ...formData, genericName: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    placeholder="Ej: Amoxicilina"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Concentración</label>
+                  <input
+                    type="text"
+                    value={formData.concentration}
+                    onChange={(e) => setFormData({ ...formData, concentration: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    placeholder="Ej: 500 mg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Forma farmacéutica</label>
+                  <select
+                    value={formData.pharmaceuticalForm}
+                    onChange={(e) => setFormData({ ...formData, pharmaceuticalForm: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="Tabletas">Tabletas</option>
+                    <option value="Cápsulas">Cápsulas</option>
+                    <option value="Jarabe">Jarabe</option>
+                    <option value="Suspensión">Suspensión</option>
+                    <option value="Crema">Crema</option>
+                    <option value="Ungüento">Ungüento</option>
+                    <option value="Ampolla">Ampolla</option>
+                    <option value="Inyectable">Inyectable</option>
+                    <option value="Gotas">Gotas</option>
+                    <option value="Óvulo">Óvulo</option>
+                    <option value="Supositorio">Supositorio</option>
+                    <option value="Parche">Parche</option>
+                    <option value="Polvo">Polvo</option>
+                    <option value="Solución">Solución</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Presentación</label>
+                  <input
+                    type="text"
+                    value={formData.presentation}
+                    onChange={(e) => setFormData({ ...formData, presentation: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    placeholder="Ej: Caja x 20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Laboratorio</label>
+                  <input
+                    type="text"
+                    value={formData.laboratory}
+                    onChange={(e) => setFormData({ ...formData, laboratory: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    placeholder="Ej: Genfar"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Categoría terapéutica</label>
+                  <input
+                    type="text"
+                    value={formData.medicineCategory}
+                    onChange={(e) => setFormData({ ...formData, medicineCategory: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    placeholder="Ej: Antibiótico"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Reg. Sanitario</label>
+                  <input
+                    type="text"
+                    value={formData.sanitaryRegistry}
+                    onChange={(e) => setFormData({ ...formData, sanitaryRegistry: e.target.value })}
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Código de barras secundario</label>
+                <input
+                  type="text"
+                  value={formData.barcodeSecondary}
+                  onChange={(e) => setFormData({ ...formData, barcodeSecondary: e.target.value })}
+                  pattern="[0-9]{8,14}"
+                  className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                  placeholder="Código alternativo (8-14 dígitos)"
+                />
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.requiresPrescription}
+                  onChange={(e) => setFormData({ ...formData, requiresPrescription: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                />
+                <span className="text-sm text-gray-700">Requiere receta médica</span>
+              </label>
+            </div>
+          )}
+
           <div className="border-t border-gray-200 pt-4 mt-4">
             <p className="text-sm font-medium text-[#1F2A37] mb-3">Configuración para tu tienda</p>
             
@@ -843,20 +1055,77 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">
-                  Stock inicial {formData.unitType === 'KG' ? '(Opcional)' : ''}
-                </label>
-                <input
-                  type="number"
-                  step={formData.unitType === 'UNIT' ? '1' : '0.01'}
-                  min="0"
-                  value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
-                  placeholder={formData.unitType === 'UNIT' ? 'Ej: 100' : 'Ej: 25.5'}
-                />
-              </div>
+              {/* ✅ MÓDULO PH2: En farmacia — sección de lote reemplaza stock directo */}
+              {batchExpiryEnabled ? (
+                <div className="border border-amber-200 rounded-lg p-4 bg-amber-50/40 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-amber-600" />
+                    <p className="text-sm font-semibold text-amber-800">Lote inicial y vencimiento</p>
+                    <span className="text-xs text-white bg-amber-500 px-2 py-0.5 rounded">Farmacia</span>
+                  </div>
+                  <p className="text-xs text-amber-700">Registra el lote para habilitar alertas de vencimiento y prioridad FEFO en ventas.</p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Nº de lote</label>
+                      <input
+                        type="text"
+                        value={batchData.batchNumber}
+                        onChange={(e) => setBatchData({ ...batchData, batchNumber: e.target.value })}
+                        className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
+                        placeholder="Ej: L001"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Fecha de vencimiento <span className="text-amber-600">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={batchData.expiryDate}
+                        onChange={(e) => setBatchData({ ...batchData, expiryDate: e.target.value })}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Cantidad inicial
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={batchData.quantity}
+                      onChange={(e) => setBatchData({ ...batchData, quantity: e.target.value })}
+                      className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
+                      placeholder="Ej: 100"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Este valor define el stock inicial del producto.</p>
+                  </div>
+
+                  {!batchData.expiryDate && (
+                    <p className="text-xs text-amber-600">⚠️ Sin fecha de vencimiento no habrá alertas ni FEFO activo para este producto.</p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                    Stock inicial {formData.unitType === 'KG' ? '(Opcional)' : ''}
+                  </label>
+                  <input
+                    type="number"
+                    step={formData.unitType === 'UNIT' ? '1' : '0.01'}
+                    min="0"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                    placeholder={formData.unitType === 'UNIT' ? 'Ej: 100' : 'Ej: 25.5'}
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-[#1F2A37] mb-2">

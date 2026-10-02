@@ -155,7 +155,8 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     invoiceLine.ele('cbc:ID').txt(item.lineNumber.toString());
     
     const quantity = formatUBLQuantity(item.quantity);
-    const unitCode = mapUnitTypeToUBL(item.unitType);
+    // ✅ PH8: Usar unitSunatCode del snapshot si está disponible
+    const unitCode = item.unitSunatCode || mapUnitTypeToUBL(item.unitType);
     invoiceLine.ele('cbc:InvoicedQuantity', { unitCode }).txt(quantity);
     
     invoiceLine.ele('cbc:LineExtensionAmount', { currencyID: currency })

@@ -18,6 +18,17 @@ export interface Product {
   baseUnitId?: string | null; // ✅ MÓDULO F2.1: Unidad SUNAT
   imageUrl: string | null;
   isGlobal?: boolean; // ✅ MÓDULO 18.1: Catálogo Global
+  // ✅ MÓDULO PH1: Campos farmacéuticos (opcionales)
+  commercialName?: string | null;
+  genericName?: string | null;
+  concentration?: string | null;
+  pharmaceuticalForm?: string | null;
+  presentation?: string | null;
+  laboratory?: string | null;
+  sanitaryRegistry?: string | null;
+  requiresPrescription?: boolean;
+  medicineCategory?: string | null;
+  barcodeSecondary?: string | null;
 }
 
 export interface StoreProduct {

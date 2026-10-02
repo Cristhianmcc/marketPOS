@@ -5,18 +5,25 @@ import { useRouter } from 'next/navigation';
 import { toast, Toaster } from 'sonner';
 
 // ✅ MÓDULO V1: Tipos de perfiles de negocio
-type BusinessProfile = 'BODEGA' | 'FERRETERIA' | 'TALLER' | 'LAVANDERIA' | 'POLLERIA' | 'HOSTAL' | 'BOTICA' | 'ACCESORIOS';
+type BusinessProfile = 'BODEGA' | 'FERRETERIA' | 'TALLER' | 'LAVANDERIA' | 'POLLERIA' | 'HOSTAL' | 'BOTICA' | 'FARMACIA' | 'ACCESORIOS';
 
 // Flags de rubro (NO son de plan) con sus perfiles por defecto
 // SUNAT ya NO aparece aquí — es un flag de plan (solo BUSINESS y DEMO lo activan automáticamente)
 const RUBRO_FLAG_OPTIONS = [
-  { key: 'ENABLE_ADVANCED_UNITS',   name: 'Unidades Avanzadas',          description: 'Vender por m², kg, ml fraccionados',         defaultProfiles: ['FERRETERIA'] },
-  { key: 'ENABLE_CONVERSIONS',      name: 'Conversiones de Unidades',    description: '1 caja = 12 unidades, etc.',                  defaultProfiles: ['FERRETERIA'] },
-  { key: 'ENABLE_SELLUNIT_PRICING', name: 'Precio por Presentación',     description: 'Precio especial por caja, docena, etc.',      defaultProfiles: ['FERRETERIA'] },
-  { key: 'ENABLE_SERVICES',         name: 'Servicios',                   description: 'Mano de obra, servicios sin inventario',      defaultProfiles: ['TALLER', 'LAVANDERIA', 'HOSTAL'] },
-  { key: 'ENABLE_WORK_ORDERS',      name: 'Órdenes de Trabajo',           description: 'Recepción, diagnóstico y seguimiento de trabajos', defaultProfiles: ['TALLER'] },
-  { key: 'ENABLE_RESERVATIONS',     name: 'Reservaciones',               description: 'Check-in/out y disponibilidad de habitaciones', defaultProfiles: ['HOSTAL'] },
-  { key: 'ENABLE_BATCH_EXPIRY',     name: 'Lotes y Vencimientos',        description: 'Trazabilidad de lotes, alertas, FIFO',        defaultProfiles: ['BOTICA'] },
+  { key: 'ENABLE_ADVANCED_UNITS',       name: 'Unidades Avanzadas',          description: 'Vender por m², kg, ml fraccionados',                  defaultProfiles: ['FERRETERIA'] },
+  { key: 'ENABLE_CONVERSIONS',          name: 'Conversiones de Unidades',    description: '1 caja = 12 unidades, etc.',                          defaultProfiles: ['FERRETERIA'] },
+  { key: 'ENABLE_SELLUNIT_PRICING',     name: 'Precio por Presentación',     description: 'Precio especial por caja, docena, etc.',              defaultProfiles: ['FERRETERIA'] },
+  { key: 'ENABLE_SERVICES',            name: 'Servicios',                   description: 'Mano de obra, servicios sin inventario',              defaultProfiles: ['TALLER', 'LAVANDERIA', 'HOSTAL'] },
+  { key: 'ENABLE_WORK_ORDERS',         name: 'Órdenes de Trabajo',           description: 'Recepción, diagnóstico y seguimiento de trabajos',    defaultProfiles: ['TALLER'] },
+  { key: 'ENABLE_RESERVATIONS',        name: 'Reservaciones',               description: 'Check-in/out y disponibilidad de habitaciones',      defaultProfiles: ['HOSTAL'] },
+  { key: 'ENABLE_BATCH_EXPIRY',        name: 'Lotes y Vencimientos',        description: 'Trazabilidad de lotes, alertas, FEFO',               defaultProfiles: ['BOTICA', 'FARMACIA'] },
+  { key: 'ENABLE_FEFO_SALES',          name: 'Ventas FEFO',                 description: 'El medicamento que vence antes sale primero',         defaultProfiles: ['BOTICA', 'FARMACIA'] },
+  { key: 'ENABLE_PHARMA_FIELDS',       name: 'Campos Farmacéuticos',        description: 'Principio activo, concentración, forma farmacéutica', defaultProfiles: ['BOTICA', 'FARMACIA'] },
+  { key: 'ENABLE_MEDICINE_SEARCH',     name: 'Búsqueda por DCI',            description: 'Buscar medicamentos por principio activo (DCI)',     defaultProfiles: ['BOTICA', 'FARMACIA'] },
+  { key: 'ENABLE_RESTRICTED_PRODUCTS', name: 'Productos Controlados',       description: 'Registro sanitario obligatorio, medicamentos controlados', defaultProfiles: ['FARMACIA'] },
+  { key: 'ENABLE_SUPPLIERS',           name: 'Proveedores y Compras',       description: 'Proveedores, órdenes de compra y recepción de stock', defaultProfiles: ['BOTICA', 'FARMACIA'] },
+  { key: 'ENABLE_PATIENTS',            name: 'Historial de Pacientes',      description: 'Pacientes, historial de dispensación e interacciones', defaultProfiles: ['BOTICA', 'FARMACIA'] },
+  { key: 'ENABLE_CONTROLLED_BOOK',     name: 'Libro de Controlados',        description: 'Registro DIGEMID de medicamentos controlados',        defaultProfiles: ['BOTICA', 'FARMACIA'] },
 ] as const;
 
 type RubroFlagKey = typeof RUBRO_FLAG_OPTIONS[number]['key'];
@@ -36,7 +43,9 @@ const PLAN_INFO = {
     // DEMO activa todo para que el cliente pueda probar cada módulo
     extraFlags: ['ENABLE_ADVANCED_UNITS', 'ENABLE_CONVERSIONS', 'ENABLE_SELLUNIT_PRICING',
                  'ENABLE_SERVICES', 'ENABLE_WORK_ORDERS', 'ENABLE_RESERVATIONS',
-                 'ENABLE_BATCH_EXPIRY'] as RubroFlagKey[],
+                 'ENABLE_BATCH_EXPIRY', 'ENABLE_FEFO_SALES', 'ENABLE_PHARMA_FIELDS',
+                 'ENABLE_MEDICINE_SEARCH', 'ENABLE_RESTRICTED_PRODUCTS',
+                 'ENABLE_SUPPLIERS', 'ENABLE_PATIENTS', 'ENABLE_CONTROLLED_BOOK'] as RubroFlagKey[],
   },
   STARTER: {
     label: '📦 Básico — Solo ventas esenciales',
@@ -223,7 +232,7 @@ export default function AdminStoresPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.message || 'Error al crear tienda');
+        toast.error(data.detail || data.message || 'Error al crear tienda');
         return;
       }
 

@@ -197,6 +197,67 @@ export async function GET(request: NextRequest) {
     });
     const saldoPendiente = Number(openReceivables._sum.balance || 0);
 
+    // Calcular costo total y ganancia bruta
+    const userCostFilter = session.role === 'CASHIER'
+      ? Prisma.sql`AND s.user_id = ${session.userId}`
+      : Prisma.empty;
+    const profitResult = await prisma.$queryRaw<Array<{ total_cost: any; total_revenue: any }>>(
+      Prisma.sql`
+        SELECT 
+          COALESCE(SUM(si.cost_price * si.quantity), 0) as total_cost,
+          COALESCE(SUM(si.total_line), 0) as total_revenue
+        FROM sale_items si
+        INNER JOIN sales s ON s.id = si.sale_id
+        WHERE s.store_id = ${session.storeId}
+          AND s.created_at >= ${fromDate}
+          AND s.created_at <= ${toDate}
+          AND s.total > 0
+          ${userCostFilter}
+      `
+    );
+    const totalCost = Number(profitResult[0]?.total_cost || 0);
+    const totalRevenue = Number(profitResult[0]?.total_revenue || 0);
+    const grossProfit = totalRevenue - totalCost;
+
+    // Desglose de ganancia por producto
+    const profitByProductRows = await prisma.$queryRaw<Array<{
+      product_name: string;
+      qty: any;
+      unit_cost: any;
+      unit_price: any;
+      total_cost: any;
+      total_revenue: any;
+    }>>(
+      Prisma.sql`
+        SELECT 
+          si.product_name,
+          SUM(si.quantity) as qty,
+          ROUND(AVG(si.cost_price), 2) as unit_cost,
+          ROUND(AVG(si.unit_price), 2) as unit_price,
+          COALESCE(SUM(si.cost_price * si.quantity), 0) as total_cost,
+          COALESCE(SUM(si.total_line), 0) as total_revenue
+        FROM sale_items si
+        INNER JOIN sales s ON s.id = si.sale_id
+        WHERE s.store_id = ${session.storeId}
+          AND s.created_at >= ${fromDate}
+          AND s.created_at <= ${toDate}
+          AND s.total > 0
+          AND si.cost_price IS NOT NULL
+          ${userCostFilter}
+        GROUP BY si.product_name
+        ORDER BY SUM(si.total_line) DESC
+      `
+    );
+    const profitByProduct = profitByProductRows.map(r => ({
+      productName: r.product_name,
+      quantity: Number(r.qty),
+      unitCost: Number(r.unit_cost),
+      unitPrice: Number(r.unit_price),
+      totalCost: Number(r.total_cost),
+      totalRevenue: Number(r.total_revenue),
+      profit: Number(r.total_revenue) - Number(r.total_cost),
+    }));
+
     // Sales by payment method
     const paymentMethodSummary = sales.reduce((acc: any, sale) => {
       const method = sale.paymentMethod;
@@ -222,6 +283,9 @@ export async function GET(request: NextRequest) {
         totalFiado,
         fiadoCobrado,
         saldoPendiente,
+        totalCost,
+        grossProfit,
+        profitMargin: totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0,
         dateRange: {
           from: fromDate.toISOString(),
           to: toDate.toISOString(),
@@ -234,6 +298,7 @@ export async function GET(request: NextRequest) {
         totalQuantity: Number(p.total_quantity),
         totalAmount: Number(p.total_amount),
       })),
+      profitByProduct,
     });
   } catch (error) {
     console.error('Error fetching summary:', error);

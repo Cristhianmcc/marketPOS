@@ -4,6 +4,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
+import { getDefaultCategoriesForProfile, getProfileFlags } from '@/lib/businessProfiles';
+import { BusinessProfile } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -17,6 +19,7 @@ interface ProvisionRequest {
   storeRuc?: string;
   storeAddress?: string;
   storePhone?: string;
+  businessProfile?: string; // ✅ PH: Perfil de negocio (default BODEGA)
   
   // Datos del usuario
   userName: string;
@@ -72,6 +75,7 @@ export async function POST(request: Request) {
     // Crear tienda y usuario en una transacción
     const result = await prisma.$transaction(async (tx) => {
       // 1. Crear la tienda
+      const profile = (body.businessProfile || 'BODEGA') as BusinessProfile;
       const store = await tx.store.create({
         data: {
           name: body.storeName,
@@ -79,6 +83,7 @@ export async function POST(request: Request) {
           address: body.storeAddress || null,
           phone: body.storePhone || null,
           status: 'ACTIVE',
+          businessProfile: profile,
         },
       });
 
@@ -131,21 +136,8 @@ export async function POST(request: Request) {
         },
       });
 
-      // 5. Crear categorías por defecto
-      const defaultCategories = [
-        { name: 'Abarrotes',            slug: 'abarrotes',            color: '#F59E0B', icon: '🛒', sortOrder: 1 },
-        { name: 'Bebidas',              slug: 'bebidas',              color: '#3B82F6', icon: '🥤', sortOrder: 2 },
-        { name: 'Lácteos y Derivados',  slug: 'lacteos-derivados',    color: '#BFDBFE', icon: '🥛', sortOrder: 3 },
-        { name: 'Panadería y Pastelería', slug: 'panaderia-pasteleria', color: '#D97706', icon: '🍞', sortOrder: 4 },
-        { name: 'Carnes y Embutidos',   slug: 'carnes-embutidos',     color: '#EF4444', icon: '🥩', sortOrder: 5 },
-        { name: 'Frutas y Verduras',    slug: 'frutas-verduras',      color: '#10B981', icon: '🥦', sortOrder: 6 },
-        { name: 'Limpieza del Hogar',   slug: 'limpieza-hogar',       color: '#6366F1', icon: '🧹', sortOrder: 7 },
-        { name: 'Cuidado Personal',     slug: 'cuidado-personal',     color: '#EC4899', icon: '🧴', sortOrder: 8 },
-        { name: 'Golosinas y Snacks',   slug: 'golosinas-snacks',     color: '#F97316', icon: '🍬', sortOrder: 9 },
-        { name: 'Congelados',           slug: 'congelados',           color: '#60A5FA', icon: '🧊', sortOrder: 10 },
-        { name: 'Farmacia',             slug: 'farmacia',             color: '#34D399', icon: '💊', sortOrder: 11 },
-        { name: 'Otros',               slug: 'otros',                color: '#9CA3AF', icon: '📦', sortOrder: 12 },
-      ];
+      // 5. Crear categorías y flags según perfil de negocio
+      const defaultCategories = getDefaultCategoriesForProfile(profile);
       await tx.category.createMany({
         data: defaultCategories.map((cat) => ({
           storeId: store.id,
@@ -158,6 +150,19 @@ export async function POST(request: Request) {
         })),
         skipDuplicates: true,
       });
+
+      // 6. Crear feature flags según perfil de negocio
+      const profileFlags = getProfileFlags(profile);
+      if (profileFlags.length > 0) {
+        await tx.featureFlag.createMany({
+          data: profileFlags.map((flagKey) => ({
+            storeId: store.id,
+            key: flagKey,
+            enabled: true,
+          })),
+          skipDuplicates: true,
+        });
+      }
 
       return { store, user };
     });

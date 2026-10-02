@@ -108,7 +108,12 @@ const PRODUCTS_SEED = [
 
 interface RubroSeedItem {
   categories: { name: string; icon: string; color: string; order: number }[];
-  products: { name: string; category: string; price: number; stock: number | null; allowDecimals?: boolean }[];
+  products: {
+    name: string; category: string; price: number; stock: number | null; allowDecimals?: boolean;
+    genericName?: string; concentration?: string; pharmaceuticalForm?: string;
+    presentation?: string; laboratory?: string; sanitaryRegistry?: string;
+    requiresPrescription?: boolean; medicineCategory?: string;
+  }[];
 }
 
 const RUBRO_SEEDS: Record<string, RubroSeedItem> = {
@@ -315,21 +320,61 @@ const RUBRO_SEEDS: Record<string, RubroSeedItem> = {
       { name: 'Otros',            icon: '📦', color: '#9CA3AF', order: 6 },
     ],
     products: [
-      { name: 'Paracetamol 500mg x10',   category: 'Analgésicos',      price: 2.50,  stock: 50 },
-      { name: 'Ibuprofeno 400mg x8',     category: 'Analgésicos',      price: 3.50,  stock: 40 },
-      { name: 'Naproxeno 500mg x10',     category: 'Analgésicos',      price: 4.00,  stock: 30 },
-      { name: 'Amoxicilina 500mg x12',   category: 'Antibióticos',     price: 12.00, stock: 20 },
-      { name: 'Azitromicina 500mg x3',   category: 'Antibióticos',     price: 15.00, stock: 15 },
-      { name: 'Vitamina C 1g x10',       category: 'Vitaminas',        price: 6.00,  stock: 30 },
-      { name: 'Complejo B x30',          category: 'Vitaminas',        price: 8.50,  stock: 25 },
-      { name: 'Vitamina D3 1000UI x30',  category: 'Vitaminas',        price: 12.00, stock: 20 },
-      { name: 'Jabón Antiséptico',       category: 'Higiene',          price: 5.50,  stock: 30 },
-      { name: 'Alcohol 70° 250ml',       category: 'Higiene',          price: 4.50,  stock: 40 },
-      { name: 'Gel Desinfectante 250ml', category: 'Higiene',          price: 8.00,  stock: 25 },
-      { name: 'Algodón 100g',            category: 'Primeros Auxilios',price: 4.00,  stock: 30 },
-      { name: 'Esparadrapo 5m',          category: 'Primeros Auxilios',price: 5.50,  stock: 25 },
-      { name: 'Venda Elástica 4"',       category: 'Primeros Auxilios',price: 6.00,  stock: 20 },
-      { name: 'Termómetro Digital',      category: 'Otros',            price: 25.00, stock: 10 },
+      { name: 'Paracetamol 500mg x10',   category: 'Analgésicos',      price: 2.50,  stock: 50, genericName: 'Paracetamol', concentration: '500 mg', pharmaceuticalForm: 'Tableta', presentation: 'Caja x 10 tabletas', laboratory: 'Medifarma', sanitaryRegistry: 'NSE-0012', medicineCategory: 'Analgésico' },
+      { name: 'Ibuprofeno 400mg x8',     category: 'Analgésicos',      price: 3.50,  stock: 40, genericName: 'Ibuprofeno', concentration: '400 mg', pharmaceuticalForm: 'Tableta recubierta', presentation: 'Caja x 8 tabletas', laboratory: 'Portugal', sanitaryRegistry: 'NSE-0087', medicineCategory: 'Antiinflamatorio' },
+      { name: 'Naproxeno 500mg x10',     category: 'Analgésicos',      price: 4.00,  stock: 30, genericName: 'Naproxeno sódico', concentration: '500 mg', pharmaceuticalForm: 'Tableta', presentation: 'Caja x 10 tabletas', laboratory: 'Farmindustria', sanitaryRegistry: 'NSE-0134', medicineCategory: 'Antiinflamatorio' },
+      { name: 'Amoxicilina 500mg x12',   category: 'Antibióticos',     price: 12.00, stock: 20, genericName: 'Amoxicilina', concentration: '500 mg', pharmaceuticalForm: 'Cápsula', presentation: 'Caja x 12 cápsulas', laboratory: 'Genfar', sanitaryRegistry: 'NSE-0201', requiresPrescription: true, medicineCategory: 'Antibiótico' },
+      { name: 'Azitromicina 500mg x3',   category: 'Antibióticos',     price: 15.00, stock: 15, genericName: 'Azitromicina', concentration: '500 mg', pharmaceuticalForm: 'Tableta recubierta', presentation: 'Caja x 3 tabletas', laboratory: 'AC Farma', sanitaryRegistry: 'NSE-0215', requiresPrescription: true, medicineCategory: 'Antibiótico' },
+      { name: 'Vitamina C 1g x10',       category: 'Vitaminas',        price: 6.00,  stock: 30, genericName: 'Ácido ascórbico', concentration: '1 g', pharmaceuticalForm: 'Tableta efervescente', presentation: 'Tubo x 10 tabletas', laboratory: 'Bayer', sanitaryRegistry: 'NSE-0310', medicineCategory: 'Vitamina' },
+      { name: 'Complejo B x30',          category: 'Vitaminas',        price: 8.50,  stock: 25, genericName: 'Complejo B', concentration: 'B1+B6+B12', pharmaceuticalForm: 'Tableta recubierta', presentation: 'Frasco x 30 tabletas', laboratory: 'Medifarma', sanitaryRegistry: 'NSE-0322', medicineCategory: 'Vitamina' },
+      { name: 'Vitamina D3 1000UI x30',  category: 'Vitaminas',        price: 12.00, stock: 20, genericName: 'Colecalciferol', concentration: '1000 UI', pharmaceuticalForm: 'Cápsula blanda', presentation: 'Frasco x 30 cápsulas', laboratory: 'Mason Natural', sanitaryRegistry: 'NSE-0335', medicineCategory: 'Vitamina' },
+      { name: 'Jabón Antiséptico',       category: 'Higiene',          price: 5.50,  stock: 30, genericName: 'Triclosán', concentration: '1%', pharmaceuticalForm: 'Jabón barra', presentation: 'Barra 100 g', laboratory: 'Protex', sanitaryRegistry: 'NSHC-0410', medicineCategory: 'Higiene' },
+      { name: 'Alcohol 70° 250ml',       category: 'Higiene',          price: 4.50,  stock: 40, genericName: 'Alcohol etílico', concentration: '70°', pharmaceuticalForm: 'Solución tópica', presentation: 'Frasco x 250 ml', laboratory: 'Alkofarma', sanitaryRegistry: 'NSHC-0421', medicineCategory: 'Antiséptico' },
+      { name: 'Gel Desinfectante 250ml', category: 'Higiene',          price: 8.00,  stock: 25, genericName: 'Alcohol gel', concentration: '70%', pharmaceuticalForm: 'Gel tópico', presentation: 'Frasco x 250 ml', laboratory: 'Aval', sanitaryRegistry: 'NSHC-0433', medicineCategory: 'Antiséptico' },
+      { name: 'Algodón 100g',            category: 'Primeros Auxilios',price: 4.00,  stock: 30, genericName: 'Algodón hidrófilo', pharmaceuticalForm: 'Material de curación', presentation: 'Bolsa x 100 g', laboratory: 'Ninet', sanitaryRegistry: 'NSDM-0501', medicineCategory: 'Material médico' },
+      { name: 'Esparadrapo 5m',          category: 'Primeros Auxilios',price: 5.50,  stock: 25, genericName: 'Esparadrapo microporoso', pharmaceuticalForm: 'Material de curación', presentation: 'Rollo 2.5 cm x 5 m', laboratory: 'Nexcare', sanitaryRegistry: 'NSDM-0512', medicineCategory: 'Material médico' },
+      { name: 'Venda Elástica 4"',       category: 'Primeros Auxilios',price: 6.00,  stock: 20, genericName: 'Venda elástica', pharmaceuticalForm: 'Material de curación', presentation: 'Rollo 4 pulgadas x 5 yardas', laboratory: 'Covidien', sanitaryRegistry: 'NSDM-0523', medicineCategory: 'Material médico' },
+      { name: 'Termómetro Digital',      category: 'Otros',            price: 25.00, stock: 10, genericName: 'Termómetro digital', pharmaceuticalForm: 'Dispositivo médico', presentation: 'Unidad', laboratory: 'Omron', sanitaryRegistry: 'NSDM-0601', medicineCategory: 'Dispositivo médico' },
+    ],
+  },
+
+  FARMACIA: {
+    categories: [
+      { name: 'Analgésicos',      icon: '💊', color: '#EF4444', order: 1 },
+      { name: 'Antibióticos',     icon: '🧬', color: '#3B82F6', order: 2 },
+      { name: 'Antigripales',     icon: '🤧', color: '#F59E0B', order: 3 },
+      { name: 'Vitaminas',        icon: '🌿', color: '#10B981', order: 4 },
+      { name: 'Higiene',          icon: '🧴', color: '#8B5CF6', order: 5 },
+      { name: 'Primeros Auxilios',icon: '🩹', color: '#F97316', order: 6 },
+      { name: 'Controlados Rx',   icon: '🔒', color: '#DC2626', order: 7 },
+      { name: 'Inyectables',      icon: '💉', color: '#7C3AED', order: 8 },
+      { name: 'Material Médico',  icon: '🩺', color: '#0284C7', order: 9 },
+      { name: 'Otros',            icon: '📦', color: '#9CA3AF', order: 10 },
+    ],
+    products: [
+      { name: 'Paracetamol 500mg x10',        category: 'Analgésicos',      price: 2.50,  stock: 80, genericName: 'Paracetamol', concentration: '500 mg', pharmaceuticalForm: 'Tableta', presentation: 'Caja x 10 tabletas', laboratory: 'Medifarma', sanitaryRegistry: 'NSE-0012', medicineCategory: 'Analgésico' },
+      { name: 'Ibuprofeno 400mg x10',         category: 'Analgésicos',      price: 3.50,  stock: 60, genericName: 'Ibuprofeno', concentration: '400 mg', pharmaceuticalForm: 'Tableta recubierta', presentation: 'Caja x 10 tabletas', laboratory: 'Portugal', sanitaryRegistry: 'NSE-0087', medicineCategory: 'Antiinflamatorio' },
+      { name: 'Metamizol 500mg x10',          category: 'Analgésicos',      price: 4.50,  stock: 40, genericName: 'Metamizol sódico', concentration: '500 mg', pharmaceuticalForm: 'Tableta', presentation: 'Caja x 10 tabletas', laboratory: 'Farmindustria', sanitaryRegistry: 'NSE-0099', medicineCategory: 'Analgésico' },
+      { name: 'Amoxicilina 500mg x12',        category: 'Antibióticos',     price: 12.00, stock: 30, genericName: 'Amoxicilina', concentration: '500 mg', pharmaceuticalForm: 'Cápsula', presentation: 'Caja x 12 cápsulas', laboratory: 'Genfar', sanitaryRegistry: 'NSE-0201', requiresPrescription: true, medicineCategory: 'Antibiótico' },
+      { name: 'Azitromicina 500mg x3',        category: 'Antibióticos',     price: 15.00, stock: 20, genericName: 'Azitromicina', concentration: '500 mg', pharmaceuticalForm: 'Tableta recubierta', presentation: 'Caja x 3 tabletas', laboratory: 'AC Farma', sanitaryRegistry: 'NSE-0215', requiresPrescription: true, medicineCategory: 'Antibiótico' },
+      { name: 'Ciprofloxacino 500mg x8',      category: 'Antibióticos',     price: 14.00, stock: 20, genericName: 'Ciprofloxacino', concentration: '500 mg', pharmaceuticalForm: 'Tableta recubierta', presentation: 'Caja x 8 tabletas', laboratory: 'Farmindustria', sanitaryRegistry: 'NSE-0228', requiresPrescription: true, medicineCategory: 'Antibiótico' },
+      { name: 'Antigripal Plus x10',          category: 'Antigripales',     price: 5.50,  stock: 50, genericName: 'Paracetamol + Clorfenamina + Fenilefrina', concentration: '500/4/10 mg', pharmaceuticalForm: 'Tableta', presentation: 'Caja x 10 tabletas', laboratory: 'Portugal', sanitaryRegistry: 'NSE-0301', medicineCategory: 'Antigripal' },
+      { name: 'Loratadina 10mg x10',          category: 'Antigripales',     price: 4.20,  stock: 40, genericName: 'Loratadina', concentration: '10 mg', pharmaceuticalForm: 'Tableta', presentation: 'Caja x 10 tabletas', laboratory: 'Genfar', sanitaryRegistry: 'NSE-0312', medicineCategory: 'Antihistamínico' },
+      { name: 'Vitamina C 1g x10',            category: 'Vitaminas',        price: 6.00,  stock: 50, genericName: 'Ácido ascórbico', concentration: '1 g', pharmaceuticalForm: 'Tableta efervescente', presentation: 'Tubo x 10 tabletas', laboratory: 'Bayer', sanitaryRegistry: 'NSE-0310', medicineCategory: 'Vitamina' },
+      { name: 'Complejo B x30',               category: 'Vitaminas',        price: 8.50,  stock: 30, genericName: 'Complejo B', concentration: 'B1+B6+B12', pharmaceuticalForm: 'Tableta recubierta', presentation: 'Frasco x 30 tabletas', laboratory: 'Medifarma', sanitaryRegistry: 'NSE-0322', medicineCategory: 'Vitamina' },
+      { name: 'Vitamina D3 2000UI x30',       category: 'Vitaminas',        price: 14.00, stock: 25, genericName: 'Colecalciferol', concentration: '2000 UI', pharmaceuticalForm: 'Cápsula blanda', presentation: 'Frasco x 30 cápsulas', laboratory: 'Mason Natural', sanitaryRegistry: 'NSE-0340', medicineCategory: 'Vitamina' },
+      { name: 'Omeprazol 20mg x14',           category: 'Otros',            price: 5.50,  stock: 40, genericName: 'Omeprazol', concentration: '20 mg', pharmaceuticalForm: 'Cápsula', presentation: 'Caja x 14 cápsulas', laboratory: 'AC Farma', sanitaryRegistry: 'NSE-0401', medicineCategory: 'Antiulceroso' },
+      { name: 'Jabón Antiséptico 100g',       category: 'Higiene',          price: 5.50,  stock: 30, genericName: 'Triclosán', concentration: '1%', pharmaceuticalForm: 'Jabón barra', presentation: 'Barra 100 g', laboratory: 'Protex', sanitaryRegistry: 'NSHC-0410', medicineCategory: 'Higiene' },
+      { name: 'Alcohol 70° 500ml',            category: 'Higiene',          price: 7.00,  stock: 40, genericName: 'Alcohol etílico', concentration: '70°', pharmaceuticalForm: 'Solución tópica', presentation: 'Frasco x 500 ml', laboratory: 'Alkofarma', sanitaryRegistry: 'NSHC-0425', medicineCategory: 'Antiséptico' },
+      { name: 'Algodón 100g',                 category: 'Primeros Auxilios',price: 4.00,  stock: 30, genericName: 'Algodón hidrófilo', pharmaceuticalForm: 'Material de curación', presentation: 'Bolsa x 100 g', laboratory: 'Ninet', sanitaryRegistry: 'NSDM-0501', medicineCategory: 'Material médico' },
+      { name: 'Venda Elástica 4"',            category: 'Primeros Auxilios',price: 6.00,  stock: 25, genericName: 'Venda elástica', pharmaceuticalForm: 'Material de curación', presentation: 'Rollo 4 pulgadas x 5 yardas', laboratory: 'Covidien', sanitaryRegistry: 'NSDM-0523', medicineCategory: 'Material médico' },
+      { name: 'Esparadrapo 5m',               category: 'Primeros Auxilios',price: 5.50,  stock: 25, genericName: 'Esparadrapo microporoso', pharmaceuticalForm: 'Material de curación', presentation: 'Rollo 2.5 cm x 5 m', laboratory: 'Nexcare', sanitaryRegistry: 'NSDM-0512', medicineCategory: 'Material médico' },
+      { name: 'Diazepam 5mg x10',             category: 'Controlados Rx',   price: 8.00,  stock: 15, genericName: 'Diazepam', concentration: '5 mg', pharmaceuticalForm: 'Tableta', presentation: 'Caja x 10 tabletas', laboratory: 'AC Farma', sanitaryRegistry: 'NSE-0701', requiresPrescription: true, medicineCategory: 'Ansiolítico' },
+      { name: 'Insulina NPH 100UI/ml 10ml',   category: 'Inyectables',      price: 48.00, stock: 10, genericName: 'Insulina humana NPH', concentration: '100 UI/ml', pharmaceuticalForm: 'Suspensión inyectable', presentation: 'Frasco ampolla x 10 ml', laboratory: 'Sanofi', sanitaryRegistry: 'NSE-0801', requiresPrescription: true, medicineCategory: 'Antidiabético' },
+      { name: 'Dexametasona 4mg/2ml amp',     category: 'Inyectables',      price: 6.50,  stock: 20, genericName: 'Dexametasona fosfato', concentration: '4 mg/2 ml', pharmaceuticalForm: 'Solución inyectable', presentation: 'Ampolla x 2 ml', laboratory: 'Medifarma', sanitaryRegistry: 'NSE-0812', requiresPrescription: true, medicineCategory: 'Corticoide' },
+      { name: 'Termómetro Digital',           category: 'Material Médico',  price: 25.00, stock: 10, genericName: 'Termómetro digital', pharmaceuticalForm: 'Dispositivo médico', presentation: 'Unidad', laboratory: 'Omron', sanitaryRegistry: 'NSDM-0601', medicineCategory: 'Dispositivo médico' },
+      { name: 'Tensiómetro Manual',           category: 'Material Médico',  price: 85.00, stock: 5, genericName: 'Tensiómetro aneroide', pharmaceuticalForm: 'Dispositivo médico', presentation: 'Kit completo', laboratory: 'Omron', sanitaryRegistry: 'NSDM-0612', medicineCategory: 'Dispositivo médico' },
+      { name: 'Guantes de Látex x50',         category: 'Material Médico',  price: 28.00, stock: 15, genericName: 'Guantes de examen', pharmaceuticalForm: 'Dispositivo médico', presentation: 'Caja x 50 pares', laboratory: 'Supermax', sanitaryRegistry: 'NSDM-0620', medicineCategory: 'Material médico' },
     ],
   },
 };
@@ -350,12 +395,12 @@ export async function POST(request: NextRequest) {
     });
     const profile = store?.businessProfile ?? 'BODEGA';
 
-    // Verificar si ya hay categorías
-    const existingCategories = await prisma.category.count({ where: { storeId } });
-    if (existingCategories > 0) {
+    // Verificar si ya hay productos (no categorías — las categorías se crean en la transacción de store creation)
+    const existingProducts = await prisma.storeProduct.count({ where: { storeId } });
+    if (existingProducts > 0) {
       return NextResponse.json({
         success: true,
-        message: 'La tienda ya tiene datos',
+        message: 'La tienda ya tiene productos',
         categoriesCreated: 0,
         productsCreated: 0,
       });
@@ -417,11 +462,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Crear categorías
+    // Mapear categorías: primero usar las ya existentes, luego crear las que falten
     const categoryMap = new Map<string, string>();
-    
+
+    // Cargar categorías existentes de la tienda, indexadas por nombre Y slug
+    const existingCats = await prisma.category.findMany({ where: { storeId }, select: { id: true, name: true, slug: true } });
+    for (const cat of existingCats) {
+      categoryMap.set(cat.name, cat.id);
+      categoryMap.set(cat.slug, cat.id); // también por slug para detectar colisiones
+    }
+
+    // Crear solo las categorías que no existen aún (por nombre ni por slug)
     for (const cat of categoriesToCreate) {
       const slug = generateSlug(cat.name);
+      if (categoryMap.has(cat.name) || categoryMap.has(slug)) continue; // ya existe
       const created = await prisma.category.create({
         data: {
           storeId,
@@ -434,7 +488,16 @@ export async function POST(request: NextRequest) {
         },
       });
       categoryMap.set(cat.name, created.id);
+      categoryMap.set(slug, created.id); // también por slug
     }
+
+    // ✅ MÓDULO PH2: Productos con vencimiento próximo para demostración de alertas (pharma)
+    const NEAR_EXPIRY_DEMO = new Set([
+      'Alcohol 70° 250ml', 'Alcohol 70° 500ml',
+      'Insulina NPH 100UI/ml 10ml',
+      'Dexametasona 4mg/2ml amp',
+    ]);
+    const isPharmaProfile = profile === 'FARMACIA' || profile === 'BOTICA';
 
     // Crear productos
     let productsCreated = 0;
@@ -454,31 +517,68 @@ export async function POST(request: NextRequest) {
           category: prod.category,
           unitType: useDecimal ? 'KG' : 'UNIT',
           baseUnitId: unitId,
+          ...('genericName' in prod && prod.genericName ? { genericName: prod.genericName } : {}),
+          ...('concentration' in prod && prod.concentration ? { concentration: prod.concentration } : {}),
+          ...('pharmaceuticalForm' in prod && prod.pharmaceuticalForm ? { pharmaceuticalForm: prod.pharmaceuticalForm } : {}),
+          ...('presentation' in prod && prod.presentation ? { presentation: prod.presentation } : {}),
+          ...('laboratory' in prod && prod.laboratory ? { laboratory: prod.laboratory } : {}),
+          ...('sanitaryRegistry' in prod && prod.sanitaryRegistry ? { sanitaryRegistry: prod.sanitaryRegistry } : {}),
+          ...('requiresPrescription' in prod && prod.requiresPrescription !== undefined ? { requiresPrescription: prod.requiresPrescription } : {}),
+          ...('medicineCategory' in prod && prod.medicineCategory ? { medicineCategory: prod.medicineCategory } : {}),
         },
       });
 
       // Crear StoreProduct
-      await prisma.storeProduct.create({
+      // En farmacia, el stock real vendrá del lote; se inicializa en 0 y el batch lo actualizará
+      const sp = await prisma.storeProduct.create({
         data: {
           storeId,
           productId: master.id,
           price: prod.price,
-          stock: prod.stock,
+          stock: isPharmaProfile ? 0 : prod.stock,
           minStock: prod.stock !== null ? 5 : null,
           active: true,
         },
       });
 
+      // ✅ MÓDULO PH2: Crear lote inicial con fecha de vencimiento para perfiles pharma
+      if (isPharmaProfile && prod.stock && prod.stock > 0) {
+        const expiryDate = new Date();
+        if (NEAR_EXPIRY_DEMO.has(prod.name)) {
+          // ~40 días: aparecerá en alertas POR_VENCER (umbral 60 días)
+          expiryDate.setDate(expiryDate.getDate() + 40);
+        } else {
+          // 18 meses: stock normal
+          expiryDate.setMonth(expiryDate.getMonth() + 18);
+        }
+        const qty = prod.stock;
+        await prisma.productBatch.create({
+          data: {
+            storeId,
+            storeProductId: sp.id,
+            batchNumber: 'L001',
+            expiryDate,
+            quantityInitial: qty,
+            quantityAvailable: qty,
+          },
+        });
+        // Actualizar el stock del StoreProduct con la cantidad del lote
+        await prisma.storeProduct.update({
+          where: { id: sp.id },
+          data: { stock: qty },
+        });
+      }
+
       productsCreated++;
     }
 
-    console.log(`[seed-products] Created ${categoriesToCreate.length} categories and ${productsCreated} products for store ${storeId} (profile: ${profile})`);
+    console.log(`[seed-products] Created ${productsCreated} products for store ${storeId} (profile: ${profile})`);
 
     return NextResponse.json({
       success: true,
-      categoriesCreated: categoriesToCreate.length,
+      categoriesCreated: 0, // categorías ya vienen de la creación de tienda
       productsCreated,
-      message: 'Datos de ejemplo creados correctamente',
+      message: 'Productos de ejemplo creados correctamente',
     });
   } catch (error) {
     console.error('[seed-products] Error:', error);

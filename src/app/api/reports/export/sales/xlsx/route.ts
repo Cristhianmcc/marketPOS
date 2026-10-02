@@ -94,12 +94,19 @@ const C = {
     PLIN:   { bg: 'FF006080', lt: 'FFE0F4FF' },
     CARD:   { bg: 'FF7D4607', lt: 'FFFFF0D0' },
     CREDIT: { bg: 'FF8B0000', lt: 'FFFFE0E0' },
+    MIXED:  { bg: 'FF6B21A8', lt: 'FFF3E8FF' },
     OTROS:  { bg: 'FF595959', lt: 'FFF5F5F5' },
   } as Record<string, { bg: string; lt: string }>,
 };
 
 const METHOD_LABEL: Record<string, string> = {
-  CASH: 'Efectivo', YAPE: 'Yape', PLIN: 'Plin', CARD: 'Tarjeta', CREDIT: 'Fiado',
+  CASH: 'Efectivo', YAPE: 'Yape', PLIN: 'Plin', CARD: 'Tarjeta', CREDIT: 'Fiado', FIADO: 'Fiado', MIXED: 'Mixto',
+};
+const getMixedLabel = (sale: any) => {
+  if (sale.paymentMethod === 'MIXED' && sale.paymentDetails?.splits?.length) {
+    return sale.paymentDetails.splits.map((s: any) => METHOD_LABEL[s.method] || s.method).join('/');
+  }
+  return METHOD_LABEL[sale.paymentMethod] ?? sale.paymentMethod;
 };
 const ROLE_LABEL: Record<string, string> = {
   OWNER: 'Propietario', ADMIN: 'Administrador', CASHIER: 'Cajero',
@@ -148,6 +155,11 @@ export async function GET(request: NextRequest) {
       include: {
         user:     { select: { name: true } },
         customer: { select: { name: true } },
+        items: {
+          include: {
+            storeProduct: { include: { product: { select: { name: true } } } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -186,8 +198,8 @@ export async function GET(request: NextRequest) {
     });
 
     // â”€â”€ anchos de columna â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const dataCols = hasCoupons ? 14 : 13;
-    const tableColWidths = [8, 12, 10, 10, 11, ...(hasCoupons ? [24] : []), 10, 11, 13, 10, 10, 20, 14, 9];
+    const dataCols = hasCoupons ? 15 : 14;
+    const tableColWidths = [8, 12, 10, 10, 11, ...(hasCoupons ? [24] : []), 10, 11, 13, 10, 10, 20, 14, 40];
     tableColWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
     const nMethods = methodEntries.length;
@@ -267,8 +279,8 @@ export async function GET(request: NextRequest) {
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     const tableHeaders = [
       'Ticket', 'Fecha', 'Hora', 'Subtotal', 'Descuentos',
-      ...(hasCoupons ? ['CupÃ³n'] : []),
-      'Impuesto', 'Total', 'Método Pago', 'Pagado', 'Vuelto', 'Cliente', 'Cajero',
+      ...(hasCoupons ? ['Cup\u00f3n'] : []),
+      'Impuesto', 'Total', 'M\u00e9todo Pago', 'Pagado', 'Vuelto', 'Cliente', 'Cajero', 'Productos',
     ];
 
     // Cabecera de tabla
@@ -298,11 +310,18 @@ export async function GET(request: NextRequest) {
           : []),
         Number(s.tax),
         Number(s.total),
-        METHOD_LABEL[s.paymentMethod] ?? s.paymentMethod,
+        getMixedLabel(s),
         s.amountPaid   !== null ? Number(s.amountPaid)   : '',
         s.changeAmount !== null ? Number(s.changeAmount) : '',
         s.customer?.name ?? '',
         s.user.name,
+        s.items.map((item: any) => {
+          const name = item.isService
+            ? (item.serviceName ?? 'Servicio')
+            : (item.storeProduct?.product?.name ?? item.productName ?? '?');
+          const qty = Number(item.quantity);
+          return `${name} x${qty % 1 === 0 ? qty : qty.toFixed(3)}`;
+        }).join(', '),
       ];
 
       vals.forEach((v, ci) => {

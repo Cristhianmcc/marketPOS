@@ -24,6 +24,7 @@ import {
   FileText,
   MapPin,
   Mail,
+  Briefcase,
 } from 'lucide-react';
 
 type Step = 'check' | 'cloud-login' | 'provision' | 'success';
@@ -53,6 +54,7 @@ export default function SetupPage() {
   const [storeRuc, setStoreRuc] = useState('');
   const [storeAddress, setStoreAddress] = useState('');
   const [storePhone, setStorePhone] = useState('');
+  const [businessProfile, setBusinessProfile] = useState('BODEGA');
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userPassword, setUserPassword] = useState('');
@@ -140,6 +142,7 @@ export default function SetupPage() {
           storeRuc,
           storeAddress,
           storePhone,
+          businessProfile,
           userName,
           userEmail,
           userPassword,
@@ -404,6 +407,32 @@ export default function SetupPage() {
                       disabled={loading}
                     />
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tipo de Negocio *
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={businessProfile}
+                      onChange={(e) => setBusinessProfile(e.target.value)}
+                      className="w-full h-11 pl-11 pr-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 appearance-none"
+                      required
+                      disabled={loading}
+                    >
+                      <option value="BODEGA">Bodega / Abarrotes</option>
+                      <option value="FARMACIA">Farmacia</option>
+                      <option value="BOTICA">Botica</option>
+                      <option value="FERRETERIA">Ferretera</option>
+                      <option value="TALLER">Taller Mecánico</option>
+                      <option value="LAVANDERIA">Lavandería</option>
+                      <option value="POLLERIA">Pollería / Restaurante</option>
+                      <option value="HOSTAL">Hostal / Hotel</option>
+                      <option value="ACCESORIOS">Accesorios / Tecnología</option>
+                    </select>
+                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
 

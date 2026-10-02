@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Lock, Upload, Loader2 } from 'lucide-react';
+import { X, Lock, Upload, Loader2, FlaskConical, Package, AlertTriangle, Clock } from 'lucide-react';
+import { useFlags } from '@/hooks/useFlags';
 
 interface UnitOption {
   id: string;
@@ -35,6 +36,17 @@ interface EditProductModalProps {
       isGlobal: boolean;
       imageUrl?: string | null;
       baseUnitId?: string | null;
+      // ✅ MÓDULO PH1
+      commercialName?: string | null;
+      genericName?: string | null;
+      concentration?: string | null;
+      pharmaceuticalForm?: string | null;
+      presentation?: string | null;
+      laboratory?: string | null;
+      sanitaryRegistry?: string | null;
+      requiresPrescription?: boolean;
+      medicineCategory?: string | null;
+      barcodeSecondary?: string | null;
     };
   };
 }
@@ -51,6 +63,17 @@ export function EditProductModal({
   const [categories, setCategories] = useState<string[]>([]);
   const [availableUnits, setAvailableUnits] = useState<UnitOption[]>([]);
 
+  // ✅ Lotes del producto (solo lectura)
+  const [batches, setBatches] = useState<{
+    id: string; batchNumber: string; expiryDate: string;
+    quantityAvailable: number; status: string; daysToExpiry: number;
+  }[]>([]);
+
+  // ✅ MÓDULO PH1: Flag farmacéutico
+  const { isOn: isFlagOn } = useFlags();
+  const pharmaFieldsEnabled = isFlagOn('ENABLE_PHARMA_FIELDS');
+  const batchesEnabled = isFlagOn('ENABLE_BATCH_EXPIRY');
+
   const [form, setForm] = useState({
     name: storeProduct.product.name,
     brand: storeProduct.product.brand ?? '',
@@ -64,6 +87,17 @@ export function EditProductModal({
     imageUrl: storeProduct.product.imageUrl ?? '',
     baseUnitId: storeProduct.product.baseUnitId ?? '',
     publishInCatalog: !!storeProduct.publishInCatalog,
+    // ✅ MÓDULO PH1: Campos farmacéuticos
+    commercialName: storeProduct.product.commercialName ?? '',
+    genericName: storeProduct.product.genericName ?? '',
+    concentration: storeProduct.product.concentration ?? '',
+    pharmaceuticalForm: storeProduct.product.pharmaceuticalForm ?? '',
+    presentation: storeProduct.product.presentation ?? '',
+    laboratory: storeProduct.product.laboratory ?? '',
+    sanitaryRegistry: storeProduct.product.sanitaryRegistry ?? '',
+    requiresPrescription: storeProduct.product.requiresPrescription ?? false,
+    medicineCategory: storeProduct.product.medicineCategory ?? '',
+    barcodeSecondary: storeProduct.product.barcodeSecondary ?? '',
   });
 
   // Restablecer form cuando cambia el producto
@@ -84,6 +118,17 @@ export function EditProductModal({
       imageUrl: storeProduct.product.imageUrl ?? '',
       baseUnitId: storeProduct.product.baseUnitId ?? '',
       publishInCatalog: !!storeProduct.publishInCatalog,
+      // ✅ MÓDULO PH1
+      commercialName: storeProduct.product.commercialName ?? '',
+      genericName: storeProduct.product.genericName ?? '',
+      concentration: storeProduct.product.concentration ?? '',
+      pharmaceuticalForm: storeProduct.product.pharmaceuticalForm ?? '',
+      presentation: storeProduct.product.presentation ?? '',
+      laboratory: storeProduct.product.laboratory ?? '',
+      sanitaryRegistry: storeProduct.product.sanitaryRegistry ?? '',
+      requiresPrescription: storeProduct.product.requiresPrescription ?? false,
+      medicineCategory: storeProduct.product.medicineCategory ?? '',
+      barcodeSecondary: storeProduct.product.barcodeSecondary ?? '',
     });
     setError('');
   }, [storeProduct]);
@@ -111,6 +156,16 @@ export function EditProductModal({
         }
       })
       .catch(() => {});
+
+    // Cargar lotes si ENABLE_BATCH_EXPIRY está activo
+    if (batchesEnabled) {
+      fetch(`/api/batches?storeProductId=${storeProduct.id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.batches) setBatches(data.batches);
+        })
+        .catch(() => {});
+    }
   }, [isOpen]);
 
   const handleChange = (field: string, value: string) => {
@@ -211,6 +266,19 @@ export function EditProductModal({
         body.category  = form.category;
         body.imageUrl  = form.imageUrl || null;
         body.baseUnitId = form.baseUnitId || null;
+        // ✅ MÓDULO PH1: Campos farmacéuticos
+        if (pharmaFieldsEnabled) {
+          body.commercialName     = form.commercialName.trim() || null;
+          body.genericName        = form.genericName.trim() || null;
+          body.concentration      = form.concentration.trim() || null;
+          body.pharmaceuticalForm = form.pharmaceuticalForm || null;
+          body.presentation       = form.presentation.trim() || null;
+          body.laboratory         = form.laboratory.trim() || null;
+          body.sanitaryRegistry   = form.sanitaryRegistry.trim() || null;
+          body.requiresPrescription = form.requiresPrescription;
+          body.medicineCategory   = form.medicineCategory.trim() || null;
+          body.barcodeSecondary   = form.barcodeSecondary.trim() || null;
+        }
       }
 
       const res = await fetch(`/api/store-products/${storeProduct.id}`, {
@@ -431,6 +499,185 @@ export function EditProductModal({
               />
             )}
           </div>
+
+          {/* ✅ MÓDULO PH1: Sección farmacéutica — solo si ENABLE_PHARMA_FIELDS ON */}
+          {pharmaFieldsEnabled && !isGlobal && (
+            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/40 space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <FlaskConical className="w-4 h-4 text-blue-600" />
+                <p className="text-sm font-semibold text-blue-800">Datos farmacéuticos</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Nombre comercial</label>
+                  <input
+                    className={inputClass}
+                    value={form.commercialName}
+                    onChange={e => handleChange('commercialName', e.target.value)}
+                    placeholder="Ej: Amoxidal"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Principio activo (DCI)</label>
+                  <input
+                    className={inputClass}
+                    value={form.genericName}
+                    onChange={e => handleChange('genericName', e.target.value)}
+                    placeholder="Ej: Amoxicilina"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Concentración</label>
+                  <input
+                    className={inputClass}
+                    value={form.concentration}
+                    onChange={e => handleChange('concentration', e.target.value)}
+                    placeholder="Ej: 500 mg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Forma farmacéutica</label>
+                  <select
+                    className={inputClass}
+                    value={form.pharmaceuticalForm}
+                    onChange={e => handleChange('pharmaceuticalForm', e.target.value)}
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="Tabletas">Tabletas</option>
+                    <option value="Cápsulas">Cápsulas</option>
+                    <option value="Jarabe">Jarabe</option>
+                    <option value="Suspensión">Suspensión</option>
+                    <option value="Crema">Crema</option>
+                    <option value="Ungüento">Ungüento</option>
+                    <option value="Ampolla">Ampolla</option>
+                    <option value="Inyectable">Inyectable</option>
+                    <option value="Gotas">Gotas</option>
+                    <option value="Óvulo">Óvulo</option>
+                    <option value="Supositorio">Supositorio</option>
+                    <option value="Parche">Parche</option>
+                    <option value="Polvo">Polvo</option>
+                    <option value="Solución">Solución</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Presentación</label>
+                  <input
+                    className={inputClass}
+                    value={form.presentation}
+                    onChange={e => handleChange('presentation', e.target.value)}
+                    placeholder="Ej: Caja x 20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Laboratorio</label>
+                  <input
+                    className={inputClass}
+                    value={form.laboratory}
+                    onChange={e => handleChange('laboratory', e.target.value)}
+                    placeholder="Ej: Genfar"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Categoría terapéutica</label>
+                  <input
+                    className={inputClass}
+                    value={form.medicineCategory}
+                    onChange={e => handleChange('medicineCategory', e.target.value)}
+                    placeholder="Ej: Antibiótico"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Reg. Sanitario</label>
+                  <input
+                    className={inputClass}
+                    value={form.sanitaryRegistry}
+                    onChange={e => handleChange('sanitaryRegistry', e.target.value)}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Código de barras secundario</label>
+                <input
+                  className={inputClass}
+                  value={form.barcodeSecondary}
+                  onChange={e => handleChange('barcodeSecondary', e.target.value)}
+                  pattern="[0-9]{8,14}"
+                  placeholder="Código alternativo (8-14 dígitos)"
+                />
+              </div>
+
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.requiresPrescription}
+                  onChange={e => setForm(prev => ({ ...prev, requiresPrescription: e.target.checked }))}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                />
+                <span className="text-sm text-gray-700">Requiere receta médica</span>
+              </label>
+            </div>
+          )}
+
+          {/* ✅ Sección lotes — solo lectura, si ENABLE_BATCH_EXPIRY ON */}
+          {batchesEnabled && batches.length > 0 && (
+            <div className="border border-purple-200 rounded-lg p-4 bg-purple-50/40 space-y-2">
+              <div className="flex items-center gap-2 mb-1">
+                <Package className="w-4 h-4 text-purple-600" />
+                <p className="text-sm font-semibold text-purple-800">Lotes registrados</p>
+                <span className="text-xs text-purple-500 ml-auto">{batches.length} lote{batches.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="space-y-1.5">
+                {batches.map(b => {
+                  const expDate = new Date(b.expiryDate);
+                  const isExpired = b.status === 'EXPIRED';
+                  const isWarning = b.status === 'WARNING';
+                  return (
+                    <div
+                      key={b.id}
+                      className={`flex items-center justify-between p-2 rounded-md text-xs ${
+                        isExpired ? 'bg-red-50 border border-red-200' :
+                        isWarning ? 'bg-amber-50 border border-amber-200' :
+                        'bg-white border border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {isExpired ? (
+                          <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                        ) : isWarning ? (
+                          <Clock className="w-3.5 h-3.5 text-amber-500" />
+                        ) : (
+                          <Package className="w-3.5 h-3.5 text-gray-400" />
+                        )}
+                        <span className="font-medium">{b.batchNumber}</span>
+                        <span className="text-gray-500">|</span>
+                        <span className={isExpired ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-gray-600'}>
+                          Vence: {expDate.toLocaleDateString('es-PE')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{b.quantityAvailable} und</span>
+                        {isExpired && <span className="text-red-600 font-bold">VENCIDO</span>}
+                        {isWarning && <span className="text-amber-600 font-bold">POR VENCER ({b.daysToExpiry}d)</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-purple-500 mt-1">Para agregar o editar lotes, usa el botón de lotes en la tabla de inventario.</p>
+            </div>
+          )}
 
           {/* Sección tienda */}
           <div className="border-t border-gray-200 pt-4">

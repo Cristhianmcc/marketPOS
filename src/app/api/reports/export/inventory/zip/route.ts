@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
+import { isFeatureEnabled } from '@/lib/featureFlags';
+import { FeatureFlagKey } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -53,24 +55,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Sin tienda asignada' }, { status: 403 });
     }
 
+    const pharmaEnabled = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_PHARMA_FIELDS);
+
     const products = await prisma.storeProduct.findMany({
       where: { storeId: session.storeId },
-      include: { product: true },
+      include: {
+        product: true,
+        ...(pharmaEnabled ? {
+          batches: {
+            where: { active: true, quantityAvailable: { gt: 0 } },
+            orderBy: { expiryDate: 'asc' },
+            take: 1,
+          },
+        } : {}),
+      },
       orderBy: { product: { name: 'asc' } },
     });
 
     const index = loadIndex();
 
     // Construir CSV con nombre de archivo local en vez de URL
-    const headers = [
+    const baseHeaders = [
       'Nombre', 'Marca', 'Contenido', 'Categoria', 'Codigo', 'Tipo',
       'Precio', 'Stock', 'Stock Minimo', 'Estado', 'Imagen',
     ];
+    const pharmaHeaders = pharmaEnabled ? [
+      'Nombre Comercial', 'Principio Activo', 'Concentracion', 'Forma Farmaceutica',
+      'Presentacion', 'Laboratorio', 'Registro Sanitario', 'Requiere Receta',
+      'Categoria Terapeutica', 'Lote Proximo', 'Fecha Vencimiento',
+    ] : [];
+    const headers = [...baseHeaders, ...pharmaHeaders];
 
     // Mapa: productId → nombre de archivo de imagen (para incluirlo en el ZIP)
     const imageFiles: { csvName: string; localPath: string }[] = [];
 
-    const rows = products.map(sp => {
+    const rows = (products as any[]).map((sp) => {
       let imageCsvValue = '';
       const imageUrl = sp.product.imageUrl || '';
 
@@ -79,23 +98,18 @@ export async function GET(request: NextRequest) {
         if (localId && index[localId]) {
           const entry = index[localId];
           const ext = path.extname(entry.filename) || '.jpg';
-          // Nombre seguro para el archivo en el ZIP
           const safeName = sp.product.name
             .replace(/[^a-zA-Z0-9\u00C0-\u024F\s-]/g, '')
             .replace(/\s+/g, '_')
             .substring(0, 50) + ext;
           imageCsvValue = `imagenes/${safeName}`;
-          imageFiles.push({
-            csvName: safeName,
-            localPath: path.join(LOCAL_IMAGES_DIR, entry.filename),
-          });
+          imageFiles.push({ csvName: safeName, localPath: path.join(LOCAL_IMAGES_DIR, entry.filename) });
         } else if (imageUrl.startsWith('http')) {
-          // Imagen Cloudinary u otra URL externa — poner la URL directamente
           imageCsvValue = imageUrl;
         }
       }
 
-      return [
+      const base = [
         escapeCSV(sp.product.name),
         escapeCSV(sp.product.brand || ''),
         escapeCSV(sp.product.content || ''),
@@ -107,6 +121,22 @@ export async function GET(request: NextRequest) {
         escapeCSV(sp.minStock !== null ? Number(sp.minStock).toFixed(3) : ''),
         escapeCSV(sp.active ? 'Activo' : 'Inactivo'),
         escapeCSV(imageCsvValue),
+      ];
+      if (!pharmaEnabled) return base;
+      const batch = sp.batches?.[0];
+      return [
+        ...base,
+        escapeCSV(sp.product.commercialName || ''),
+        escapeCSV(sp.product.genericName || ''),
+        escapeCSV(sp.product.concentration || ''),
+        escapeCSV(sp.product.pharmaceuticalForm || ''),
+        escapeCSV(sp.product.presentation || ''),
+        escapeCSV(sp.product.laboratory || ''),
+        escapeCSV(sp.product.sanitaryRegistry || ''),
+        escapeCSV(sp.product.requiresPrescription ? 'Si' : 'No'),
+        escapeCSV(sp.product.medicineCategory || ''),
+        escapeCSV(batch?.batchNumber || ''),
+        escapeCSV(batch ? new Date(batch.expiryDate).toLocaleDateString('es-PE') : ''),
       ];
     });
 

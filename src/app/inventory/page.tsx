@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
-import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag, Download, Upload, FileArchive, CheckSquare, Square, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit, TrendingUp, Power, Globe, Share2, Package, Scale, Wrench, FolderTree, Tag, Download, Upload, FileArchive, CheckSquare, Square, Trash2, Eye, EyeOff, Loader2, FileText } from 'lucide-react';
 import { CreateProductModal } from '@/components/inventory/CreateProductModal';
 import { EditProductModal } from '@/components/inventory/EditProductModal';
 import { StockMovementModal } from '@/components/inventory/StockMovementModal';
+import { BatchesModal } from '@/components/inventory/BatchesModal';
 import { ProductConversionsModal } from '@/components/inventory/ProductConversionsModal';
 import { ProductSellUnitPricesModal } from '@/components/inventory/ProductSellUnitPricesModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
@@ -26,6 +27,17 @@ interface Product {
   baseUnitId?: string | null;
   isGlobal: boolean; // ✅ MÓDULO 18.1
   imageUrl: string | null; // ✅ Imagen del producto
+  // ✅ MÓDULO PH1: Campos farmacéuticos
+  commercialName?: string | null;
+  genericName?: string | null;
+  concentration?: string | null;
+  pharmaceuticalForm?: string | null;
+  presentation?: string | null;
+  laboratory?: string | null;
+  sanitaryRegistry?: string | null;
+  requiresPrescription?: boolean;
+  medicineCategory?: string | null;
+  barcodeSecondary?: string | null;
 }
 
 interface StoreProduct {
@@ -81,6 +93,11 @@ export default function InventoryPage() {
     productName?: string;
     price?: number;
   }>({ open: false });
+  // ✅ MÓDULO PH2: Modal de lotes
+  const [batchesModal, setBatchesModal] = useState<{
+    open: boolean;
+    storeProduct?: StoreProduct;
+  }>({ open: false });
 
   // ✅ MÓDULO F2: Feature flags para unidades avanzadas
   const { isOn: isFlagOn, isDesktop } = useFlags();
@@ -88,6 +105,7 @@ export default function InventoryPage() {
   const conversionsEnabled = isFlagOn('ENABLE_CONVERSIONS');
   const sellUnitPricingEnabled = isFlagOn('ENABLE_SELLUNIT_PRICING'); // ✅ MÓDULO F2.3
   const servicesEnabled = isFlagOn('ENABLE_SERVICES'); // ✅ MÓDULO F3
+  const batchesEnabled = isFlagOn('ENABLE_BATCH_EXPIRY'); // ✅ MÓDULO PH2
 
   useEffect(() => {
     fetchUser();
@@ -248,7 +266,7 @@ export default function InventoryPage() {
     }
   };
 
-  const isOwner = user?.role === 'OWNER';
+  const isOwner = user?.role === 'OWNER' || user?.role === 'SUPERADMIN';
 
   return (
     <AuthLayout storeName="Inventario">
@@ -272,6 +290,26 @@ export default function InventoryPage() {
                   >
                     <Wrench className="w-4 h-4" />
                     Servicios
+                  </button>
+                )}
+                {/* ✅ MÓDULO PH4: Alertas de vencimiento */}
+                {batchesEnabled && (
+                  <button
+                    onClick={() => router.push('/inventory/expiry-alerts')}
+                    className="h-10 px-4 border border-red-300 bg-red-50 rounded-md text-sm font-medium text-red-700 hover:bg-red-100 transition-colors flex items-center gap-2"
+                  >
+                    <Tag className="w-4 h-4" />
+                    Alertas vencimiento
+                  </button>
+                )}
+                {/* ✅ MÓDULO PH7: Reportes farmacéuticos */}
+                {batchesEnabled && (
+                  <button
+                    onClick={() => router.push('/inventory/pharma-reports')}
+                    className="h-10 px-4 border border-purple-300 bg-purple-50 rounded-md text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors flex items-center gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Reportes farma
                   </button>
                 )}
                 <button
@@ -623,6 +661,15 @@ export default function InventoryPage() {
                                     <Tag className="w-4 h-4 text-green-600" />
                                   </button>
                                 )}
+                                {batchesEnabled && (
+                                  <button
+                                    onClick={() => setBatchesModal({ open: true, storeProduct: sp })}
+                                    className="p-1 hover:bg-blue-50 rounded-md transition-colors"
+                                    title="Gestión de lotes"
+                                  >
+                                    <Package className="w-4 h-4 text-blue-600" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => setStockModal({ open: true, storeProduct: sp })}
                                   className="p-1 hover:bg-gray-100 rounded-md transition-colors"
@@ -732,6 +779,19 @@ export default function InventoryPage() {
           onClose={() => setConversionsModal({ open: false })}
           productId={conversionsModal.productId}
           productName={conversionsModal.productName || ''}
+        />
+      )}
+
+      {/* ✅ MÓDULO PH2: Modal de lotes */}
+      {batchesModal.open && batchesModal.storeProduct && (
+        <BatchesModal
+          isOpen={batchesModal.open}
+          onClose={() => setBatchesModal({ open: false })}
+          onSuccess={() => {
+            toast.success('Lote actualizado');
+            loadProducts();
+          }}
+          storeProduct={batchesModal.storeProduct}
         />
       )}
 

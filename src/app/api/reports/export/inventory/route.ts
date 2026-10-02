@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
+import { isFeatureEnabled } from '@/lib/featureFlags';
+import { FeatureFlagKey } from '@prisma/client';
 
 function escapeCSV(value: any): string {
   if (value === null || value === undefined) return '';
@@ -21,48 +23,66 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const pharmaEnabled = await isFeatureEnabled(session.storeId!, FeatureFlagKey.ENABLE_PHARMA_FIELDS);
+
     const products = await prisma.storeProduct.findMany({
-      where: {
-        storeId: session.storeId,
-      },
+      where: { storeId: session.storeId },
       include: {
         product: true,
+        ...(pharmaEnabled ? {
+          batches: {
+            where: { active: true, quantityAvailable: { gt: 0 } },
+            orderBy: { expiryDate: 'asc' },
+            take: 1,
+          },
+        } : {}),
       },
-      orderBy: {
-        product: {
-          name: 'asc',
-        },
-      },
+      orderBy: { product: { name: 'asc' } },
     });
 
     // Generate CSV
-    const headers = [
-      'Nombre',
-      'Marca',
-      'Contenido',
-      'Categoria',
-      'Codigo',
-      'Tipo',
-      'Precio',
-      'Stock',
-      'Stock Minimo',
-      'Estado',
-      'Imagen URL', // ✅ MÓDULO S5: URL de imagen del producto
+    const baseHeaders = [
+      'Nombre', 'Marca', 'Contenido', 'Categoria', 'Codigo', 'Tipo',
+      'Precio', 'Stock', 'Stock Minimo', 'Estado', 'Imagen URL',
     ];
+    const pharmaHeaders = pharmaEnabled ? [
+      'Nombre Comercial', 'Principio Activo', 'Concentracion', 'Forma Farmaceutica',
+      'Presentacion', 'Laboratorio', 'Registro Sanitario', 'Requiere Receta',
+      'Categoria Terapeutica', 'Lote Proximo', 'Fecha Vencimiento',
+    ] : [];
+    const headers = [...baseHeaders, ...pharmaHeaders];
 
-    const rows = products.map(sp => [
-      escapeCSV(sp.product.name),
-      escapeCSV(sp.product.brand || ''),
-      escapeCSV(sp.product.content || ''),
-      escapeCSV(sp.product.category),
-      escapeCSV(sp.product.barcode || sp.product.internalSku),
-      escapeCSV(sp.product.unitType === 'UNIT' ? 'Unidad' : 'KG'),
-      escapeCSV(Number(sp.price).toFixed(2)),
-      escapeCSV(sp.stock !== null ? Number(sp.stock).toFixed(3) : ''),
-      escapeCSV(sp.minStock !== null ? Number(sp.minStock).toFixed(3) : ''),
-      escapeCSV(sp.active ? 'Activo' : 'Inactivo'),
-      escapeCSV(sp.product.imageUrl || ''), // ✅ MÓDULO S5: URL de imagen
-    ]);
+    const rows = products.map((sp: any) => {
+      const base = [
+        escapeCSV(sp.product.name),
+        escapeCSV(sp.product.brand || ''),
+        escapeCSV(sp.product.content || ''),
+        escapeCSV(sp.product.category),
+        escapeCSV(sp.product.barcode || sp.product.internalSku),
+        escapeCSV(sp.product.unitType === 'UNIT' ? 'Unidad' : 'KG'),
+        escapeCSV(Number(sp.price).toFixed(2)),
+        escapeCSV(sp.stock !== null ? Number(sp.stock).toFixed(3) : ''),
+        escapeCSV(sp.minStock !== null ? Number(sp.minStock).toFixed(3) : ''),
+        escapeCSV(sp.active ? 'Activo' : 'Inactivo'),
+        escapeCSV(sp.product.imageUrl || ''),
+      ];
+      if (!pharmaEnabled) return base;
+      const batch = sp.batches?.[0];
+      return [
+        ...base,
+        escapeCSV(sp.product.commercialName || ''),
+        escapeCSV(sp.product.genericName || ''),
+        escapeCSV(sp.product.concentration || ''),
+        escapeCSV(sp.product.pharmaceuticalForm || ''),
+        escapeCSV(sp.product.presentation || ''),
+        escapeCSV(sp.product.laboratory || ''),
+        escapeCSV(sp.product.sanitaryRegistry || ''),
+        escapeCSV(sp.product.requiresPrescription ? 'Si' : 'No'),
+        escapeCSV(sp.product.medicineCategory || ''),
+        escapeCSV(batch?.batchNumber || ''),
+        escapeCSV(batch ? new Date(batch.expiryDate).toLocaleDateString('es-PE') : ''),
+      ];
+    });
 
     const csv = [
       headers.join(';'),

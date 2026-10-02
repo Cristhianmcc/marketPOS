@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
+    const offset = (page - 1) * limit;
 
     // Default: last 7 days
     const fromDate = from ? new Date(from + 'T00:00:00.000-05:00') : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -25,6 +28,23 @@ export async function GET(request: NextRequest) {
     const userFilter = session.role === 'CASHIER' 
       ? Prisma.sql`AND s.user_id = ${session.userId}`
       : Prisma.empty;
+
+    // Count total days
+    const countResult = await prisma.$queryRaw<Array<{ count: bigint }>>(
+      Prisma.sql`
+        SELECT COUNT(*) as count FROM (
+          SELECT DATE(s.created_at) as sale_date
+          FROM sales s
+          WHERE s.store_id = ${session.storeId}
+            AND s.created_at >= ${fromDate}
+            AND s.created_at <= ${toDate}
+            AND s.total > 0
+            ${userFilter}
+          GROUP BY DATE(s.created_at)
+        ) sub
+      `
+    );
+    const total = Number(countResult[0]?.count || 0);
     
     const dailySales = await prisma.$queryRaw<Array<{
       sale_date: Date;
@@ -48,6 +68,7 @@ export async function GET(request: NextRequest) {
           ${userFilter}
         GROUP BY DATE(s.created_at)
         ORDER BY sale_date DESC
+        LIMIT ${limit} OFFSET ${offset}
       `
     );
 
@@ -59,6 +80,9 @@ export async function GET(request: NextRequest) {
         cashTotal: Number(d.cash_total),
         otherTotal: Number(d.other_total),
       })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
     });
   } catch (error) {
     console.error('Error fetching daily sales:', error);

@@ -38,8 +38,11 @@ export interface IShiftRepository {
     storeId: string,
     userId: string | null,
     from?: Date,
-    to?: Date
-  ): Promise<ShiftWithUsers[]>;
+    to?: Date,
+    page?: number,
+    limit?: number,
+    search?: string
+  ): Promise<{ shifts: ShiftWithUsers[]; total: number }>;
 
   /**
    * Check if user has an open shift
@@ -50,4 +53,27 @@ export interface IShiftRepository {
    * Calculate cash sales for a shift
    */
   getCashSalesTotal(shiftId: string): Promise<number>;
+
+  /**
+   * Get sales totals grouped by payment method for a shift
+   */
+  getSalesByMethod(shiftId: string): Promise<{ byMethod: Record<string, { total: number; count: number }>; mixedInfo: { count: number; total: number; details: string[]; splitTotals: Record<string, number> } }>;
+
+  /**
+   * Get total cost and profit for a shift (based on sale_items.cost_price snapshots)
+   */
+  getShiftProfit(shiftId: string): Promise<{ totalSales: number; totalCost: number; profit: number }>;
+
+  /**
+   * Get profit breakdown by product for a shift
+   */
+  getShiftProfitByProduct(shiftId: string): Promise<Array<{
+    productName: string;
+    quantity: number;
+    unitCost: number;
+    unitPrice: number;
+    totalCost: number;
+    totalRevenue: number;
+    profit: number;
+  }>>;
 }

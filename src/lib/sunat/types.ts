@@ -53,6 +53,9 @@ export interface SunatLineItem {
   /** Tipo de unidad (UNIT, KG, etc.) */
   unitType?: string;
   
+  /** Código SUNAT de unidad (NIU, KGM, LTR, MLT, ZZ) — snapshot directo */
+  unitSunatCode?: string;
+
   /** SKU interno del producto (opcional) */
   internalSku?: string | null;
   

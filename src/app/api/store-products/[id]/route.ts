@@ -25,7 +25,11 @@ export async function PUT(
     const body = await req.json();
     const { 
       name, brand, content, barcode, category, price, costPrice, minStock, imageUrl, baseUnitId,
-      publishInCatalog
+      publishInCatalog,
+      // ✅ MÓDULO PH1: Campos farmacéuticos
+      commercialName, genericName, concentration, pharmaceuticalForm,
+      presentation, laboratory, sanitaryRegistry, requiresPrescription,
+      medicineCategory, barcodeSecondary,
     } = body;
 
     // Verificar que el storeProduct pertenece a esta tienda
@@ -49,7 +53,7 @@ export async function PUT(
 
     // Actualizar campos del producto maestro (solo si no es global)
     if (!storeProduct.product.isGlobal) {
-      const productUpdates: Record<string, string | null> = {};
+      const productUpdates: Record<string, string | boolean | null> = {};
       if (name !== undefined)       productUpdates.name       = String(name).trim();
       if (brand !== undefined)      productUpdates.brand      = brand ? String(brand).trim() : null;
       if (content !== undefined)    productUpdates.content    = content ? String(content).trim() : null;
@@ -70,6 +74,17 @@ export async function PUT(
       if (category !== undefined)   productUpdates.category   = String(category).trim();
       if (imageUrl !== undefined)   productUpdates.imageUrl   = imageUrl || null;
       if (baseUnitId !== undefined) productUpdates.baseUnitId = baseUnitId || null;
+      // ✅ MÓDULO PH1: Campos farmacéuticos
+      if (commercialName !== undefined)     productUpdates.commercialName     = commercialName || null;
+      if (genericName !== undefined)        productUpdates.genericName        = genericName || null;
+      if (concentration !== undefined)      productUpdates.concentration      = concentration || null;
+      if (pharmaceuticalForm !== undefined) productUpdates.pharmaceuticalForm = pharmaceuticalForm || null;
+      if (presentation !== undefined)       productUpdates.presentation       = presentation || null;
+      if (laboratory !== undefined)         productUpdates.laboratory         = laboratory || null;
+      if (sanitaryRegistry !== undefined)   productUpdates.sanitaryRegistry   = sanitaryRegistry || null;
+      if (requiresPrescription !== undefined) productUpdates.requiresPrescription = Boolean(requiresPrescription);
+      if (medicineCategory !== undefined)   productUpdates.medicineCategory   = medicineCategory || null;
+      if (barcodeSecondary !== undefined)   productUpdates.barcodeSecondary   = barcodeSecondary || null;
 
       if (Object.keys(productUpdates).length > 0) {
         await prisma.productMaster.update({

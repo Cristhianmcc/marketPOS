@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const userId = searchParams.get('userId');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '15', 10);
 
     // Build where clause
     const where: any = {
@@ -38,19 +40,24 @@ export async function GET(request: NextRequest) {
       where.openedById = userId;
     }
 
-    const shifts = await prisma.shift.findMany({
-      where,
-      include: {
-        openedBy: {
-          select: {
-            name: true,
+    const [shifts, total] = await Promise.all([
+      prisma.shift.findMany({
+        where,
+        include: {
+          openedBy: {
+            select: {
+              name: true,
+            },
           },
         },
-      },
-      orderBy: {
-        openedAt: 'desc',
-      },
-    });
+        orderBy: {
+          openedAt: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.shift.count({ where }),
+    ]);
 
     // Get sales for each shift
     const shiftsWithSales = await Promise.all(
@@ -85,7 +92,12 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    return NextResponse.json({ shifts: shiftsWithSales });
+    return NextResponse.json({
+      shifts: shiftsWithSales,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error('Error fetching shifts report:', error);
     return NextResponse.json(

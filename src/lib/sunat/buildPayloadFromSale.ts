@@ -63,13 +63,27 @@ export async function buildPayloadFromSale(
         },
       },
       items: {
-        include: {
+        select: {
+          id: true,
+          productName: true,
+          productContent: true,
+          unitType: true,
+          quantity: true,
+          unitPrice: true,
+          subtotal: true,
+          discountAmount: true,
+          isService: true,
+          unitSunatCode: true,
+          unitSunatCodeUsed: true,
+          // PH8: pharma snapshot para descripción enriquecida
+          commercialName: true,
+          genericName: true,
+          concentration: true,
+          pharmaceuticalForm: true,
           storeProduct: {
-            include: {
+            select: {
               product: {
                 select: {
-                  name: true,
-                  content: true,
                   internalSku: true,
                   barcode: true,
                 },
@@ -233,10 +247,17 @@ export async function buildPayloadFromSale(
 
   // 9. Construir items desde SaleItem snapshot
   const items: SunatLineItem[] = sale.items.map((item, index) => {
-    // Descripción: nombre del producto + contenido (si existe)
-    let description = item.productName;
-    if (item.productContent) {
-      description += ` ${item.productContent}`;
+    // ✅ PH8: Descripción enriquecida para farmacia
+    let description: string;
+    if (item.commercialName) {
+      // Farmacia: nombre comercial + concentración + forma farmacéutica
+      description = item.commercialName;
+      if (item.concentration) description += ` ${item.concentration}`;
+      if (item.pharmaceuticalForm) description += ` ${item.pharmaceuticalForm}`;
+    } else {
+      // Bodega/general: nombre del producto + contenido
+      description = item.productName;
+      if (item.productContent) description += ` ${item.productContent}`;
     }
 
     return {
@@ -246,6 +267,8 @@ export async function buildPayloadFromSale(
       unitPrice: Number(item.unitPrice),
       lineSubtotal: Number(item.subtotal),
       discountsApplied: Number(item.discountAmount || 0),
+      // ✅ PH8: Usar código SUNAT del snapshot (ya validado en checkout)
+      unitSunatCode: item.unitSunatCodeUsed || item.unitSunatCode || undefined,
       internalSku: item.storeProduct?.product?.internalSku,
       barcode: item.storeProduct?.product?.barcode,
     };

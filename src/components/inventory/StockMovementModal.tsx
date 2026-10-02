@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Package } from 'lucide-react';
+import { useFlags } from '@/hooks/useFlags';
 
 interface StockMovementModalProps {
   isOpen: boolean;
@@ -29,6 +30,9 @@ export function StockMovementModal({
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
   const [notes, setNotes] = useState('');
+
+  const { isOn } = useFlags();
+  const batchesEnabled = isOn('ENABLE_BATCH_EXPIRY');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +178,16 @@ export function StockMovementModal({
                 className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
                 placeholder="Opcional"
               />
+            </div>
+          )}
+
+          {type === 'PURCHASE' && batchesEnabled && (
+            <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3">
+              <Package className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+              <p className="text-xs text-blue-700">
+                Para registrar esta entrada con trazabilidad de lote (número y vencimiento),
+                usa el botón <strong>Lotes</strong> del producto en la lista de inventario.
+              </p>
             </div>
           )}
 

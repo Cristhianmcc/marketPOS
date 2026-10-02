@@ -290,15 +290,37 @@ const MINIMARKET_CATEGORIES: CategorySeed[] = [
   },
 ];
 
+const BOTICA_CATEGORIES: CategorySeed[] = [
+  { name: 'Analgésicos y Antiinflamatorios', slug: 'analgesicos-antiinflamatorios', icon: 'Pill',          color: '#ef4444' },
+  { name: 'Antibióticos',                     slug: 'antibioticos',                 icon: 'Shield',        color: '#8b5cf6' },
+  { name: 'Antigripales y Tos',               slug: 'antigripales-tos',             icon: 'Wind',          color: '#3b82f6' },
+  { name: 'Antiácidos y Digestivos',          slug: 'antiacidos-digestivos',        icon: 'Activity',      color: '#f59e0b' },
+  { name: 'Vitaminas y Suplementos',          slug: 'vitaminas-suplementos',        icon: 'Sun',           color: '#10b981' },
+  { name: 'Genéricos',                        slug: 'genericos',                    icon: 'Package',       color: '#6366f1' },
+  { name: 'Uso Tópico',                       slug: 'uso-topico',                   icon: 'Droplet',       color: '#f97316' },
+  { name: 'Infantil y Bebés',                 slug: 'infantil-bebes',               icon: 'Heart',         color: '#ec4899' },
+  { name: 'Cuidado Personal',                 slug: 'cuidado-personal',             icon: 'User',          color: '#14b8a6' },
+  { name: 'Otros Medicamentos',               slug: 'otros-medicamentos',           icon: 'MoreHorizontal',color: '#9ca3af' },
+];
+
+const FARMACIA_CATEGORIES: CategorySeed[] = [
+  ...BOTICA_CATEGORIES,
+  { name: 'Controlados (Rx)',         slug: 'controlados-rx',         icon: 'Lock',        color: '#dc2626' },
+  { name: 'Inyectables y Ampollas',  slug: 'inyectables-ampollas',   icon: 'Syringe',     color: '#7c3aed' },
+  { name: 'Material Médico',         slug: 'material-medico',        icon: 'Stethoscope', color: '#0284c7' },
+  { name: 'Cosméticos',              slug: 'cosmeticos',             icon: 'Sparkles',    color: '#db2777' },
+];
+
 // Mapeo de perfil a categorías
 const CATEGORIES_BY_PROFILE: Record<BusinessProfile, CategorySeed[]> = {
-  BODEGA: BODEGA_CATEGORIES,
+  BODEGA:     BODEGA_CATEGORIES,
   FERRETERIA: FERRETERIA_CATEGORIES,
-  TALLER: FERRETERIA_CATEGORIES, // Taller usa categorías de ferretería
+  TALLER:     FERRETERIA_CATEGORIES, // Taller usa categorías de ferretería
   LAVANDERIA: BODEGA_CATEGORIES,
-  POLLERIA: BODEGA_CATEGORIES,
-  HOSTAL: BODEGA_CATEGORIES,
-  BOTICA: BODEGA_CATEGORIES,
+  POLLERIA:   BODEGA_CATEGORIES,
+  HOSTAL:     BODEGA_CATEGORIES,
+  BOTICA:     BOTICA_CATEGORIES,
+  FARMACIA:   FARMACIA_CATEGORIES,
   ACCESORIOS: FERRETERIA_CATEGORIES, // Accesorios tech
 };
 

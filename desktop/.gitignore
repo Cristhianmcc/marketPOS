@@ -31,3 +31,4 @@ npm-debug.log*
 build-resources/
 .next/
 build-log.txt
+node_modules

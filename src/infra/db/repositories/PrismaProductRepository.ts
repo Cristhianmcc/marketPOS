@@ -52,6 +52,10 @@ export class PrismaProductRepository implements ProductRepository {
               { barcode: { contains: query } },
               { internalSku: { contains: query } },
               { brand: { contains: query, mode: 'insensitive' } },
+              // ✅ MÓDULO PH1: Búsqueda por campos farmacéuticos
+              { commercialName: { contains: query, mode: 'insensitive' } },
+              { genericName: { contains: query, mode: 'insensitive' } },
+              { barcodeSecondary: { contains: query } },
             ],
           }
         : {}, // Sin filtro si query está vacío
@@ -102,8 +106,19 @@ export class PrismaProductRepository implements ProductRepository {
         content: product.content,
         category: product.category,
         unitType: product.unitType,
-        baseUnitId: product.baseUnitId || null, // ✅ MÓDULO F2.1: Unidad SUNAT
+        baseUnitId: product.baseUnitId || null,
         imageUrl: product.imageUrl || null,
+        // ✅ MÓDULO PH1: Campos farmacéuticos
+        commercialName: product.commercialName || null,
+        genericName: product.genericName || null,
+        concentration: product.concentration || null,
+        pharmaceuticalForm: product.pharmaceuticalForm || null,
+        presentation: product.presentation || null,
+        laboratory: product.laboratory || null,
+        sanitaryRegistry: product.sanitaryRegistry || null,
+        requiresPrescription: product.requiresPrescription ?? false,
+        medicineCategory: product.medicineCategory || null,
+        barcodeSecondary: product.barcodeSecondary || null,
       },
     });
 
@@ -116,8 +131,18 @@ export class PrismaProductRepository implements ProductRepository {
       content: created.content,
       category: created.category,
       unitType: created.unitType,
-      baseUnitId: created.baseUnitId, // ✅ MÓDULO F2.1
+      baseUnitId: created.baseUnitId,
       imageUrl: created.imageUrl,
+      commercialName: created.commercialName,
+      genericName: created.genericName,
+      concentration: created.concentration,
+      pharmaceuticalForm: created.pharmaceuticalForm,
+      presentation: created.presentation,
+      laboratory: created.laboratory,
+      sanitaryRegistry: created.sanitaryRegistry,
+      requiresPrescription: created.requiresPrescription,
+      medicineCategory: created.medicineCategory,
+      barcodeSecondary: created.barcodeSecondary,
     };
   }
 }

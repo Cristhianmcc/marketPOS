@@ -23,6 +23,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '15', 10);
+    const search = searchParams.get('search') || undefined;
 
     const fromDate = from ? new Date(from) : undefined;
     const toDate = to ? new Date(to) : undefined;
@@ -30,14 +33,17 @@ export async function GET(request: Request) {
     // OWNER ve todos los turnos, CASHIER solo los suyos
     const userId = session.role === 'OWNER' ? null : session.userId;
 
-    const shifts = await shiftRepo.getHistory(
+    const { shifts, total } = await shiftRepo.getHistory(
       session.storeId,
       userId,
       fromDate,
-      toDate
+      toDate,
+      page,
+      limit,
+      search
     );
 
-    return NextResponse.json({ shifts });
+    return NextResponse.json({ shifts, total, page, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error('Error getting shift history:', error);
     return NextResponse.json(

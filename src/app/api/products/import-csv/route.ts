@@ -47,6 +47,16 @@ interface ParsedProduct {
   conversions: ParsedConversion[];
   errors: string[];
   warnings: string[];
+  // Campos farmacéuticos (solo presentes si el CSV los incluye)
+  commercialName: string | null;
+  genericName: string | null;
+  concentration: string | null;
+  pharmaceuticalForm: string | null;
+  presentation: string | null;
+  laboratory: string | null;
+  sanitaryRegistry: string | null;
+  requiresPrescription: boolean;
+  medicineCategory: string | null;
 }
 
 interface ImportResult {
@@ -88,13 +98,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!session.storeId) {
+      return NextResponse.json(
+        { error: 'Sin tienda asignada' },
+        { status: 403 }
+      );
+    }
+
     const contentType = request.headers.get('content-type') || '';
     console.log('[CSV Import] 3. Content-Type:', contentType);
     
+    const sessionWithStore = { storeId: session.storeId!, userId: session.userId };
+
     // Si es form-data, es preview/parse (modo web legacy)
     if (contentType.includes('multipart/form-data')) {
       console.log('[CSV Import] 4. Route: PREVIEW (FormData)');
-      const result = await handlePreview(request, session);
+      const result = await handlePreview(request, sessionWithStore);
       console.log('[CSV Import] 5. Preview complete');
       return result;
     }
@@ -105,13 +124,13 @@ export async function POST(request: NextRequest) {
       
       if (body.action === 'preview' && body.fileContent) {
         console.log('[CSV Import] 4. Route: PREVIEW (JSON text)');
-        const result = await handlePreviewFromText(body.fileContent, session);
+        const result = await handlePreviewFromText(body.fileContent, sessionWithStore);
         console.log('[CSV Import] 5. Preview complete');
         return result;
       }
       
       console.log('[CSV Import] 4. Route: IMPORT');
-      const result = await handleImportFromBody(body, session);
+      const result = await handleImportFromBody(body, sessionWithStore);
       console.log('[CSV Import] 5. Import complete');
       return result;
     }
@@ -394,6 +413,15 @@ async function handleImportFromBody(
               category: product.category || 'Otros',
               unitType,
               baseUnitId: baseUnit?.id,
+              commercialName:     product.commercialName,
+              genericName:        product.genericName,
+              concentration:      product.concentration,
+              pharmaceuticalForm: product.pharmaceuticalForm,
+              presentation:       product.presentation,
+              laboratory:         product.laboratory,
+              sanitaryRegistry:   product.sanitaryRegistry,
+              requiresPrescription: product.requiresPrescription,
+              medicineCategory:   product.medicineCategory,
             },
           });
         } else if (updateExisting) {
@@ -405,8 +433,15 @@ async function handleImportFromBody(
               content: product.content,
               category: product.category || 'Otros',
               unitType,
-              baseUnitId: baseUnit?.id,
-            },
+              baseUnitId: baseUnit?.id,              commercialName:     product.commercialName,
+              genericName:        product.genericName,
+              concentration:      product.concentration,
+              pharmaceuticalForm: product.pharmaceuticalForm,
+              presentation:       product.presentation,
+              laboratory:         product.laboratory,
+              sanitaryRegistry:   product.sanitaryRegistry,
+              requiresPrescription: product.requiresPrescription,
+              medicineCategory:   product.medicineCategory,            },
           });
         }
 
@@ -639,6 +674,18 @@ function parseProductRow(
     }
   }
 
+  // ── Campos farmacéuticos (opcionales) ──────────────────────────────────
+  const commercialName    = row['nombre comercial']    || row['commercialname']    || null;
+  const genericName       = row['principio activo']    || row['genericname']       || null;
+  const concentration     = row['concentracion']       || row['concentration']     || null;
+  const pharmaceuticalForm = row['forma farmaceutica'] || row['pharmaceuticalform'] || null;
+  const presentation      = row['presentacion']        || row['presentation']      || null;
+  const laboratory        = row['laboratorio']         || row['laboratory']        || null;
+  const sanitaryRegistry  = row['registro sanitario']  || row['sanitaryregistry']  || null;
+  const reqStr            = (row['requiere receta'] || row['requiresprescription'] || '').toLowerCase();
+  const requiresPrescription = ['si', 'sí', 'yes', '1', 'true'].includes(reqStr);
+  const medicineCategory  = row['categoria terapeutica'] || row['medicinecategory'] || null;
+
   // Conversions (formato: "BOX:12,PACK:6")
   const conversions: ParsedConversion[] = [];
   const conversionsStr = row['conversions'] || row['conversiones'] || '';
@@ -675,5 +722,14 @@ function parseProductRow(
     conversions,
     errors,
     warnings,
+    commercialName:     commercialName     ? commercialName.trim()     : null,
+    genericName:        genericName        ? genericName.trim()        : null,
+    concentration:      concentration      ? concentration.trim()      : null,
+    pharmaceuticalForm: pharmaceuticalForm ? pharmaceuticalForm.trim() : null,
+    presentation:       presentation       ? presentation.trim()       : null,
+    laboratory:         laboratory         ? laboratory.trim()         : null,
+    sanitaryRegistry:   sanitaryRegistry   ? sanitaryRegistry.trim()  : null,
+    requiresPrescription,
+    medicineCategory:   medicineCategory   ? medicineCategory.trim()  : null,
   };
 }

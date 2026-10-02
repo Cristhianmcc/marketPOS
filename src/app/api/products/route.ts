@@ -78,6 +78,17 @@ export async function POST(req: NextRequest) {
       unitType: data.unitType,
       baseUnitId: data.baseUnitId || null, // ✅ MÓDULO F2.1: Unidad SUNAT
       imageUrl: data.imageUrl || null,
+      // ✅ MÓDULO PH1: Campos farmacéuticos
+      commercialName: data.commercialName || null,
+      genericName: data.genericName || null,
+      concentration: data.concentration || null,
+      pharmaceuticalForm: data.pharmaceuticalForm || null,
+      presentation: data.presentation || null,
+      laboratory: data.laboratory || null,
+      sanitaryRegistry: data.sanitaryRegistry || null,
+      requiresPrescription: data.requiresPrescription ?? false,
+      medicineCategory: data.medicineCategory || null,
+      barcodeSecondary: data.barcodeSecondary || null,
     });
 
     // Sincronizar al catálogo cloud en segundo plano (fire-and-forget)

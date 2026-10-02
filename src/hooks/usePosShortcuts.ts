@@ -1,7 +1,7 @@
 // ✅ MÓDULO 17.1: ATAJOS DE TECLADO (KEYBOARD-FIRST POS)
 // Hook global de atajos de teclado para el POS
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { usePathname } from 'next/navigation';
 
 interface ShortcutHandlers {
@@ -24,12 +24,14 @@ interface ShortcutHandlers {
   selectYape: () => void;
   selectPlin: () => void;
   selectCard: () => void;
+  confirmPayment: () => void;
 }
 
 interface ShortcutOptions {
   enabled?: boolean;
   isCheckoutModalOpen?: boolean;
   hasOpenShift?: boolean;
+  barcodeBufferRef?: MutableRefObject<string>;
 }
 
 export function usePosShortcuts(
@@ -40,7 +42,8 @@ export function usePosShortcuts(
   const { 
     enabled = true,
     isCheckoutModalOpen = false,
-    hasOpenShift = false
+    hasOpenShift = false,
+    barcodeBufferRef
   } = options;
 
   // Ref para almacenar el índice del ítem seleccionado en el carrito
@@ -79,6 +82,10 @@ export function usePosShortcuts(
         switch (e.key) {
           case 'Escape':
             handlers.closeModal();
+            break;
+          case 'Enter':
+            e.preventDefault();
+            handlers.confirmPayment();
             break;
           case 'F5':
             handlers.selectCash();
@@ -130,8 +137,10 @@ export function usePosShortcuts(
 
         // CHECKOUT - Abrir
         case 'F4':
-          // Solo si hay turno abierto
-          if (hasOpenShift) {
+        case 'Enter':
+          // Solo si hay turno abierto y no hay escaneo de barcode en progreso
+          if (hasOpenShift && !(barcodeBufferRef && barcodeBufferRef.current.length >= 4)) {
+            e.preventDefault();
             handlers.openCheckout();
           }
           break;

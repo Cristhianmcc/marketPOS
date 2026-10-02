@@ -39,6 +39,7 @@ export async function GET(
         paymentMethod: true,
         amountPaid: true,
         changeAmount: true,
+        paymentDetails: true, // ✅ Pago Mixto: desglose de splits
         createdAt: true,
         printedAt: true,
         customerId: true,
@@ -79,6 +80,12 @@ export async function GET(
             conversionFactorUsed: true,
             pricingMode: true,
             sellUnitPriceApplied: true,
+            // ✅ PH8: Snapshot farmacéutico
+            commercialName: true,
+            genericName: true,
+            concentration: true,
+            pharmaceuticalForm: true,
+            unitSunatCodeUsed: true,
           },
         },
         // Usuario - solo nombre

@@ -22,6 +22,7 @@ interface UnitOption {
 interface StoreProduct {
   id: string;
   price: number;
+  costPrice: number | null;
   stock: number | null;
   active: boolean;
   product: {
@@ -63,6 +64,9 @@ interface CartItem {
   conversionFactorUsed?: number;
   // ✅ MÓDULO F2.3: Precio por unidad de venta
   sellUnitPriceApplied?: number;
+  // Venta libre (producto no registrado en inventario)
+  isFreeItem?: boolean;
+  freeItemName?: string;
 }
 
 interface CartPanelProps {
@@ -444,8 +448,8 @@ function CartPanelComponent({
                         </button>
                       </div>
                       
-                      {/* ✅ MÓDULO F2.2: Selector de unidad */}
-                      {advancedUnitsEnabled && onUpdateItemUnit && (
+                      {/* ✅ MÓDULO F2.2: Selector de unidad (no aplica a venta libre) */}
+                      {advancedUnitsEnabled && onUpdateItemUnit && !item.isFreeItem && (
                         <UnitDropdown
                           productMasterId={item.storeProduct.product.id}
                           storeProductId={item.storeProduct.id}

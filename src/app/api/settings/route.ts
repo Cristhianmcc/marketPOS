@@ -44,8 +44,18 @@ export async function GET(request: NextRequest) {
         ruc: store.ruc,
         address: store.address,
         phone: store.phone,
+        businessProfile: store.businessProfile,
       },
-      settings: store.settings || null,
+      settings: store.settings
+        ? {
+            ...store.settings,
+            taxRate: store.settings.taxRate,
+            expiryAlertDays: store.settings.expiryAlertDays,
+            fefoEnabled: store.settings.fefoEnabled,
+            expiredBatchPolicy: store.settings.expiredBatchPolicy,
+            showExpiredWarnings: store.settings.showExpiredWarnings,
+          }
+        : null,
     });
   } catch (error) {
     console.error('Error fetching settings:', error);
@@ -76,7 +86,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { storeName, storeRuc, storeAddress, storePhone, ticketFooter, ticketLogo, taxRate } = body;
+    const {
+      storeName, storeRuc, storeAddress, storePhone,
+      ticketFooter, ticketLogo, taxRate,
+      // Configuración farmacéutica
+      expiryAlertDays, fefoEnabled, expiredBatchPolicy, showExpiredWarnings,
+    } = body;
 
     // Actualizar Store y Settings en transacción
     const result = await prisma.$transaction(async (tx) => {
@@ -97,6 +112,13 @@ export async function PATCH(request: NextRequest) {
       });
 
       let updatedSettings;
+      const pharmaData = {
+        ...(expiryAlertDays !== undefined && { expiryAlertDays: Math.max(1, parseInt(expiryAlertDays) || 60) }),
+        ...(fefoEnabled !== undefined && { fefoEnabled: Boolean(fefoEnabled) }),
+        ...(expiredBatchPolicy !== undefined && { expiredBatchPolicy }),
+        ...(showExpiredWarnings !== undefined && { showExpiredWarnings: Boolean(showExpiredWarnings) }),
+      };
+
       if (existingSettings) {
         updatedSettings = await tx.storeSettings.update({
           where: { storeId: session.storeId },
@@ -104,6 +126,7 @@ export async function PATCH(request: NextRequest) {
             ticketFooter: ticketFooter || null,
             ticketLogo: ticketLogo || null,
             taxRate: taxRate !== undefined ? taxRate : 0,
+            ...pharmaData,
           },
         });
       } else {
@@ -113,6 +136,7 @@ export async function PATCH(request: NextRequest) {
             ticketFooter: ticketFooter || null,
             ticketLogo: ticketLogo || null,
             taxRate: taxRate !== undefined ? taxRate : 0,
+            ...pharmaData,
           },
         });
       }

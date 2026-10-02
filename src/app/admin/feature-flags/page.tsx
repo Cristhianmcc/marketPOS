@@ -3,6 +3,8 @@
 // OWNER puede ver y cambiar flags de rubro. Los flags de plan son solo lectura (gestionados por suscripción).
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { FeatureFlagKey } from '@prisma/client';
 
 // Flags gestionados exclusivamente por el plan de suscripción (SUPERADMIN via syncFeatureFlagsFromPlan)
@@ -95,9 +97,48 @@ const FLAG_LABELS: Record<FeatureFlagKey, { name: string; description: string; c
     description: 'Trazabilidad de lotes, alertas de vencimiento, FIFO automático',
     critical: false,
   },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MÓDULO PH — FLAGS FARMACÉUTICOS / BOTICA
+  // ═══════════════════════════════════════════════════════════════════════════
+  ENABLE_FEFO_SALES: {
+    name: 'Ventas FEFO (Botica)',
+    description: 'El lote que vence antes sale primero automáticamente',
+    critical: false,
+  },
+  ENABLE_PHARMA_FIELDS: {
+    name: 'Campos Farmacéuticos',
+    description: 'Agrega principio activo, concentración, forma farmacéutica y laboratorio a los productos',
+    critical: false,
+  },
+  ENABLE_MEDICINE_SEARCH: {
+    name: 'Búsqueda por DCI (Botica)',
+    description: 'Permite buscar medicamentos por principio activo / DCI además del nombre comercial',
+    critical: false,
+  },
+  ENABLE_RESTRICTED_PRODUCTS: {
+    name: 'Productos Controlados / Rx',
+    description: 'Alerta al vender productos que requieren receta médica; registra datos del paciente',
+    critical: false,
+  },
+  ENABLE_SUPPLIERS: {
+    name: 'Proveedores y Órdenes de Compra',
+    description: 'Gestión de proveedores y órdenes de compra con recepción de mercancía',
+    critical: false,
+  },
+  ENABLE_PATIENTS: {
+    name: 'Historial de Pacientes (Botica)',
+    description: 'Registro de pacientes con alergias, condiciones y historial de dispensación',
+    critical: false,
+  },
+  ENABLE_CONTROLLED_BOOK: {
+    name: 'Libro de Controlados DIGEMID',
+    description: 'Registro oficial de dispensación de medicamentos controlados según normativa DIGEMID',
+    critical: false,
+  },
 };
 
 export default function FeatureFlagsPage() {
+  const router = useRouter();
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -188,7 +229,16 @@ export default function FeatureFlagsPage() {
     <div className="p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">Configuración de Funcionalidades</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <button
+              onClick={() => router.back()}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Volver"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <h1 className="text-3xl font-bold">Configuración de Funcionalidades</h1>
+          </div>
           <p className="text-gray-600">
             Activa o desactiva funcionalidades para tu tienda. Los cambios son inmediatos.
           </p>

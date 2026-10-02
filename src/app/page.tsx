@@ -42,6 +42,29 @@ export default async function HomePage() {
   // STARTER no tiene acceso a módulos admin avanzados
   const isStarterPlan = planCode === 'STARTER';
 
+  // ✅ MÓDULO PH3: Alertas de vencimiento para dashboard (solo FARMACIA/BOTICA)
+  let expiryAlertSummary: { expired: number; expiringSoon: number } | null = null;
+  if (session.storeId && hasFlag(FeatureFlagKey.ENABLE_BATCH_EXPIRY)) {
+    const storeSettings = await prisma.storeSettings.findUnique({
+      where: { storeId: session.storeId },
+      select: { expiryAlertDays: true },
+    });
+    const alertDays = storeSettings?.expiryAlertDays ?? 60;
+    const now = new Date();
+    const thresholdDate = new Date();
+    thresholdDate.setDate(now.getDate() + alertDays);
+
+    const [expiredCount, expiringSoonCount] = await Promise.all([
+      prisma.productBatch.count({
+        where: { storeId: session.storeId, active: true, expiryDate: { lt: now } },
+      }),
+      prisma.productBatch.count({
+        where: { storeId: session.storeId, active: true, expiryDate: { gte: now, lt: thresholdDate } },
+      }),
+    ]);
+    expiryAlertSummary = { expired: expiredCount, expiringSoon: expiringSoonCount };
+  }
+
   const roleDisplay = session.role === 'OWNER' ? 'Propietario' : 'Cajero';
   const currentTime = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
   const currentDate = new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -89,6 +112,40 @@ export default async function HomePage() {
             </div>
           </div>
         </div>
+
+        {/* ✅ MÓDULO PH3: Widget de alertas de vencimiento — solo FARMACIA/BOTICA */}
+        {expiryAlertSummary && (expiryAlertSummary.expired > 0 || expiryAlertSummary.expiringSoon > 0) && (
+          <div className="mb-6">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {expiryAlertSummary.expired > 0 && (
+                <a href="/inventory/expiry-alerts?status=EXPIRED" className="flex-1 flex items-center gap-4 bg-red-50 border border-red-200 rounded-xl p-4 hover:bg-red-100 transition-colors">
+                  <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-red-800">{expiryAlertSummary.expired} lote{expiryAlertSummary.expired !== 1 ? 's' : ''} vencido{expiryAlertSummary.expired !== 1 ? 's' : ''}</p>
+                    <p className="text-xs text-red-600">Requieren atención inmediata · Click para ver</p>
+                  </div>
+                </a>
+              )}
+              {expiryAlertSummary.expiringSoon > 0 && (
+                <a href="/inventory/expiry-alerts?status=WARNING" className="flex-1 flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors">
+                  <div className="p-2 bg-amber-100 rounded-lg flex-shrink-0">
+                    <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-800">{expiryAlertSummary.expiringSoon} lote{expiryAlertSummary.expiringSoon !== 1 ? 's' : ''} próximo{expiryAlertSummary.expiringSoon !== 1 ? 's' : ''} a vencer</p>
+                    <p className="text-xs text-amber-600">Dentro del umbral de alerta · Click para ver</p>
+                  </div>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Acciones rápidas estilo Stitch */}
         <div className="mb-10">

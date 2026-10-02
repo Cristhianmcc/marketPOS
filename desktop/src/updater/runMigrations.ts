@@ -416,6 +416,238 @@ export class MigrationRunner {
       `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_category VARCHAR(255);`,
       `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_visible BOOLEAN DEFAULT true;`,
       `ALTER TABLE store_products ADD COLUMN IF NOT EXISTS catalog_updated_at TIMESTAMP(3);`,
+
+      // ═══════════════════════════════════════════════════════════════
+      // MÓDULOS FARMACIA (PH1-PH12) — añadidos al sistema web
+      // ═══════════════════════════════════════════════════════════════
+
+      // 1. Nuevos valores del enum FeatureFlagKey
+      `ALTER TYPE "FeatureFlagKey" ADD VALUE IF NOT EXISTS 'ENABLE_FEFO_SALES';`,
+      `ALTER TYPE "FeatureFlagKey" ADD VALUE IF NOT EXISTS 'ENABLE_PHARMA_FIELDS';`,
+      `ALTER TYPE "FeatureFlagKey" ADD VALUE IF NOT EXISTS 'ENABLE_MEDICINE_SEARCH';`,
+      `ALTER TYPE "FeatureFlagKey" ADD VALUE IF NOT EXISTS 'ENABLE_RESTRICTED_PRODUCTS';`,
+      `ALTER TYPE "FeatureFlagKey" ADD VALUE IF NOT EXISTS 'ENABLE_SUPPLIERS';`,
+      `ALTER TYPE "FeatureFlagKey" ADD VALUE IF NOT EXISTS 'ENABLE_PATIENTS';`,
+      `ALTER TYPE "FeatureFlagKey" ADD VALUE IF NOT EXISTS 'ENABLE_CONTROLLED_BOOK';`,
+
+      // 2. Nuevo valor en BusinessProfile
+      `ALTER TYPE "BusinessProfile" ADD VALUE IF NOT EXISTS 'FARMACIA';`,
+
+      // 3. Nuevos enums para farmacia
+      `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PurchaseOrderStatus') THEN
+          CREATE TYPE "PurchaseOrderStatus" AS ENUM ('DRAFT','SENT','PARTIAL','RECEIVED','CANCELLED');
+        END IF;
+      END $$;`,
+      `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'InteractionSeverity') THEN
+          CREATE TYPE "InteractionSeverity" AS ENUM ('LOW','MODERATE','HIGH');
+        END IF;
+      END $$;`,
+
+      // 4. Columnas farmacéuticas en products_master (PH1)
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS commercial_name VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS generic_name VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS concentration VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS pharmaceutical_form VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS presentation VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS laboratory VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS sanitary_registry VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS requires_prescription BOOLEAN NOT NULL DEFAULT false;`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS medicine_category VARCHAR(255);`,
+      `ALTER TABLE products_master ADD COLUMN IF NOT EXISTS barcode_secondary VARCHAR(255);`,
+
+      // 5. Columnas farmacéuticas en sale_items (PH8 snapshot)
+      `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS commercial_name VARCHAR(255);`,
+      `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS generic_name VARCHAR(255);`,
+      `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS ph_concentration VARCHAR(255);`,
+      `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS pharmaceutical_form VARCHAR(255);`,
+      `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_sunat_code_used VARCHAR(30);`,
+      `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS batch_breakdown JSONB;`,
+
+      // 5b. Snapshot de costo en sale_items (ganancia por venta)
+      `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2);`,
+
+      // 6. Columna batch_id en movements (PH2)
+      `ALTER TABLE movements ADD COLUMN IF NOT EXISTS batch_id VARCHAR(30);`,
+
+      // 7. Columnas FEFO y alertas de vencimiento en store_settings (PH3/PH4)
+      `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS expired_batch_policy VARCHAR(20) NOT NULL DEFAULT 'BLOCK_EXPIRED';`,
+      `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS fefo_enabled BOOLEAN NOT NULL DEFAULT false;`,
+      `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS expiry_alert_days INT NOT NULL DEFAULT 60;`,
+      `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS show_expired_warnings BOOLEAN NOT NULL DEFAULT true;`,
+
+      // 8. Tabla product_batches (PH2 — lotes y vencimientos)
+      `CREATE TABLE IF NOT EXISTS product_batches (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        store_product_id VARCHAR(30) NOT NULL REFERENCES store_products(id) ON DELETE CASCADE,
+        batch_number VARCHAR(255) NOT NULL,
+        expiry_date TIMESTAMP(3) NOT NULL,
+        purchase_date TIMESTAMP(3),
+        quantity_initial DECIMAL(18,6) NOT NULL,
+        quantity_available DECIMAL(18,6) NOT NULL,
+        unit_cost DECIMAL(10,2),
+        active BOOLEAN NOT NULL DEFAULT true,
+        notes TEXT,
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS product_batches_store_product_batch_expiry_key
+        ON product_batches(store_id, store_product_id, batch_number, expiry_date);`,
+      `CREATE INDEX IF NOT EXISTS product_batches_store_product_idx ON product_batches(store_id, store_product_id);`,
+      `CREATE INDEX IF NOT EXISTS product_batches_expiry_idx ON product_batches(expiry_date);`,
+      `CREATE INDEX IF NOT EXISTS product_batches_store_active_idx ON product_batches(store_id, active);`,
+
+      // 9. Tabla suppliers (PH9 — proveedores)
+      `CREATE TABLE IF NOT EXISTS suppliers (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        ruc VARCHAR(20),
+        contact_name VARCHAR(255),
+        phone VARCHAR(50),
+        email VARCHAR(255),
+        address TEXT,
+        notes TEXT,
+        active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE INDEX IF NOT EXISTS suppliers_store_active_idx ON suppliers(store_id, active);`,
+      `CREATE INDEX IF NOT EXISTS suppliers_store_name_idx ON suppliers(store_id, name);`,
+
+      // 10. Tabla purchase_orders (PH9)
+      `CREATE TABLE IF NOT EXISTS purchase_orders (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        supplier_id VARCHAR(30) NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        created_by_id VARCHAR(30) NOT NULL REFERENCES users(id),
+        order_number INT NOT NULL,
+        status "PurchaseOrderStatus" NOT NULL DEFAULT 'DRAFT',
+        notes TEXT,
+        total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        expected_date TIMESTAMP(3),
+        received_at TIMESTAMP(3),
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS purchase_orders_store_number_key ON purchase_orders(store_id, order_number);`,
+      `CREATE INDEX IF NOT EXISTS purchase_orders_store_status_idx ON purchase_orders(store_id, status);`,
+      `CREATE INDEX IF NOT EXISTS purchase_orders_supplier_idx ON purchase_orders(supplier_id);`,
+
+      // 11. Tabla purchase_order_items (PH9)
+      `CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id VARCHAR(30) PRIMARY KEY,
+        purchase_order_id VARCHAR(30) NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+        store_product_id VARCHAR(30) NOT NULL REFERENCES store_products(id) ON DELETE CASCADE,
+        quantity_ordered DECIMAL(10,2) NOT NULL,
+        quantity_received DECIMAL(10,2) NOT NULL DEFAULT 0,
+        unit_cost DECIMAL(10,2) NOT NULL,
+        batch_number VARCHAR(255),
+        expiry_date TIMESTAMP(3)
+      );`,
+      `CREATE INDEX IF NOT EXISTS po_items_order_idx ON purchase_order_items(purchase_order_id);`,
+
+      // 12. Tabla patients (PH10 — pacientes)
+      `CREATE TABLE IF NOT EXISTS patients (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        dni VARCHAR(30) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        birth_date TIMESTAMP(3),
+        gender VARCHAR(5),
+        address TEXT,
+        allergies TEXT,
+        conditions TEXT,
+        notes TEXT,
+        active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS patients_store_dni_key ON patients(store_id, dni);`,
+      `CREATE INDEX IF NOT EXISTS patients_store_name_idx ON patients(store_id, name);`,
+      `CREATE INDEX IF NOT EXISTS patients_store_active_idx ON patients(store_id, active);`,
+
+      // 13. Tabla patient_medications (PH10)
+      `CREATE TABLE IF NOT EXISTS patient_medications (
+        id VARCHAR(30) PRIMARY KEY,
+        patient_id VARCHAR(30) NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+        sale_id VARCHAR(30) NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+        product_name VARCHAR(255) NOT NULL,
+        generic_name VARCHAR(255),
+        concentration VARCHAR(255),
+        quantity DECIMAL(10,2) NOT NULL,
+        prescribed_by VARCHAR(255),
+        dosage VARCHAR(255),
+        consult_reason TEXT,
+        notes TEXT,
+        dispensed_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE INDEX IF NOT EXISTS patient_meds_patient_date_idx ON patient_medications(patient_id, dispensed_at);`,
+      `CREATE INDEX IF NOT EXISTS patient_meds_patient_generic_idx ON patient_medications(patient_id, generic_name);`,
+      `CREATE INDEX IF NOT EXISTS patient_meds_sale_idx ON patient_medications(sale_id);`,
+
+      // 14. Tabla controlled_book_entries (PH11 — libro controlados)
+      `CREATE TABLE IF NOT EXISTS controlled_book_entries (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+        sale_id VARCHAR(30) NOT NULL,
+        sale_number INT NOT NULL,
+        sale_date TIMESTAMP(3) NOT NULL,
+        product_name VARCHAR(255) NOT NULL,
+        generic_name VARCHAR(255),
+        concentration VARCHAR(255),
+        laboratory VARCHAR(255),
+        batch_number VARCHAR(255),
+        quantity DECIMAL(10,2) NOT NULL,
+        prescription_number VARCHAR(255) NOT NULL,
+        prescribed_by VARCHAR(255),
+        cmp_number VARCHAR(50),
+        patient_id VARCHAR(30) REFERENCES patients(id) ON DELETE SET NULL,
+        patient_name VARCHAR(255) NOT NULL,
+        patient_dni VARCHAR(30) NOT NULL,
+        dispensed_by_id VARCHAR(30) NOT NULL REFERENCES users(id),
+        dispensed_by_name VARCHAR(255) NOT NULL,
+        notes TEXT,
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE INDEX IF NOT EXISTS controlled_book_store_date_idx ON controlled_book_entries(store_id, sale_date);`,
+      `CREATE INDEX IF NOT EXISTS controlled_book_store_dni_idx ON controlled_book_entries(store_id, patient_dni);`,
+      `CREATE INDEX IF NOT EXISTS controlled_book_store_product_idx ON controlled_book_entries(store_id, product_name);`,
+      `CREATE INDEX IF NOT EXISTS controlled_book_store_rx_idx ON controlled_book_entries(store_id, prescription_number);`,
+
+      // 15. Tabla drug_interactions (PH12 — interacciones)
+      `CREATE TABLE IF NOT EXISTS drug_interactions (
+        id VARCHAR(30) PRIMARY KEY,
+        drug_a VARCHAR(255) NOT NULL,
+        drug_b VARCHAR(255) NOT NULL,
+        severity "InteractionSeverity" NOT NULL,
+        description TEXT NOT NULL,
+        recommendation TEXT,
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS drug_interactions_drugs_key ON drug_interactions(drug_a, drug_b);`,
+      `CREATE INDEX IF NOT EXISTS drug_interactions_drug_a_idx ON drug_interactions(drug_a);`,
+      `CREATE INDEX IF NOT EXISTS drug_interactions_drug_b_idx ON drug_interactions(drug_b);`,
+
+      // 16. Tabla drug_interaction_logs (PH12)
+      `CREATE TABLE IF NOT EXISTS drug_interaction_logs (
+        id VARCHAR(30) PRIMARY KEY,
+        store_id VARCHAR(30) NOT NULL,
+        sale_id VARCHAR(30),
+        patient_id VARCHAR(30) REFERENCES patients(id) ON DELETE SET NULL,
+        drug_a VARCHAR(255) NOT NULL,
+        drug_b VARCHAR(255) NOT NULL,
+        severity "InteractionSeverity" NOT NULL,
+        description TEXT NOT NULL,
+        action VARCHAR(50) NOT NULL,
+        acknowledged_by VARCHAR(30),
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );`,
+      `CREATE INDEX IF NOT EXISTS drug_interaction_logs_store_date_idx ON drug_interaction_logs(store_id, created_at);`,
+      `CREATE INDEX IF NOT EXISTS drug_interaction_logs_patient_idx ON drug_interaction_logs(patient_id);`,
     ];
 
     const sql = patches.join('\n');
@@ -478,14 +710,36 @@ export class MigrationRunner {
         };
       }
 
-      // Count migration folders before
+      // Count real (14-digit timestamp) migration folders
       const migrationFolders = fs.readdirSync(migrationsPath)
         .filter(f => {
           const fullPath = path.join(migrationsPath, f);
           return fs.statSync(fullPath).isDirectory() && f.match(/^\d{14}_/);
         });
 
-      console.log(`[MigrationRunner] Found ${migrationFolders.length} migration(s)`);
+      console.log(`[MigrationRunner] Found ${migrationFolders.length} real migration(s)`);
+
+      // If only baseline migrations exist (0001_init style with empty SQL),
+      // fall through to db push so fresh installs get all tables created.
+      if (migrationFolders.length === 0) {
+        console.log('[MigrationRunner] Only baseline migrations found - using db push for schema creation');
+        await this.execPrismaDbPush(schemaPath, databaseUrl);
+
+        console.log('[MigrationRunner] Schema created via db push. User must complete /setup to provision store.');
+
+        try {
+          await this.seedGlobalCatalog(databaseUrl);
+        } catch (seedErr) {
+          console.error('[MigrationRunner] Catalog seed error (non-fatal):', seedErr);
+        }
+
+        return {
+          success: true,
+          migrationsApplied: 1,
+          migrationsSkipped: 0,
+          message: 'Schema pushed successfully (db push — baseline only)',
+        };
+      }
 
       // Run prisma migrate deploy
       let output = '';

@@ -13,6 +13,21 @@ export const CreateProductSchema = z.object({
     .optional()
     .nullable(),
   imageUrl: z.string().min(1, 'URL de imagen inválida').optional().nullable(),
+  // ✅ MÓDULO PH1: Campos farmacéuticos (todos opcionales)
+  commercialName: z.string().optional().nullable(),
+  genericName: z.string().optional().nullable(),
+  concentration: z.string().optional().nullable(),
+  pharmaceuticalForm: z.string().optional().nullable(),
+  presentation: z.string().optional().nullable(),
+  laboratory: z.string().optional().nullable(),
+  sanitaryRegistry: z.string().optional().nullable(),
+  requiresPrescription: z.boolean().optional().default(false),
+  medicineCategory: z.string().optional().nullable(),
+  barcodeSecondary: z
+    .string()
+    .regex(/^\d{8,14}$/, 'Código secundario debe ser numérico de 8-14 dígitos')
+    .optional()
+    .nullable(),
 });
 
 export const ConfigureStoreProductSchema = z.object({
