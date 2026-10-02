@@ -3,7 +3,7 @@
  * Manages PostgreSQL server startup
  */
 
-import { execSync, execFileSync, spawnSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -132,15 +132,6 @@ async function preStartCleanup(dataDir: string, logPath: string): Promise<void> 
         } catch {
           // Ignore errors - process may already be dead
         }
-        // Also kill by image name as fallback
-        try {
-          spawnSync('taskkill', ['/IM', 'postgres.exe', '/F', '/T'], {
-            windowsHide: true,
-            timeout: 5000,
-          });
-        } catch {
-          // Ignore
-        }
         // Wait for the process to die
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -232,14 +223,24 @@ async function runPgCtlStart(
   console.log(`[startPostgres] Running: "${pgCtlPath}" ${args.join(' ')}`);
 
   try {
-    // Try to start PostgreSQL
-    const result = execFileSync(pgCtlPath, args, {
+    // Do not pipe stdout/stderr here. On Windows the postgres child can inherit
+    // those handles from pg_ctl, which makes Node wait for EOF even after
+    // pg_ctl has exited and the database is already accepting connections.
+    // PostgreSQL writes its diagnostics to logPath through pg_ctl -l.
+    const result = spawnSync(pgCtlPath, args, {
       windowsHide: true,
-      encoding: 'utf-8',
+      stdio: 'ignore',
       timeout: 90000, // 90 seconds to allow pg_ctl's 60s timeout
     });
-    
-    console.log(`[startPostgres] pg_ctl output: ${result}`);
+
+    if (result.error) {
+      throw result.error;
+    }
+    if (result.status !== 0) {
+      throw new Error(`pg_ctl exited with code ${result.status ?? 'unknown'}`);
+    }
+
+    console.log('[startPostgres] pg_ctl start completed');
 
     return {
       success: true,

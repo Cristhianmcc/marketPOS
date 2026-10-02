@@ -187,6 +187,12 @@ datos reales de clientes.
 El archivo temporal `--pwfile` de `initdb` también se crea dentro de `logs` en ese runtime y se
 elimina en `finally`; no usa `%TEMP%`, que está bloqueado para el proceso de baja integridad.
 
+El inicio de PostgreSQL ejecuta `pg_ctl` con `stdio: ignore`: en Windows, canalizar su salida
+puede dejar a Electron esperando indefinidamente porque el proceso `postgres` hereda los handles,
+aunque la base ya esté lista. Los detalles del servidor se conservan en el archivo indicado por
+`pg_ctl -l`. La limpieza previa solo termina el PID registrado por este clúster y no debe usar
+`taskkill /IM postgres.exe`, pues podría cerrar otras instalaciones PostgreSQL del equipo.
+
 Para equipos donde Windows no ejecuta `.cmd` o `.lnk`, `desktop/launcher/SunatBetaLauncher.cs`
 genera `Iniciar Monterrial POS SUNAT Beta.exe`, un lanzador gráfico que aplica los mismos
 argumentos sin depender de asociaciones de scripts. `prepare-build.js` lo compila con el
