@@ -35,7 +35,10 @@ export function getPgDataDir(): string {
  * Location: LocalAppData/MonterrialPOS-SUNAT-Beta/logs
  */
 export function getLogsDir(): string {
-  return path.join(getMarketPOSDir(), 'logs');
+  // Keep the database in Documents for compatibility, but place this
+  // transient process log in Electron userData. Windows can protect
+  // Documents from writes made by unsigned portable executables.
+  return path.join(app.getPath('userData'), 'postgres-logs');
 }
 
 /**

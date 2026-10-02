@@ -161,16 +161,22 @@ no puede cargar sus archivos `.node` directamente desde `app.asar`.
 
 En Windows afectado por `STATUS_BREAKPOINT (0x80000003)`, la Beta se inicia mediante
 `Abrir Monterrial POS SUNAT Beta.cmd`. El lanzador autorizado usa `--no-sandbox`,
-desactiva GPU y asigna el perfil aislado
-perfil aislado `%APPDATA%/monterrial-pos-sunat-beta/isolated-test` y pasa
+desactiva GPU, asigna el perfil aislado
+`%APPDATA%/monterrial-pos-sunat-beta/isolated-test` y pasa
 `--sunat-beta-isolated` para poder probar junto al POS instalado. El arranque normal mantiene
 el bloqueo de instancia única. `extraFiles` lo incluye junto al
 ejecutable; esta excepción no debe aplicarse al producto principal.
 
+La base Beta continúa en `Documents/MonterrialPOS-SUNAT-Beta`. Solo el log transitorio de
+`pg_ctl` se guarda bajo el `userData` de Electron para evitar bloqueos de escritura sobre
+Documentos; este cambio no mueve ni recrea la base existente.
+
 Para equipos donde Windows no ejecuta `.cmd` o `.lnk`, `desktop/launcher/SunatBetaLauncher.cs`
 genera `Iniciar Monterrial POS SUNAT Beta.exe`, un lanzador gráfico que aplica los mismos
 argumentos sin depender de asociaciones de scripts. `prepare-build.js` lo compila con el
-compilador C# de Windows y `extraFiles` lo coloca junto a la aplicación.
+compilador C# de Windows y `extraFiles` lo coloca junto a la aplicación. Desde el Escritorio,
+el lanzador selecciona la salida `dist-electron*` más reciente para soportar el directorio de
+reintento que genera el empaquetador cuando una versión anterior sigue abierta.
 Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
 pruebas locales, la configuración externa debe suministrarse al proceso al
 arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.

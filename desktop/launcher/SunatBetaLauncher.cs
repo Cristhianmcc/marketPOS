@@ -14,14 +14,31 @@ internal static class SunatBetaLauncher
 
             if (!File.Exists(target))
             {
-                target = Path.Combine(
+                string desktopRoot = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
                     "marketPOS-sunat-beta",
-                    "desktop",
-                    "dist-electron",
-                    "win-unpacked",
-                    "Monterrial POS SUNAT Beta.exe"
+                    "desktop"
                 );
+                DateTime newest = DateTime.MinValue;
+                if (Directory.Exists(desktopRoot))
+                {
+                    foreach (string outputDir in Directory.GetDirectories(desktopRoot, "dist-electron*"))
+                    {
+                        string candidate = Path.Combine(
+                            outputDir,
+                            "win-unpacked",
+                            "Monterrial POS SUNAT Beta.exe"
+                        );
+                        DateTime modified = File.Exists(candidate)
+                            ? File.GetLastWriteTimeUtc(candidate)
+                            : DateTime.MinValue;
+                        if (modified > newest)
+                        {
+                            newest = modified;
+                            target = candidate;
+                        }
+                    }
+                }
                 baseDir = Path.GetDirectoryName(target);
             }
 
