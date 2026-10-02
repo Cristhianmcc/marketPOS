@@ -162,6 +162,12 @@ firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como me
 heredado. Esto permite que el administrador validado por el servicio cloud use el
 panel sin empaquetar su correo ni otros secretos en el ejecutable.
 
+En los builds desktop de esta rama, `next.config.ts` fija
+`NEXT_PUBLIC_ENABLE_SUNAT=true` durante la compilación para mostrar la sección de
+facturación electrónica en `/settings`. La disponibilidad efectiva y los permisos
+siguen verificándose en los endpoints del servidor; esto no activa producción ni
+incluye credenciales en el paquete.
+
 Los módulos nativos `usb` y `@serialport` deben permanecer en `asarUnpack`; Electron
 no puede cargar sus archivos `.node` directamente desde `app.asar`.
 
