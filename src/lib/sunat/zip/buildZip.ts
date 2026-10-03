@@ -42,7 +42,9 @@ export function extractFromZip(zipBase64: string, filename?: string): string | n
     const zipBuffer = Buffer.from(zipBase64, 'base64');
     const zip = new AdmZip(zipBuffer);
     
-    const entries = zip.getEntries();
+    // SUNAT Beta puede incluir una carpeta (por ejemplo `dummy/`) antes del
+    // XML de respuesta. Solo los archivos son candidatos a CDR.
+    const entries = zip.getEntries().filter(entry => !entry.isDirectory);
     
     if (entries.length === 0) {
       return null;

@@ -79,7 +79,7 @@ export function generateDebitNoteXML(
     .ele('cbc:Description').txt(debitNoteMetadata.debitNoteReason);
 
   // Signature
-  const signature = doc.ele('cac:Signature', { 'ID': docId });
+  const signature = doc.ele('cac:Signature');
   signature.ele('cbc:ID').txt(docId);
   const signatureParty = signature.ele('cac:SignatoryParty');
   signatureParty.ele('cac:PartyIdentification').ele('cbc:ID').txt(issuer.ruc);

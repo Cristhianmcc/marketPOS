@@ -63,7 +63,7 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
   doc.ele('cbc:DocumentCurrencyCode').txt(currency);
 
   // Signature (referencia al ID para la firma)
-  const signature = doc.ele('cac:Signature', { 'ID': docId });
+  const signature = doc.ele('cac:Signature');
   signature.ele('cbc:ID').txt(docId);
   const signatureParty = signature.ele('cac:SignatoryParty');
   const partyIdentification = signatureParty.ele('cac:PartyIdentification');
@@ -99,8 +99,40 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     supplierAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
   }
 
+  // Datos tributarios exigidos por SUNAT UBL 2.1.
+  const supplierTaxScheme = supplier.ele('cac:PartyTaxScheme');
+  supplierTaxScheme.ele('cbc:RegistrationName').txt(issuer.razonSocial);
+  supplierTaxScheme.ele('cbc:CompanyID', {
+    schemeID: '6',
+    schemeName: 'SUNAT:Identificador de Documento de Identidad',
+    schemeAgencyName: 'PE:SUNAT',
+    schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
+  }).txt(issuer.ruc);
+  const registrationAddress = supplierTaxScheme.ele('cac:RegistrationAddress');
+  if (issuer.ubigeo) {
+    registrationAddress.ele('cbc:ID').txt(issuer.ubigeo);
+  }
+  registrationAddress.ele('cbc:AddressTypeCode').txt('0000');
+  if (issuer.address) {
+    registrationAddress.ele('cbc:StreetName').txt(issuer.address);
+  }
+  registrationAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
+  const issuerTaxScheme = supplierTaxScheme.ele('cac:TaxScheme');
+  issuerTaxScheme.ele('cbc:ID').txt('1000');
+  issuerTaxScheme.ele('cbc:Name').txt('IGV');
+  issuerTaxScheme.ele('cbc:TaxTypeCode').txt('VAT');
+
   const supplierLegalEntity = supplier.ele('cac:PartyLegalEntity');
   supplierLegalEntity.ele('cbc:RegistrationName').txt(issuer.razonSocial);
+  const legalRegistrationAddress = supplierLegalEntity.ele('cac:RegistrationAddress');
+  if (issuer.ubigeo) {
+    legalRegistrationAddress.ele('cbc:ID').txt(issuer.ubigeo);
+  }
+  legalRegistrationAddress.ele('cbc:AddressTypeCode').txt('0000');
+  if (issuer.address) {
+    legalRegistrationAddress.ele('cbc:StreetName').txt(issuer.address);
+  }
+  legalRegistrationAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
 
   // AccountingCustomerParty (Cliente)
   const customerParty = doc.ele('cac:AccountingCustomerParty');
@@ -115,15 +147,26 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
   }).txt(customer.docNumber);
 
-  const customerLegalEntity = customerNode.ele('cac:PartyLegalEntity');
-  customerLegalEntity.ele('cbc:RegistrationName').txt(customer.name);
-
   // Dirección del cliente (opcional)
   if (customer.address) {
     const customerAddress = customerNode.ele('cac:PostalAddress');
     customerAddress.ele('cbc:StreetName').txt(customer.address);
     customerAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
   }
+
+  const customerTaxScheme = customerNode.ele('cac:PartyTaxScheme');
+  customerTaxScheme.ele('cbc:RegistrationName').txt(customer.name);
+  customerTaxScheme.ele('cbc:CompanyID', {
+    schemeID: customerDocType,
+    schemeName: 'SUNAT:Identificador de Documento de Identidad',
+    schemeAgencyName: 'PE:SUNAT',
+    schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
+  }).txt(customer.docNumber);
+  customerTaxScheme.ele('cac:TaxScheme').ele('cbc:ID').txt('-');
+
+  // En UBL 2.1 PostalAddress debe ir antes de PartyLegalEntity.
+  const customerLegalEntity = customerNode.ele('cac:PartyLegalEntity');
+  customerLegalEntity.ele('cbc:RegistrationName').txt(customer.name);
 
   const paymentTerms = doc.ele('cac:PaymentTerms');
   paymentTerms.ele('cbc:ID').txt('FormaPago');
