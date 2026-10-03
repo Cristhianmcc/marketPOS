@@ -79,7 +79,8 @@ export function isValidRuc(ruc: string | null | undefined): boolean {
   
   const remainder = sum % 11;
   const checkDigit = 11 - remainder;
-  const expectedDigit = checkDigit === 11 ? 0 : (checkDigit === 10 ? 0 : checkDigit);
+  // SUNAT normaliza 11 a 1 y 10 a 0.
+  const expectedDigit = checkDigit >= 10 ? checkDigit - 10 : checkDigit;
   
   return parseInt(cleanRuc[10]) === expectedDigit;
 }
