@@ -448,6 +448,9 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
     HOSTNAME: '127.0.0.1',
     DESKTOP_MODE: 'true',
     ENABLE_SUNAT: 'true',
+    // Esta distribución es exclusivamente para pruebas contra SUNAT BETA.
+    // Los datos de prueba pueden no existir en el padrón de producción.
+    SUNAT_SKIP_CHECK_DIGIT: 'true',
     DESKTOP_INTERNAL_TOKEN: internalToken,
     MONTERRIAL_DATA_DIR: monterrialDataDir,
   };
