@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import {
   Building2,
   Key,
@@ -71,6 +71,7 @@ export default function SunatOnboardingPage() {
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [testSignError, setTestSignError] = useState<string | null>(null);
 
   // Form states
   const [ruc, setRuc] = useState('');
@@ -236,20 +237,25 @@ export default function SunatOnboardingPage() {
 
   // Test de firma
   const testSign = async () => {
+    setTestSignError(null);
     setSaving(true);
     try {
       const res = await fetch('/api/onboarding/sunat/test-sign', {
         method: 'POST',
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        throw new Error(data.error || `No se pudo probar la firma (HTTP ${res.status})`);
+      }
       
       toast.success('✓ Firma verificada correctamente');
       await loadStatus();
       setCurrentStep(4); // Ir a Preferencias
     } catch (error: any) {
-      toast.error(error.message);
+      const message = error?.message || 'No se pudo conectar con el servicio de firma';
+      setTestSignError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -358,6 +364,7 @@ export default function SunatOnboardingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" richColors />
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4">
@@ -669,6 +676,13 @@ export default function SunatOnboardingPage() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
                 {status?.steps?.testSignedXml ? 'Probar de Nuevo' : 'Probar Firma'}
               </button>
+
+              {testSignError && (
+                <div role="alert" className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+                  <AlertTriangle className="w-4 h-4 inline mr-2" />
+                  {testSignError}
+                </div>
+              )}
 
               {status?.steps?.testSignedXml && (
                 <button
