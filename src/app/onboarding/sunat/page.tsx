@@ -361,6 +361,15 @@ export default function SunatOnboardingPage() {
 
   const currentStepData = STEPS[currentStep];
   const StepIcon = currentStepData?.icon;
+  const completedSteps = [
+    Boolean(status?.steps?.fiscalData),
+    Boolean(status?.steps?.solCredentials),
+    Boolean(status?.steps?.certificate),
+    Boolean(status?.steps?.testSignedXml),
+    currentStep > 4,
+    Boolean(status?.enabled),
+  ];
+  const canGoNext = currentStep < 4 && completedSteps[currentStep];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -393,14 +402,16 @@ export default function SunatOnboardingPage() {
           <div className="flex items-center gap-1 min-w-max">
             {STEPS.map((step, index) => {
               const Icon = step.icon;
-              const isCompleted = index < currentStep || 
-                (status?.steps && Object.values(status.steps)[index]);
+              const isCompleted = completedSteps[index];
               const isCurrent = index === currentStep;
               
               return (
                 <button
                   key={step.id}
-                  onClick={() => setCurrentStep(index)}
+                  onClick={() => {
+                    if (index <= currentStep) setCurrentStep(index);
+                  }}
+                  disabled={index > currentStep}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     isCurrent
                       ? 'bg-blue-100 text-blue-700'
@@ -868,7 +879,7 @@ export default function SunatOnboardingPage() {
             </span>
             <button
               onClick={() => setCurrentStep(Math.min(STEPS.length - 1, currentStep + 1))}
-              disabled={currentStep === STEPS.length - 1}
+              disabled={currentStep === STEPS.length - 1 || !canGoNext}
               className="flex items-center gap-1 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Siguiente

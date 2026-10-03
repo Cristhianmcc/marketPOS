@@ -50,9 +50,18 @@ export async function PATCH(req: NextRequest) {
     const { ruc, razonSocial, address, ubigeo } = body;
 
     // 5. Validaciones
-    if (!ruc || !isValidRuc(ruc)) {
+    const cleanRuc = typeof ruc === 'string' ? ruc.trim() : '';
+
+    if (!/^\d{11}$/.test(cleanRuc)) {
       return NextResponse.json(
-        { error: 'RUC inválido. Debe tener 11 dígitos.' },
+        { error: 'RUC inválido. Debe contener exactamente 11 dígitos numéricos.' },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidRuc(cleanRuc)) {
+      return NextResponse.json(
+        { error: 'RUC inválido. El prefijo o el dígito verificador no corresponde.' },
         { status: 400 }
       );
     }
@@ -75,7 +84,7 @@ export async function PATCH(req: NextRequest) {
     const settings = await prisma.sunatSettings.upsert({
       where: { storeId: user.storeId! },
       update: {
-        ruc: ruc.trim(),
+        ruc: cleanRuc,
         razonSocial: razonSocial.trim(),
         address: address.trim(),
         ubigeo: ubigeo?.trim() || null,
@@ -85,7 +94,7 @@ export async function PATCH(req: NextRequest) {
         storeId: user.storeId!,
         env: 'BETA',
         enabled: false,
-        ruc: ruc.trim(),
+        ruc: cleanRuc,
         razonSocial: razonSocial.trim(),
         address: address.trim(),
         ubigeo: ubigeo?.trim() || null,
