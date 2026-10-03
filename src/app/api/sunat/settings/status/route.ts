@@ -45,14 +45,15 @@ export async function GET(req: NextRequest) {
     }
 
     // 4. Verificar si está completamente configurado
-    // En BETA: solo necesita RUC y credenciales SOL
+    // En BETA el cliente SOAP usa las credenciales públicas de prueba
+    // (RUC + MODDATOS), por lo que basta con tener el RUC configurado.
     // En PROD: necesita también certificado digital
     const isBeta = settings.env === 'BETA';
     const hasBasicConfig = !!(settings.ruc && settings.solUser && settings.solPass);
     const hasCertificate = !!(settings.certPfxBase64 && settings.certPassword);
     
     const configured = isBeta 
-      ? hasBasicConfig  // BETA: sin certificado OK
+      ? !!settings.ruc
       : (hasBasicConfig && hasCertificate);  // PROD: todo requerido
 
     // 5. Parsear series
