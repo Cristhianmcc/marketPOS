@@ -37,6 +37,10 @@ export function signXml(xml: string, cert: Certificate, signatureId: string): Si
     // 3. Configurar la referencia (todo el documento con transform enveloped)
     sig.addReference({
       xpath: '/*',
+      // SUNAT requires the enveloped signature to reference the whole UBL
+      // document with URI="". Without this option xml-crypto adds an `Id`
+      // attribute to the Invoice root, which is not valid in the UBL schema.
+      isEmptyUri: true,
       digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
       transforms: [
         'http://www.w3.org/2000/09/xmldsig#enveloped-signature',

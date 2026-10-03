@@ -786,8 +786,9 @@ async function validateJobExecution(document: any): Promise<{
 
   const settings = document.store.sunatSettings;
 
-  // Validar credenciales SOL
-  if (!settings.solUser || !settings.solPass) {
+  // SUNAT Beta usa las credenciales públicas MODDATOS (ver loadSolCredentials).
+  // Las credenciales configuradas por la tienda solo son obligatorias en producción.
+  if (settings.env !== 'BETA' && (!settings.solUser || !settings.solPass)) {
     return {
       valid: false,
       code: 'MISSING_CREDENTIALS',
