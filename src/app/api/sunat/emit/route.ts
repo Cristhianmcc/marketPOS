@@ -86,11 +86,16 @@ export async function POST(req: NextRequest) {
       saleId,
       docType, // 'BOLETA' | 'FACTURA'
       customerDocType, // 'DNI' | 'RUC' | 'CE' | etc
-      customerDocNumber,
+      customerDocNumber: rawCustomerDocNumber,
       customerName,
       customerAddress, // Opcional
       customerEmail, // Opcional
     } = body;
+
+    // Normalizar documentos pegados o ingresados con espacios/separadores.
+    const customerDocNumber = typeof rawCustomerDocNumber === 'string'
+      ? rawCustomerDocNumber.replace(/\D/g, '')
+      : '';
 
     // 1. Validar campos obligatorios
     if (!saleId || !docType || !customerDocType || !customerDocNumber || !customerName) {
@@ -113,7 +118,7 @@ export async function POST(req: NextRequest) {
       if (!isValidRuc(customerDocNumber)) {
         return NextResponse.json(
           { 
-            error: 'FACTURA requiere RUC válido (11 dígitos)',
+            error: `FACTURA requiere RUC válido (11 dígitos; se recibieron ${customerDocNumber.length})`,
             code: 'INVALID_RUC_FOR_FACTURA',
             hint: 'El RUC debe tener exactamente 11 dígitos y formato válido',
           },
