@@ -254,6 +254,11 @@ argumentos sin depender de asociaciones de scripts. `prepare-build.js` lo compil
 compilador C# de Windows y `extraFiles` lo coloca junto a la aplicación. Desde el Escritorio,
 el lanzador selecciona la salida `dist-electron*` más reciente para soportar el directorio de
 reintento que genera el empaquetador cuando una versión anterior sigue abierta.
+El perfil aislado conserva un bloqueo de instancia propio: puede ejecutarse junto al POS
+instalado, pero un segundo clic sobre el lanzador BETA enfoca la ventana existente en vez de
+arrancar otro renderer y otro servidor sobre la misma base portable. Los errores graves del
+renderer de esa variante se guardan, sin consola general ni datos de negocio, en
+`renderer-errors.log` dentro de su `userData` aislado.
 Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
 pruebas locales, la configuración externa debe suministrarse al proceso al
 arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.

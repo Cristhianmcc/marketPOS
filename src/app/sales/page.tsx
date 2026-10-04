@@ -113,7 +113,6 @@ function SalesPageContent() {
     loadUserInfo();
     checkSunatStatus(); // ✅ MÓDULO 18.5
     checkPatientsFlag(); // ✅ MÓDULO PH4
-    fetchSales(1);
   }, []);
 
   useEffect(() => {

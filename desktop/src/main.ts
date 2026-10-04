@@ -64,11 +64,13 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 // Si el usuario hace doble-click en el icono mientras ya está abierta,
 // la ventana existente se trae al frente inmediatamente.
 // ============================================================================
-// The explicit beta launcher uses an isolated Electron profile and may run next
-// to the installed production POS while SUNAT integration is being tested.
+// The explicit beta launcher uses an isolated Electron profile, so its lock is
+// independent from the installed production POS. It still needs its own lock:
+// otherwise each double-click starts another renderer/server against the same
+// portable database and the first page load can become nondeterministic.
 const isIsolatedSunatBeta = process.argv.includes('--sunat-beta-isolated');
 
-if (!isPgDaemonMode && !isIsolatedSunatBeta) {
+if (!isPgDaemonMode) {
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) {
     // Ya hay una instancia corriendo — salir inmediatamente
@@ -380,6 +382,36 @@ function createMainWindow(): void {
   // Mostrar pantalla de carga inmediatamente (loadApplication() se llama
   // cuando el servidor esté listo, al final del startup)
   mainWindow.loadFile(path.join(__dirname, '..', 'resources', 'loading.html'));
+
+  // Persist only renderer failures from the beta profile. This deliberately
+  // excludes ordinary console output so credentials and customer data are not
+  // copied into diagnostic logs.
+  if (isIsolatedSunatBeta) {
+    const rendererLog = path.join(USER_DATA_PATH, 'renderer-errors.log');
+    const appendRendererError = (kind: string, message: string): void => {
+      try {
+        fs.mkdirSync(USER_DATA_PATH, { recursive: true });
+        const safeMessage = message.replace(/[\r\n]+/g, ' ').slice(0, 4000);
+        fs.appendFileSync(rendererLog, `${new Date().toISOString()} [${kind}] ${safeMessage}\n`, 'utf8');
+      } catch {
+        // Diagnostics must never interrupt application startup.
+      }
+    };
+
+    mainWindow.webContents.on('console-message', (_event, level, message) => {
+      if (level >= 2 && (message.includes('[Error Ventas]') || message.includes('ChunkLoadError'))) {
+        appendRendererError('renderer', message);
+      }
+    });
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      appendRendererError('render-process-gone', `${details.reason}; exitCode=${details.exitCode}`);
+    });
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (isMainFrame) {
+        appendRendererError('did-fail-load', `${errorCode}; ${errorDescription}; ${validatedURL}`);
+      }
+    });
+  }
 
   // Interceptar el cierre: ocultar a la bandeja en vez de destruir
   mainWindow.on('close', (event) => {
