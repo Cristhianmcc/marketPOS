@@ -204,21 +204,7 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
     // Si un intento anterior pudo llegar a SUNAT pero se perdio la respuesta,
     // recuperar primero el CDR evita reenviar el mismo comprobante a ciegas.
     let recoveredCdr: string | undefined;
-    if (attempts > 0 && soapConfig.environment === 'PROD' && document.docType === 'BOLETA') {
-      await markJobFailed(
-        jobId,
-        'AMBIGUOUS_BOLETA_RETRY',
-        'No se reenviará automáticamente la boleta porque el intento anterior pudo llegar a SUNAT. Verifica su estado antes de regularizarla.',
-        false
-      );
-      return {
-        success: false,
-        jobId,
-        documentId,
-        message: 'Reintento de boleta detenido para evitar un envío fiscal duplicado',
-      };
-    }
-    if (attempts > 0 && soapConfig.environment === 'PROD' && document.docType !== 'BOLETA') {
+    if (attempts > 0 && soapConfig.environment === 'PROD') {
       const recovery = await getStatusCdr(soapConfig, {
         ruc: settings.ruc,
         docTypeCode: sunatCode,
