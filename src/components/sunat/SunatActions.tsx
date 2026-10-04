@@ -45,6 +45,7 @@ export default function SunatActions({
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const effectiveCustomerDocType = docType === 'FACTURA' ? 'RUC' : customerDocType;
 
   // No mostrar acciones para FIADO
   if (paymentMethod === 'FIADO') {
@@ -66,7 +67,7 @@ export default function SunatActions({
         body: JSON.stringify({
           saleId,
           docType,
-          customerDocType,
+          customerDocType: effectiveCustomerDocType,
           customerDocNumber,
           customerName,
           customerAddress: customerAddress || undefined,
@@ -196,7 +197,11 @@ export default function SunatActions({
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setDocType('BOLETA')}
+                    onClick={() => {
+                      setDocType('BOLETA');
+                      setCustomerDocType('DNI');
+                      setCustomerDocNumber('');
+                    }}
                     className={`flex-1 px-3 py-2 text-sm rounded border ${
                       docType === 'BOLETA'
                         ? 'bg-blue-600 text-white border-blue-600'
@@ -207,7 +212,11 @@ export default function SunatActions({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDocType('FACTURA')}
+                    onClick={() => {
+                      setDocType('FACTURA');
+                      setCustomerDocType('RUC');
+                      setCustomerDocNumber('');
+                    }}
                     disabled={userRole === 'CASHIER'}
                     className={`flex-1 px-3 py-2 text-sm rounded border ${
                       docType === 'FACTURA'
@@ -226,7 +235,7 @@ export default function SunatActions({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Documento</label>
                 <select
-                  value={customerDocType}
+                  value={effectiveCustomerDocType}
                   onChange={(e) => setCustomerDocType(e.target.value)}
                   disabled={docType === 'FACTURA'}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
@@ -246,14 +255,14 @@ export default function SunatActions({
               {/* Número de Documento */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Número de {customerDocType}
+                  Número de {effectiveCustomerDocType}
                 </label>
                 <input
                   type="text"
                   value={customerDocNumber}
                   onChange={(e) => setCustomerDocNumber(e.target.value)}
-                  placeholder={customerDocType === 'RUC' ? '20123456789' : '12345678'}
-                  maxLength={customerDocType === 'RUC' ? 11 : 20}
+                  placeholder={effectiveCustomerDocType === 'RUC' ? '20123456789' : '12345678'}
+                  maxLength={effectiveCustomerDocType === 'RUC' ? 11 : 20}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
