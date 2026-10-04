@@ -6,6 +6,7 @@ import { signXml, verifyXmlSignature } from '../src/lib/sunat/sign/signXmlCrypto
 import { buildZip } from '../src/lib/sunat/zip/buildZip';
 import { parseCdr } from '../src/lib/sunat/cdr/parseCdr';
 import type { SunatDocumentPayload } from '../src/lib/sunat/types';
+import { validateBoletaData } from '../src/lib/sunat/validation/fiscalValidations';
 
 async function main() {
   const generated = generateBetaCertificate('20123456789');
@@ -64,6 +65,18 @@ async function main() {
   assert.equal(signed.signedXml.includes('MOCK_'), false);
   assert.ok(signed.digestValue);
   assert.ok(signed.signatureValue);
+
+  const consumerFinalPayload: SunatDocumentPayload = {
+    ...payload,
+    customer: { docType: 'OTHER', docNumber: '-', name: 'CLIENTES VARIOS' },
+    metadata: { ...payload.metadata, number: 2, fullNumber: 'B001-00000002' },
+  };
+  const consumerFinalXml = generateInvoiceXML(consumerFinalPayload, 'consumer-final-document');
+  assert.match(consumerFinalXml, /schemeID="0"/);
+  assert.match(consumerFinalXml, /<cbc:ID[^>]*>-<\/cbc:ID>/);
+  assert.equal(validateBoletaData('OTHER', '-', 700).valid, true);
+  assert.equal(validateBoletaData('OTHER', '-', 700.01).valid, false);
+  assert.equal(validateBoletaData('DNI', '12345678', 700.01).valid, true);
 
   const acceptedCdr = `<?xml version="1.0"?><ApplicationResponse xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><cbc:ResponseCode>0</cbc:ResponseCode><cbc:Description>Aceptado</cbc:Description></ApplicationResponse>`;
   const observedCdr = `<?xml version="1.0"?><ApplicationResponse xmlns:x="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><x:ResponseCode>0</x:ResponseCode><x:Description>Aceptado</x:Description><x:Note>Observación de prueba</x:Note></ApplicationResponse>`;

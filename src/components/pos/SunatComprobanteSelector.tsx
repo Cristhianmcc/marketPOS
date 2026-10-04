@@ -51,9 +51,9 @@ export default function SunatComprobanteSelector({
   const [loading, setLoading] = useState(true);
   const [wantComprobante, setWantComprobante] = useState(false);
   const [docType, setDocType] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
-  const [customerDocType, setCustomerDocType] = useState<string>('DNI');
-  const [customerDocNumber, setCustomerDocNumber] = useState('');
-  const [customerName, setCustomerName] = useState('');
+  const [customerDocType, setCustomerDocType] = useState<string>('OTHER');
+  const [customerDocNumber, setCustomerDocNumber] = useState('-');
+  const [customerName, setCustomerName] = useState('CLIENTES VARIOS');
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
 
@@ -108,12 +108,13 @@ export default function SunatComprobanteSelector({
     } else {
       // IMPORTANTE: Para FACTURA siempre forzar RUC
       const effectiveDocType = docType === 'FACTURA' ? 'RUC' : customerDocType;
+      const finalConsumer = docType === 'BOLETA' && effectiveDocType === 'OTHER';
       onChange({
         enabled: true,
         docType,
         customerDocType: effectiveDocType,
-        customerDocNumber,
-        customerName,
+        customerDocNumber: finalConsumer ? '-' : customerDocNumber,
+        customerName: finalConsumer ? 'CLIENTES VARIOS' : customerName,
         customerAddress,
         customerEmail,
       });
@@ -124,8 +125,12 @@ export default function SunatComprobanteSelector({
   useEffect(() => {
     if (docType === 'FACTURA') {
       setCustomerDocType('RUC');
+      setCustomerDocNumber('');
+      setCustomerName('');
     } else {
-      setCustomerDocType('DNI');
+      setCustomerDocType('OTHER');
+      setCustomerDocNumber('-');
+      setCustomerName('CLIENTES VARIOS');
     }
   }, [docType]);
 
@@ -212,29 +217,34 @@ export default function SunatComprobanteSelector({
                   onChange={(e) => setCustomerDocType(e.target.value)}
                   className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
                 >
+                  <option value="OTHER">Sin documento</option>
                   <option value="DNI">DNI</option>
                   <option value="CE">CE</option>
                   <option value="PASAPORTE">Pasaporte</option>
                 </select>
               )}
             </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
-                Número
-              </label>
-              <input
-                type="text"
-                value={customerDocNumber}
-                onChange={(e) => setCustomerDocNumber(e.target.value)}
-                placeholder={customerDocType === 'RUC' ? '20123456789' : '12345678'}
-                maxLength={customerDocType === 'RUC' ? 11 : customerDocType === 'DNI' ? 8 : 20}
-                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {docType === 'BOLETA' && customerDocType === 'OTHER' ? (
+              <div className="flex items-end pb-1 text-[11px] text-blue-700">
+                Consumidor final (hasta S/ 700)
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-0.5">Número</label>
+                <input
+                  type="text"
+                  value={customerDocNumber}
+                  onChange={(e) => setCustomerDocNumber(e.target.value)}
+                  placeholder={customerDocType === 'RUC' ? '20123456789' : '12345678'}
+                  maxLength={customerDocType === 'RUC' ? 11 : customerDocType === 'DNI' ? 8 : 20}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
           </div>
 
           {/* Nombre/Razón Social */}
-          <div>
+          {!(docType === 'BOLETA' && customerDocType === 'OTHER') && <div>
             <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
               {docType === 'FACTURA' ? 'Razón Social' : 'Nombre'}
             </label>
@@ -245,7 +255,7 @@ export default function SunatComprobanteSelector({
               placeholder={docType === 'FACTURA' ? 'EMPRESA S.A.C.' : 'Juan Pérez'}
               className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
             />
-          </div>
+          </div>}
 
           {/* Dirección solo para FACTURA */}
           {docType === 'FACTURA' && (

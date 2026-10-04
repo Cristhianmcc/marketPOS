@@ -24,7 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { auditSunatEmitRequested, auditSunatEmitSuccess, auditSunatEmitFailed } from '@/domain/sunat/audit';
-import { validateFacturaData, validateBoletaData, isValidRuc, isValidDni } from '@/lib/sunat/validation/fiscalValidations';
+import { validateBoletaData, isValidRuc, isValidDni } from '@/lib/sunat/validation/fiscalValidations';
 import { isSuperAdmin } from '@/lib/superadmin';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 import { buildPayloadFromSale } from '@/lib/sunat/buildPayloadFromSale';
@@ -88,18 +88,28 @@ export async function POST(req: NextRequest) {
       docType, // 'BOLETA' | 'FACTURA'
       customerDocType, // 'DNI' | 'RUC' | 'CE' | etc
       customerDocNumber: rawCustomerDocNumber,
-      customerName,
+      customerName: rawCustomerName,
       customerAddress, // Opcional
       customerEmail, // Opcional
     } = body;
 
-    // Normalizar documentos pegados o ingresados con espacios/separadores.
-    const customerDocNumber = typeof rawCustomerDocNumber === 'string'
-      ? rawCustomerDocNumber.replace(/\D/g, '')
+    const requestedCustomerDocType = typeof customerDocType === 'string'
+      ? customerDocType.trim().toUpperCase()
       : '';
+    const isFinalConsumer = docType === 'BOLETA'
+      && (requestedCustomerDocType === 'OTHER' || requestedCustomerDocType === '0' || !requestedCustomerDocType);
+    const customerDocNumber = isFinalConsumer
+      ? '-'
+      : ['RUC', '6', 'DNI', '1'].includes(requestedCustomerDocType)
+        ? String(rawCustomerDocNumber || '').replace(/\D/g, '')
+        : String(rawCustomerDocNumber || '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    const customerName = isFinalConsumer
+      ? 'CLIENTES VARIOS'
+      : String(rawCustomerName || '').trim();
+    const effectiveCustomerDocType = isFinalConsumer ? 'OTHER' : requestedCustomerDocType;
 
     // 1. Validar campos obligatorios
-    if (!saleId || !docType || !customerDocType || !customerDocNumber || !customerName) {
+    if (!saleId || !docType || !effectiveCustomerDocType || !customerDocNumber || !customerName) {
       return NextResponse.json(
         { error: 'Faltan campos obligatorios: saleId, docType, customerDocType, customerDocNumber, customerName' },
         { status: 400 }
@@ -126,7 +136,7 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      if (customerDocType.toUpperCase() !== 'RUC' && customerDocType !== '6') {
+      if (effectiveCustomerDocType !== 'RUC' && effectiveCustomerDocType !== '6') {
         return NextResponse.json(
           { 
             error: 'FACTURA requiere tipo de documento RUC',
@@ -137,7 +147,7 @@ export async function POST(req: NextRequest) {
       }
     } else if (docType === 'BOLETA') {
       // BOLETA: DNI opcional pero si se incluye debe ser válido
-      if (customerDocType.toUpperCase() === 'DNI' || customerDocType === '1') {
+      if (effectiveCustomerDocType === 'DNI' || effectiveCustomerDocType === '1') {
         if (!isValidDni(customerDocNumber)) {
           return NextResponse.json(
             { 
@@ -196,6 +206,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
     }
 
+    if (docType === 'BOLETA') {
+      const validation = validateBoletaData(
+        effectiveCustomerDocType,
+        customerDocNumber,
+        Number(sale.total)
+      );
+      if (!validation.valid) {
+        return NextResponse.json(
+          { error: validation.errors[0], code: 'INVALID_BOLETA_CUSTOMER' },
+          { status: 400 }
+        );
+      }
+    }
+
     // 4. Verificar permisos de tienda
     if (!isSuper && sale.storeId !== user.storeId) {
       return NextResponse.json({ error: 'No tienes acceso a esta venta' }, { status: 403 });
@@ -242,9 +266,11 @@ export async function POST(req: NextRequest) {
           success: true,
           idempotent: true,
           message: 'Documento ya emitido previamente',
-          documentId: existingDoc.id,
-          fullNumber: existingDoc.fullNumber,
-          status: existingDoc.status,
+          document: {
+            id: existingDoc.id,
+            fullNumber: existingDoc.fullNumber,
+            status: existingDoc.status,
+          },
           emitKey,
         });
       } else if (existingDoc.status === 'REJECTED' || existingDoc.status === 'ERROR') {
@@ -273,7 +299,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 8. Determinar serie según docType
-    const normalizedCustomerDocType = normalizeCustomerDocType(customerDocType);
+    const normalizedCustomerDocType = normalizeCustomerDocType(effectiveCustomerDocType);
     const fiscalDocType = docType as SunatDocType;
 
     // Construir el snapshot fiscal definitivo de la venta. Esta función
@@ -328,7 +354,7 @@ export async function POST(req: NextRequest) {
       saleId,
       docType,
       electronicDoc.fullNumber,
-      customerDocType,
+      effectiveCustomerDocType,
       customerDocNumber
     );
 

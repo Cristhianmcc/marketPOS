@@ -144,6 +144,13 @@ ambiente es BETA. El texto QR se persiste al firmar nuevas emisiones; para los
 documentos anteriores se reconstruye al descargar sin reservar otro correlativo.
 El listado de ventas expone PDF junto a XML y CDR.
 
+Las boletas pueden emitirse a un cliente identificado o a `CLIENTES VARIOS`. En
+el segundo caso se usa el tipo de documento SUNAT `0` y el número `-`; si el
+importe supera S/ 700, el servidor exige identificar al cliente. El selector de
+la caja y la emisión posterior desde Ventas comparten estas reglas. Los números
+de DNI/RUC se normalizan como dígitos y los documentos alfanuméricos, como carnet
+de extranjería o pasaporte, conservan sus letras.
+
 La emisión principal reserva el correlativo mediante `SunatSettings`, genera UBL,
 firma XMLDSig RSA-SHA256, verifica la firma y crea el job en una transacción. BETA
 usa las credenciales oficiales de prueba y puede generar un PFX autofirmado por

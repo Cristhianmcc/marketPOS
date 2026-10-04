@@ -40,9 +40,9 @@ export default function SunatActions({
   const [retrying, setRetrying] = useState(false);
 
   const [docType, setDocType] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
-  const [customerDocType, setCustomerDocType] = useState('DNI');
-  const [customerDocNumber, setCustomerDocNumber] = useState('');
-  const [customerName, setCustomerName] = useState('');
+  const [customerDocType, setCustomerDocType] = useState('OTHER');
+  const [customerDocNumber, setCustomerDocNumber] = useState('-');
+  const [customerName, setCustomerName] = useState('CLIENTES VARIOS');
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const effectiveCustomerDocType = docType === 'FACTURA' ? 'RUC' : customerDocType;
@@ -53,7 +53,8 @@ export default function SunatActions({
   }
 
   const handleEmit = async () => {
-    if (!customerDocNumber || !customerName) {
+    const finalConsumer = docType === 'BOLETA' && effectiveCustomerDocType === 'OTHER';
+    if ((!customerDocNumber || !customerName) && !finalConsumer) {
       toast.error('Completa todos los campos obligatorios');
       return;
     }
@@ -68,8 +69,8 @@ export default function SunatActions({
           saleId,
           docType,
           customerDocType: effectiveCustomerDocType,
-          customerDocNumber,
-          customerName,
+          customerDocNumber: finalConsumer ? '-' : customerDocNumber,
+          customerName: finalConsumer ? 'CLIENTES VARIOS' : customerName,
           customerAddress: customerAddress || undefined,
           customerEmail: customerEmail || undefined,
         }),
@@ -215,8 +216,9 @@ export default function SunatActions({
                     type="button"
                     onClick={() => {
                       setDocType('BOLETA');
-                      setCustomerDocType('DNI');
-                      setCustomerDocNumber('');
+                      setCustomerDocType('OTHER');
+                      setCustomerDocNumber('-');
+                      setCustomerName('CLIENTES VARIOS');
                     }}
                     className={`flex-1 px-3 py-2 text-sm rounded border ${
                       docType === 'BOLETA'
@@ -232,6 +234,7 @@ export default function SunatActions({
                       setDocType('FACTURA');
                       setCustomerDocType('RUC');
                       setCustomerDocNumber('');
+                      setCustomerName('');
                     }}
                     disabled={userRole === 'CASHIER'}
                     className={`flex-1 px-3 py-2 text-sm rounded border ${
@@ -260,6 +263,7 @@ export default function SunatActions({
                     <option value="RUC">RUC</option>
                   ) : (
                     <>
+                      <option value="OTHER">Sin documento (consumidor final)</option>
                       <option value="DNI">DNI</option>
                       <option value="CE">Carnet de Extranjería</option>
                       <option value="PASAPORTE">Pasaporte</option>
@@ -268,8 +272,14 @@ export default function SunatActions({
                 </select>
               </div>
 
+              {docType === 'BOLETA' && effectiveCustomerDocType === 'OTHER' && (
+                <div className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                  Se emitirá a CLIENTES VARIOS. Si el total supera S/ 700, debes identificar al cliente.
+                </div>
+              )}
+
               {/* Número de Documento */}
-              <div>
+              {!(docType === 'BOLETA' && effectiveCustomerDocType === 'OTHER') && <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Número de {effectiveCustomerDocType}
                 </label>
@@ -281,10 +291,10 @@ export default function SunatActions({
                   maxLength={effectiveCustomerDocType === 'RUC' ? 11 : 20}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
                 />
-              </div>
+              </div>}
 
               {/* Nombre */}
-              <div>
+              {!(docType === 'BOLETA' && effectiveCustomerDocType === 'OTHER') && <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {docType === 'FACTURA' ? 'Razón Social' : 'Nombre Completo'}
                 </label>
@@ -295,7 +305,7 @@ export default function SunatActions({
                   placeholder={docType === 'FACTURA' ? 'MI EMPRESA S.A.C.' : 'Juan Pérez'}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
                 />
-              </div>
+              </div>}
 
               {/* Dirección (FACTURA) */}
               {docType === 'FACTURA' && (
