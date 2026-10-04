@@ -120,7 +120,7 @@ export default function SunatActions({
     }
   };
 
-  const handleDownload = async (type: 'xml' | 'cdr') => {
+  const handleDownload = async (type: 'xml' | 'cdr' | 'pdf') => {
     if (!documentId) return;
 
     try {
@@ -175,6 +175,17 @@ export default function SunatActions({
         >
           <Download className="w-3.5 h-3.5" />
           XML
+        </button>
+      )}
+
+      {/* Representación impresa con QR */}
+      {documentId && hasXml && (
+        <button
+          onClick={() => handleDownload('pdf')}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          PDF
         </button>
       )}
 

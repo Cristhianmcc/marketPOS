@@ -137,6 +137,13 @@ al arrancar el servidor local, procesa como máximo tres trabajos `SEND_CPE` BET
 y usa el lock/reintentos de `processSunatJob.ts`. Resúmenes, bajas y producción
 siguen fuera de este procesador automático.
 
+La representación impresa de facturas y boletas se genera bajo demanda en
+`/api/sunat/documents/[id]/download?type=pdf`. Usa el snapshot del documento y
+de la venta, incorpora el QR fiscal, hash, estado y una marca visible cuando el
+ambiente es BETA. El texto QR se persiste al firmar nuevas emisiones; para los
+documentos anteriores se reconstruye al descargar sin reservar otro correlativo.
+El listado de ventas expone PDF junto a XML y CDR.
+
 La emisión principal reserva el correlativo mediante `SunatSettings`, genera UBL,
 firma XMLDSig RSA-SHA256, verifica la firma y crea el job en una transacción. BETA
 usa las credenciales oficiales de prueba y puede generar un PFX autofirmado por

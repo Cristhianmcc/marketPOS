@@ -33,6 +33,7 @@ import { generateInvoiceXML } from '@/lib/sunat/ubl/invoice';
 import { loadCertificate } from '@/lib/sunat/cert/loadCertificate';
 import { signXml, calculateXmlHash, verifyXmlSignature } from '@/lib/sunat/sign/signXmlCrypto';
 import type { CustomerDocType, SunatDocType } from '@prisma/client';
+import { buildSunatQrText } from '@/lib/sunat/qr';
 
 /**
  * Genera emitKey para idempotencia
@@ -366,6 +367,19 @@ export async function POST(req: NextRequest) {
       throw signingError;
     }
 
+    const qrText = buildSunatQrText({
+      issuerRuc: payload.issuer.ruc,
+      docType: fiscalDocType,
+      series: electronicDoc.series,
+      number: electronicDoc.number,
+      igv: payload.totals.tax,
+      total: payload.totals.total,
+      issueDate: electronicDoc.issueDate,
+      customerDocType: normalizedCustomerDocType,
+      customerDocNumber,
+      hash,
+    });
+
     // Guardar firma y job de forma atómica. El worker nunca verá un trabajo
     // encolado cuyo documento todavía no tenga XML firmado.
     const [, job] = await prisma.$transaction([
@@ -374,6 +388,7 @@ export async function POST(req: NextRequest) {
         data: {
           xmlSigned: signedXml,
           hash,
+          qrText,
           status: 'SIGNED',
           sunatMessage: null,
         },
