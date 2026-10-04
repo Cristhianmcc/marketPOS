@@ -108,6 +108,38 @@ function SalesPageContent() {
     fetchSales();
   }, [currentPage]);
 
+  // La configuracion SUNAT y las ventas se cargan en paralelo. Si las ventas
+  // llegan primero, consultar sus comprobantes cuando termine la configuracion.
+  useEffect(() => {
+    if (!sunatEnabled) {
+      setDocumentsData({});
+      return;
+    }
+
+    const saleIds = sales.map((sale) => sale.id);
+    if (saleIds.length > 0) {
+      void fetchDocumentsData(saleIds);
+    }
+  }, [sunatEnabled, sales]);
+
+  // Actualizar documentos en proceso hasta recibir el resultado de SUNAT.
+  useEffect(() => {
+    if (!sunatEnabled || sales.length === 0) return;
+
+    const pendingStatuses: SunatStatus[] = ['DRAFT', 'SIGNED', 'SENT'];
+    const hasPendingDocument = Object.values(documentsData).some((entry) =>
+      entry.document ? pendingStatuses.includes(entry.document.status) : false
+    );
+
+    if (!hasPendingDocument) return;
+
+    const timer = window.setInterval(() => {
+      void fetchDocumentsData(sales.map((sale) => sale.id));
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [sunatEnabled, sales, documentsData]);
+
   const checkPatientsFlag = async () => {
     try {
       const res = await fetch('/api/flags');
@@ -163,9 +195,6 @@ function SalesPageContent() {
       setTotalSales(data.total || 0);
       
       // ✅ MÓDULO 18.5: Cargar datos SUNAT para cada venta
-      if (sunatEnabled && data.sales) {
-        fetchDocumentsData(data.sales.map((s: Sale) => s.id));
-      }
     } catch (error) {
       console.error('Error fetching sales:', error);
     } finally {
