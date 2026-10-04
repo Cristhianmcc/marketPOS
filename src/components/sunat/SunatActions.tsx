@@ -125,8 +125,13 @@ export default function SunatActions({
 
     try {
       const url = `/api/sunat/documents/${documentId}/download?type=${type}`;
-      window.open(url, '_blank');
-      toast.success(`Descargando ${type.toUpperCase()}...`);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success(`Descarga de ${type.toUpperCase()} iniciada. Revisa tu carpeta Descargas.`);
     } catch (error: any) {
       console.error('Error downloading:', error);
       toast.error('Error al descargar archivo');
