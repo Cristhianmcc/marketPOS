@@ -7,14 +7,16 @@
  * 
  * IMPORTANTE: Este código NO bloquea el checkout. Los jobs se procesan de forma asíncrona.
  * 
- * MÓDULO 18.7: Usa loadSolCredentials para prioridad ENV > DB
+ * MÓDULO 18.7: Usa credenciales aisladas por tienda en producción.
  */
 
 import { PrismaClient, SunatStatus } from '@prisma/client';
-import { sendBill, sendSummary, getStatus } from '../soap/sunatClient';
+import { sendBill, sendSummary, getStatus, getStatusCdr } from '../soap/sunatClient';
 import { buildZip, buildSunatFilename, mapDocTypeToSunatCode } from '../zip/buildZip';
 import { parseCdr, isAcceptedBysunat, getStatusMessage } from '../cdr/parseCdr';
 import { loadSolCredentials, sanitizeCredentialsForLog } from '../credentials/loadSolCredentials';
+import { parseAdjustmentMetadata } from '../adjustmentMetadata';
+import { cancelSaleLocally } from '@/lib/sales/cancelSaleLocally';
 
 const prisma = new PrismaClient();
 
@@ -94,7 +96,7 @@ export async function processSunatJob(jobId: string): Promise<ProcessResult> {
     }
 
     // PASO 3: Validaciones
-    const validation = await validateJobExecution(document);
+    const validation = await validateJobExecution(document, job.type);
     if (!validation.valid) {
       await markJobFailed(jobId, validation.code!, validation.message!, false);
       return {
@@ -116,6 +118,8 @@ export async function processSunatJob(jobId: string): Promise<ProcessResult> {
       result = await processSendSummary(job, document, settings);
     } else if (job.type === 'QUERY_TICKET') {
       result = await processQueryTicket(job, document, settings);
+    } else if (job.type === 'LOCAL_CANCEL') {
+      result = await processLocalCancel(job, document);
     } else {
       result = {
         success: false,
@@ -165,7 +169,7 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
       };
     }
 
-    // MÓDULO 18.7: Cargar credenciales SOL con prioridad ENV > DB
+    // BETA usa MODDATOS; PROD carga las credenciales exclusivas de la tienda.
     const solCredentials = await loadSolCredentials(prisma, document.storeId);
     
     // Log sanitizado (sin password)
@@ -191,16 +195,46 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
       });
     }
 
-    // Enviar a SUNAT
-    const sendResult = await sendBill(
-      {
-        solUser: solCredentials.solUser,
-        solPass: solCredentials.solPass,
-        environment: settings.env || 'BETA',
-      },
-      filename,
-      zipBase64
-    );
+    const soapConfig = {
+      solUser: solCredentials.solUser,
+      solPass: solCredentials.solPass,
+      environment: settings.env || 'BETA',
+    } as const;
+
+    // Si un intento anterior pudo llegar a SUNAT pero se perdio la respuesta,
+    // recuperar primero el CDR evita reenviar el mismo comprobante a ciegas.
+    let recoveredCdr: string | undefined;
+    if (attempts > 0 && soapConfig.environment === 'PROD' && document.docType === 'BOLETA') {
+      await markJobFailed(
+        jobId,
+        'AMBIGUOUS_BOLETA_RETRY',
+        'No se reenviará automáticamente la boleta porque el intento anterior pudo llegar a SUNAT. Verifica su estado antes de regularizarla.',
+        false
+      );
+      return {
+        success: false,
+        jobId,
+        documentId,
+        message: 'Reintento de boleta detenido para evitar un envío fiscal duplicado',
+      };
+    }
+    if (attempts > 0 && soapConfig.environment === 'PROD' && document.docType !== 'BOLETA') {
+      const recovery = await getStatusCdr(soapConfig, {
+        ruc: settings.ruc,
+        docTypeCode: sunatCode,
+        series: document.series,
+        number: document.number,
+      });
+      if (!recovery.success) {
+        await markJobFailed(jobId, recovery.errorCode || 'CDR_QUERY_ERROR', recovery.errorMessage || 'No se pudo reconciliar el envio anterior', true);
+        return { success: false, jobId, documentId, message: recovery.errorMessage || 'No se pudo reconciliar el envio anterior', shouldRetry: true };
+      }
+      recoveredCdr = recovery.cdrZipBase64;
+    }
+
+    const sendResult = recoveredCdr
+      ? { success: true, cdrZipBase64: recoveredCdr }
+      : await sendBill(soapConfig, filename, zipBase64);
 
     if (!sendResult.success) {
       // Error de SUNAT o red
@@ -240,28 +274,55 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
         ? 'ACCEPTED'
         : 'REJECTED';
 
-    await prisma.electronicDocument.update({
-      where: { id: documentId },
-      data: {
-        status: newStatus,
-        cdrZip: sendResult.cdrZipBase64,
-        sunatCode: cdr.responseCode,
-        sunatMessage: cdr.notes.length > 0
-          ? `${cdr.description} | ${cdr.notes.join(' | ')}`
-          : cdr.description,
-        sunatResponseAt: new Date(),
-      },
-    });
+    const adjustment = parseAdjustmentMetadata(document.voidReason);
+    const shouldCancelLocally =
+      newStatus === 'ACCEPTED' &&
+      document.docType === 'NOTA_CREDITO' &&
+      adjustment?.cancelSaleOnAcceptance &&
+      !!document.saleId;
 
-    // Marcar job como completado
-    await prisma.sunatJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'DONE',
-        completedAt: new Date(),
-        lockedAt: null,
-        lockedBy: null,
-      },
+    // Registrar la respuesta, completar el envío y programar la reversión local
+    // en una sola transacción. Así nunca se reenvía un CPE ya aceptado porque
+    // falló la creación del trabajo local posterior.
+    await prisma.$transaction(async (tx) => {
+      await tx.electronicDocument.update({
+        where: { id: documentId },
+        data: {
+          status: newStatus,
+          cdrZip: sendResult.cdrZipBase64,
+          sunatCode: cdr.responseCode,
+          sunatMessage: cdr.notes.length > 0
+            ? `${cdr.description} | ${cdr.notes.join(' | ')}`
+            : cdr.description,
+          sunatResponseAt: new Date(),
+        },
+      });
+
+      await tx.sunatJob.update({
+        where: { id: jobId },
+        data: {
+          status: 'DONE',
+          completedAt: new Date(),
+          lockedAt: null,
+          lockedBy: null,
+          lastError: null,
+        },
+      });
+
+      if (shouldCancelLocally) {
+        const existingLocalJob = await tx.sunatJob.findFirst({
+          where: { documentId, type: 'LOCAL_CANCEL', status: { in: ['QUEUED', 'RUNNING', 'DONE'] } },
+        });
+        if (!existingLocalJob) await tx.sunatJob.create({
+          data: {
+            storeId: document.storeId,
+            documentId,
+            type: 'LOCAL_CANCEL',
+            status: 'QUEUED',
+            nextRunAt: new Date(),
+          },
+        });
+      }
     });
 
     return {
@@ -289,6 +350,32 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
       shouldRetry: true,
     };
   }
+}
+
+async function processLocalCancel(job: any, document: any): Promise<ProcessResult> {
+  const metadata = parseAdjustmentMetadata(document.voidReason);
+  if (
+    document.docType !== 'NOTA_CREDITO' ||
+    document.status !== 'ACCEPTED' ||
+    !metadata?.cancelSaleOnAcceptance ||
+    !document.saleId
+  ) {
+    await markJobFailed(job.id, 'LOCAL_CANCEL_INVALID', 'La nota no habilita una anulación local', false);
+    return { success: false, jobId: job.id, documentId: document.id, message: 'La nota no habilita una anulación local' };
+  }
+
+  const sale = await prisma.sale.findUnique({ where: { id: document.saleId }, select: { userId: true } });
+  if (!sale) {
+    await markJobFailed(job.id, 'SALE_NOT_FOUND', 'Venta no encontrada para revertir', false);
+    return { success: false, jobId: job.id, documentId: document.id, message: 'Venta no encontrada para revertir' };
+  }
+
+  await cancelSaleLocally(prisma, document.saleId, sale.userId, metadata.reason);
+  await prisma.sunatJob.update({
+    where: { id: job.id },
+    data: { status: 'DONE', completedAt: new Date(), lockedAt: null, lockedBy: null, lastError: null },
+  });
+  return { success: true, jobId: job.id, documentId: document.id, message: 'Venta e inventario revertidos' };
 }
 
 /**
@@ -319,13 +406,27 @@ async function processSendSummary(job: any, document: any, settings: any): Promi
       };
     }
 
-    // MÓDULO 18.7: Cargar credenciales SOL con prioridad ENV > DB
+    if (attempts > 0 && settings.env === 'PROD' && !document.sunatTicket) {
+      await markJobFailed(
+        jobId,
+        'AMBIGUOUS_SUMMARY_RETRY',
+        'No se reenviará el resumen o baja: el intento anterior pudo generar un ticket que no fue recibido.',
+        false
+      );
+      return {
+        success: false,
+        jobId,
+        documentId,
+        message: 'Reintento detenido para evitar duplicar un resumen o comunicación de baja',
+      };
+    }
+
+    // BETA usa MODDATOS; PROD carga las credenciales de la tienda.
     const solCredentials = await loadSolCredentials(prisma, document.storeId);
 
     // Construir nombre de archivo según tipo (SUMMARY o VOIDED)
-    const isSummary = document.docType === 'SUMMARY';
-    const prefix = isSummary ? 'RC' : 'RA';
-    const filename = `${settings.ruc}-${document.series}-${formatFilenameDate(document.issueDate)}-${String(document.number).padStart(5, '0')}`;
+    // fullNumber fue calculado antes de firmar. Debe ser tambien el nombre del ZIP.
+    const filename = document.fullNumber;
 
     // Construir ZIP
     const zipBase64 = buildZip(filename, document.xmlSigned);
@@ -367,38 +468,22 @@ async function processSendSummary(job: any, document: any, settings: any): Promi
       };
     }
 
-    // Guardar ticket en el documento
-    await prisma.electronicDocument.update({
-      where: { id: documentId },
-      data: {
-        status: 'SENT',
-        sunatTicket: sendResult.ticket,
-      },
-    });
-
-    // Marcar este job como completado
-    await prisma.sunatJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'DONE',
-        completedAt: new Date(),
-        lockedAt: null,
-        lockedBy: null,
-      },
-    });
-
-    // Crear job QUERY_TICKET para consultar resultado en unos minutos
-    // SUNAT recomienda esperar al menos 1 minuto antes de consultar
-    const nextRunAt = new Date(Date.now() + 60 * 1000); // 1 minuto después
-    
-    await prisma.sunatJob.create({
-      data: {
-        storeId: document.storeId,
-        documentId: documentId,
-        type: 'QUERY_TICKET',
-        status: 'QUEUED',
-        nextRunAt,
-      },
+    const nextRunAt = new Date(Date.now() + 60 * 1000);
+    await prisma.$transaction(async (tx) => {
+      await tx.electronicDocument.update({
+        where: { id: documentId },
+        data: { status: 'SENT', sunatTicket: sendResult.ticket },
+      });
+      await tx.sunatJob.update({
+        where: { id: jobId },
+        data: { status: 'DONE', completedAt: new Date(), lockedAt: null, lockedBy: null, lastError: null },
+      });
+      const existingQuery = await tx.sunatJob.findFirst({
+        where: { documentId, type: 'QUERY_TICKET', status: { in: ['QUEUED', 'RUNNING', 'DONE'] } },
+      });
+      if (!existingQuery) await tx.sunatJob.create({
+        data: { storeId: document.storeId, documentId, type: 'QUERY_TICKET', status: 'QUEUED', nextRunAt },
+      });
     });
 
     return {
@@ -455,7 +540,7 @@ async function processQueryTicket(job: any, document: any, settings: any): Promi
       };
     }
 
-    // MÓDULO 18.7: Cargar credenciales SOL con prioridad ENV > DB
+    // BETA usa MODDATOS; PROD carga las credenciales de la tienda.
     const solCredentials = await loadSolCredentials(prisma, document.storeId);
 
     // Consultar estado del ticket
@@ -532,31 +617,32 @@ async function processQueryTicket(job: any, document: any, settings: any): Promi
         }
       }
 
-      await prisma.electronicDocument.update({
-        where: { id: documentId },
-        data: {
-          status: cdrObserved ? 'OBSERVED' : 'ACCEPTED',
-          cdrZip: statusResult.cdrZipBase64,
-          sunatCode: cdrCode,
-          sunatMessage: cdrDescription,
-          sunatResponseAt: new Date(),
-        },
+      const summaryIds = document.docType === 'SUMMARY' ? getSummaryDocumentIds(document) : [];
+      const voidedIds = document.docType === 'VOIDED' ? getVoidedDocumentIds(document) : [];
+      await prisma.$transaction(async (tx) => {
+        await tx.electronicDocument.update({
+          where: { id: documentId },
+          data: {
+            status: cdrObserved ? 'OBSERVED' : 'ACCEPTED',
+            cdrZip: statusResult.cdrZipBase64,
+            sunatCode: cdrCode,
+            sunatMessage: cdrDescription,
+            sunatResponseAt: new Date(),
+          },
+        });
+        await tx.sunatJob.update({
+          where: { id: jobId },
+          data: { status: 'DONE', completedAt: new Date(), lockedAt: null, lockedBy: null, lastError: null },
+        });
+        if (summaryIds.length > 0) await tx.electronicDocument.updateMany({
+          where: { id: { in: summaryIds }, storeId: document.storeId, docType: 'BOLETA' },
+          data: { reportedInSummary: true },
+        });
+        if (voidedIds.length > 0) await tx.electronicDocument.updateMany({
+          where: { id: { in: voidedIds }, storeId: document.storeId },
+          data: { status: 'CANCELED' },
+        });
       });
-
-      await prisma.sunatJob.update({
-        where: { id: jobId },
-        data: {
-          status: 'DONE',
-          completedAt: new Date(),
-          lockedAt: null,
-          lockedBy: null,
-        },
-      });
-
-      // Si es un SUMMARY, marcar las boletas incluidas como reportadas
-      if (document.docType === 'SUMMARY') {
-        await markBoletasAsReportedInSummary(document);
-      }
 
       return {
         success: true,
@@ -586,6 +672,14 @@ async function processQueryTicket(job: any, document: any, settings: any): Promi
         sunatResponseAt: new Date(),
       },
     });
+
+    if (document.docType === 'SUMMARY') {
+      const summaryIds = getSummaryDocumentIds(document);
+      if (summaryIds.length > 0) await prisma.electronicDocument.updateMany({
+        where: { id: { in: summaryIds }, storeId: document.storeId, docType: 'BOLETA' },
+        data: { reportedInSummary: false },
+      });
+    }
 
     await prisma.sunatJob.update({
       where: { id: jobId },
@@ -629,26 +723,26 @@ async function processQueryTicket(job: any, document: any, settings: any): Promi
  * Marca las boletas incluidas en un Summary como reportadas.
  * Esto evita que se vuelvan a incluir en otro resumen.
  */
-async function markBoletasAsReportedInSummary(summaryDocument: any): Promise<void> {
-  // El Summary incluye un metadata de qué documentos contiene
-  // Esto se guardó al crear el Summary en el campo voidReason (temporal) o se puede
-  // parsear del XML. Por ahora usamos un enfoque simple: actualizar boletas
-  // del mismo día y tienda que no estén reportadas
-  
-  // En una implementación real, deberíamos guardar los IDs de los documentos
-  // incluidos en el Summary. Por ahora este es un placeholder.
-  console.log(`Summary ${summaryDocument.id} aceptado. Marcando boletas como reportadas.`);
+function getSummaryDocumentIds(summaryDocument: any): string[] {
+  try {
+    const parsed = JSON.parse(summaryDocument.voidReason || '[]');
+    if (Array.isArray(parsed)) return parsed.filter((id): id is string => typeof id === 'string');
+  } catch {
+    throw new Error(`El resumen ${summaryDocument.fullNumber} no conserva la lista de boletas`);
+  }
+  return [];
 }
 
-/**
- * Formatea la fecha para el nombre de archivo (YYYYMMDD)
- */
-function formatFilenameDate(date: Date): string {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
+function getVoidedDocumentIds(voidedDocument: any): string[] {
+  try {
+    const parsed = JSON.parse(voidedDocument.voidReason || '{}');
+    if (parsed?.kind === 'VOIDED' && Array.isArray(parsed.documentIds)) {
+      return parsed.documentIds.filter((id: unknown): id is string => typeof id === 'string');
+    }
+  } catch {
+    throw new Error(`La baja ${voidedDocument.fullNumber} no conserva la lista de documentos`);
+  }
+  return [];
 }
 
 /**
@@ -748,24 +842,36 @@ async function markJobFailed(
       },
     });
 
-    // Actualizar documento a ERROR
-    await prisma.electronicDocument.update({
-      where: { id: job.documentId },
-      data: {
-        status: 'ERROR',
-      },
-    });
+    // Un fallo al aplicar una consecuencia local no cambia el resultado fiscal
+    // ya aceptado por SUNAT. Solo los trabajos de transmisión marcan el CPE ERROR.
+    if (job.type !== 'LOCAL_CANCEL') {
+      await prisma.electronicDocument.update({
+        where: { id: job.documentId },
+        data: {
+          status: 'ERROR',
+        },
+      });
+    }
   }
 }
 
 /**
  * Valida que un documento pueda ser enviado a SUNAT.
  */
-async function validateJobExecution(document: any): Promise<{
+async function validateJobExecution(document: any, jobType: string): Promise<{
   valid: boolean;
   code?: string;
   message?: string;
 }> {
+  // La reversión local ocurre después de la aceptación y no depende de red,
+  // credenciales ni del interruptor SUNAT. Debe terminar incluso si el owner
+  // desactiva SUNAT inmediatamente después de recibir el CDR.
+  if (jobType === 'LOCAL_CANCEL') {
+    return document.status === 'ACCEPTED'
+      ? { valid: true }
+      : { valid: false, code: 'INVALID_STATUS', message: `Estado del documento debe ser ACCEPTED, actual: ${document.status}` };
+  }
+
   // Validar feature flag
   if (process.env.ENABLE_SUNAT !== 'true') {
     return {
@@ -796,12 +902,14 @@ async function validateJobExecution(document: any): Promise<{
     };
   }
 
-  // Validar estado del documento
-  if (document.status !== 'SIGNED') {
+  const expectedStatus = jobType === 'QUERY_TICKET'
+    ? 'SENT'
+    : 'SIGNED';
+  if (document.status !== expectedStatus) {
     return {
       valid: false,
       code: 'INVALID_STATUS',
-      message: `Estado del documento debe ser SIGNED, actual: ${document.status}`,
+      message: `Estado del documento debe ser ${expectedStatus}, actual: ${document.status}`,
     };
   }
 

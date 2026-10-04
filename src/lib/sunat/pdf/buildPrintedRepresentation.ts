@@ -30,6 +30,10 @@ export interface PrintedRepresentationData {
     name: string;
     address?: string | null;
   };
+  reference?: {
+    fullNumber: string;
+    reason?: string | null;
+  };
   items: PrintedRepresentationItem[];
   totals: {
     taxable: number;
@@ -153,6 +157,17 @@ export async function buildPrintedRepresentationPdf(
     for (const customerAddressLine of wrapText(data.customer.address, regular, 9, CONTENT_WIDTH)) {
       text(`Direccion: ${customerAddressLine}`, MARGIN, 9);
       y -= 12;
+    }
+  }
+  if (data.reference) {
+    y -= 2;
+    text(`Comprobante afectado: ${data.reference.fullNumber}`, MARGIN, 9, bold);
+    y -= 14;
+    if (data.reference.reason) {
+      for (const reasonLine of wrapText(`Motivo: ${data.reference.reason}`, regular, 9, CONTENT_WIDTH)) {
+        text(reasonLine, MARGIN, 9);
+        y -= 12;
+      }
     }
   }
   y -= 2;

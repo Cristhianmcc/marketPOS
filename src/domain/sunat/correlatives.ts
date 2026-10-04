@@ -34,6 +34,12 @@ export async function getNextSunatNumber(
     case 'NOTA_DEBITO':
       field = 'nextNdNumber';
       break;
+    case 'SUMMARY':
+      field = 'nextSummaryNumber';
+      break;
+    case 'VOIDED':
+      field = 'nextVoidedNumber';
+      break;
     default:
       throw new Error(`Tipo de documento no soportado para correlativos: ${docType}`);
   }

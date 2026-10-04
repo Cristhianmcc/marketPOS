@@ -54,6 +54,7 @@ interface ElectronicDocumentData {
   hasDocument: boolean;
   document?: {
     id: string;
+    docType: 'FACTURA' | 'BOLETA';
     fullNumber: string;
     status: SunatStatus;
     sunatCode?: string | null;
@@ -61,6 +62,17 @@ interface ElectronicDocumentData {
     hasCdr: boolean;
     hasXml: boolean;
   };
+  adjustments?: Array<{
+    id: string;
+    docType: 'NOTA_CREDITO' | 'NOTA_DEBITO';
+    fullNumber: string;
+    status: SunatStatus;
+    total: number;
+    sunatCode?: string | null;
+    sunatMessage?: string | null;
+    hasXml: boolean;
+    hasCdr: boolean;
+  }>;
 }
 
 export default function SalesPage() {
@@ -128,7 +140,8 @@ function SalesPageContent() {
 
     const pendingStatuses: SunatStatus[] = ['DRAFT', 'SIGNED', 'SENT'];
     const hasPendingDocument = Object.values(documentsData).some((entry) =>
-      entry.document ? pendingStatuses.includes(entry.document.status) : false
+      (entry.document ? pendingStatuses.includes(entry.document.status) : false) ||
+      entry.adjustments?.some((adjustment) => pendingStatuses.includes(adjustment.status)) === true
     );
 
     if (!hasPendingDocument) return;
@@ -671,6 +684,18 @@ function SalesPageContent() {
                               <span className="text-xs text-gray-600">
                                 {documentsData[sale.id].document!.fullNumber}
                               </span>
+                              {documentsData[sale.id].adjustments?.map((adjustment) => (
+                                <div key={adjustment.id} className="mt-1 flex flex-col items-center border-t border-gray-200 pt-1">
+                                  <SunatStatusBadge
+                                    status={adjustment.status}
+                                    sunatCode={adjustment.sunatCode}
+                                    sunatMessage={adjustment.sunatMessage}
+                                  />
+                                  <span className="text-[11px] text-violet-700">
+                                    {adjustment.docType === 'NOTA_CREDITO' ? 'NC' : 'ND'} {adjustment.fullNumber}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
                           ) : (
                             <div className="text-xs text-gray-400 text-center">
@@ -703,7 +728,7 @@ function SalesPageContent() {
                           </div>
                           
                           {/* ✅ MÓDULO 18.5: Acciones SUNAT */}
-                          {sunatEnabled && !isAnulada && (
+                          {sunatEnabled && (!isAnulada || documentsData[sale.id]?.hasDocument) && (
                             <SunatActions
                               saleId={sale.id}
                               documentId={documentsData[sale.id]?.document?.id}
@@ -712,9 +737,31 @@ function SalesPageContent() {
                               hasCdr={documentsData[sale.id]?.document?.hasCdr}
                               userRole={userRole}
                               paymentMethod={sale.paymentMethod}
+                              documentType={documentsData[sale.id]?.document?.docType}
+                              documentTotal={sale.total}
+                              allowNotes={!isAnulada}
                               onActionComplete={() => fetchDocumentsData([sale.id])}
                             />
                           )}
+                          {sunatEnabled && documentsData[sale.id]?.adjustments?.map((adjustment) => (
+                            <div key={adjustment.id} className="border-t border-gray-200 pt-1">
+                              <span className="block text-center text-[10px] text-violet-700 mb-1">
+                                {adjustment.docType === 'NOTA_CREDITO' ? 'NC' : 'ND'} {adjustment.fullNumber}
+                              </span>
+                              <SunatActions
+                                saleId={sale.id}
+                                documentId={adjustment.id}
+                                status={adjustment.status}
+                                hasXml={adjustment.hasXml}
+                                hasCdr={adjustment.hasCdr}
+                                userRole={userRole}
+                                paymentMethod={sale.paymentMethod}
+                                documentTotal={Number(adjustment.total)}
+                                allowNotes={false}
+                                onActionComplete={() => fetchDocumentsData([sale.id])}
+                              />
+                            </div>
+                          ))}
                         </div>
                       </td>
                     </tr>

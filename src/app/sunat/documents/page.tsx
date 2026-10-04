@@ -37,7 +37,7 @@ interface SunatDocument {
   id: string;
   storeId: string;
   storeName: string;
-  docType: 'FACTURA' | 'BOLETA' | 'NC' | 'ND' | 'SUMMARY' | 'VOIDED';
+  docType: 'FACTURA' | 'BOLETA' | 'NOTA_CREDITO' | 'NOTA_DEBITO' | 'SUMMARY' | 'VOIDED';
   series: string;
   number: number;
   fullNumber: string;
@@ -90,6 +90,12 @@ const formatMoney = (amount: string | number) => {
   return `S/ ${num.toFixed(2)}`;
 };
 
+const localDateInputValue = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+};
+
 // Badge de estado
 const StatusBadge = ({ status }: { status: string }) => {
   const config: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
@@ -118,8 +124,8 @@ const DocTypeBadge = ({ type }: { type: string }) => {
   const colors: Record<string, string> = {
     FACTURA: 'bg-indigo-100 text-indigo-700',
     BOLETA: 'bg-purple-100 text-purple-700',
-    NC: 'bg-amber-100 text-amber-700',
-    ND: 'bg-pink-100 text-pink-700',
+    NOTA_CREDITO: 'bg-amber-100 text-amber-700',
+    NOTA_DEBITO: 'bg-pink-100 text-pink-700',
     SUMMARY: 'bg-cyan-100 text-cyan-700',
     VOIDED: 'bg-gray-100 text-gray-700',
   };
@@ -127,8 +133,8 @@ const DocTypeBadge = ({ type }: { type: string }) => {
   const labels: Record<string, string> = {
     FACTURA: 'Factura',
     BOLETA: 'Boleta',
-    NC: 'Nota Crédito',
-    ND: 'Nota Débito',
+    NOTA_CREDITO: 'Nota Crédito',
+    NOTA_DEBITO: 'Nota Débito',
     SUMMARY: 'Resumen',
     VOIDED: 'Baja',
   };
@@ -163,6 +169,8 @@ export default function SunatDocumentsPage() {
   const [sending, setSending] = useState<string | null>(null);
   const [signing, setSigning] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<SunatDocument | null>(null);
+  const [summaryDate, setSummaryDate] = useState(localDateInputValue);
+  const [summarizing, setSummarizing] = useState(false);
   
   // Cargar datos
   const fetchDocuments = useCallback(async () => {
@@ -200,7 +208,7 @@ export default function SunatDocumentsPage() {
   }, [fetchDocuments]);
   
   // Descargar archivo
-  const handleDownload = async (docId: string, type: 'xml' | 'cdr') => {
+  const handleDownload = async (docId: string, type: 'xml' | 'cdr' | 'pdf') => {
     setDownloading(`${docId}-${type}`);
     
     try {
@@ -219,7 +227,7 @@ export default function SunatDocumentsPage() {
       
       // Nombre del archivo desde header o generar
       const contentDisposition = res.headers.get('content-disposition');
-      let filename = type === 'xml' ? 'documento.xml' : 'cdr.xml';
+      let filename = type === 'xml' ? 'documento.xml' : type === 'cdr' ? 'cdr.xml' : 'comprobante.pdf';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="(.+)"/);
         if (match) filename = match[1];
@@ -311,6 +319,26 @@ export default function SunatDocumentsPage() {
       setRetrying(null);
     }
   };
+
+  const handleDailySummary = async () => {
+    if (!confirm(`¿Crear el Resumen Diario de boletas del ${summaryDate}?`)) return;
+    setSummarizing(true);
+    try {
+      const res = await fetch('/api/sunat/summary/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referenceDate: summaryDate }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'No se pudo crear el Resumen Diario');
+      alert(result.message || 'Resumen Diario creado y encolado');
+      fetchDocuments();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSummarizing(false);
+    }
+  };
   
   // Reset filtros
   const resetFilters = () => {
@@ -352,14 +380,31 @@ export default function SunatDocumentsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Documentos Electrónicos SUNAT</h1>
             <p className="text-gray-600 mt-1">Facturas, boletas y documentos electrónicos emitidos</p>
           </div>
-          <button
-            onClick={fetchDocuments}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="date"
+              value={summaryDate}
+              onChange={(event) => setSummaryDate(event.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm"
+              title="Fecha de las boletas para el Resumen Diario"
+            />
+            <button
+              onClick={handleDailySummary}
+              disabled={summarizing || !summaryDate}
+              className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50"
+            >
+              {summarizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Resumen de boletas
+            </button>
+            <button
+              onClick={fetchDocuments}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </button>
+          </div>
         </div>
       </div>
       
@@ -444,8 +489,8 @@ export default function SunatDocumentsPage() {
                 <option value="ALL">Todos</option>
                 <option value="FACTURA">Factura</option>
                 <option value="BOLETA">Boleta</option>
-                <option value="NC">Nota Crédito</option>
-                <option value="ND">Nota Débito</option>
+                <option value="NOTA_CREDITO">Nota Crédito</option>
+                <option value="NOTA_DEBITO">Nota Débito</option>
                 <option value="SUMMARY">Resumen</option>
                 <option value="VOIDED">Baja</option>
               </select>
@@ -577,6 +622,21 @@ export default function SunatDocumentsPage() {
                               )}
                             </button>
                           )}
+
+                          {doc.hasXmlSigned && ['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO'].includes(doc.docType) && (
+                            <button
+                              onClick={() => handleDownload(doc.id, 'pdf')}
+                              disabled={downloading === `${doc.id}-pdf`}
+                              className="p-1.5 hover:bg-violet-50 rounded"
+                              title="Descargar representación impresa PDF con QR"
+                            >
+                              {downloading === `${doc.id}-pdf` ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
+                              ) : (
+                                <FileCheck className="w-4 h-4 text-violet-600" />
+                              )}
+                            </button>
+                          )}
                           
                           {/* Descargar CDR */}
                           {doc.hasCdr && (
@@ -627,7 +687,7 @@ export default function SunatDocumentsPage() {
                           )}
                           
                           {/* Reintentar */}
-                          {['ERROR', 'REJECTED', 'SENT'].includes(doc.status) && (
+                          {doc.status === 'ERROR' && (
                             <button
                               onClick={() => handleRetry(doc.id)}
                               disabled={retrying === doc.id}

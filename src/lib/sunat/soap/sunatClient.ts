@@ -83,6 +83,59 @@ export interface GetStatusResult {
   errorMessage?: string;
 }
 
+export interface GetStatusCdrResult {
+  success: boolean;
+  found: boolean;
+  statusCode?: string;
+  statusMessage?: string;
+  cdrZipBase64?: string;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+function xmlValue(xml: string, tag: string): string | undefined {
+  return xml.match(new RegExp(`<(?:\\w+:)?${tag}[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${tag}>`, 'i'))?.[1]?.trim();
+}
+
+/** Recupera el CDR de una factura o nota ya recibida en produccion. */
+export async function getStatusCdr(
+  config: SunatClientConfig,
+  query: { ruc: string; docTypeCode: string; series: string; number: number }
+): Promise<GetStatusCdrResult> {
+  if (config.environment !== 'PROD') return { success: true, found: false };
+  const envelope = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ser="http://service.sunat.gob.pe" xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+<soapenv:Header><wsse:Security><wsse:UsernameToken><wsse:Username>${escapeXml(config.solUser)}</wsse:Username><wsse:Password>${escapeXml(config.solPass)}</wsse:Password></wsse:UsernameToken></wsse:Security></soapenv:Header>
+<soapenv:Body><ser:getStatusCdr><rucComprobante>${escapeXml(query.ruc)}</rucComprobante><tipoComprobante>${escapeXml(query.docTypeCode)}</tipoComprobante><serieComprobante>${escapeXml(query.series)}</serieComprobante><numeroComprobante>${query.number}</numeroComprobante></ser:getStatusCdr></soapenv:Body>
+</soapenv:Envelope>`;
+  try {
+    const response = await fetch(SUNAT_ENDPOINTS.PROD.billConsult, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: 'urn:getStatusCdr' },
+      body: envelope,
+      signal: AbortSignal.timeout(SUNAT_TIMEOUTS.query),
+    });
+    const xml = await response.text();
+    const fault = xmlValue(xml, 'faultstring');
+    if (fault) {
+      if (/no existe|no encontrad/i.test(fault)) return { success: true, found: false, statusMessage: fault };
+      return { success: false, found: false, errorCode: xmlValue(xml, 'faultcode') || 'SOAP_FAULT', errorMessage: fault };
+    }
+    const content = xmlValue(xml, 'content');
+    const statusCode = xmlValue(xml, 'statusCode');
+    const statusMessage = xmlValue(xml, 'statusMessage');
+    if (!response.ok) return { success: false, found: false, errorCode: String(response.status), errorMessage: statusMessage || `HTTP ${response.status}` };
+    return { success: true, found: Boolean(content), cdrZipBase64: content, statusCode, statusMessage };
+  } catch (error) {
+    return { success: false, found: false, errorCode: 'CDR_QUERY_ERROR', errorMessage: error instanceof Error ? error.message : 'No se pudo consultar el CDR' };
+  }
+}
+
 /**
  * Envía un comprobante electrónico a SUNAT (Factura, Boleta, NC, ND).
  * 

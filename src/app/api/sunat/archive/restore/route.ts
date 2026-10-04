@@ -1,0 +1,131 @@
+import crypto from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/infra/db/prisma';
+import { getCurrentUser } from '@/lib/session';
+import { logAudit } from '@/lib/auditLog';
+
+type FiscalArchive = {
+  version: number;
+  exportedAt: string;
+  source: { storeId: string; storeName: string; ruc: string | null };
+  settings: Record<string, unknown> | null;
+  documents: Array<Record<string, unknown> & { id: string; docType: string; series: string; number: number }>;
+};
+
+const STATUS_RANK: Record<string, number> = {
+  DRAFT: 0, PENDING: 1, XML_BUILT: 2, SIGNED: 3, SENT: 4,
+  ERROR: 4, REJECTED: 5, ACCEPTED: 6, OBSERVED: 6, CANCELED: 7,
+};
+
+function digest(value: unknown): string {
+  return crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
+function text(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+export async function POST(request: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user?.storeId) return NextResponse.json({ error: 'No autenticado en una tienda' }, { status: 401 });
+  if (user.role !== 'OWNER') return NextResponse.json({ error: 'Solo OWNER puede restaurar el archivo fiscal' }, { status: 403 });
+  if (request.headers.get('x-desktop-app') !== 'true' && process.env.DESKTOP_MODE !== 'true') {
+    return NextResponse.json({ error: 'Disponible solamente en la aplicación desktop' }, { status: 400 });
+  }
+
+  const body = await request.json() as { data?: FiscalArchive; checksum?: string };
+  if (!body.data || body.data.version !== 1 || body.checksum !== `sha256:${digest(body.data)}`) {
+    return NextResponse.json({ error: 'Archivo fiscal inválido o corrupto' }, { status: 400 });
+  }
+
+  const currentStore = await prisma.store.findUnique({
+    where: { id: user.storeId },
+    select: { id: true, ruc: true },
+  });
+  const sourceRuc = body.data.source.ruc?.replace(/\D/g, '') || null;
+  const currentRuc = currentStore?.ruc?.replace(/\D/g, '') || null;
+  if (!currentStore || (sourceRuc && currentRuc && sourceRuc !== currentRuc)) {
+    return NextResponse.json({ error: 'El respaldo fiscal pertenece a otra tienda' }, { status: 409 });
+  }
+
+  const sourceSettings = body.data.settings || {};
+  const archivedDocs = Array.isArray(body.data.documents) ? body.data.documents : [];
+  const storeId = user.storeId;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const existingSettings = await tx.sunatSettings.findUnique({ where: { storeId } });
+    const restoredSettings = {
+      env: 'BETA' as const,
+      enabled: false,
+      ruc: text(sourceSettings.ruc) || currentRuc,
+      razonSocial: text(sourceSettings.razonSocial),
+      address: text(sourceSettings.address),
+      ubigeo: text(sourceSettings.ubigeo),
+      defaultFacturaSeries: text(sourceSettings.defaultFacturaSeries) || 'F001',
+      defaultBoletaSeries: text(sourceSettings.defaultBoletaSeries) || 'B001',
+      defaultNcSeries: text(sourceSettings.defaultNcSeries) || 'FC01',
+      defaultNdSeries: text(sourceSettings.defaultNdSeries) || 'FD01',
+      defaultSummarySeries: text(sourceSettings.defaultSummarySeries) || 'RC01',
+      defaultVoidedSeries: text(sourceSettings.defaultVoidedSeries) || 'RA01',
+      nextFacturaNumber: Math.max(existingSettings?.nextFacturaNumber || 1, Number(sourceSettings.nextFacturaNumber) || 1),
+      nextBoletaNumber: Math.max(existingSettings?.nextBoletaNumber || 1, Number(sourceSettings.nextBoletaNumber) || 1),
+      nextNcNumber: Math.max(existingSettings?.nextNcNumber || 1, Number(sourceSettings.nextNcNumber) || 1),
+      nextNdNumber: Math.max(existingSettings?.nextNdNumber || 1, Number(sourceSettings.nextNdNumber) || 1),
+      nextSummaryNumber: Math.max(existingSettings?.nextSummaryNumber || 1, Number(sourceSettings.nextSummaryNumber) || 1),
+      nextVoidedNumber: Math.max(existingSettings?.nextVoidedNumber || 1, Number(sourceSettings.nextVoidedNumber) || 1),
+    };
+    await tx.sunatSettings.upsert({ where: { storeId }, create: { storeId, ...restoredSettings }, update: restoredSettings });
+
+    const saleNumbers = archivedDocs.map(doc => Number(doc.saleNumber)).filter(Number.isFinite);
+    const sales = saleNumbers.length
+      ? await tx.sale.findMany({ where: { storeId, saleNumber: { in: saleNumbers } }, select: { id: true, saleNumber: true } })
+      : [];
+    const saleByNumber = new Map(sales.map(sale => [sale.saleNumber, sale.id]));
+    const sourceIdToNewId = new Map<string, string>();
+    let created = 0;
+    let updated = 0;
+
+    for (const doc of archivedDocs) {
+      if (!['FACTURA', 'BOLETA', 'NOTA_CREDITO', 'NOTA_DEBITO', 'SUMMARY', 'VOIDED'].includes(doc.docType)) continue;
+      const existing = await tx.electronicDocument.findUnique({
+        where: { storeId_docType_series_number: { storeId, docType: doc.docType as any, series: String(doc.series), number: Number(doc.number) } },
+      });
+      const archivedStatus = String(doc.status || 'ERROR');
+      const common = {
+        fullNumber: String(doc.fullNumber), issueDate: new Date(String(doc.issueDate)), currency: String(doc.currency || 'PEN'),
+        customerDocType: String(doc.customerDocType || 'OTHER') as any,
+        customerDocNumber: String(doc.customerDocNumber || '-'), customerName: String(doc.customerName || 'CLIENTES VARIOS'),
+        customerAddress: text(doc.customerAddress), taxable: String(doc.taxable || '0'), igv: String(doc.igv || '0'), total: String(doc.total || '0'),
+        status: archivedStatus as any, hash: text(doc.hash), qrText: text(doc.qrText), xmlSigned: text(doc.xmlSigned), cdrZip: text(doc.cdrZip),
+        sunatTicket: text(doc.sunatTicket), sunatCode: text(doc.sunatCode), sunatMessage: text(doc.sunatMessage),
+        sunatResponseAt: doc.sunatResponseAt ? new Date(String(doc.sunatResponseAt)) : null,
+        reportedInSummary: Boolean(doc.reportedInSummary), voidReason: text(doc.voidReason), zipSentBase64: text(doc.zipSentBase64),
+        saleId: saleByNumber.get(Number(doc.saleNumber)) || null,
+      };
+      if (!existing) {
+        const createdDoc = await tx.electronicDocument.create({ data: { storeId, docType: doc.docType as any, series: String(doc.series), number: Number(doc.number), ...common } });
+        sourceIdToNewId.set(doc.id, createdDoc.id);
+        created++;
+      } else {
+        sourceIdToNewId.set(doc.id, existing.id);
+        if ((STATUS_RANK[archivedStatus] ?? 0) >= (STATUS_RANK[existing.status] ?? 0)) {
+          await tx.electronicDocument.update({ where: { id: existing.id }, data: common });
+          updated++;
+        }
+      }
+    }
+
+    for (const doc of archivedDocs) {
+      const restoredId = sourceIdToNewId.get(doc.id);
+      const referenceId = typeof doc.referenceDocId === 'string' ? sourceIdToNewId.get(doc.referenceDocId) : undefined;
+      if (restoredId && referenceId) await tx.electronicDocument.update({ where: { id: restoredId }, data: { referenceDocId: referenceId } });
+    }
+    return { created, updated, skipped: archivedDocs.length - created - updated };
+  }, { timeout: 60_000 });
+
+  await logAudit({
+    storeId, userId: user.userId, action: 'SUNAT_ARCHIVE_RESTORED', entityType: 'SUNAT', entityId: storeId, severity: 'WARN',
+    meta: { exportedAt: body.data.exportedAt, ...result, credentialsRestored: false, jobsRestored: false },
+  });
+  return NextResponse.json({ success: true, ...result, enabled: false });
+}

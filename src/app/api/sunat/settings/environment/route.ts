@@ -8,8 +8,8 @@
  * 1. Solo SUPERADMIN puede cambiar a PROD
  * 2. Validación completa de configuración antes de permitir PROD:
  *    - RUC configurado (11 dígitos)
- *    - Credenciales SOL configuradas (o en ENV)
- *    - Certificado digital cargado (o en ENV)
+ *    - Credenciales SOL configuradas para la tienda
+ *    - Certificado digital cargado para la tienda
  * 3. Confirmación tipada: debe enviar confirmText = "ACTIVAR PRODUCCION"
  * 4. Auditoría completa del cambio (sin datos sensibles)
  * 
@@ -37,22 +37,20 @@ const EnvironmentChangeSchema = z.object({
 });
 
 /**
- * Verifica si las credenciales SOL están disponibles (ENV o DB)
+ * Verifica si las credenciales SOL están disponibles para la tienda.
  */
 function hasSolCredentials(settings: any): boolean {
-  // Prioridad: ENV > DB
-  const solUser = process.env.SUNAT_SOL_USER || settings?.solUser;
-  const solPass = process.env.SUNAT_SOL_PASS || settings?.solPass;
+  const solUser = settings?.solUser;
+  const solPass = settings?.solPass;
   return !!(solUser && solPass);
 }
 
 /**
- * Verifica si el certificado está disponible (ENV o DB)
+ * Verifica si el certificado está disponible para la tienda.
  */
 function hasCertificate(settings: any): boolean {
-  // Prioridad: ENV > DB
-  const certPfx = process.env.SUNAT_CERT_PFX || settings?.certPfxBase64;
-  const certPass = process.env.SUNAT_CERT_PASSWORD || settings?.certPassword;
+  const certPfx = settings?.certPfxBase64;
+  const certPass = settings?.certPassword;
   return !!(certPfx && certPass);
 }
 
@@ -78,6 +76,9 @@ export async function POST(req: NextRequest) {
         { error: 'No autenticado' },
         { status: 401 }
       );
+    }
+    if (!user.storeId) {
+      return NextResponse.json({ error: 'Seleccione una tienda' }, { status: 400 });
     }
 
     // 2. Solo SUPERADMIN puede cambiar entorno
@@ -144,12 +145,12 @@ export async function POST(req: NextRequest) {
 
       // 6.3 Validar credenciales SOL
       if (!hasSolCredentials(settings)) {
-        validationErrors.push('Credenciales SOL no configuradas (ni en ENV ni en configuración)');
+        validationErrors.push('Credenciales SOL no configuradas para esta tienda');
       }
 
       // 6.4 Validar certificado digital
       if (!hasCertificate(settings)) {
-        validationErrors.push('Certificado digital no configurado (ni en ENV ni en configuración)');
+        validationErrors.push('Certificado digital no configurado para esta tienda');
       }
 
       // 6.5 Validar datos del emisor
@@ -266,6 +267,9 @@ export async function GET(req: NextRequest) {
         { error: 'No autenticado' },
         { status: 401 }
       );
+    }
+    if (!user.storeId) {
+      return NextResponse.json({ error: 'Seleccione una tienda' }, { status: 400 });
     }
 
     // 2. Obtener configuración

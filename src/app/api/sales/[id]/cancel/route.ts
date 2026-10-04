@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
+import { cancelSaleLocally } from '@/lib/sales/cancelSaleLocally';
 
 export async function POST(
   request: NextRequest,
@@ -35,6 +36,10 @@ export async function POST(
           },
         },
         user: true,
+        electronicDocuments: {
+          where: { docType: { in: ['FACTURA', 'BOLETA'] } },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -93,91 +98,34 @@ export async function POST(
       );
     }
 
-    // TRANSACCIÓN ACID: Anular venta + Revertir stock + Cancelar receivable si existe
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Marcar venta como anulada
-      const cancelledSale = await tx.sale.update({
-        where: { id: saleId },
-        data: {
-          total: 0,
-          subtotal: 0,
-          tax: 0,
+    const activeFiscalDocument = sale.electronicDocuments.find((document) =>
+      ['SIGNED', 'SENT', 'ACCEPTED', 'OBSERVED'].includes(document.status)
+    );
+    if (activeFiscalDocument) {
+      return NextResponse.json(
+        {
+          code: 'FISCAL_ADJUSTMENT_REQUIRED',
+          message: `La venta tiene el comprobante ${activeFiscalDocument.fullNumber}. Emite una nota de crédito para anularla fiscalmente.`,
+          documentId: activeFiscalDocument.id,
+          documentStatus: activeFiscalDocument.status,
         },
-      });
+        { status: 409 }
+      );
+    }
 
-      // 2. Si había cupón aplicado, decrementar usesCount (Módulo 14.2-A)
-      if (sale.couponCode && Number(sale.couponDiscount) > 0) {
-        const coupon = await tx.coupon.findUnique({
-          where: {
-            storeId_code: {
-              storeId: sale.storeId,
-              code: sale.couponCode,
-            },
-          },
-        });
-
-        if (coupon && coupon.usesCount > 0) {
-          await tx.coupon.update({
-            where: { id: coupon.id },
-            data: { usesCount: { decrement: 1 } },
-          });
-        }
-      }
-
-      // 3. Si es venta FIADO, cancelar receivable
-      let cancelledReceivable = null;
-      if (sale.paymentMethod === 'FIADO') {
-        const receivableResult = await tx.receivable.updateMany({
-          where: { saleId },
-          data: {
-            status: 'CANCELLED',
-            balance: 0,
-          },
-        });
-        
-        // Obtener receivable para auditoría
-        if (receivableResult.count > 0) {
-          cancelledReceivable = await tx.receivable.findFirst({
-            where: { saleId },
-          });
-        }
-      }
-
-      // 3. Por cada item: revertir stock + crear movement inverso (SOLO PRODUCTOS)
-      for (const item of sale.items) {
-        // ✅ F3: Skip servicios - no tienen stock
-        if (item.isService || !item.storeProduct) {
-          continue;
-        }
-
-        const storeProduct = item.storeProduct;
-
-        // Actualizar stock (sumar lo que se vendió)
-        await tx.storeProduct.update({
-          where: { id: storeProduct.id },
-          data: {
-            stock: {
-              increment: item.quantity,
-            },
-          },
-        });
-
-        // Crear movement inverso (ADJUSTMENT)
-        await tx.movement.create({
-          data: {
-            storeId: session.storeId,
-            storeProductId: storeProduct.id,
-            type: 'ADJUSTMENT',
-            quantity: item.quantity, // positivo = suma
-            notes: `Anulación ticket #${sale.saleNumber}`,
-            createdById: session.userId,
-            createdAt: new Date(),
-          },
-        });
-      }
-
-      return cancelledSale;
-    });
+    const cancellation = await cancelSaleLocally(
+      prisma,
+      saleId,
+      session.userId,
+      'Anulación local sin comprobante fiscal vigente'
+    );
+    const result = { id: saleId };
+    if (!cancellation.cancelled) {
+      return NextResponse.json(
+        { code: 'SALE_ALREADY_CANCELLED', message: 'Esta venta ya está anulada' },
+        { status: 409 }
+      );
+    }
 
     // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
     const { ip, userAgent } = getRequestMetadata(request);

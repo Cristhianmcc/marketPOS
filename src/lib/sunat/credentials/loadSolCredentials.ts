@@ -16,7 +16,7 @@ import { PrismaClient } from '@prisma/client';
 export interface SolCredentials {
   solUser: string;
   solPass: string;
-  source: 'BETA' | 'ENV' | 'DB';
+  source: 'BETA' | 'DB';
 }
 
 export class SolCredentialsError extends Error {
@@ -27,8 +27,8 @@ export class SolCredentialsError extends Error {
 }
 
 /**
- * Carga las credenciales SOL desde ENV o DB
- * Prioridad: ENV > SunatSettings
+ * BETA usa credenciales públicas de prueba; PROD usa exclusivamente la
+ * configuración de la tienda para evitar compartir secretos entre negocios.
  * 
  * @param prisma - Cliente de Prisma
  * @param storeId - ID de la tienda
@@ -57,22 +57,9 @@ export async function loadSolCredentials(
     };
   }
 
-  // 1. Intentar cargar desde ENV (recomendado para producción)
-  const envUser = process.env.SUNAT_SOL_USER;
-  const envPass = process.env.SUNAT_SOL_PASS;
-
-  if (envUser && envPass) {
-    return {
-      solUser: settings?.ruc ? buildSolUser(settings.ruc, envUser) : envUser,
-      solPass: envPass,
-      source: 'ENV',
-    };
-  }
-
-  // 2. Cargar desde SunatSettings
   if (!settings?.solUser || !settings?.solPass) {
     throw new SolCredentialsError(
-      'Credenciales SOL no configuradas. Configure SUNAT_SOL_USER y SUNAT_SOL_PASS en ENV o en SunatSettings.',
+      'Credenciales SOL no configuradas para esta tienda.',
       'SOL_NOT_CONFIGURED'
     );
   }
@@ -91,13 +78,7 @@ export async function loadSolCredentials(
 export async function hasSolCredentials(
   prisma: PrismaClient,
   storeId: string
-): Promise<{ available: boolean; source?: 'BETA' | 'ENV' | 'DB' }> {
-  // Verificar ENV primero
-  if (process.env.SUNAT_SOL_USER && process.env.SUNAT_SOL_PASS) {
-    return { available: true, source: 'ENV' };
-  }
-
-  // Verificar DB
+): Promise<{ available: boolean; source?: 'BETA' | 'DB' }> {
   const settings = await prisma.sunatSettings.findUnique({
     where: { storeId },
     select: {
@@ -141,7 +122,7 @@ export function buildSolUser(ruc: string, user: string): string {
  */
 export function sanitizeCredentialsForLog(credentials: SolCredentials): {
   solUserMasked: string;
-  source: 'BETA' | 'ENV' | 'DB';
+  source: 'BETA' | 'DB';
 } {
   // Mostrar solo primeros 4 caracteres del usuario
   const masked = credentials.solUser.length > 4 

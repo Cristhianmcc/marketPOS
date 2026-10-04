@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **26/09/2026**, zona America/Lima. Base Git observada:
+Última revisión: **04/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -133,9 +133,9 @@ Construcción de payload -> XML UBL -> firma -> ZIP -> job -> SOAP -> CDR/estado
 En la rama `feature/sunat-beta`, Electron inicia `desktop/src/sunatProcessor.ts`,
 que consulta cada diez segundos el endpoint local
 `/api/sunat/jobs/process-pending`. El endpoint exige un token aleatorio generado
-al arrancar el servidor local, procesa como máximo tres trabajos `SEND_CPE` BETA
-y usa el lock/reintentos de `processSunatJob.ts`. Resúmenes, bajas y producción
-siguen fuera de este procesador automático.
+al arrancar el servidor local, procesa hasta tres trabajos por ciclo de tipo
+`SEND_CPE`, `SEND_SUMMARY`, `QUERY_TICKET` o `LOCAL_CANCEL`, tanto BETA como PROD,
+y usa el lock/reintentos de `processSunatJob.ts`.
 
 La representación impresa de facturas y boletas se genera bajo demanda en
 `/api/sunat/documents/[id]/download?type=pdf`. Usa el snapshot del documento y
@@ -198,6 +198,47 @@ la carpeta está ignorada por Git y hereda los permisos de baja integridad reque
 entorno de prueba. Es una base
 vacía y descartable para pruebas; no debe tratarse como almacenamiento definitivo ni incluir
 datos reales de clientes.
+
+### Estado SUNAT de la rama Beta (04/10/2026)
+
+- Facturas, boletas, notas de crédito y notas de débito generan UBL, se firman,
+  se verifican localmente y se encolan sin bloquear la venta. La representación
+  impresa PDF incluye QR, hash, datos del cliente, referencia de notas y marca
+  BETA cuando corresponde. Se descarga desde Ventas o `/sunat/documents`.
+- Las boletas aceptan DNI, CE, pasaporte o consumidor final (`OTHER`, número
+  `-`, nombre `CLIENTES VARIOS`). Por encima de S/ 700 se exige identificación.
+- `src/app/api/sunat/notes/route.ts` crea NC/ND contra un comprobante aceptado.
+  Una NC total puede programar `LOCAL_CANCEL`; solo después del CDR aceptado se
+  revierte la venta, el cupón, el fiado, el stock general y los lotes FEFO.
+  La cancelación local directa rechaza ventas que ya tienen un comprobante
+  fiscal vigente.
+- El Resumen Diario se crea desde `/sunat/documents`, reserva exactamente sus
+  boletas y usa `SEND_SUMMARY` seguido de `QUERY_TICKET`. La Comunicación de Baja
+  usa el mismo flujo para facturas y notas; las boletas se corrigen mediante
+  Resumen Diario o nota de crédito según el caso.
+- Electron consulta la cola cada diez segundos. Sin conexión, el endpoint deja
+  los trabajos intactos. En PROD, un reintento de factura o nota consulta primero
+  `getStatusCdr`; si no puede reconciliar el intento anterior, no reenvía a
+  ciegas. Los locks y las transacciones evitan que dos workers completen el mismo
+  trabajo o reserven dos veces un resumen.
+- Credenciales SOL y certificado de PROD se cargan exclusivamente desde
+  `SunatSettings` de la tienda. BETA usa MODDATOS y puede generar un certificado
+  de prueba. Volver desde una restauración deja SUNAT desactivado y obliga a
+  revisar credenciales y certificado antes de emitir.
+- Cada ZIP de backup desktop tiene un archivo hermano `.sunat-fiscal`, cifrado
+  con `electron.safeStorage`. Contiene XML, CDR, respuestas, relaciones y
+  correlativos, pero no contiene contraseña SOL, certificado, contraseña del
+  certificado ni jobs. La sincronización cloud actual solo recoge `.zip`, por
+  lo que no sube este archivo fiscal. Al restaurar, los correlativos conservan el
+  máximo entre la base y el archivo y nunca se recrean trabajos de envío. El
+  cifrado está ligado al usuario de Windows: sirve para recuperación local en el
+  mismo perfil; una exportación portable a otro equipo requiere un mecanismo
+  adicional con contraseña elegida por el propietario.
+
+Comprobación local disponible: `npm run sunat:test:local`. Cubre generación,
+firma y verificación de factura, boleta identificada, consumidor final, NC, ND,
+Resumen Diario, Comunicación de Baja, nombres SUNAT y PDF con QR. No sustituye
+una homologación ni una emisión controlada en PROD con certificado y SOL reales.
 El archivo temporal `--pwfile` de `initdb` también se crea dentro de `logs` en ese runtime y se
 elimina en `finally`; no usa `%TEMP%`, que está bloqueado para el proceso de baja integridad.
 

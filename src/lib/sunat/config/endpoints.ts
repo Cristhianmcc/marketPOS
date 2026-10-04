@@ -32,11 +32,11 @@ export const SUNAT_ENDPOINTS = {
     /** Servicio de envío de comprobantes */
     billService: 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService',
     /** Servicio de consulta de tickets */
-    billConsult: 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billConsultService',
+    billConsult: 'https://e-factura.sunat.gob.pe/ol-it-wsconscpegem/billConsultService',
     /** WSDL para billService */
     billServiceWsdl: 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService?wsdl',
     /** WSDL para billConsult */
-    billConsultWsdl: 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billConsultService?wsdl',
+    billConsultWsdl: 'https://e-factura.sunat.gob.pe/ol-it-wsconscpegem/billConsultService?wsdl',
   },
 } as const;
 

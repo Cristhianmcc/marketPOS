@@ -27,6 +27,7 @@ import type { VoidedPayload, VoidedDocumentLine } from '@/lib/sunat/ubl/voided';
 import { signXml, SignatureError } from '@/lib/sunat/sign/signXmlCrypto';
 import { loadCertificate, CertificateError } from '@/lib/sunat/cert/loadCertificate';
 import { logAudit } from '@/lib/auditLog';
+import { getNextSunatNumber } from '@/domain/sunat/correlatives';
 
 export async function POST(req: NextRequest) {
   try {
@@ -86,17 +87,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar credenciales
-    if (!settings.solUser || !settings.solPass) {
+    if (settings.env === 'PROD' && (!settings.solUser || !settings.solPass)) {
       return NextResponse.json(
         { error: 'Credenciales SOL no configuradas' },
-        { status: 400 }
-      );
-    }
-
-    // Solo BETA por ahora
-    if (settings.env !== 'BETA') {
-      return NextResponse.json(
-        { error: 'PROD no permitido aún. Solo BETA está habilitado (MÓDULO 18.7)' },
         { status: 400 }
       );
     }
@@ -125,6 +118,9 @@ export async function POST(req: NextRequest) {
       if (doc.docType === 'SUMMARY' || doc.docType === 'VOIDED') {
         errors.push(`${doc.fullNumber}: No se puede anular un ${doc.docType}`);
       }
+      if (doc.docType === 'BOLETA' || doc.series.startsWith('B')) {
+        errors.push(`${doc.fullNumber}: Las boletas se anulan mediante Resumen Diario, no Comunicación de Baja`);
+      }
     }
 
     if (errors.length > 0) {
@@ -135,7 +131,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Obtener siguiente número de baja
-    const nextNumber = settings.nextVoidedNumber || 1;
+    const nextNumber = await getNextSunatNumber(prisma, storeId, 'VOIDED');
     const series = settings.defaultVoidedSeries || 'RA01';
     const issueDate = new Date();
 
@@ -143,6 +139,13 @@ export async function POST(req: NextRequest) {
     // SUNAT requiere que sea la misma para todos los documentos en una baja
     // Por simplicidad, usamos la fecha del primer documento
     const referenceDate = documents[0].issueDate;
+    const referenceDay = referenceDate.toISOString().slice(0, 10);
+    if (documents.some((document) => document.issueDate.toISOString().slice(0, 10) !== referenceDay)) {
+      return NextResponse.json(
+        { error: 'Todos los documentos de una Comunicación de Baja deben tener la misma fecha de emisión' },
+        { status: 400 }
+      );
+    }
 
     // 5. Construir payload de la baja
     const lines: VoidedDocumentLine[] = documents.map(doc => ({
@@ -218,7 +221,8 @@ export async function POST(req: NextRequest) {
       { taxable: 0, igv: 0, total: 0 }
     );
 
-    const voidedDoc = await prisma.electronicDocument.create({
+    const { voidedDoc, job } = await prisma.$transaction(async (tx) => {
+      const voidedDoc = await tx.electronicDocument.create({
       data: {
         storeId,
         docType: 'VOIDED',
@@ -236,39 +240,13 @@ export async function POST(req: NextRequest) {
         status: 'SIGNED',
         xmlSigned: signResult.signedXml,
         hash: signResult.digestValue,
-        voidReason,
-        // Guardar IDs de documentos anulados
-        referenceDocId: documents[0].id, // Principal (solo uno en relación)
+        voidReason: JSON.stringify({ kind: 'VOIDED', reason: voidReason, documentIds }),
       },
     });
-
-    // 10. Actualizar correlativo de la baja
-    await prisma.sunatSettings.update({
-      where: { storeId },
-      data: { nextVoidedNumber: nextNumber + 1 },
-    });
-
-    // 11. Marcar los documentos originales con referencia al voided
-    // (se marcarán como CANCELED cuando la baja sea aceptada)
-    await prisma.electronicDocument.updateMany({
-      where: {
-        id: { in: documentIds },
-      },
-      data: {
-        voidReason,
-        referenceDocId: voidedDoc.id,
-      },
-    });
-
-    // 12. Encolar job SEND_SUMMARY (Voided usa mismo servicio sendSummary)
-    const job = await prisma.sunatJob.create({
-      data: {
-        storeId,
-        documentId: voidedDoc.id,
-        type: 'SEND_SUMMARY', // Voided usa sendSummary también
-        status: 'QUEUED',
-        nextRunAt: new Date(),
-      },
+      const job = await tx.sunatJob.create({
+        data: { storeId, documentId: voidedDoc.id, type: 'SEND_SUMMARY', status: 'QUEUED', nextRunAt: new Date() },
+      });
+      return { voidedDoc, job };
     });
 
     // 13. Auditar

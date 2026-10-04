@@ -27,6 +27,7 @@ import { signXml, SignatureError } from '@/lib/sunat/sign/signXmlCrypto';
 import { loadCertificate, CertificateError } from '@/lib/sunat/cert/loadCertificate';
 import { startOfDay, endOfDay, format } from 'date-fns';
 import { logAudit } from '@/lib/auditLog';
+import { getNextSunatNumber } from '@/domain/sunat/correlatives';
 
 // Máximo de documentos por resumen (límite SUNAT)
 const MAX_DOCS_PER_SUMMARY = 500;
@@ -74,17 +75,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar credenciales
-    if (!settings.solUser || !settings.solPass) {
+    if (settings.env === 'PROD' && (!settings.solUser || !settings.solPass)) {
       return NextResponse.json(
         { error: 'Credenciales SOL no configuradas' },
-        { status: 400 }
-      );
-    }
-
-    // Solo BETA por ahora (MÓDULO 18.6)
-    if (settings.env !== 'BETA') {
-      return NextResponse.json(
-        { error: 'PROD no permitido aún. Solo BETA está habilitado (MÓDULO 18.7)' },
         { status: 400 }
       );
     }
@@ -121,7 +114,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Obtener siguiente número de resumen
-    const nextNumber = settings.nextSummaryNumber || 1;
+    const nextNumber = await getNextSunatNumber(prisma, storeId, 'SUMMARY');
     const series = settings.defaultSummarySeries || 'RC01';
 
     // 4. Construir payload del resumen
@@ -203,7 +196,8 @@ export async function POST(req: NextRequest) {
 
     const fullNumber = getSummaryFilename(settings.ruc!, series, nextNumber, refDate);
 
-    const summaryDoc = await prisma.electronicDocument.create({
+    const { summaryDoc, job } = await prisma.$transaction(async (tx) => {
+      const summaryDoc = await tx.electronicDocument.create({
       data: {
         storeId,
         docType: 'SUMMARY',
@@ -225,22 +219,17 @@ export async function POST(req: NextRequest) {
         voidReason: JSON.stringify(boletas.map(b => b.id)),
       },
     });
-
-    // 9. Actualizar correlativo del resumen
-    await prisma.sunatSettings.update({
-      where: { storeId },
-      data: { nextSummaryNumber: nextNumber + 1 },
-    });
-
-    // 10. Encolar job SEND_SUMMARY
-    const job = await prisma.sunatJob.create({
-      data: {
-        storeId,
-        documentId: summaryDoc.id,
-        type: 'SEND_SUMMARY',
-        status: 'QUEUED',
-        nextRunAt: new Date(), // Ejecutar inmediatamente
-      },
+      const reserved = await tx.electronicDocument.updateMany({
+        where: { id: { in: boletas.map((boleta) => boleta.id) }, storeId, reportedInSummary: false },
+        data: { reportedInSummary: true },
+      });
+      if (reserved.count !== boletas.length) {
+        throw new Error('Las boletas fueron tomadas por otro resumen; vuelve a ejecutar el proceso');
+      }
+      const job = await tx.sunatJob.create({
+        data: { storeId, documentId: summaryDoc.id, type: 'SEND_SUMMARY', status: 'QUEUED', nextRunAt: new Date() },
+      });
+      return { summaryDoc, job };
     });
 
     // 11. Auditar

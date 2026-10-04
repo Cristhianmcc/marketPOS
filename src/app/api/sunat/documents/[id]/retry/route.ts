@@ -3,7 +3,7 @@
  * 
  * POST /api/sunat/documents/:id/retry
  * 
- * Crea un nuevo job para reintentar el envío de un documento con ERROR o REJECTED.
+ * Crea un nuevo job para reconciliar/reintentar un documento con ERROR técnico.
  * Útil para recuperar documentos fallidos manualmente.
  */
 
@@ -81,11 +81,14 @@ export async function POST(
       );
     }
 
-    // 7. Validar estado del documento (solo ERROR o REJECTED pueden reintentarse)
-    if (document.status !== 'ERROR' && document.status !== 'REJECTED') {
+    // Un REJECTED ya tiene respuesta fiscal y no se debe reenviar sin corregir
+    // el documento. Este endpoint solo recupera fallos técnicos.
+    if (document.status !== 'ERROR') {
       return NextResponse.json(
         { 
-          error: `Solo documentos con ERROR o REJECTED pueden reintentarse (estado actual: ${document.status})`,
+          error: document.status === 'REJECTED'
+            ? 'SUNAT rechazó el documento. Debe corregirse y emitirse uno nuevo; no se reenviará el mismo XML.'
+            : `Solo documentos con ERROR técnico pueden reintentarse (estado actual: ${document.status})`,
           currentStatus: document.status,
         },
         { status: 400 }
@@ -100,11 +103,15 @@ export async function POST(
       );
     }
 
+    const jobType = document.docType === 'SUMMARY' || document.docType === 'VOIDED'
+      ? 'SEND_SUMMARY'
+      : 'SEND_CPE';
+
     // 9. Verificar que no exista un job QUEUED ya
     const existingQueuedJob = await prisma.sunatJob.findFirst({
       where: {
         documentId,
-        type: 'SEND_CPE',
+        type: jobType,
         status: 'QUEUED',
       },
     });
@@ -123,7 +130,7 @@ export async function POST(
     const lastJob = await prisma.sunatJob.findFirst({
       where: {
         documentId,
-        type: 'SEND_CPE',
+        type: jobType,
       },
       orderBy: {
         createdAt: 'desc',
@@ -131,23 +138,23 @@ export async function POST(
     });
 
     // 11. Crear nuevo job de reintento
-    const retryJob = await prisma.sunatJob.create({
-      data: {
-        documentId,
-        storeId: document.storeId,
-        type: 'SEND_CPE',
-        status: 'QUEUED',
-        attempts: 0, // Reiniciar contador de intentos
-        nextRunAt: new Date(), // Ejecutar inmediatamente
-      },
-    });
-
-    // 12. Actualizar documento a PENDING (salir de ERROR/REJECTED)
-    await prisma.electronicDocument.update({
-      where: { id: documentId },
-      data: {
-        status: 'PENDING',
-      },
+    const retryJob = await prisma.$transaction(async (tx) => {
+      await tx.electronicDocument.update({
+        where: { id: documentId },
+        data: { status: 'SIGNED' },
+      });
+      return tx.sunatJob.create({
+        data: {
+          documentId,
+          storeId: document.storeId,
+          type: jobType,
+          status: 'QUEUED',
+          // Un valor mayor que cero obliga al procesador PROD a consultar el
+          // CDR antes de considerar un reenvío del mismo correlativo.
+          attempts: Math.max(lastJob?.attempts || 0, 1),
+          nextRunAt: new Date(),
+        },
+      });
     });
 
     // 13. Auditoría

@@ -65,20 +65,18 @@ export function generateCreditNoteXML(
   // Moneda del documento
   doc.ele('cbc:DocumentCurrencyCode').txt(currency);
 
+  // Tipo y motivo de la nota de crédito
+  const discrepancy = doc.ele('cac:DiscrepancyResponse');
+  discrepancy.ele('cbc:ReferenceID').txt(creditNoteMetadata.referencedDocNumber);
+  discrepancy.ele('cbc:ResponseCode').txt(creditNoteMetadata.creditNoteTypeCode);
+  discrepancy.ele('cbc:Description').txt(creditNoteMetadata.creditNoteReason);
+
   // Documento de referencia (factura o boleta original)
   const billingReference = doc.ele('cac:BillingReference');
   const invoiceDocumentReference = billingReference.ele('cac:InvoiceDocumentReference');
   invoiceDocumentReference.ele('cbc:ID').txt(creditNoteMetadata.referencedDocNumber);
   const refDocType = creditNoteMetadata.referencedDocType === 'FACTURA' ? '01' : '03';
   invoiceDocumentReference.ele('cbc:DocumentTypeCode').txt(refDocType);
-
-  // Tipo y motivo de la nota de crédito
-  doc.ele('cbc:DiscrepancyResponse')
-    .ele('cbc:ReferenceID').txt(creditNoteMetadata.referencedDocNumber);
-  doc.ele('cbc:DiscrepancyResponse')
-    .ele('cbc:ResponseCode').txt(creditNoteMetadata.creditNoteTypeCode);
-  doc.ele('cbc:DiscrepancyResponse')
-    .ele('cbc:Description').txt(creditNoteMetadata.creditNoteReason);
 
   // Signature
   const signature = doc.ele('cac:Signature');
@@ -136,10 +134,32 @@ export function generateCreditNoteXML(
   items.forEach((item) => {
     const creditNoteLine = doc.ele('cac:CreditNoteLine');
     creditNoteLine.ele('cbc:ID').txt(item.lineNumber.toString());
-    creditNoteLine.ele('cbc:CreditedQuantity', { unitCode: mapUnitTypeToUBL(item.unitType) })
+    const unitCode = item.unitSunatCode || mapUnitTypeToUBL(item.unitType);
+    const lineTaxable = item.taxableAmount ?? item.lineSubtotal / 1.18;
+    const lineTax = item.taxAmount ?? item.lineSubtotal - lineTaxable;
+    const unitValue = item.unitValue ?? (item.quantity > 0 ? lineTaxable / item.quantity : 0);
+    creditNoteLine.ele('cbc:CreditedQuantity', { unitCode })
       .txt(formatUBLQuantity(item.quantity));
     creditNoteLine.ele('cbc:LineExtensionAmount', { currencyID: currency })
-      .txt(formatUBLAmount(item.lineSubtotal));
+      .txt(formatUBLAmount(lineTaxable));
+
+    const pricingReference = creditNoteLine.ele('cac:PricingReference');
+    const alternativePrice = pricingReference.ele('cac:AlternativeConditionPrice');
+    alternativePrice.ele('cbc:PriceAmount', { currencyID: currency }).txt(formatUBLAmount(item.unitPrice));
+    alternativePrice.ele('cbc:PriceTypeCode').txt('01');
+
+    const lineTaxTotal = creditNoteLine.ele('cac:TaxTotal');
+    lineTaxTotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(lineTax));
+    const lineTaxSubtotal = lineTaxTotal.ele('cac:TaxSubtotal');
+    lineTaxSubtotal.ele('cbc:TaxableAmount', { currencyID: currency }).txt(formatUBLAmount(lineTaxable));
+    lineTaxSubtotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(lineTax));
+    const lineTaxCategory = lineTaxSubtotal.ele('cac:TaxCategory');
+    lineTaxCategory.ele('cbc:Percent').txt(getIGVPercentage().toString());
+    lineTaxCategory.ele('cbc:TaxExemptionReasonCode').txt(getDefaultIGVAffectation());
+    const lineTaxScheme = lineTaxCategory.ele('cac:TaxScheme');
+    lineTaxScheme.ele('cbc:ID').txt(SUNAT_CATALOGS.TAX_TYPE.IGV);
+    lineTaxScheme.ele('cbc:Name').txt('IGV');
+    lineTaxScheme.ele('cbc:TaxTypeCode').txt('VAT');
 
     // Item
     const itemElement = creditNoteLine.ele('cac:Item');
@@ -148,7 +168,7 @@ export function generateCreditNoteXML(
     // Price
     const price = creditNoteLine.ele('cac:Price');
     price.ele('cbc:PriceAmount', { currencyID: currency })
-      .txt(formatUBLAmount(item.unitPrice));
+      .txt(formatUBLAmount(unitValue));
   });
 
   return doc.end({ prettyPrint: true });

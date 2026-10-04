@@ -22,6 +22,9 @@ interface SunatActionsProps {
   hasCdr?: boolean;
   userRole: string;
   paymentMethod?: string;
+  documentType?: 'FACTURA' | 'BOLETA';
+  documentTotal?: number;
+  allowNotes?: boolean;
   onActionComplete?: () => void;
 }
 
@@ -33,11 +36,21 @@ export default function SunatActions({
   hasCdr,
   userRole,
   paymentMethod,
+  documentType,
+  documentTotal = 0,
+  allowNotes = true,
   onActionComplete,
 }: SunatActionsProps) {
   const [showEmitModal, setShowEmitModal] = useState(false);
   const [emitting, setEmitting] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [creatingNote, setCreatingNote] = useState(false);
+  const [noteType, setNoteType] = useState<'NOTA_CREDITO' | 'NOTA_DEBITO'>('NOTA_CREDITO');
+  const [noteReasonCode, setNoteReasonCode] = useState('01');
+  const [noteReason, setNoteReason] = useState('ANULACIÓN DE LA OPERACIÓN');
+  const [noteAmount, setNoteAmount] = useState(String(documentTotal || ''));
+  const [cancelSale, setCancelSale] = useState(true);
 
   const [docType, setDocType] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
   const [customerDocType, setCustomerDocType] = useState('OTHER');
@@ -139,6 +152,43 @@ export default function SunatActions({
     }
   };
 
+  const handleCreateNote = async () => {
+    if (!documentId) return;
+    const amount = Number(noteAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || !noteReason.trim()) {
+      toast.error('Completa el importe y el motivo de la nota');
+      return;
+    }
+    setCreatingNote(true);
+    try {
+      const res = await fetch('/api/sunat/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referenceDocumentId: documentId,
+          noteType,
+          reasonCode: noteReasonCode,
+          reason: noteReason.trim(),
+          amount,
+          cancelSaleOnAcceptance: noteType === 'NOTA_CREDITO' && cancelSale,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo crear la nota electrónica');
+        return;
+      }
+      toast.success(`${noteType === 'NOTA_CREDITO' ? 'Nota de crédito' : 'Nota de débito'} ${data.document.fullNumber} encolada`);
+      setShowNoteModal(false);
+      onActionComplete?.();
+    } catch (error) {
+      console.error('Error creating SUNAT note:', error);
+      toast.error('Error de red al crear la nota');
+    } finally {
+      setCreatingNote(false);
+    }
+  };
+
   return (
     <div className="flex flex-wrap gap-2">
       {/* Emitir (si no tiene documento) */}
@@ -152,8 +202,8 @@ export default function SunatActions({
         </button>
       )}
 
-      {/* Reintentar (si ERROR o REJECTED) */}
-      {documentId && (status === 'ERROR' || status === 'REJECTED') && (
+      {/* Reintentar solamente fallos técnicos; un rechazo requiere corrección. */}
+      {documentId && status === 'ERROR' && (
         <button
           onClick={handleRetry}
           disabled={retrying}
@@ -199,6 +249,85 @@ export default function SunatActions({
           <FileText className="w-3.5 h-3.5" />
           CDR
         </button>
+      )}
+
+      {allowNotes && documentId && userRole === 'OWNER' && (status === 'ACCEPTED' || status === 'OBSERVED') && (
+        <button
+          onClick={() => {
+            setNoteAmount(String(documentTotal));
+            setShowNoteModal(true);
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded hover:bg-violet-700"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Nota / Anular
+        </button>
+      )}
+
+      {showNoteModal && documentId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Ajuste fiscal de {documentType || 'comprobante'}</h3>
+            <p className="text-sm text-gray-600 mb-4">El comprobante original se conserva. SUNAT recibirá una nota vinculada.</p>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <button type="button" onClick={() => {
+                  setNoteType('NOTA_CREDITO'); setNoteReasonCode('01');
+                  setNoteReason('ANULACIÓN DE LA OPERACIÓN'); setCancelSale(true); setNoteAmount(String(documentTotal));
+                }} className={`flex-1 px-3 py-2 rounded border text-sm ${noteType === 'NOTA_CREDITO' ? 'bg-violet-600 text-white' : 'bg-white'}`}>Nota de crédito</button>
+                <button type="button" onClick={() => {
+                  setNoteType('NOTA_DEBITO'); setNoteReasonCode('02');
+                  setNoteReason('AUMENTO EN EL VALOR'); setCancelSale(false); setNoteAmount('');
+                }} className={`flex-1 px-3 py-2 rounded border text-sm ${noteType === 'NOTA_DEBITO' ? 'bg-violet-600 text-white' : 'bg-white'}`}>Nota de débito</button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Motivo SUNAT</label>
+                <select value={noteReasonCode} onChange={(event) => {
+                  const option = event.currentTarget.selectedOptions[0];
+                  setNoteReasonCode(event.target.value); setNoteReason(option.text);
+                  if (event.target.value !== '01' && event.target.value !== '05') setCancelSale(false);
+                }} className="w-full px-3 py-2 border rounded">
+                  {noteType === 'NOTA_CREDITO' ? <>
+                    <option value="01">ANULACIÓN DE LA OPERACIÓN</option>
+                    <option value="02">ANULACIÓN POR ERROR EN RUC</option>
+                    <option value="03">DESCUENTO GLOBAL</option>
+                    <option value="04">DESCUENTO POR ÍTEM</option>
+                    <option value="05">DEVOLUCIÓN TOTAL</option>
+                    <option value="06">DEVOLUCIÓN PARCIAL</option>
+                    <option value="08">DISMINUCIÓN EN EL VALOR</option>
+                    <option value="09">OTROS CONCEPTOS</option>
+                  </> : <>
+                    <option value="01">INTERESES POR MORA</option>
+                    <option value="02">AUMENTO EN EL VALOR</option>
+                    <option value="03">PENALIDADES</option>
+                    <option value="10">OTROS CONCEPTOS</option>
+                  </>}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Descripción</label>
+                <input value={noteReason} onChange={(event) => setNoteReason(event.target.value)} className="w-full px-3 py-2 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Importe total (S/)</label>
+                <input type="number" min="0.01" step="0.01" max={noteType === 'NOTA_CREDITO' ? documentTotal : undefined}
+                  value={noteAmount} onChange={(event) => setNoteAmount(event.target.value)} className="w-full px-3 py-2 border rounded" />
+              </div>
+              {noteType === 'NOTA_CREDITO' && (noteReasonCode === '01' || noteReasonCode === '05') && (
+                <label className="flex items-start gap-2 rounded bg-red-50 p-3 text-sm text-red-800">
+                  <input type="checkbox" checked={cancelSale} onChange={(event) => setCancelSale(event.target.checked)} className="mt-1" />
+                  Al ser aceptada, anular la venta local y devolver el stock. Requiere el importe total S/ {documentTotal.toFixed(2)}.
+                </label>
+              )}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleCreateNote} disabled={creatingNote} className="flex-1 px-4 py-2 bg-violet-600 text-white rounded disabled:opacity-50">
+                {creatingNote ? 'Creando...' : 'Firmar y encolar nota'}
+              </button>
+              <button onClick={() => setShowNoteModal(false)} disabled={creatingNote} className="px-4 py-2 bg-gray-200 rounded">Cerrar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal para emitir */}

@@ -18,8 +18,8 @@ export class CertificateError extends Error {
 }
 
 /**
- * Carga el certificado digital desde ENV o DB
- * Prioridad: ENV > SunatSettings
+ * Carga el certificado digital de la tienda. BETA puede crear uno de prueba;
+ * PROD nunca toma certificados globales del proceso.
  * 
  * @param prisma - Cliente de Prisma
  * @param storeId - ID de la tienda
@@ -30,48 +30,32 @@ export async function loadCertificate(
   prisma: PrismaClient,
   storeId: string
 ): Promise<Certificate> {
-  let pfxBase64: string | null = null;
-  let password: string | null = null;
+  const settings = await prisma.sunatSettings.findUnique({
+    where: { storeId },
+    select: { env: true, ruc: true, certPfxBase64: true, certPassword: true },
+  });
 
-  // 1. Intentar cargar desde ENV (recomendado para producción)
-  if (process.env.SUNAT_CERT_PFX && process.env.SUNAT_CERT_PASSWORD) {
-    pfxBase64 = process.env.SUNAT_CERT_PFX;
-    password = process.env.SUNAT_CERT_PASSWORD;
-  } else {
-    // 2. Cargar desde SunatSettings
-    const settings = await prisma.sunatSettings.findUnique({
-      where: { storeId },
-      select: {
-        env: true,
-        ruc: true,
-        certPfxBase64: true,
-        certPassword: true,
-      },
-    });
-
-    if (!settings?.certPfxBase64 || !settings?.certPassword) {
-      if (settings?.env === 'BETA' && settings.ruc) {
-        const generated = generateBetaCertificate(settings.ruc);
-        await prisma.sunatSettings.update({
-          where: { storeId },
-          data: {
-            certPfxBase64: generated.pfxBase64,
-            certPassword: generated.password,
-            stepCertificate: true,
-          },
-        });
-        return parsePfxCertificate(generated.pfxBase64, generated.password);
-      }
-
-      throw new CertificateError(
-        'Certificado digital no configurado. Configure SUNAT_CERT_PFX y SUNAT_CERT_PASSWORD en ENV o en SunatSettings.',
-        'CERT_NOT_CONFIGURED'
-      );
+  if (!settings?.certPfxBase64 || !settings?.certPassword) {
+    if (settings?.env === 'BETA' && settings.ruc) {
+      const generated = generateBetaCertificate(settings.ruc);
+      await prisma.sunatSettings.update({
+        where: { storeId },
+        data: {
+          certPfxBase64: generated.pfxBase64,
+          certPassword: generated.password,
+          stepCertificate: true,
+        },
+      });
+      return parsePfxCertificate(generated.pfxBase64, generated.password);
     }
-
-    pfxBase64 = settings.certPfxBase64;
-    password = settings.certPassword;
+    throw new CertificateError(
+      'Certificado digital no configurado para esta tienda.',
+      'CERT_NOT_CONFIGURED'
+    );
   }
+
+  const pfxBase64 = settings.certPfxBase64;
+  const password = settings.certPassword;
 
   // Parsear el certificado PFX
   try {

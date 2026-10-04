@@ -10,7 +10,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+import { app, safeStorage } from 'electron';
 import archiver from 'archiver';
 import crypto from 'crypto';
 import AdmZip from 'adm-zip';
@@ -212,6 +212,10 @@ export class BackupScheduler {
       // Crear ZIP
       await this.createZipFile(filePath, metadata, backupData);
 
+      // El archivo fiscal queda cifrado por Windows y separado del ZIP que el
+      // sincronizador cloud puede copiar.
+      await this.createEncryptedFiscalArchive(filePath);
+
       // Verificar archivo creado
       const stats = fs.statSync(filePath);
 
@@ -231,6 +235,23 @@ export class BackupScheduler {
       console.error('[BackupScheduler] Backup failed:', errorMessage);
       return { success: false, error: errorMessage };
     }
+  }
+
+  private getFiscalArchivePath(zipPath: string): string {
+    return zipPath.replace(/\.zip$/i, '.sunat-fiscal');
+  }
+
+  private async createEncryptedFiscalArchive(zipPath: string): Promise<void> {
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('Windows no ofrece cifrado seguro para el respaldo fiscal');
+    }
+    const response = await fetch(`${this.serverUrl}/api/sunat/archive/export`, {
+      headers: { 'x-desktop-app': 'true', ...(this.authToken && { Cookie: this.authToken }) },
+    });
+    if (!response.ok) throw new Error('No se pudo obtener el respaldo fiscal de la tienda');
+    const payload = await response.json();
+    const encrypted = safeStorage.encryptString(JSON.stringify(payload));
+    fs.writeFileSync(this.getFiscalArchivePath(zipPath), encrypted, { flag: 'wx' });
   }
 
   private async fetchBackupData(storeId: string): Promise<Record<string, unknown> | null> {
@@ -342,6 +363,8 @@ export class BackupScheduler {
         const toDelete = files.slice(this.config.maxBackups);
         for (const file of toDelete) {
           fs.unlinkSync(file.path);
+          const fiscalPath = this.getFiscalArchivePath(file.path);
+          if (fs.existsSync(fiscalPath)) fs.unlinkSync(fiscalPath);
           console.log(`[BackupScheduler] Deleted old backup: ${file.name}`);
         }
       }
@@ -478,6 +501,7 @@ export class BackupScheduler {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-desktop-app': 'true',
           ...(this.authToken && { Cookie: this.authToken }),
         },
         body: JSON.stringify({ metadata, data }),
@@ -486,6 +510,23 @@ export class BackupScheduler {
       if (!response.ok) {
         const errorData = await response.json() as { message?: string };
         return { success: false, error: errorData.message || 'Error en restauración' };
+      }
+
+      const fiscalPath = this.getFiscalArchivePath(filePath);
+      if (fs.existsSync(fiscalPath)) {
+        if (!safeStorage.isEncryptionAvailable()) {
+          return { success: false, error: 'Windows no puede descifrar el respaldo fiscal en este usuario' };
+        }
+        const fiscalPayload = JSON.parse(safeStorage.decryptString(fs.readFileSync(fiscalPath)));
+        const fiscalResponse = await fetch(`${this.serverUrl}/api/sunat/archive/restore`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-desktop-app': 'true', ...(this.authToken && { Cookie: this.authToken }) },
+          body: JSON.stringify(fiscalPayload),
+        });
+        if (!fiscalResponse.ok) {
+          const errorData = await fiscalResponse.json() as { error?: string };
+          return { success: false, error: errorData.error || 'No se pudo restaurar el archivo fiscal' };
+        }
       }
 
       return { success: true, metadata };

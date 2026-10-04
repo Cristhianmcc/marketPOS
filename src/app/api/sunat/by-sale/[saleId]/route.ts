@@ -34,7 +34,6 @@ export async function GET(
           orderBy: {
             createdAt: 'desc',
           },
-          take: 1,
         },
       },
     });
@@ -63,7 +62,15 @@ export async function GET(
       });
     }
 
-    const doc = sale.electronicDocuments[0];
+    const doc = sale.electronicDocuments.find((item) =>
+      item.docType === 'FACTURA' || item.docType === 'BOLETA'
+    );
+    if (!doc) {
+      return NextResponse.json({ hasDocument: false, saleId: sale.id });
+    }
+    const adjustments = sale.electronicDocuments.filter((item) =>
+      item.referenceDocId === doc.id && (item.docType === 'NOTA_CREDITO' || item.docType === 'NOTA_DEBITO')
+    );
 
     // 5. Buscar último job asociado (opcional, para mostrar detalles)
     const lastJob = await prisma.sunatJob.findFirst({
@@ -107,6 +114,17 @@ export async function GET(
         lastError: lastJob.lastError,
         nextRunAt: lastJob.nextRunAt,
       } : null,
+      adjustments: adjustments.map((item) => ({
+        id: item.id,
+        docType: item.docType,
+        fullNumber: item.fullNumber,
+        status: item.status,
+        total: item.total,
+        sunatCode: item.sunatCode,
+        sunatMessage: item.sunatMessage,
+        hasXml: !!item.xmlSigned,
+        hasCdr: !!item.cdrZip,
+      })),
     });
 
   } catch (error: any) {

@@ -15,6 +15,7 @@ import { extractFromZip } from '@/lib/sunat/zip/buildZip';
 import { isSuperAdmin } from '@/lib/superadmin';
 import { buildSunatQrText } from '@/lib/sunat/qr';
 import { buildPrintedRepresentationPdf } from '@/lib/sunat/pdf/buildPrintedRepresentation';
+import { parseAdjustmentMetadata } from '@/lib/sunat/adjustmentMetadata';
 
 export async function GET(
   req: NextRequest,
@@ -41,6 +42,9 @@ export async function GET(
           include: {
             items: true,
           },
+        },
+        referenceDoc: {
+          select: { fullNumber: true },
         },
       },
     });
@@ -158,6 +162,28 @@ export async function GET(
         hash: doc.hash,
       });
 
+      const adjustment = parseAdjustmentMetadata(doc.voidReason);
+      const originalItemsTotal = doc.sale.items.reduce(
+        (sum, item) => sum + Number(item.totalLine || item.subtotal),
+        0
+      );
+      const isFullAdjustment = adjustment && Math.abs(originalItemsTotal - Number(doc.total)) < 0.01;
+      const printedItems = adjustment && !isFullAdjustment
+        ? [{
+          description: adjustment.reason,
+          quantity: 1,
+          unit: 'ZZ',
+          unitPrice: Number(doc.total),
+          total: Number(doc.total),
+        }]
+        : doc.sale.items.map((item) => ({
+          description: [item.productName, item.productContent].filter(Boolean).join(' '),
+          quantity: Number(item.quantityOriginal ?? item.quantity),
+          unit: item.unitSymbol || item.unitSunatCodeUsed || item.unitSunatCode || 'NIU',
+          unitPrice: Number(item.unitPrice),
+          total: Number(item.totalLine || item.subtotal),
+        }));
+
       const pdf = await buildPrintedRepresentationPdf({
         environment: doc.sunatSettings.env,
         issuer: {
@@ -179,13 +205,11 @@ export async function GET(
           name: doc.customerName,
           address: doc.customerAddress,
         },
-        items: doc.sale.items.map((item) => ({
-          description: [item.productName, item.productContent].filter(Boolean).join(' '),
-          quantity: Number(item.quantityOriginal ?? item.quantity),
-          unit: item.unitSymbol || item.unitSunatCodeUsed || item.unitSunatCode || 'NIU',
-          unitPrice: Number(item.unitPrice),
-          total: Number(item.totalLine || item.subtotal),
-        })),
+        reference: doc.referenceDoc ? {
+          fullNumber: doc.referenceDoc.fullNumber,
+          reason: adjustment?.reason || doc.voidReason,
+        } : undefined,
+        items: printedItems,
         totals: {
           taxable: Number(doc.taxable),
           igv: Number(doc.igv),

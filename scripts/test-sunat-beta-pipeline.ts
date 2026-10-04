@@ -7,6 +7,10 @@ import { buildZip } from '../src/lib/sunat/zip/buildZip';
 import { parseCdr } from '../src/lib/sunat/cdr/parseCdr';
 import type { SunatDocumentPayload } from '../src/lib/sunat/types';
 import { validateBoletaData } from '../src/lib/sunat/validation/fiscalValidations';
+import { generateCreditNoteXML } from '../src/lib/sunat/ubl/creditNote';
+import { generateDebitNoteXML } from '../src/lib/sunat/ubl/debitNote';
+import { generateSummaryXML, getSummaryFilename } from '../src/lib/sunat/ubl/summary';
+import { generateVoidedXML, getVoidedFilename } from '../src/lib/sunat/ubl/voided';
 
 async function main() {
   const generated = generateBetaCertificate('20123456789');
@@ -77,6 +81,45 @@ async function main() {
   assert.equal(validateBoletaData('OTHER', '-', 700).valid, true);
   assert.equal(validateBoletaData('OTHER', '-', 700.01).valid, false);
   assert.equal(validateBoletaData('DNI', '12345678', 700.01).valid, true);
+
+  const notePayload: SunatDocumentPayload = {
+    ...payload,
+    metadata: { ...payload.metadata, docType: 'NOTA_CREDITO', series: 'BC01', number: 1, fullNumber: 'BC01-00000001' },
+  };
+  const creditXml = generateCreditNoteXML(notePayload, 'credit-note', {
+    referencedDocType: 'BOLETA', referencedDocNumber: 'B001-00000001',
+    creditNoteTypeCode: '01', creditNoteReason: 'ANULACION DE LA OPERACION',
+  });
+  assert.match(creditXml, /<cbc:ResponseCode>01<\/cbc:ResponseCode>/);
+  assert.match(creditXml, /<cbc:DocumentTypeCode>03<\/cbc:DocumentTypeCode>/);
+  assert.equal(verifyXmlSignature(signXml(creditXml, certificate, 'credit-note').signedXml, certificate), true);
+
+  const debitXml = generateDebitNoteXML(
+    { ...notePayload, metadata: { ...notePayload.metadata, docType: 'NOTA_DEBITO', series: 'BD01' } },
+    'debit-note',
+    { referencedDocType: 'BOLETA', referencedDocNumber: 'B001-00000001', debitNoteTypeCode: '01', debitNoteReason: 'INTERESES' },
+  );
+  assert.match(debitXml, /<cbc:ResponseCode>01<\/cbc:ResponseCode>/);
+  assert.equal(verifyXmlSignature(signXml(debitXml, certificate, 'debit-note').signedXml, certificate), true);
+
+  const referenceDate = new Date('2026-10-01T12:00:00-05:00');
+  const summaryName = getSummaryFilename(payload.issuer.ruc, 'RC01', 1, referenceDate);
+  const summaryXml = generateSummaryXML({
+    issuer: { ruc: payload.issuer.ruc, razonSocial: payload.issuer.razonSocial },
+    referenceDate, issueDate: referenceDate, series: 'RC01', number: 1,
+    lines: [{ documentId: 'boleta-1', series: 'B001', number: 1, docType: 'BOLETA', customerDocType: 'DNI', customerDocNumber: '12345678', taxable: 8.47, igv: 1.53, total: 10 }],
+  }, 'summary-document');
+  assert.equal(summaryName, '20123456789-RC01-20261001-00001');
+  assert.equal(verifyXmlSignature(signXml(summaryXml, certificate, 'summary-document').signedXml, certificate), true);
+
+  const voidedName = getVoidedFilename(payload.issuer.ruc, 'RA01', 1, referenceDate);
+  const voidedXml = generateVoidedXML({
+    issuer: { ruc: payload.issuer.ruc, razonSocial: payload.issuer.razonSocial },
+    referenceDate, issueDate: referenceDate, series: 'RA01', number: 1,
+    lines: [{ documentId: 'invoice-1', documentTypeCode: '01', series: 'F001', number: 1, voidReason: 'ERROR EN LA OPERACION' }],
+  }, 'voided-document');
+  assert.equal(voidedName, '20123456789-RA01-20261001-00001');
+  assert.equal(verifyXmlSignature(signXml(voidedXml, certificate, 'voided-document').signedXml, certificate), true);
 
   const acceptedCdr = `<?xml version="1.0"?><ApplicationResponse xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><cbc:ResponseCode>0</cbc:ResponseCode><cbc:Description>Aceptado</cbc:Description></ApplicationResponse>`;
   const observedCdr = `<?xml version="1.0"?><ApplicationResponse xmlns:x="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><x:ResponseCode>0</x:ResponseCode><x:Description>Aceptado</x:Description><x:Note>Observación de prueba</x:Note></ApplicationResponse>`;
