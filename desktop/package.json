@@ -73,6 +73,10 @@
         "to": ".env"
       },
       {
+        "from": "build-resources/build-id.txt",
+        "to": "build-id.txt"
+      },
+      {
         "from": "build-resources/server",
         "to": "server",
         "filter": [

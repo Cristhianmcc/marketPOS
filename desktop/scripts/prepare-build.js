@@ -34,6 +34,12 @@ function writePublicDesktopEnv() {
   console.log('Created desktop public environment (CLOUD_URL only)');
 }
 
+function writeBuildId() {
+  const buildId = new Date().toISOString();
+  fs.writeFileSync(path.join(BUILD_RESOURCES, 'build-id.txt'), `${buildId}\n`, 'utf8');
+  console.log('Created desktop build identifier');
+}
+
 function buildWindowsLauncher() {
   if (process.platform !== 'win32') return;
 
@@ -207,6 +213,7 @@ function main() {
   }
 
   writePublicDesktopEnv();
+  writeBuildId();
   buildWindowsLauncher();
   
   console.log('='.repeat(60));

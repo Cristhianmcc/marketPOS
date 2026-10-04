@@ -119,7 +119,18 @@ interface ServerState {
   databaseUrl: string;
   internalToken: string;
   startedAt: string;
+  buildId?: string;
 }
+
+function getCurrentBuildId(): string {
+  try {
+    return fs.readFileSync(path.join(RESOURCES_PATH, 'build-id.txt'), 'utf-8').trim();
+  } catch {
+    return 'development';
+  }
+}
+
+const CURRENT_BUILD_ID = getCurrentBuildId();
 
 function saveServerState(state: ServerState): void {
   const stateFile = path.join(USER_DATA_PATH, 'server-state.json');
@@ -465,6 +476,7 @@ async function respawnServer(): Promise<void> {
       databaseUrl: process.env.DATABASE_URL || '',
       internalToken: localServer.internalToken,
       startedAt: new Date().toISOString(),
+      buildId: CURRENT_BUILD_ID,
     });
     // Restablecer contador si el servidor arrancó OK
     serverRestartCount = 0;
@@ -1246,6 +1258,10 @@ app.whenReady().then(async () => {
   if (!isDev) {
     const savedState = loadServerState();
     if (savedState) {
+      if (savedState.buildId !== CURRENT_BUILD_ID) {
+        console.log('[App] Background server belongs to a previous build; starting the updated server.');
+        clearServerState();
+      } else {
       console.log('[App] Verificando servidor en background...');
       const alive = await pingServerHealth(savedState.url);
       if (alive) {
@@ -1276,6 +1292,7 @@ app.whenReady().then(async () => {
       } else {
         console.log('[App] Servidor en background no responde — iniciando desde cero...');
         clearServerState();
+      }
       }
     }
   }
@@ -1451,6 +1468,7 @@ app.whenReady().then(async () => {
         databaseUrl: process.env.DATABASE_URL || '',
         internalToken: localServer.internalToken,
         startedAt: new Date().toISOString(),
+        buildId: CURRENT_BUILD_ID,
       });
 
       // Servidor listo — navegar a la app
