@@ -23,7 +23,7 @@ interface SunatActionsProps {
   userRole: string;
   paymentMethod?: string;
   documentType?: 'FACTURA' | 'BOLETA';
-  documentTotal?: number;
+  documentTotal?: number | string;
   allowNotes?: boolean;
   onActionComplete?: () => void;
 }
@@ -41,6 +41,10 @@ export default function SunatActions({
   allowNotes = true,
   onActionComplete,
 }: SunatActionsProps) {
+  const normalizedDocumentTotal = Number(documentTotal);
+  const safeDocumentTotal = Number.isFinite(normalizedDocumentTotal)
+    ? normalizedDocumentTotal
+    : 0;
   const [showEmitModal, setShowEmitModal] = useState(false);
   const [emitting, setEmitting] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -49,7 +53,7 @@ export default function SunatActions({
   const [noteType, setNoteType] = useState<'NOTA_CREDITO' | 'NOTA_DEBITO'>('NOTA_CREDITO');
   const [noteReasonCode, setNoteReasonCode] = useState('01');
   const [noteReason, setNoteReason] = useState('ANULACIÓN DE LA OPERACIÓN');
-  const [noteAmount, setNoteAmount] = useState(String(documentTotal || ''));
+  const [noteAmount, setNoteAmount] = useState(String(safeDocumentTotal || ''));
   const [cancelSale, setCancelSale] = useState(true);
 
   const [docType, setDocType] = useState<'BOLETA' | 'FACTURA'>('BOLETA');
@@ -254,7 +258,7 @@ export default function SunatActions({
       {allowNotes && documentId && userRole === 'OWNER' && (status === 'ACCEPTED' || status === 'OBSERVED') && (
         <button
           onClick={() => {
-            setNoteAmount(String(documentTotal));
+            setNoteAmount(String(safeDocumentTotal));
             setShowNoteModal(true);
           }}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded hover:bg-violet-700"
@@ -273,7 +277,7 @@ export default function SunatActions({
               <div className="flex gap-2">
                 <button type="button" onClick={() => {
                   setNoteType('NOTA_CREDITO'); setNoteReasonCode('01');
-                  setNoteReason('ANULACIÓN DE LA OPERACIÓN'); setCancelSale(true); setNoteAmount(String(documentTotal));
+                  setNoteReason('ANULACIÓN DE LA OPERACIÓN'); setCancelSale(true); setNoteAmount(String(safeDocumentTotal));
                 }} className={`flex-1 px-3 py-2 rounded border text-sm ${noteType === 'NOTA_CREDITO' ? 'bg-violet-600 text-white' : 'bg-white'}`}>Nota de crédito</button>
                 <button type="button" onClick={() => {
                   setNoteType('NOTA_DEBITO'); setNoteReasonCode('02');
@@ -310,13 +314,13 @@ export default function SunatActions({
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Importe total (S/)</label>
-                <input type="number" min="0.01" step="0.01" max={noteType === 'NOTA_CREDITO' ? documentTotal : undefined}
+                <input type="number" min="0.01" step="0.01" max={noteType === 'NOTA_CREDITO' ? safeDocumentTotal : undefined}
                   value={noteAmount} onChange={(event) => setNoteAmount(event.target.value)} className="w-full px-3 py-2 border rounded" />
               </div>
               {noteType === 'NOTA_CREDITO' && (noteReasonCode === '01' || noteReasonCode === '05') && (
                 <label className="flex items-start gap-2 rounded bg-red-50 p-3 text-sm text-red-800">
                   <input type="checkbox" checked={cancelSale} onChange={(event) => setCancelSale(event.target.checked)} className="mt-1" />
-                  Al ser aceptada, anular la venta local y devolver el stock. Requiere el importe total S/ {documentTotal.toFixed(2)}.
+                  Al ser aceptada, anular la venta local y devolver el stock. Requiere el importe total S/ {safeDocumentTotal.toFixed(2)}.
                 </label>
               )}
             </div>
