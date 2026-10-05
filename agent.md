@@ -259,6 +259,10 @@ instalado, pero un segundo clic sobre el lanzador BETA enfoca la ventana existen
 arrancar otro renderer y otro servidor sobre la misma base portable. Los errores graves del
 renderer de esa variante se guardan, sin consola general ni datos de negocio, en
 `renderer-errors.log` dentro de su `userData` aislado.
+El proceso principal aplica ese `userData` con `app.setPath` antes de solicitar el bloqueo;
+el argumento Chromium `--user-data-dir` por sí solo no aísla de forma fiable el bloqueo de
+Electron. Si una segunda ejecución termina con código 0, el lanzador lo considera un cierre
+normal y no muestra un error falso.
 Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
 pruebas locales, la configuración externa debe suministrarse al proceso al
 arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.

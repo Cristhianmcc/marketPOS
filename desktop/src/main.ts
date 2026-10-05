@@ -70,6 +70,20 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 // portable database and the first page load can become nondeterministic.
 const isIsolatedSunatBeta = process.argv.includes('--sunat-beta-isolated');
 
+// Chromium accepts --user-data-dir, but Electron's single-instance lock uses
+// app.getPath('userData'). Set it explicitly before requesting the lock so the
+// beta cannot collide with an installed production instance.
+if (isIsolatedSunatBeta) {
+  const userDataArg = process.argv.find((arg) => arg.startsWith('--user-data-dir='));
+  const configuredPath = userDataArg?.slice('--user-data-dir='.length).replace(/^"|"$/g, '');
+  const isolatedUserDataPath = configuredPath || path.join(
+    app.getPath('appData'),
+    'monterrial-pos-sunat-beta',
+    'isolated-test'
+  );
+  app.setPath('userData', isolatedUserDataPath);
+}
+
 if (!isPgDaemonMode) {
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) {

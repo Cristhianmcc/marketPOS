@@ -70,7 +70,7 @@ internal static class SunatBetaLauncher
                 throw new InvalidOperationException("Windows no devolvio el proceso de la aplicacion.");
             }
 
-            if (process.WaitForExit(12000))
+            if (process.WaitForExit(12000) && process.ExitCode != 0)
             {
                 System.Windows.Forms.MessageBox.Show(
                     "La aplicacion se cerro durante el inicio. Codigo: " + process.ExitCode,
