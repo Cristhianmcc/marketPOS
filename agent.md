@@ -188,7 +188,7 @@ no puede cargar sus archivos `.node` directamente desde `app.asar`.
 En Windows afectado por `STATUS_BREAKPOINT (0x80000003)`, la Beta se inicia mediante
 `Abrir Monterrial POS SUNAT Beta.cmd`. El lanzador autorizado usa `--no-sandbox`,
 desactiva GPU, asigna el perfil aislado
-`%APPDATA%/monterrial-pos-sunat-beta/isolated-test` y pasa
+`.sunat-beta-runtime/electron-profile` dentro del worktree aislado y pasa
 `--sunat-beta-isolated` para poder probar junto al POS instalado. El arranque normal mantiene
 el bloqueo de instancia única. `extraFiles` lo incluye junto al
 ejecutable; esta excepción no debe aplicarse al producto principal.

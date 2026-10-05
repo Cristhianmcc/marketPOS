@@ -54,11 +54,14 @@ internal static class SunatBetaLauncher
             {
                 FileName = target,
                 Arguments = "--sunat-beta-isolated --no-sandbox --disable-gpu --enable-logging " +
-                    "--user-data-dir=\"" + Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "monterrial-pos-sunat-beta",
-                        "isolated-test"
-                    ) + "\"",
+                    "--user-data-dir=\"" + Path.GetFullPath(Path.Combine(
+                        baseDir,
+                        "..",
+                        "..",
+                        "..",
+                        ".sunat-beta-runtime",
+                        "electron-profile"
+                    )) + "\"",
                 WorkingDirectory = baseDir,
                 UseShellExecute = false
             };

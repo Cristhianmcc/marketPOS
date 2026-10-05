@@ -72,7 +72,10 @@ const isIsolatedSunatBeta = process.argv.includes('--sunat-beta-isolated');
 
 // Chromium accepts --user-data-dir, but Electron's single-instance lock uses
 // app.getPath('userData'). Set it explicitly before requesting the lock so the
-// beta cannot collide with an installed production instance.
+// beta cannot collide with an installed production instance. The beta launcher
+// points this to the worktree's writable .sunat-beta-runtime directory; AppData
+// can be read-only in restricted Windows profiles and then Electron exits before
+// app.ready with process_singleton error 5.
 if (isIsolatedSunatBeta) {
   const userDataArg = process.argv.find((arg) => arg.startsWith('--user-data-dir='));
   const configuredPath = userDataArg?.slice('--user-data-dir='.length).replace(/^"|"$/g, '');
