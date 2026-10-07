@@ -100,9 +100,17 @@ export function mapDocTypeToSunatCode(docType: string): string {
   const mapping: Record<string, string> = {
     'FACTURA': '01',
     'BOLETA': '03',
+    'NOTA_CREDITO': '07',
+    'NOTA_DEBITO': '08',
+    // Compatibilidad con nombres usados por versiones anteriores.
     'CREDIT_NOTE': '07',
     'DEBIT_NOTE': '08',
   };
-  
-  return mapping[docType] || '01';
+
+  const sunatCode = mapping[docType];
+  if (!sunatCode) {
+    throw new Error(`Tipo de documento SUNAT no soportado: ${docType}`);
+  }
+
+  return sunatCode;
 }
