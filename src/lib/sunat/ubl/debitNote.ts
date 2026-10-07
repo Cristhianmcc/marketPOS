@@ -99,7 +99,49 @@ export function generateDebitNoteXML(
       schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
     }).txt(issuer.ruc);
   supplier.ele('cac:PartyName').ele('cbc:Name').txt(issuer.razonSocial);
-  supplier.ele('cac:PartyLegalEntity').ele('cbc:RegistrationName').txt(issuer.razonSocial);
+
+  if (issuer.address) {
+    const supplierAddress = supplier.ele('cac:PostalAddress');
+    if (issuer.ubigeo) {
+      supplierAddress.ele('cbc:ID').txt(issuer.ubigeo);
+    }
+    supplierAddress.ele('cbc:StreetName').txt(issuer.address);
+    supplierAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
+  }
+
+  const supplierTaxScheme = supplier.ele('cac:PartyTaxScheme');
+  supplierTaxScheme.ele('cbc:RegistrationName').txt(issuer.razonSocial);
+  supplierTaxScheme.ele('cbc:CompanyID', {
+    schemeID: '6',
+    schemeName: 'SUNAT:Identificador de Documento de Identidad',
+    schemeAgencyName: 'PE:SUNAT',
+    schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
+  }).txt(issuer.ruc);
+  const registrationAddress = supplierTaxScheme.ele('cac:RegistrationAddress');
+  if (issuer.ubigeo) {
+    registrationAddress.ele('cbc:ID').txt(issuer.ubigeo);
+  }
+  registrationAddress.ele('cbc:AddressTypeCode').txt('0000');
+  if (issuer.address) {
+    registrationAddress.ele('cbc:StreetName').txt(issuer.address);
+  }
+  registrationAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
+  const issuerTaxScheme = supplierTaxScheme.ele('cac:TaxScheme');
+  issuerTaxScheme.ele('cbc:ID').txt('1000');
+  issuerTaxScheme.ele('cbc:Name').txt('IGV');
+  issuerTaxScheme.ele('cbc:TaxTypeCode').txt('VAT');
+
+  const supplierLegalEntity = supplier.ele('cac:PartyLegalEntity');
+  supplierLegalEntity.ele('cbc:RegistrationName').txt(issuer.razonSocial);
+  const legalRegistrationAddress = supplierLegalEntity.ele('cac:RegistrationAddress');
+  if (issuer.ubigeo) {
+    legalRegistrationAddress.ele('cbc:ID').txt(issuer.ubigeo);
+  }
+  legalRegistrationAddress.ele('cbc:AddressTypeCode').txt('0000');
+  if (issuer.address) {
+    legalRegistrationAddress.ele('cbc:StreetName').txt(issuer.address);
+  }
+  legalRegistrationAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
 
   // AccountingCustomerParty (Cliente)
   const customerParty = doc.ele('cac:AccountingCustomerParty');
@@ -112,6 +154,23 @@ export function generateDebitNoteXML(
       schemeAgencyName: 'PE:SUNAT',
       schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
     }).txt(customer.docNumber);
+
+  if (customer.address) {
+    const customerAddress = custParty.ele('cac:PostalAddress');
+    customerAddress.ele('cbc:StreetName').txt(customer.address);
+    customerAddress.ele('cac:Country').ele('cbc:IdentificationCode').txt('PE');
+  }
+
+  const customerTaxScheme = custParty.ele('cac:PartyTaxScheme');
+  customerTaxScheme.ele('cbc:RegistrationName').txt(customer.name);
+  customerTaxScheme.ele('cbc:CompanyID', {
+    schemeID: customerDocType,
+    schemeName: 'SUNAT:Identificador de Documento de Identidad',
+    schemeAgencyName: 'PE:SUNAT',
+    schemeURI: 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo06'
+  }).txt(customer.docNumber);
+  customerTaxScheme.ele('cac:TaxScheme').ele('cbc:ID').txt('-');
+
   custParty.ele('cac:PartyLegalEntity').ele('cbc:RegistrationName').txt(customer.name);
 
   // TaxTotal
