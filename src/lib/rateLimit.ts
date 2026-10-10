@@ -43,7 +43,9 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   
   // ✅ MÓDULO S8 - Admin sensitive endpoints
   'backup-export': { maxRequests: 3, windowSeconds: 60 },
-  'backup-restore': { maxRequests: 1, windowSeconds: 120 },
+  // La restauración puede fallar por validación o por un conflicto transitorio.
+  // Permitir reintentar sin quitar la protección contra bucles automáticos.
+  'backup-restore': { maxRequests: 3, windowSeconds: 60 },
   'admin-store-create': { maxRequests: 3, windowSeconds: 60 },
   'admin-user-create': { maxRequests: 5, windowSeconds: 60 },
   'sunat': { maxRequests: 10, windowSeconds: 60 },

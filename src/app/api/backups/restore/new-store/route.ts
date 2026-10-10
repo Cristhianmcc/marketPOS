@@ -18,9 +18,18 @@ function isSuperAdmin(email: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    // ✅ MÓDULO S8: Rate limit backup restore (muy restrictivo)
+    const session = await getSession();
+    if (!session.userId || (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email))) {
+      return NextResponse.json(
+        { code: 'FORBIDDEN', message: 'Solo SUPERADMIN puede crear tiendas desde backup' },
+        { status: 403 }
+      );
+    }
+
+    // Limitar por administrador autenticado. En Electron la IP puede ser
+    // "unknown", por lo que usarla sola bloquearía a todas las sesiones locales.
     const clientIP = getClientIP(request);
-    const rateLimitResult = checkRateLimit('backup-restore', clientIP);
+    const rateLimitResult = checkRateLimit('backup-restore', `${session.userId}:${clientIP}`);
     
     if (!rateLimitResult.allowed) {
       const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
@@ -34,14 +43,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { code: 'TOO_MANY_REQUESTS', message: `Demasiadas solicitudes. Intenta en ${waitSeconds}s` },
         { status: 429, headers: { 'Retry-After': String(waitSeconds) } }
-      );
-    }
-
-    const session = await getSession();
-    if (!session.userId || (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email))) {
-      return NextResponse.json(
-        { code: 'FORBIDDEN', message: 'Solo SUPERADMIN puede crear tiendas desde backup' },
-        { status: 403 }
       );
     }
 
@@ -232,9 +233,22 @@ export async function POST(request: NextRequest) {
       // 3. Upsert ProductMasters
       const productIdMap = new Map<string, string>();
       for (const pm of backupData.productMasters) {
-        const existing = pm.barcode
-          ? await tx.productMaster.findFirst({ where: { barcode: pm.barcode } })
-          : await tx.productMaster.findFirst({ where: { internalSku: pm.internalSku } });
+        // barcode e internalSku son únicos. Hay que comprobar ambos: buscar solo
+        // por barcode podía intentar crear un SKU que ya existía en el catálogo.
+        const [byBarcode, byInternalSku] = await Promise.all([
+          pm.barcode
+            ? tx.productMaster.findUnique({ where: { barcode: pm.barcode } })
+            : Promise.resolve(null),
+          tx.productMaster.findUnique({ where: { internalSku: pm.internalSku } }),
+        ]);
+
+        if (byBarcode && byInternalSku && byBarcode.id !== byInternalSku.id) {
+          throw Object.assign(new Error('El código de barras y el SKU pertenecen a productos distintos'), {
+            code: 'RESTORE_CATALOG_CONFLICT',
+          });
+        }
+
+        const existing = byBarcode || byInternalSku;
 
         if (existing) {
           productIdMap.set(pm.id, existing.id);
@@ -590,6 +604,11 @@ export async function POST(request: NextRequest) {
           fiscalDocuments: backupData.fiscalArchive?.data?.documents?.length || 0,
         },
       };
+    }, {
+      // Importar cientos de productos y documentos puede superar los 5 s que
+      // Prisma concede por defecto a una transacción interactiva.
+      maxWait: 10_000,
+      timeout: 120_000,
     });
 
     // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
@@ -659,8 +678,28 @@ export async function POST(request: NextRequest) {
       }).catch(e => console.error('Audit log failed (non-blocking):', e));
     } catch {}
     
+    if (error?.code === 'RESTORE_CATALOG_CONFLICT' || error?.code === 'P2002') {
+      return NextResponse.json(
+        {
+          code: 'BACKUP_CATALOG_CONFLICT',
+          message: 'El respaldo contiene un producto que entra en conflicto con el catálogo actual. No se importó ningún dato.',
+        },
+        { status: 409 }
+      );
+    }
+
+    if (error?.code === 'P2028' || /transaction.*(?:closed|timeout|timed out)/i.test(String(error?.message || ''))) {
+      return NextResponse.json(
+        {
+          code: 'BACKUP_RESTORE_TIMEOUT',
+          message: 'La restauración tardó más de lo permitido. No se importó ningún dato; puedes reintentar.',
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { code: 'SERVER_ERROR', message: 'Error al restaurar backup' },
+      { code: 'SERVER_ERROR', message: 'No se pudo restaurar el respaldo. No se importó ningún dato; puedes reintentar.' },
       { status: 500 }
     );
   }

@@ -192,6 +192,14 @@ El respaldo de Valky del 10/10/2026 pasó auditoría de ZIP/XML/CDR/correlativos
 una ejecución exacta del endpoint con Prisma simulado: 224 productos, 16 ventas,
 16 detalles, 18 movimientos, un cliente, un fiado y 12 documentos fiscales.
 
+La restauración permite tres intentos por minuto por SUPERADMIN autenticado e IP;
+no debe volver a bloquear el segundo intento después de un fallo aislado. La
+transacción admite hasta 120 segundos para respaldos grandes. Al reutilizar el
+catálogo maestro compara tanto código de barras como SKU interno y detiene toda la
+transacción si ambos identificadores apuntan a productos distintos. `Store.name`
+no es único, por lo que una tienda activa con el mismo nombre original no causa
+por sí sola un fallo de restauración.
+
 En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
 firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
 heredado. Esto permite que el administrador validado por el servicio cloud use el

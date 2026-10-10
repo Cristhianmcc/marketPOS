@@ -40,7 +40,12 @@ const tx = {
   store: { create: async ({ data }) => (state.store = { id: id('store'), ...data }) },
   storeSettings: { create: async ({ data }) => data },
   productMaster: {
-    findFirst: async () => null,
+    findUnique: async ({ where }) => {
+      if (Object.prototype.hasOwnProperty.call(where, 'barcode')) {
+        return state.productMasters.find(product => product.barcode === where.barcode) || null;
+      }
+      return state.productMasters.find(product => product.internalSku === where.internalSku) || null;
+    },
     create: create('productMasters', 'pm'),
   },
   user: {
@@ -76,7 +81,12 @@ const tx = {
     },
   },
 };
-const prisma = { $transaction: async callback => callback(tx) };
+const prisma = {
+  $transaction: async (callback, options) => {
+    assert(options?.timeout >= 60_000, 'restore transaction timeout is too short');
+    return callback(tx);
+  },
+};
 
 const originalLoad = Module._load;
 Module._load = function(request, parent, isMain) {
@@ -96,6 +106,15 @@ function assert(value, message) { if (!value) throw new Error(message); }
 (async () => {
   const route = compile(`${repo}/src/app/api/backups/restore/new-store/route.ts`);
   const raw = fs.readFileSync(backupPath);
+  const archive = new AdmZip(raw);
+  const backupData = JSON.parse(archive.readAsText('data.json'));
+  const productWithBarcode = backupData.productMasters.find(product => product.barcode);
+  assert(productWithBarcode, 'backup needs a product with barcode for catalog reuse test');
+  state.productMasters.push({
+    ...productWithBarcode,
+    id: 'preexisting-product',
+    barcode: `existing-${productWithBarcode.id}`,
+  });
   const fakeFile = { name: path.basename(backupPath), size: raw.length, arrayBuffer: async () => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) };
   const request = { formData: async () => ({ get: key => key === 'backup' ? fakeFile : null }), headers: { get: () => null } };
   const response = await route.POST(request);
@@ -103,10 +122,9 @@ function assert(value, message) { if (!value) throw new Error(message); }
   assert(response.status === 200 && body.success, `endpoint failed: ${body.message || response.status}`);
   assert(state.store.status === 'ARCHIVED', 'restored store is not archived');
   assert(state.settings.enabled === false && state.settings.env === 'BETA', 'SUNAT was not disabled after restore');
-  const archive = new AdmZip(raw);
   const expected = JSON.parse(archive.readAsText('metadata.json')).counts;
-  const backupData = JSON.parse(archive.readAsText('data.json'));
   const expectedFiscalDocuments = backupData.fiscalArchive?.data?.documents?.length || 0;
+  assert(state.productMasters.length === expected.productMasters, 'product master count mismatch');
   assert(state.storeProducts.length === expected.storeProducts, 'store product count mismatch');
   assert(state.sales.length === expected.sales, 'sales count mismatch');
   assert(state.saleItems.length === expected.saleItems, 'sale item count mismatch');
