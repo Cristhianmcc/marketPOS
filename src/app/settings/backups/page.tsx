@@ -91,6 +91,7 @@ export default function BackupsPage() {
                 <li>✓ Clientes y cuentas por cobrar</li>
                 <li>✓ Movimientos de inventario</li>
                 <li>✓ Configuración de la tienda</li>
+                <li>✓ XML, CDR, estados y correlativos SUNAT</li>
               </ul>
             </div>
 
@@ -98,6 +99,7 @@ export default function BackupsPage() {
               <h3 className="font-medium text-orange-900 mb-2">Seguridad</h3>
               <ul className="text-sm text-orange-800 space-y-1">
                 <li>• Las contraseñas NO se exportan</li>
+                <li>• Las credenciales SOL y el certificado privado NO se exportan</li>
                 <li>• El archivo contiene solo datos de tu tienda</li>
                 <li>• Guarda el backup en un lugar seguro</li>
               </ul>
@@ -215,6 +217,7 @@ export default function BackupsPage() {
                         <li>Crea una nueva tienda con los datos del backup</li>
                         <li>Genera un OWNER con contraseña temporal</li>
                         <li>Preserva todo el historial (ventas, turnos, cuentas)</li>
+                        <li>Recupera XML, CDR y correlativos; SUNAT queda desactivado</li>
                         <li>NO afecta ninguna tienda existente</li>
                       </ul>
                     </div>

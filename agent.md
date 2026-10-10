@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **04/10/2026**, zona America/Lima. Base Git observada:
+Última revisión: **09/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -171,6 +171,14 @@ un `.env` público con solamente `CLOUD_URL`; cuando un usuario no existe en la 
 local, el login valida OWNER/SUPERADMIN contra `/api/auth/login` por HTTPS. No volver
 a empaquetar `CLOUD_DATABASE_URL`, `LICENSE_API_KEY` ni el `.env` completo.
 
+Los backups desktop nuevos incluyen `fiscalArchive` dentro de `data.json`, cubierto
+por el checksum general del ZIP. Contiene documentos, XML firmado, CDR, estados y
+correlativos, pero excluye credenciales SOL y certificado privado. Esto permite que
+el archivo fiscal acompañe tanto al respaldo local como a su copia en la nube y se
+recupere en otra instalación. La restauración conserva el mayor correlativo entre
+el destino y el respaldo y deja SUNAT desactivado. Se mantiene lectura compatible
+del sidecar `.sunat-fiscal` cifrado usado por builds Beta anteriores.
+
 En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
 firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
 heredado. Esto permite que el administrador validado por el servicio cloud use el
@@ -199,7 +207,7 @@ entorno de prueba. Es una base
 vacía y descartable para pruebas; no debe tratarse como almacenamiento definitivo ni incluir
 datos reales de clientes.
 
-### Estado SUNAT de la rama Beta (04/10/2026)
+### Estado SUNAT de la rama Beta (09/10/2026)
 
 - Facturas, boletas, notas de crédito y notas de débito generan UBL, se firman,
   se verifican localmente y se encolan sin bloquear la venta. La representación
@@ -225,15 +233,13 @@ datos reales de clientes.
   `SunatSettings` de la tienda. BETA usa MODDATOS y puede generar un certificado
   de prueba. Volver desde una restauración deja SUNAT desactivado y obliga a
   revisar credenciales y certificado antes de emitir.
-- Cada ZIP de backup desktop tiene un archivo hermano `.sunat-fiscal`, cifrado
-  con `electron.safeStorage`. Contiene XML, CDR, respuestas, relaciones y
-  correlativos, pero no contiene contraseña SOL, certificado, contraseña del
-  certificado ni jobs. La sincronización cloud actual solo recoge `.zip`, por
-  lo que no sube este archivo fiscal. Al restaurar, los correlativos conservan el
-  máximo entre la base y el archivo y nunca se recrean trabajos de envío. El
-  cifrado está ligado al usuario de Windows: sirve para recuperación local en el
-  mismo perfil; una exportación portable a otro equipo requiere un mecanismo
-  adicional con contraseña elegida por el propietario.
+- Cada ZIP nuevo incluye `fiscalArchive` dentro de `data.json` y lo protege el
+  checksum general del respaldo, por lo que también viaja con la copia cloud.
+  Contiene XML, CDR, respuestas, relaciones y correlativos, pero no contiene
+  contraseña SOL, certificado privado, contraseña del certificado ni jobs. Al
+  restaurar como nueva tienda, los documentos se enlazan por número de venta,
+  los correlativos conservan el máximo y SUNAT queda desactivado. El desktop
+  mantiene lectura de los sidecars `.sunat-fiscal` de builds Beta anteriores.
 
 Comprobación local disponible: `npm run sunat:test:local`. Cubre generación,
 firma y verificación de factura, boleta identificada, consumidor final, NC, ND,

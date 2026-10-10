@@ -189,8 +189,16 @@ export class BackupScheduler {
       const fileName = `backup_${timestamp}.zip`;
       const filePath = path.join(backupDir, fileName);
 
+      // El archivo fiscal forma parte del mismo ZIP para que el respaldo pueda
+      // recuperarse en otra PC y también viaje con la copia en la nube. No
+      // contiene credenciales SOL ni el certificado privado.
+      const fiscalArchive = backupData.fiscalArchive && typeof backupData.fiscalArchive === 'object'
+        ? backupData.fiscalArchive as Record<string, unknown>
+        : await this.fetchFiscalArchive();
+      const completeBackupData = { ...backupData, fiscalArchive };
+
       // Crear checksum
-      const dataJsonContent = JSON.stringify(backupData, null, 2);
+      const dataJsonContent = JSON.stringify(completeBackupData, null, 2);
       const checksum = crypto.createHash('sha256').update(dataJsonContent, 'utf8').digest('hex');
 
       // Metadata
@@ -205,16 +213,12 @@ export class BackupScheduler {
           phone: storeInfo.phone,
         },
         checksum: `sha256:${checksum}`,
-        counts: this.calculateCounts(backupData),
+        counts: this.calculateCounts(completeBackupData),
         trigger,
       };
 
       // Crear ZIP
-      await this.createZipFile(filePath, metadata, backupData);
-
-      // El archivo fiscal queda cifrado por Windows y separado del ZIP que el
-      // sincronizador cloud puede copiar.
-      await this.createEncryptedFiscalArchive(filePath);
+      await this.createZipFile(filePath, metadata, completeBackupData);
 
       // Verificar archivo creado
       const stats = fs.statSync(filePath);
@@ -241,17 +245,12 @@ export class BackupScheduler {
     return zipPath.replace(/\.zip$/i, '.sunat-fiscal');
   }
 
-  private async createEncryptedFiscalArchive(zipPath: string): Promise<void> {
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('Windows no ofrece cifrado seguro para el respaldo fiscal');
-    }
+  private async fetchFiscalArchive(): Promise<Record<string, unknown>> {
     const response = await fetch(`${this.serverUrl}/api/sunat/archive/export`, {
       headers: { 'x-desktop-app': 'true', ...(this.authToken && { Cookie: this.authToken }) },
     });
     if (!response.ok) throw new Error('No se pudo obtener el respaldo fiscal de la tienda');
-    const payload = await response.json();
-    const encrypted = safeStorage.encryptString(JSON.stringify(payload));
-    fs.writeFileSync(this.getFiscalArchivePath(zipPath), encrypted, { flag: 'wx' });
+    return await response.json() as Record<string, unknown>;
   }
 
   private async fetchBackupData(storeId: string): Promise<Record<string, unknown> | null> {
@@ -512,12 +511,17 @@ export class BackupScheduler {
         return { success: false, error: errorData.message || 'Error en restauración' };
       }
 
+      let fiscalPayload = data.fiscalArchive as Record<string, unknown> | undefined;
       const fiscalPath = this.getFiscalArchivePath(filePath);
-      if (fs.existsSync(fiscalPath)) {
+      // Compatibilidad con respaldos Beta anteriores que guardaban el archivo
+      // fiscal como un sidecar protegido por el usuario de Windows.
+      if (!fiscalPayload && fs.existsSync(fiscalPath)) {
         if (!safeStorage.isEncryptionAvailable()) {
           return { success: false, error: 'Windows no puede descifrar el respaldo fiscal en este usuario' };
         }
-        const fiscalPayload = JSON.parse(safeStorage.decryptString(fs.readFileSync(fiscalPath)));
+        fiscalPayload = JSON.parse(safeStorage.decryptString(fs.readFileSync(fiscalPath)));
+      }
+      if (fiscalPayload) {
         const fiscalResponse = await fetch(`${this.serverUrl}/api/sunat/archive/restore`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-desktop-app': 'true', ...(this.authToken && { Cookie: this.authToken }) },

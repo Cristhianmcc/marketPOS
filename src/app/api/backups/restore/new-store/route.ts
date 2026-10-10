@@ -6,6 +6,10 @@ import AdmZip from 'adm-zip';
 import crypto from 'crypto';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
+import {
+  restoreFiscalArchive,
+  validateFiscalArchiveEnvelope,
+} from '@/lib/sunat/fiscalArchive';
 
 function isSuperAdmin(email: string): boolean {
   const superadminEmails = process.env.SUPERADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
@@ -387,7 +391,19 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return { newStore, newOwner, tempPassword };
+      // 11. Restaurar archivo fiscal portable después de recrear las ventas.
+      // No recupera credenciales SOL, certificado privado ni jobs pendientes.
+      // SUNAT queda desactivado hasta que el OWNER vuelva a configurarlo.
+      const fiscalRestore = backupData.fiscalArchive
+        ? await restoreFiscalArchive(
+            tx,
+            newStore.id,
+            newStore.ruc,
+            validateFiscalArchiveEnvelope(backupData.fiscalArchive).data
+          )
+        : null;
+
+      return { newStore, newOwner, tempPassword, fiscalRestore };
     });
 
     // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
@@ -406,6 +422,7 @@ export async function POST(request: NextRequest) {
         allowedLegacy: allowLegacy,
         productsCount: backupData.products?.length || 0,
         salesCount: backupData.sales?.length || 0,
+        fiscalRestore: result.fiscalRestore,
         restoredBy: session.email,
       },
       ip,
@@ -426,6 +443,7 @@ export async function POST(request: NextRequest) {
       },
       warning: 'Cambiar password inmediatamente',
       note: 'La tienda fue creada como ARCHIVED. Un SUPERADMIN debe reactivarla para que sea operativa.',
+      fiscalRestore: result.fiscalRestore,
       ...(isLegacyBackup && { 
         legacyWarning: '⚠️ BACKUP LEGACY: Restaurado sin verificación de integridad (sin checksum). Verifica la integridad de los datos manualmente.' 
       })

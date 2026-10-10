@@ -70,7 +70,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Exportar datos (sin passwords)
-    const [users, storeProducts, shifts, sales, movements, customers, receivables] = await Promise.all([
+    const [
+      users,
+      storeProducts,
+      shifts,
+      sales,
+      movements,
+      customers,
+      receivables,
+      sunatSettings,
+      electronicDocuments,
+    ] = await Promise.all([
       prisma.user.findMany({
         where: { storeId: storeIdToExport },
         select: {
@@ -127,6 +137,23 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
+      prisma.sunatSettings.findUnique({
+        where: { storeId: storeIdToExport },
+        select: {
+          env: true, ruc: true, razonSocial: true, address: true, ubigeo: true,
+          defaultFacturaSeries: true, defaultBoletaSeries: true,
+          defaultNcSeries: true, defaultNdSeries: true,
+          defaultSummarySeries: true, defaultVoidedSeries: true,
+          nextFacturaNumber: true, nextBoletaNumber: true,
+          nextNcNumber: true, nextNdNumber: true,
+          nextSummaryNumber: true, nextVoidedNumber: true,
+        },
+      }),
+      prisma.electronicDocument.findMany({
+        where: { storeId: storeIdToExport },
+        orderBy: { createdAt: 'asc' },
+        include: { sale: { select: { saleNumber: true } } },
+      }),
     ]);
 
     // Extraer ProductMasters únicos
@@ -136,6 +163,28 @@ export async function GET(request: NextRequest) {
         id: { in: Array.from(productMasterIds) },
       },
     });
+
+    const fiscalData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      source: {
+        storeId: store.id,
+        storeName: store.name,
+        ruc: sunatSettings?.ruc || store.ruc || null,
+      },
+      settings: sunatSettings,
+      documents: electronicDocuments.map(({ sale, ...document }) => ({
+        ...document,
+        taxable: document.taxable.toString(),
+        igv: document.igv.toString(),
+        total: document.total.toString(),
+        saleNumber: sale?.saleNumber ?? null,
+      })),
+    };
+    const fiscalArchive = {
+      data: fiscalData,
+      checksum: `sha256:${crypto.createHash('sha256').update(JSON.stringify(fiscalData)).digest('hex')}`,
+    };
 
     // Data completo
     const backupData = {
@@ -157,6 +206,7 @@ export async function GET(request: NextRequest) {
       movements,
       customers,
       receivables,
+      fiscalArchive,
     };
 
     // Calcular checksum SHA-256 del contenido de data.json
