@@ -65,31 +65,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    restorePhase = 'READ_MULTIPART';
-    // Leer archivo ZIP
-    const formData = await request.formData();
-    restorePhase = 'VALIDATE_UPLOAD';
-    const file = formData.get('backup') as File;
-    const allowLegacy = formData.get('allowLegacy') === 'true';
+    const MAX_BACKUP_BYTES = 512 * 1024 * 1024;
+    const contentType = request.headers.get('content-type')?.toLowerCase() || '';
+    let fileName = '';
+    let fileSize = 0;
+    let allowLegacy = false;
+    let buffer: Buffer;
 
-    if (!file) {
-      return NextResponse.json(
-        { code: 'INVALID_BACKUP_FILE', message: 'Archivo de backup requerido' },
-        { status: 400 }
-      );
+    if (contentType.includes('application/zip') || contentType.includes('application/octet-stream')) {
+      restorePhase = 'VALIDATE_UPLOAD';
+      const encodedFileName = request.headers.get('x-backup-filename') || '';
+      try {
+        fileName = decodeURIComponent(encodedFileName);
+      } catch {
+        fileName = '';
+      }
+      allowLegacy = request.headers.get('x-allow-legacy') === 'true';
+
+      const declaredSize = Number(request.headers.get('content-length') || 0);
+      if (!fileName.toLowerCase().endsWith('.zip') || declaredSize > MAX_BACKUP_BYTES) {
+        return NextResponse.json(
+          { code: 'INVALID_BACKUP_FILE', message: 'Selecciona un respaldo ZIP válido de hasta 512 MB' },
+          { status: 400 }
+        );
+      }
+
+      restorePhase = 'READ_ZIP_BUFFER';
+      buffer = Buffer.from(await request.arrayBuffer());
+      fileSize = buffer.length;
+    } else {
+      // Compatibilidad con clientes web anteriores. El desktop usa el cuerpo
+      // binario porque Request.formData() no es estable en el standalone.
+      restorePhase = 'READ_MULTIPART';
+      const formData = await request.formData();
+      const file = formData.get('backup') as File | null;
+      allowLegacy = formData.get('allowLegacy') === 'true';
+
+      if (!file) {
+        return NextResponse.json(
+          { code: 'INVALID_BACKUP_FILE', message: 'Archivo de backup requerido' },
+          { status: 400 }
+        );
+      }
+
+      fileName = file.name;
+      fileSize = file.size;
+      restorePhase = 'READ_ZIP_BUFFER';
+      buffer = Buffer.from(await file.arrayBuffer());
     }
 
-    const MAX_BACKUP_BYTES = 512 * 1024 * 1024;
-    if (file.size <= 0 || file.size > MAX_BACKUP_BYTES || !file.name.toLowerCase().endsWith('.zip')) {
+    restorePhase = 'VALIDATE_UPLOAD';
+    if (fileSize <= 0 || fileSize > MAX_BACKUP_BYTES || !fileName.toLowerCase().endsWith('.zip')) {
       return NextResponse.json(
         { code: 'INVALID_BACKUP_FILE', message: 'Selecciona un respaldo ZIP válido de hasta 512 MB' },
         { status: 400 }
       );
     }
 
-    restorePhase = 'READ_ZIP_BUFFER';
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
     restorePhase = 'OPEN_ZIP';
     const zip = new AdmZip(buffer);
 

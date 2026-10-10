@@ -115,8 +115,15 @@ function assert(value, message) { if (!value) throw new Error(message); }
     id: 'preexisting-product',
     barcode: `existing-${productWithBarcode.id}`,
   });
-  const fakeFile = { name: path.basename(backupPath), size: raw.length, arrayBuffer: async () => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) };
-  const request = { formData: async () => ({ get: key => key === 'backup' ? fakeFile : null }), headers: { get: () => null } };
+  const requestHeaders = new Map([
+    ['content-type', 'application/zip'],
+    ['content-length', String(raw.length)],
+    ['x-backup-filename', encodeURIComponent(path.basename(backupPath))],
+  ]);
+  const request = {
+    arrayBuffer: async () => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
+    headers: { get: name => requestHeaders.get(String(name).toLowerCase()) || null },
+  };
   const response = await route.POST(request);
   const body = await response.json();
   assert(response.status === 200 && body.success, `endpoint failed: ${body.message || response.status}`);

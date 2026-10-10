@@ -200,12 +200,14 @@ transacción si ambos identificadores apuntan a productos distintos. `Store.name
 no es único, por lo que una tienda activa con el mismo nombre original no causa
 por sí sola un fallo de restauración.
 
-Estado pendiente al 10/10/2026: el ZIP de Valky sigue revirtiéndose en la base Beta
-real con `BACKUP_RESTORE_FAILED`, aunque pasa la prueba aislada y la comprobación
-de solo lectura no detectó enums inválidos, referencias ausentes ni colisiones de
-barcode/SKU. El primer diagnóstico ubicó el fallo dentro de la lectura del ZIP,
-antes de abrir la transacción. La ruta separa ahora las fases de multipart, buffer,
-apertura del ZIP, manifiestos, JSON, estructura y checksum. Los fallos iniciados
+Estado pendiente al 10/10/2026: el ZIP de Valky sigue sin completar una restauración
+en la base Beta real, aunque pasa la prueba aislada y la comprobación de solo lectura
+no detectó enums inválidos, referencias ausentes ni colisiones de barcode/SKU. El
+diagnóstico por fases ubicó el fallo en `Request.formData()` del servidor standalone,
+antes de leer el ZIP. El panel desktop envía ahora el archivo como cuerpo binario
+`application/zip`; la ruta conserva multipart como compatibilidad para clientes
+anteriores y separa las fases de transporte, apertura del ZIP, manifiestos, JSON,
+estructura y checksum. La prueba aislada usa el mismo transporte binario. Los fallos iniciados
 por un SUPERADMIN de nube se auditan con `userId` nulo cuando ese identificador no
 existe en la base local; así se evita violar la FK de `AuditLog`. La resolución
 de ese usuario es tolerante y no puede convertir un `COMMIT` correcto en un error

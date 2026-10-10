@@ -332,9 +332,17 @@ export default function AdminStoresPage() {
     setRestoring(true);
     setRestoreResult(null);
     try {
-      const body = new FormData();
-      body.append('backup', restoreFile);
-      const res = await fetch('/api/backups/restore/new-store', { method: 'POST', body });
+      // Next.js standalone dentro de Electron puede fallar al interpretar
+      // multipart/form-data. Enviar el ZIP crudo conserva exactamente sus bytes
+      // y evita depender del parser multipart del runtime empacado.
+      const res = await fetch('/api/backups/restore/new-store', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/zip',
+          'X-Backup-Filename': encodeURIComponent(restoreFile.name),
+        },
+        body: restoreFile,
+      });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.message || data.error || 'No se pudo restaurar el respaldo');
