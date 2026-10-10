@@ -193,6 +193,7 @@ export async function GET(request: NextRequest) {
         ruc: store.ruc,
         address: store.address,
         phone: store.phone,
+        businessProfile: store.businessProfile,
       },
       storeSettings: store.settings,
       users,
@@ -223,6 +224,7 @@ export async function GET(request: NextRequest) {
         ruc: store.ruc,
         address: store.address,
         phone: store.phone,
+        businessProfile: store.businessProfile,
       },
       checksum: `sha256:${checksum}`,
       counts: {

@@ -102,6 +102,24 @@ interface Store {
   };
 }
 
+interface RestoreResult {
+  store: { id: string; name: string; status: 'ARCHIVED' };
+  owner: { email: string; temporaryPassword: string };
+  temporaryCredentials?: Array<{ email: string; temporaryPassword: string; role: string }>;
+  fiscalRestore?: { created: number; updated: number; skipped: number } | null;
+  restoredCounts?: {
+    users: number;
+    productMasters: number;
+    storeProducts: number;
+    sales: number;
+    saleItems: number;
+    movements: number;
+    customers: number;
+    receivables: number;
+    fiscalDocuments: number;
+  };
+}
+
 export default function AdminStoresPage() {
   const router = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
@@ -114,6 +132,10 @@ export default function AdminStoresPage() {
   const [actioningStoreId, setActioningStoreId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
   const [changingProfileStoreId, setChangingProfileStoreId] = useState<string | null>(null);
+  const [showRestoreForm, setShowRestoreForm] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreResult, setRestoreResult] = useState<RestoreResult | null>(null);
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -146,9 +168,9 @@ export default function AdminStoresPage() {
     }
   }
 
-  async function loadStores() {
+  async function loadStores(showArchivedOverride = showArchived) {
     try {
-      const res = await fetch(`/api/admin/stores?showArchived=${showArchived}`);
+      const res = await fetch(`/api/admin/stores?showArchived=${showArchivedOverride}`);
       if (res.status === 403) {
         router.push('/');
         return;
@@ -296,6 +318,40 @@ export default function AdminStoresPage() {
     }
   }
 
+  async function handleRestoreBackup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!restoreFile) {
+      toast.error('Selecciona un respaldo ZIP');
+      return;
+    }
+
+    if (!confirm('Se creará una tienda nueva ARCHIVADA. La tienda actual no será modificada. ¿Continuar?')) {
+      return;
+    }
+
+    setRestoring(true);
+    setRestoreResult(null);
+    try {
+      const body = new FormData();
+      body.append('backup', restoreFile);
+      const res = await fetch('/api/backups/restore/new-store', { method: 'POST', body });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || data.error || 'No se pudo restaurar el respaldo');
+        return;
+      }
+
+      setRestoreResult(data as RestoreResult);
+      setShowArchived(true);
+      await loadStores(true);
+      toast.success('Respaldo restaurado como tienda archivada');
+    } catch {
+      toast.error('Error de red al restaurar el respaldo');
+    } finally {
+      setRestoring(false);
+    }
+  }
+
   const archivedCount = stores.filter(s => s.status === 'ARCHIVED').length;
 
   // ✅ MÓDULO V1: Cambiar perfil de tienda
@@ -355,14 +411,29 @@ export default function AdminStoresPage() {
           </button>
         </div>
 
-        {/* Botón crear tienda */}
+        {/* Botones crear/restaurar tienda */}
         <div className="mb-6 flex items-center justify-between">
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-          >
-            {showForm ? 'Cancelar' : '+ Nueva Tienda'}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => {
+                setShowForm(!showForm);
+                setShowRestoreForm(false);
+              }}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            >
+              {showForm ? 'Cancelar' : '+ Nueva Tienda'}
+            </button>
+            <button
+              onClick={() => {
+                setShowRestoreForm(!showRestoreForm);
+                setShowForm(false);
+                setRestoreResult(null);
+              }}
+              className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+            >
+              {showRestoreForm ? 'Cancelar restauración' : 'Restaurar respaldo'}
+            </button>
+          </div>
 
           {/* Toggle mostrar archivadas */}
           <label className="flex items-center gap-2 cursor-pointer">
@@ -377,6 +448,86 @@ export default function AdminStoresPage() {
             </span>
           </label>
         </div>
+
+        {showRestoreForm && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-emerald-200">
+            <h2 className="text-xl font-bold mb-2">Restaurar como tienda nueva</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              El respaldo se verificará y se importará dentro de una transacción. La tienda actual no se modifica.
+              La copia se crea archivada y SUNAT queda desactivado hasta revisar sus credenciales.
+            </p>
+
+            {!restoreResult ? (
+              <form onSubmit={handleRestoreBackup} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Archivo ZIP del respaldo</label>
+                  <input
+                    type="file"
+                    accept=".zip,application/zip"
+                    required
+                    disabled={restoring}
+                    onChange={(event) => setRestoreFile(event.target.files?.[0] || null)}
+                    className="block w-full rounded border border-gray-300 p-2 text-sm"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={restoring || !restoreFile}
+                  className="px-6 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:bg-gray-400"
+                >
+                  {restoring ? 'Verificando y restaurando...' : 'Restaurar respaldo'}
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900">
+                  <p className="font-semibold">Restauración completada</p>
+                  <p className="text-sm mt-1">{restoreResult.store.name}</p>
+                  {restoreResult.restoredCounts && (
+                    <p className="text-sm mt-1">
+                      {restoreResult.restoredCounts.storeProducts} productos, {restoreResult.restoredCounts.sales} ventas y{' '}
+                      {restoreResult.restoredCounts.fiscalDocuments} comprobantes fiscales.
+                    </p>
+                  )}
+                </div>
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+                  <p className="font-semibold text-amber-900">Credenciales temporales restauradas</p>
+                  <div className="mt-2 space-y-2">
+                    {(restoreResult.temporaryCredentials || [
+                      { ...restoreResult.owner, role: 'OWNER' },
+                    ]).map((credential) => (
+                      <div key={credential.email} className="rounded border border-amber-200 bg-white/70 p-2 text-sm">
+                        <p><strong>{credential.role}:</strong> {credential.email}</p>
+                        <p><strong>Contraseña:</strong> <code className="select-all">{credential.temporaryPassword}</code></p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-amber-800 mt-2">Guárdalas ahora. Se muestran una sola vez y deben cambiarse al ingresar.</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRestoreForm(false);
+                      setRestoreResult(null);
+                      setRestoreFile(null);
+                    }}
+                    className="px-5 py-2 bg-gray-700 text-white rounded hover:bg-gray-800"
+                  >
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowArchived(true)}
+                    className="px-5 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    Ver tienda archivada
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Formulario crear tienda */}
         {showForm && (

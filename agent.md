@@ -12,9 +12,10 @@ Este documento describe el árbol de trabajo, no solamente el último commit.
 4. Consultar los hallazgos abiertos antes de cambiar comportamientos relacionados.
 5. Verificar el cambio y actualizar este documento si el mapa dejó de ser válido.
 
-No es una certificación de ausencia de errores. La auditoría fue estática, con
-validación de tipos/esquema y dos reproducciones aisladas. No se probaron ventas
-reales, impresión física, restauración ni emisiones SUNAT. El informe detallado
+No es una certificación de ausencia de errores. La auditoría inicial fue estática,
+con validación de tipos/esquema y dos reproducciones aisladas. Desde entonces se
+probaron en la rama Beta ventas y emisiones SUNAT BETA, además de una restauración
+transaccional aislada del respaldo indicado abajo. No se probó impresión física. El informe detallado
 es `docs/audits/2026-09-26-pos.md`.
 
 ## Arquitectura y tecnologías
@@ -179,6 +180,18 @@ recupere en otra instalación. La restauración conserva el mayor correlativo en
 el destino y el respaldo y deja SUNAT desactivado. Se mantiene lectura compatible
 del sidecar `.sunat-fiscal` cifrado usado por builds Beta anteriores.
 
+El panel `/admin/stores` permite a SUPERADMIN seleccionar un ZIP y restaurarlo
+mediante `/api/backups/restore/new-store`. El endpoint valida extensión/tamaño,
+estructura, versión, checksum general y conteos antes de abrir una transacción.
+Recrea configuración, usuarios con claves temporales nuevas, productos, stock,
+clientes, turnos, ventas con sus snapshots, movimientos, fiados/pagos y el archivo
+fiscal. Si falta una relación requerida, revierte toda la importación. La tienda
+resultante queda `ARCHIVED` y SUNAT desactivado; las claves temporales se muestran
+una sola vez para que el administrador las guarde antes de cerrar el resultado.
+El respaldo de Valky del 10/10/2026 pasó auditoría de ZIP/XML/CDR/correlativos y
+una ejecución exacta del endpoint con Prisma simulado: 224 productos, 16 ventas,
+16 detalles, 18 movimientos, un cliente, un fiado y 12 documentos fiscales.
+
 En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
 firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
 heredado. Esto permite que el administrador validado por el servicio cloud use el
@@ -304,6 +317,7 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
 | `node scripts/audit-pos-isolated.cjs` | Dos pruebas con dependencias simuladas; actualmente falla en ambos controles de autorización |
 | `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
+| `node scripts/test-backup-restore-isolated.cjs <zip>` | Ejecuta el endpoint de restauración contra Prisma simulado; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
 | `npm run build` | **Modifica esquema con `prisma db push`** antes de compilar |
 | `npm run desktop:build` | Standalone + preparación + tsc + empaquetado Windows |
@@ -318,15 +332,15 @@ una base real como comprobación rutinaria.
 ## Estado y prioridades pendientes
 
 1. Resolver cambio de identidad/tienda y retirar secretos de distribuciones.
-2. Restablecer backups verificables y migraciones sin aceptación automática de
-   pérdida de datos.
+2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
+   (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
+   estrategia de migraciones sin aceptación automática de pérdida de datos.
 3. Corregir anulaciones/lotes, abonos concurrentes, aislamiento en compras y
    trazabilidad farmacéutica.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
 5. Verificar CORS/entrada de impresión, sesión, reportes, idempotencia y turnos.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
-No hay correcciones funcionales realizadas en esta revisión.
 
 ## Último instalador encontrado
 
