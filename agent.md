@@ -203,10 +203,15 @@ por sí sola un fallo de restauración.
 Estado pendiente al 10/10/2026: el ZIP de Valky sigue revirtiéndose en la base Beta
 real con `BACKUP_RESTORE_FAILED`, aunque pasa la prueba aislada y la comprobación
 de solo lectura no detectó enums inválidos, referencias ausentes ni colisiones de
-barcode/SKU. La ruta ahora conserva la fase de importación y espera el registro
-`RESTORE_FAILED` antes de responder; el próximo intento permitirá localizar la
-restricción real sin dejar una tienda parcial. No marcar la restauración como
-verificada en PostgreSQL real hasta completar ese intento y revisar la auditoría.
+barcode/SKU. El primer diagnóstico ubicó el fallo dentro de la lectura del ZIP,
+antes de abrir la transacción. La ruta separa ahora las fases de multipart, buffer,
+apertura del ZIP, manifiestos, JSON, estructura y checksum. Los fallos iniciados
+por un SUPERADMIN de nube se auditan con `userId` nulo cuando ese identificador no
+existe en la base local; así se evita violar la FK de `AuditLog`. La resolución
+de ese usuario es tolerante y no puede convertir un `COMMIT` correcto en un error
+de restauración por una falla secundaria de auditoría. No marcar la
+restauración como verificada en PostgreSQL real hasta completar el siguiente
+intento y revisar la auditoría.
 
 En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
 firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo

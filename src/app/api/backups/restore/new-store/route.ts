@@ -16,6 +16,24 @@ function isSuperAdmin(email: string): boolean {
   return superadminEmails.includes(email);
 }
 
+async function getLocalAuditUserId(userId?: string): Promise<string | undefined> {
+  if (!userId) return undefined;
+
+  try {
+    const localUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    return localUser?.id;
+  } catch {
+    // La auditoría es auxiliar: una sesión SUPERADMIN de nube puede no tener
+    // una fila local y un fallo al resolverla nunca debe cambiar el resultado
+    // ya confirmado de la restauración.
+    return undefined;
+  }
+}
+
 export async function POST(request: NextRequest) {
   let restorePhase = 'AUTH';
   try {
@@ -47,9 +65,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    restorePhase = 'READ_BACKUP';
+    restorePhase = 'READ_MULTIPART';
     // Leer archivo ZIP
     const formData = await request.formData();
+    restorePhase = 'VALIDATE_UPLOAD';
     const file = formData.get('backup') as File;
     const allowLegacy = formData.get('allowLegacy') === 'true';
 
@@ -68,11 +87,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    restorePhase = 'READ_ZIP_BUFFER';
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    restorePhase = 'OPEN_ZIP';
     const zip = new AdmZip(buffer);
 
     // Extraer metadata y data
+    restorePhase = 'READ_ZIP_ENTRIES';
     const metadataEntry = zip.getEntry('metadata.json');
     const dataEntry = zip.getEntry('data.json');
 
@@ -83,11 +105,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    restorePhase = 'PARSE_METADATA';
     const metadata = JSON.parse(metadataEntry.getData().toString('utf8'));
 
+    restorePhase = 'PARSE_DATA';
     const dataContent = dataEntry.getData().toString('utf8');
     const backupData = JSON.parse(dataContent);
 
+    restorePhase = 'VALIDATE_DATA_STRUCTURE';
     const requiredArrays = ['users', 'productMasters', 'storeProducts', 'shifts', 'sales', 'movements', 'customers', 'receivables'];
     if (!backupData?.store?.name || requiredArrays.some(key => !Array.isArray(backupData[key]))) {
       return NextResponse.json(
@@ -96,6 +121,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    restorePhase = 'VALIDATE_CHECKSUM';
     // Validar checksum de integridad (OBLIGATORIO para backups modernos)
     let isLegacyBackup = false;
     
@@ -632,9 +658,10 @@ export async function POST(request: NextRequest) {
     // Persistir la auditoría antes de responder para no perder el diagnóstico
     // si el proceso local termina inmediatamente después de la petición.
     const { ip, userAgent } = getRequestMetadata(request);
+    const localAuditUserId = await getLocalAuditUserId(session.userId);
     await logAudit({
       storeId: result.newStore.id,
-      userId: session.userId,
+      userId: localAuditUserId,
       action: 'RESTORE_EXECUTED',
       entityType: 'RESTORE',
       entityId: result.newStore.id,
@@ -683,9 +710,14 @@ export async function POST(request: NextRequest) {
       const { ip, userAgent } = getRequestMetadata(request);
       const sessionData = await getSession();
       
+      // El SUPERADMIN puede provenir de la base de nube y no existir en la
+      // base local. AuditLog.userId tiene FK local, por lo que solo se asocia
+      // cuando el usuario realmente existe en esta base.
+      const localAuditUserId = await getLocalAuditUserId(sessionData?.userId);
+
       await logAudit({
         storeId: undefined,
-        userId: sessionData?.userId,
+        userId: localAuditUserId,
         action: 'RESTORE_FAILED',
         entityType: 'STORE',
         severity: 'ERROR',
