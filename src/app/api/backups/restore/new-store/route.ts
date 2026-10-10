@@ -17,6 +17,7 @@ function isSuperAdmin(email: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  let restorePhase = 'AUTH';
   try {
     const session = await getSession();
     if (!session.userId || (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email))) {
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    restorePhase = 'READ_BACKUP';
     // Leer archivo ZIP
     const formData = await request.formData();
     const file = formData.get('backup') as File;
@@ -181,6 +183,7 @@ export async function POST(request: NextRequest) {
     const tempPassword = `Temp${Math.random().toString(36).slice(2, 10)}!`;
     const passwordHash = await hash(tempPassword, 10);
 
+    restorePhase = 'START_TRANSACTION';
     // Transacción para crear todo
     const result = await prisma.$transaction(async (tx) => {
       // Generar nombre con fecha de restauración (formato DD/MM/YYYY)
@@ -191,6 +194,7 @@ export async function POST(request: NextRequest) {
       const restoredName = `${backupData.store.name} (Restaurado ${day}/${month}/${year})`;
 
       // 1. Crear Store como ARCHIVED por defecto
+      restorePhase = 'CREATE_STORE';
       const newStore = await tx.store.create({
         data: {
           name: restoredName,
@@ -205,6 +209,7 @@ export async function POST(request: NextRequest) {
 
       // 2. Crear StoreSettings
       if (backupData.storeSettings) {
+        restorePhase = 'RESTORE_SETTINGS';
         await tx.storeSettings.create({
           data: {
             storeId: newStore.id,
@@ -232,6 +237,7 @@ export async function POST(request: NextRequest) {
 
       // 3. Upsert ProductMasters
       const productIdMap = new Map<string, string>();
+      restorePhase = 'RESTORE_PRODUCT_MASTERS';
       for (const pm of backupData.productMasters) {
         // barcode e internalSku son únicos. Hay que comprobar ambos: buscar solo
         // por barcode podía intentar crear un SKU que ya existía en el catálogo.
@@ -294,6 +300,7 @@ export async function POST(request: NextRequest) {
       const temporaryCredentials: Array<{ email: string; temporaryPassword: string; role: string }> = [];
       let newOwner: any = null;
       let ownerTemporaryPassword = '';
+      restorePhase = 'RESTORE_USERS';
 
       const uniqueRestoredEmail = async (sourceEmail: string, index: number) => {
         const normalized = String(sourceEmail || `usuario${index + 1}@restored.local`).trim().toLowerCase();
@@ -335,6 +342,7 @@ export async function POST(request: NextRequest) {
 
       // 5. Crear StoreProducts
       const storeProductIdMap = new Map<string, string>();
+      restorePhase = 'RESTORE_STORE_PRODUCTS';
       for (const sp of backupData.storeProducts) {
         const newProductId = productIdMap.get(sp.productId);
         if (!newProductId) throw new Error('El respaldo contiene un producto de tienda sin producto maestro');
@@ -362,6 +370,7 @@ export async function POST(request: NextRequest) {
 
       // 6. Crear Customers
       const customerIdMap = new Map<string, string>();
+      restorePhase = 'RESTORE_CUSTOMERS';
       for (const customer of backupData.customers) {
         const newCustomer = await tx.customer.create({
           data: {
@@ -379,6 +388,7 @@ export async function POST(request: NextRequest) {
 
       // 7. Crear Shifts
       const shiftIdMap = new Map<string, string>();
+      restorePhase = 'RESTORE_SHIFTS';
       for (const shift of backupData.shifts) {
         const openedById = userIdMap.get(shift.openedById) || newOwner.id;
         const closedById = shift.closedById ? userIdMap.get(shift.closedById) : null;
@@ -404,6 +414,7 @@ export async function POST(request: NextRequest) {
       // 8. Crear Sales + SaleItems
       const saleIdMap = new Map<string, string>();
       let saleItemsRestored = 0;
+      restorePhase = 'RESTORE_SALES';
       for (const sale of backupData.sales) {
         const newShiftId = sale.shiftId ? shiftIdMap.get(sale.shiftId) : null;
         const newCustomerId = sale.customerId ? customerIdMap.get(sale.customerId) : null;
@@ -498,6 +509,7 @@ export async function POST(request: NextRequest) {
 
       // 9. Crear Movements
       let movementsRestored = 0;
+      restorePhase = 'RESTORE_MOVEMENTS';
       for (const movement of backupData.movements) {
         const newStoreProductId = storeProductIdMap.get(movement.storeProductId);
         if (!newStoreProductId) throw new Error('El respaldo contiene un movimiento con producto inexistente');
@@ -522,6 +534,7 @@ export async function POST(request: NextRequest) {
       // 10. Crear Receivables + Payments
       let receivablesRestored = 0;
       let receivablePaymentsRestored = 0;
+      restorePhase = 'RESTORE_RECEIVABLES';
       for (const receivable of backupData.receivables) {
         const newCustomerId = customerIdMap.get(receivable.customerId);
         const newSaleId = saleIdMap.get(receivable.saleId);
@@ -569,12 +582,14 @@ export async function POST(request: NextRequest) {
       // 11. Restaurar archivo fiscal portable después de recrear las ventas.
       // No recupera credenciales SOL, certificado privado ni jobs pendientes.
       // SUNAT queda desactivado hasta que el OWNER vuelva a configurarlo.
+      restorePhase = 'VALIDATE_FISCAL_ARCHIVE';
       const fiscalArchive = backupData.fiscalArchive
         ? validateFiscalArchiveEnvelope(backupData.fiscalArchive).data
         : null;
       // En BETA el RUC fiscal de prueba puede ser distinto al RUC comercial de
       // la tienda. Ambos valores provienen del mismo data.json verificado; la
       // restauración queda desactivada y en BETA hasta una revisión manual.
+      restorePhase = 'RESTORE_FISCAL_ARCHIVE';
       const fiscalRestore = fiscalArchive
         ? await restoreFiscalArchive(
             tx,
@@ -583,6 +598,8 @@ export async function POST(request: NextRequest) {
             fiscalArchive
           )
         : null;
+
+      restorePhase = 'COMMIT_TRANSACTION';
 
       return {
         newStore,
@@ -611,9 +628,11 @@ export async function POST(request: NextRequest) {
       timeout: 120_000,
     });
 
-    // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
+    restorePhase = 'AUDIT_SUCCESS';
+    // Persistir la auditoría antes de responder para no perder el diagnóstico
+    // si el proceso local termina inmediatamente después de la petición.
     const { ip, userAgent } = getRequestMetadata(request);
-    logAudit({
+    await logAudit({
       storeId: result.newStore.id,
       userId: session.userId,
       action: 'RESTORE_EXECUTED',
@@ -632,7 +651,7 @@ export async function POST(request: NextRequest) {
       },
       ip,
       userAgent,
-    }).catch(e => console.error('Audit log failed (non-blocking):', e));
+    });
 
     return NextResponse.json({
       success: true,
@@ -658,12 +677,13 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error restoring backup:', error);
     
-    // ✅ MÓDULO 15: Log de fallo (fire-and-forget)
+    // Persistir el fallo antes de responder. La auditoría es tolerante a
+    // errores y nunca reemplaza el resultado de la restauración.
     try {
       const { ip, userAgent } = getRequestMetadata(request);
       const sessionData = await getSession();
       
-      logAudit({
+      await logAudit({
         storeId: undefined,
         userId: sessionData?.userId,
         action: 'RESTORE_FAILED',
@@ -671,11 +691,13 @@ export async function POST(request: NextRequest) {
         severity: 'ERROR',
         meta: {
           error: error.message || 'Unknown error',
+          errorCode: typeof error?.code === 'string' ? error.code : null,
+          phase: restorePhase,
           restoredBy: sessionData?.email,
         },
         ip,
         userAgent,
-      }).catch(e => console.error('Audit log failed (non-blocking):', e));
+      });
     } catch {}
     
     if (error?.code === 'RESTORE_CATALOG_CONFLICT' || error?.code === 'P2002') {
@@ -699,7 +721,10 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { code: 'SERVER_ERROR', message: 'No se pudo restaurar el respaldo. No se importó ningún dato; puedes reintentar.' },
+      {
+        code: 'BACKUP_RESTORE_FAILED',
+        message: `No se pudo restaurar el respaldo durante ${restorePhase}. No se importó ningún dato; puedes reintentar.`,
+      },
       { status: 500 }
     );
   }

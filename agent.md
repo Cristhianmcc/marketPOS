@@ -200,6 +200,14 @@ transacción si ambos identificadores apuntan a productos distintos. `Store.name
 no es único, por lo que una tienda activa con el mismo nombre original no causa
 por sí sola un fallo de restauración.
 
+Estado pendiente al 10/10/2026: el ZIP de Valky sigue revirtiéndose en la base Beta
+real con `BACKUP_RESTORE_FAILED`, aunque pasa la prueba aislada y la comprobación
+de solo lectura no detectó enums inválidos, referencias ausentes ni colisiones de
+barcode/SKU. La ruta ahora conserva la fase de importación y espera el registro
+`RESTORE_FAILED` antes de responder; el próximo intento permitirá localizar la
+restricción real sin dejar una tienda parcial. No marcar la restauración como
+verificada en PostgreSQL real hasta completar ese intento y revisar la auditoría.
+
 En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
 firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
 heredado. Esto permite que el administrador validado por el servicio cloud use el
