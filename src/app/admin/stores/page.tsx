@@ -104,6 +104,10 @@ interface Store {
     email: string;
     name: string;
   }>;
+  subscription: {
+    planCode: PlanCode;
+    status: string;
+  } | null;
 }
 
 interface OwnerAccessResult {
@@ -487,8 +491,8 @@ export default function AdminStoresPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-6xl mx-auto">
+      <div className="min-h-screen bg-gray-50 px-3 py-4 sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-[1600px]">
           <p>Cargando...</p>
         </div>
       </div>
@@ -496,32 +500,32 @@ export default function AdminStoresPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
+    <div className="min-h-screen bg-gray-50 px-3 py-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1600px]">
+        <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Administración de Tiendas</h1>
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Administración de Tiendas</h1>
             <p className="text-gray-600 mt-2">SUPERADMIN Panel</p>
           </div>
           <button
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {loggingOut ? 'Saliendo...' : 'Cerrar sesión'}
           </button>
         </div>
 
         {/* Botones crear/restaurar tienda */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex flex-wrap gap-3">
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
             <button
               onClick={() => {
                 setShowForm(!showForm);
                 setShowRestoreForm(false);
               }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 sm:w-auto"
             >
               {showForm ? 'Cancelar' : '+ Nueva Tienda'}
             </button>
@@ -531,14 +535,14 @@ export default function AdminStoresPage() {
                 setShowForm(false);
                 setRestoreResult(null);
               }}
-              className="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium"
+              className="w-full rounded-lg bg-emerald-600 px-6 py-3 font-medium text-white hover:bg-emerald-700 sm:w-auto"
             >
               {showRestoreForm ? 'Cancelar restauración' : 'Restaurar respaldo'}
             </button>
           </div>
 
           {/* Toggle mostrar archivadas */}
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex cursor-pointer items-center gap-2 self-start md:self-auto">
             <input
               type="checkbox"
               checked={showArchived}
@@ -552,7 +556,7 @@ export default function AdminStoresPage() {
         </div>
 
         {showRestoreForm && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6 border border-emerald-200">
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-white p-4 shadow-md sm:p-6">
             <h2 className="text-xl font-bold mb-2">Restaurar como tienda nueva</h2>
             <p className="text-sm text-gray-600 mb-4">
               El respaldo se verificará y se importará dentro de una transacción. La tienda actual no se modifica.
@@ -653,7 +657,7 @@ export default function AdminStoresPage() {
 
         {/* Formulario crear tienda */}
         {showForm && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:p-6">
             <h2 className="text-xl font-bold mb-4">Crear Nueva Tienda</h2>
             
             {error && (
@@ -912,24 +916,28 @@ export default function AdminStoresPage() {
         )}
 
         {/* Tabla de tiendas */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <table className="w-full">
+        <p className="mb-2 text-xs text-gray-500 lg:hidden">
+          Desliza horizontalmente para ver todas las columnas y acciones.
+        </p>
+        <div className="overflow-x-auto rounded-lg bg-white shadow-md">
+          <table className="w-full min-w-[1280px] table-fixed">
             <thead className="bg-gray-100 border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Tienda</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Rubro</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">RUC</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Usuarios</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Productos</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Creada</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Acciones</th>
+                <th className="w-56 px-4 py-3 text-left text-sm font-semibold text-gray-700">Tienda</th>
+                <th className="w-52 px-4 py-3 text-left text-sm font-semibold text-gray-700">Rubro</th>
+                <th className="w-32 px-4 py-3 text-left text-sm font-semibold text-gray-700">RUC</th>
+                <th className="w-28 px-4 py-3 text-left text-sm font-semibold text-gray-700">Plan</th>
+                <th className="w-28 px-4 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
+                <th className="w-24 px-4 py-3 text-left text-sm font-semibold text-gray-700">Usuarios</th>
+                <th className="w-24 px-4 py-3 text-left text-sm font-semibold text-gray-700">Productos</th>
+                <th className="w-28 px-4 py-3 text-left text-sm font-semibold text-gray-700">Creada</th>
+                <th className="w-40 px-4 py-3 text-left text-sm font-semibold text-gray-700">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {stores.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     {showArchived ? 'No hay tiendas archivadas' : 'No hay tiendas activas'}
                   </td>
                 </tr>
@@ -947,7 +955,7 @@ export default function AdminStoresPage() {
                           : 'hover:bg-gray-50'
                     }`}
                   >
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 align-top">
                       <div>
                         <p className={`font-medium ${store.status === 'ARCHIVED' ? 'text-gray-500' : 'text-gray-900'}`}>
                           {store.name}
@@ -956,12 +964,12 @@ export default function AdminStoresPage() {
                           <p className="text-sm text-gray-500">{store.address}</p>
                         )}
                         {store.users[0] && (
-                          <p className="mt-1 break-all text-xs text-gray-500">OWNER: {store.users[0].email}</p>
+                          <p className="mt-1 break-words text-xs text-gray-500">OWNER: {store.users[0].email}</p>
                         )}
                       </div>
                     </td>
                     {/* ✅ MÓDULO V1: Columna Rubro */}
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 align-top">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{getProfileInfo(store.businessProfile).icon}</span>
                         <div>
@@ -985,8 +993,24 @@ export default function AdminStoresPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-700">{store.ruc || '-'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 align-top text-gray-700">{store.ruc || '-'}</td>
+                    <td className="px-4 py-4 align-top">
+                      {store.subscription ? (
+                        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+                          {store.subscription.planCode}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => router.push('/admin/billing')}
+                          className="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200"
+                          title="Asigna el plan desde Planes y licencias"
+                        >
+                          Sin plan
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 align-top">
                       {store.status === 'ACTIVE' ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           ACTIVA
@@ -997,13 +1021,13 @@ export default function AdminStoresPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-gray-700">{store._count.users}</td>
-                    <td className="px-6 py-4 text-gray-700">{store._count.storeProducts}</td>
-                    <td className="px-6 py-4 text-gray-500 text-sm">
+                    <td className="px-4 py-4 align-top text-gray-700">{store._count.users}</td>
+                    <td className="px-4 py-4 align-top text-gray-700">{store._count.storeProducts}</td>
+                    <td className="px-4 py-4 align-top text-sm text-gray-500">
                       {new Date(store.createdAt).toLocaleDateString('es-PE')}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex min-w-36 flex-col gap-2">
+                    <td className="px-4 py-4 align-top">
+                      <div className="flex min-w-32 flex-col gap-2">
                         {store.status === 'ACTIVE' ? (
                           <button
                             onClick={() => handleArchiveStore(store.id)}

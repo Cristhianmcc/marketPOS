@@ -9,6 +9,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { isSuperAdmin } from '@/lib/superadmin';
+import { FeatureFlagKey } from '@prisma/client';
+import { invalidateStoreFlags } from '@/lib/featureFlags';
+import { getPlanCapability } from '@/lib/planCapabilities';
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -142,19 +145,62 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // 8. Actualizar settings
+    // 8. Verificar que el plan contratado incluya SUNAT. Los respaldos
+    // antiguos no guardaban la suscripción; el SUPERADMIN debe asignarles un
+    // plan explícitamente antes de reactivar la emisión fiscal.
+    const subscription = enabled
+      ? await prisma.subscription.findUnique({
+          where: { storeId: user.storeId! },
+          select: { planCode: true },
+        })
+      : null;
+
+    if (enabled && (!subscription || !getPlanCapability(subscription.planCode, 'ENABLE_SUNAT'))) {
+      return NextResponse.json(
+        {
+          error: subscription
+            ? 'El plan actual no incluye facturación electrónica SUNAT'
+            : 'La tienda no tiene un plan asignado. Solicita al SUPERADMIN asignar DEMO o EMPRESARIAL.',
+          code: subscription ? 'SUNAT_PLAN_REQUIRED' : 'SUBSCRIPTION_REQUIRED',
+        },
+        { status: 403 }
+      );
+    }
+
+    // 9. Actualizar settings y reparar el flag únicamente si el plan lo permite.
     const previousEnv = settings.env;
     const previousEnabled = settings.enabled;
 
-    await prisma.sunatSettings.update({
-      where: { id: settings.id },
-      data: {
-        enabled,
-        env,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.sunatSettings.update({
+        where: { id: settings.id },
+        data: {
+          enabled,
+          env,
+        },
+      });
+
+      if (enabled) {
+        await tx.featureFlag.upsert({
+          where: {
+            storeId_key: {
+              storeId: user.storeId!,
+              key: FeatureFlagKey.ENABLE_SUNAT,
+            },
+          },
+          create: {
+            storeId: user.storeId!,
+            key: FeatureFlagKey.ENABLE_SUNAT,
+            enabled: true,
+          },
+          update: { enabled: true },
+        });
+      }
     });
 
-    // 9. Audit log
+    if (enabled) invalidateStoreFlags(user.storeId!);
+
+    // 10. Audit log
     await prisma.auditLog.create({
       data: {
         storeId: user.storeId!,

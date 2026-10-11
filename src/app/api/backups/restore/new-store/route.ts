@@ -4,6 +4,7 @@ import { prisma } from '@/infra/db/prisma';
 import { hash } from 'bcryptjs';
 import AdmZip from 'adm-zip';
 import crypto from 'crypto';
+import { FeatureFlagKey, PlanCode, SubscriptionStatus } from '@prisma/client';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 import {
@@ -353,6 +354,56 @@ export async function POST(request: NextRequest) {
             showExpiredWarnings: backupData.storeSettings.showExpiredWarnings,
           },
         });
+      }
+
+      // 2.1 Restaurar el plan y los permisos comerciales cuando el respaldo
+      // los incluye. Los ZIP anteriores siguen siendo compatibles y quedan
+      // sin plan hasta que el SUPERADMIN lo asigne explícitamente.
+      if (backupData.subscription) {
+        const sourceSubscription = backupData.subscription;
+        const validPlans = Object.values(PlanCode);
+        const validStatuses = Object.values(SubscriptionStatus);
+        if (!validPlans.includes(sourceSubscription.planCode)) {
+          throw new Error('El respaldo contiene un plan de suscripción inválido');
+        }
+        if (!validStatuses.includes(sourceSubscription.status)) {
+          throw new Error('El respaldo contiene un estado de suscripción inválido');
+        }
+
+        restorePhase = 'RESTORE_SUBSCRIPTION';
+        await tx.subscription.create({
+          data: {
+            storeId: newStore.id,
+            planCode: sourceSubscription.planCode,
+            status: sourceSubscription.status,
+            startAt: new Date(sourceSubscription.startAt),
+            trialEndsAt: sourceSubscription.trialEndsAt ? new Date(sourceSubscription.trialEndsAt) : null,
+            currentPeriodStart: new Date(sourceSubscription.currentPeriodStart),
+            currentPeriodEnd: new Date(sourceSubscription.currentPeriodEnd),
+            graceEndsAt: sourceSubscription.graceEndsAt ? new Date(sourceSubscription.graceEndsAt) : null,
+            suspendedAt: sourceSubscription.suspendedAt ? new Date(sourceSubscription.suspendedAt) : null,
+            cancelledAt: sourceSubscription.cancelledAt ? new Date(sourceSubscription.cancelledAt) : null,
+            priceAmount: sourceSubscription.priceAmount,
+            priceCurrency: sourceSubscription.priceCurrency || 'PEN',
+            billingCycle: sourceSubscription.billingCycle || 'MONTHLY',
+          },
+        });
+      }
+
+      if (Array.isArray(backupData.featureFlags)) {
+        const validFlagKeys = Object.values(FeatureFlagKey);
+        const restoredFlags = backupData.featureFlags
+          .filter((flag: any) => validFlagKeys.includes(flag.key))
+          .map((flag: any) => ({
+            storeId: newStore.id,
+            key: flag.key,
+            enabled: flag.enabled === true,
+          }));
+
+        if (restoredFlags.length > 0) {
+          restorePhase = 'RESTORE_FEATURE_FLAGS';
+          await tx.featureFlag.createMany({ data: restoredFlags, skipDuplicates: true });
+        }
       }
 
       // 3. Upsert ProductMasters

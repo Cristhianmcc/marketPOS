@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **10/10/2026**, zona America/Lima. Base Git observada:
+Última revisión: **11/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -192,6 +192,12 @@ El respaldo de Valky del 10/10/2026 pasó auditoría de ZIP/XML/CDR/correlativos
 una ejecución exacta del endpoint con Prisma simulado: 224 productos, 16 ventas,
 16 detalles, 18 movimientos, un cliente, un fiado y 12 documentos fiscales.
 
+Los respaldos generados desde el 11/10/2026 incluyen también la suscripción y
+los `FeatureFlag` de la tienda. Al restaurarlos se conservan el plan y sus
+permisos, mientras que los ZIP anteriores siguen siendo compatibles y quedan sin
+plan hasta que un SUPERADMIN lo asigne desde `/admin/billing`. Esto evita conceder
+funciones comerciales por inferencia al recuperar un respaldo antiguo.
+
 La restauración permite tres intentos por minuto por SUPERADMIN autenticado e IP;
 no debe volver a bloquear el segundo intento después de un fallo aislado. La
 transacción admite hasta 120 segundos para respaldos grandes. Al reutilizar el
@@ -241,6 +247,13 @@ En los builds desktop de esta rama, `next.config.ts` fija
 facturación electrónica en `/settings`. La disponibilidad efectiva y los permisos
 siguen verificándose en los endpoints del servidor; esto no activa producción ni
 incluye credenciales en el paquete.
+
+La activación SUNAT exige una suscripción cuyo plan incluya `ENABLE_SUNAT`
+(`DEMO` o `BUSINESS`). Si el plan lo permite, la operación actualiza
+`SunatSettings` y reconstruye el `FeatureFlag` dentro de la misma transacción;
+después invalida la caché de permisos. El panel de tiendas muestra el plan o
+`Sin plan`, con acceso a `/admin/billing`, y su tabla usa anchos controlados y
+desplazamiento horizontal para conservar las acciones en ventanas estrechas.
 
 Los módulos nativos `usb` y `@serialport` deben permanecer en `asarUnpack`; Electron
 no puede cargar sus archivos `.node` directamente desde `app.asar`.

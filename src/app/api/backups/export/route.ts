@@ -80,6 +80,8 @@ export async function GET(request: NextRequest) {
       receivables,
       sunatSettings,
       electronicDocuments,
+      subscription,
+      featureFlags,
     ] = await Promise.all([
       prisma.user.findMany({
         where: { storeId: storeIdToExport },
@@ -154,6 +156,27 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'asc' },
         include: { sale: { select: { saleNumber: true } } },
       }),
+      prisma.subscription.findUnique({
+        where: { storeId: storeIdToExport },
+        select: {
+          planCode: true,
+          status: true,
+          startAt: true,
+          trialEndsAt: true,
+          currentPeriodStart: true,
+          currentPeriodEnd: true,
+          graceEndsAt: true,
+          suspendedAt: true,
+          cancelledAt: true,
+          priceAmount: true,
+          priceCurrency: true,
+          billingCycle: true,
+        },
+      }),
+      prisma.featureFlag.findMany({
+        where: { storeId: storeIdToExport },
+        select: { key: true, enabled: true },
+      }),
     ]);
 
     // Extraer ProductMasters únicos
@@ -208,6 +231,8 @@ export async function GET(request: NextRequest) {
       customers,
       receivables,
       fiscalArchive,
+      subscription,
+      featureFlags,
     };
 
     // Calcular checksum SHA-256 del contenido de data.json

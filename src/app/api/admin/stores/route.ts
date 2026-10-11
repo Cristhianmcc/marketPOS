@@ -50,6 +50,12 @@ export async function GET(request: NextRequest) {
             enabled: true,
           },
         },
+        subscription: {
+          select: {
+            planCode: true,
+            status: true,
+          },
+        },
         users: {
           where: { role: 'OWNER' },
           select: {
