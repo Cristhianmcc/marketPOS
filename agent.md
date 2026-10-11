@@ -15,7 +15,7 @@ Este documento describe el árbol de trabajo, no solamente el último commit.
 No es una certificación de ausencia de errores. La auditoría inicial fue estática,
 con validación de tipos/esquema y dos reproducciones aisladas. Desde entonces se
 probaron en la rama Beta ventas y emisiones SUNAT BETA, además de una restauración
-transaccional aislada del respaldo indicado abajo. No se probó impresión física. El informe detallado
+transaccional real del respaldo indicado abajo. No se probó impresión física. El informe detallado
 es `docs/audits/2026-09-26-pos.md`.
 
 ## Arquitectura y tecnologías
@@ -200,10 +200,11 @@ transacción si ambos identificadores apuntan a productos distintos. `Store.name
 no es único, por lo que una tienda activa con el mismo nombre original no causa
 por sí sola un fallo de restauración.
 
-Estado pendiente al 10/10/2026: el ZIP de Valky sigue sin completar una restauración
-en la base Beta real, aunque pasa la prueba aislada y la comprobación de solo lectura
-no detectó enums inválidos, referencias ausentes ni colisiones de barcode/SKU. El
-diagnóstico por fases ubicó el fallo en `Request.formData()` del servidor standalone,
+Estado verificado al 10/10/2026: el ZIP de Valky completó una restauración en la
+base PostgreSQL Beta real como tienda archivada, sin modificar las tiendas activas.
+La interfaz confirmó 224 productos, 16 ventas y 12 comprobantes fiscales, y creó
+credenciales temporales de un solo uso para el OWNER restaurado. El diagnóstico
+previo había ubicado el fallo en `Request.formData()` del servidor standalone,
 antes de leer el ZIP. El panel desktop envía ahora el archivo como cuerpo binario
 `application/zip`; la ruta conserva compatibilidad con pantallas anteriores mediante
 un lector multipart binario propio, sin invocar el parser inestable del runtime, y
@@ -213,9 +214,8 @@ en `multipart/form-data`. Los fallos iniciados
 por un SUPERADMIN de nube se auditan con `userId` nulo cuando ese identificador no
 existe en la base local; así se evita violar la FK de `AuditLog`. La resolución
 de ese usuario es tolerante y no puede convertir un `COMMIT` correcto en un error
-de restauración por una falla secundaria de auditoría. No marcar la
-restauración como verificada en PostgreSQL real hasta completar el siguiente
-intento y revisar la auditoría.
+de restauración por una falla secundaria de auditoría. La prueba real confirmó el
+flujo completo desde el panel SUPERADMIN y la aparición de la copia archivada.
 
 En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
 firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
