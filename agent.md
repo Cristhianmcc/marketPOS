@@ -387,6 +387,24 @@ una base real como comprobación rutinaria.
 
 ## Estado y prioridades pendientes
 
+### Punto de reanudacion SUNAT Beta (2026-10-11)
+
+- Rama aislada: `feature/sunat-beta`; ultimo cambio funcional guardado en
+  `0dec19f9` (`fix: complete restored store SUNAT activation`).
+- Portable comprobado en
+  `desktop/dist-electron/win-unpacked/Iniciar Monterrial POS SUNAT Beta.exe`.
+  Arranco con el servidor local y PostgreSQL empaquetado.
+- La tienda restaurada activa conserva sus datos y configuracion SUNAT, pero no
+  tiene una suscripcion asignada. La interfaz ya reconcilia el estado efectivo:
+  muestra SUNAT desactivado y el servidor rechaza activarlo hasta que exista un
+  plan `DEMO` o `BUSINESS` con `ENABLE_SUNAT`.
+- Al reanudar, comprobar desde la sesion SUPERADMIN que `/admin/billing` lista
+  exactamente la tienda restaurada activa, asignarle el plan y verificar que la
+  suscripcion use su `storeId`. Luego volver al OWNER y confirmar activacion y
+  emision sin reiniciar la aplicacion. Si sigue sin plan, revisar la respuesta
+  de PATCH de suscripcion y la identidad de tienda seleccionada; no repetir una
+  restauracion ni modificar la tienda original para diagnosticarlo.
+
 1. Resolver cambio de identidad/tienda y retirar secretos de distribuciones.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
    (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
