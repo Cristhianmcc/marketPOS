@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **09/10/2026**, zona America/Lima. Base Git observada:
+Última revisión: **10/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -205,9 +205,11 @@ en la base Beta real, aunque pasa la prueba aislada y la comprobación de solo l
 no detectó enums inválidos, referencias ausentes ni colisiones de barcode/SKU. El
 diagnóstico por fases ubicó el fallo en `Request.formData()` del servidor standalone,
 antes de leer el ZIP. El panel desktop envía ahora el archivo como cuerpo binario
-`application/zip`; la ruta conserva multipart como compatibilidad para clientes
-anteriores y separa las fases de transporte, apertura del ZIP, manifiestos, JSON,
-estructura y checksum. La prueba aislada usa el mismo transporte binario. Los fallos iniciados
+`application/zip`; la ruta conserva compatibilidad con pantallas anteriores mediante
+un lector multipart binario propio, sin invocar el parser inestable del runtime, y
+separa las fases de transporte, apertura del ZIP, manifiestos, JSON, estructura y
+checksum. La prueba aislada pasó con el mismo ZIP tanto en transporte binario como
+en `multipart/form-data`. Los fallos iniciados
 por un SUPERADMIN de nube se auditan con `userId` nulo cuando ese identificador no
 existe en la base local; así se evita violar la FK de `AuditLog`. La resolución
 de ese usuario es tolerante y no puede convertir un `COMMIT` correcto en un error
@@ -340,7 +342,7 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
 | `node scripts/audit-pos-isolated.cjs` | Dos pruebas con dependencias simuladas; actualmente falla en ambos controles de autorización |
 | `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
-| `node scripts/test-backup-restore-isolated.cjs <zip>` | Ejecuta el endpoint de restauración contra Prisma simulado; no escribe una base real |
+| `node scripts/test-backup-restore-isolated.cjs <zip> [--multipart]` | Ejecuta el endpoint de restauración contra Prisma simulado en transporte ZIP crudo o multipart; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
 | `npm run build` | **Modifica esquema con `prisma db push`** antes de compilar |
 | `npm run desktop:build` | Standalone + preparación + tsc + empaquetado Windows |

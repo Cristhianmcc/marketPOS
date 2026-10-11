@@ -6,6 +6,7 @@ const AdmZip = require('adm-zip');
 
 const repo = path.resolve(__dirname, '..');
 const backupPath = process.argv[2] ? path.resolve(process.argv[2]) : null;
+const uploadMode = process.argv.includes('--multipart') ? 'multipart' : 'raw';
 if (!backupPath || !fs.existsSync(backupPath)) {
   throw new Error('Uso: node scripts/test-backup-restore-isolated.cjs <respaldo.zip>');
 }
@@ -115,13 +116,23 @@ function assert(value, message) { if (!value) throw new Error(message); }
     id: 'preexisting-product',
     barcode: `existing-${productWithBarcode.id}`,
   });
-  const requestHeaders = new Map([
-    ['content-type', 'application/zip'],
-    ['content-length', String(raw.length)],
-    ['x-backup-filename', encodeURIComponent(path.basename(backupPath))],
-  ]);
+  let requestBody = raw;
+  const requestHeaders = new Map();
+  if (uploadMode === 'multipart') {
+    const boundary = '----MonterrialRestoreBoundary7MA4YWxkTrZu0gW';
+    requestBody = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="backup"; filename="${path.basename(backupPath)}"\r\nContent-Type: application/zip\r\n\r\n`),
+      raw,
+      Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="allowLegacy"\r\n\r\nfalse\r\n--${boundary}--\r\n`),
+    ]);
+    requestHeaders.set('content-type', `multipart/form-data; boundary=${boundary}`);
+  } else {
+    requestHeaders.set('content-type', 'application/zip');
+    requestHeaders.set('x-backup-filename', encodeURIComponent(path.basename(backupPath)));
+  }
+  requestHeaders.set('content-length', String(requestBody.length));
   const request = {
-    arrayBuffer: async () => raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
+    arrayBuffer: async () => requestBody.buffer.slice(requestBody.byteOffset, requestBody.byteOffset + requestBody.byteLength),
     headers: { get: name => requestHeaders.get(String(name).toLowerCase()) || null },
   };
   const response = await route.POST(request);
@@ -144,6 +155,7 @@ function assert(value, message) { if (!value) throw new Error(message); }
   assert(body.restoredCounts.storeProducts === expected.storeProducts, 'response counts are not actual counts');
   console.log(JSON.stringify({
     result: 'PASS',
+    uploadMode,
     responseStatus: response.status,
     restoredAsArchived: state.store.status === 'ARCHIVED',
     products: state.storeProducts.length,

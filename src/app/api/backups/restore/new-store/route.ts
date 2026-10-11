@@ -34,6 +34,62 @@ async function getLocalAuditUserId(userId?: string): Promise<string | undefined>
   }
 }
 
+type ParsedBackupUpload = {
+  fileName: string;
+  buffer: Buffer;
+  allowLegacy: boolean;
+};
+
+function readMultipartBackup(body: Buffer, contentType: string): ParsedBackupUpload {
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  const boundary = boundaryMatch?.[1] || boundaryMatch?.[2]?.trim();
+  if (!boundary) {
+    throw new Error('MULTIPART_BOUNDARY_MISSING');
+  }
+
+  const marker = Buffer.from(`--${boundary}`);
+  const nextMarker = Buffer.from(`\r\n--${boundary}`);
+  let cursor = body.indexOf(marker);
+  let fileName = '';
+  let fileBuffer: Buffer | null = null;
+  let allowLegacy = false;
+
+  while (cursor >= 0) {
+    cursor += marker.length;
+    if (body.subarray(cursor, cursor + 2).toString('ascii') === '--') break;
+    if (body.subarray(cursor, cursor + 2).toString('ascii') === '\r\n') cursor += 2;
+
+    const headerEnd = body.indexOf(Buffer.from('\r\n\r\n'), cursor);
+    if (headerEnd < 0) throw new Error('MULTIPART_HEADERS_INVALID');
+
+    const headers = body.subarray(cursor, headerEnd).toString('utf8');
+    const dataStart = headerEnd + 4;
+    const dataEnd = body.indexOf(nextMarker, dataStart);
+    if (dataEnd < 0) throw new Error('MULTIPART_BODY_INCOMPLETE');
+
+    const disposition = headers.match(/content-disposition:\s*form-data;([^\r\n]+)/i)?.[1] || '';
+    const fieldName = disposition.match(/(?:^|;)\s*name="([^"]*)"/i)?.[1] || '';
+    const encodedFileName = disposition.match(/(?:^|;)\s*filename\*=UTF-8''([^;\r\n]+)/i)?.[1];
+    const regularFileName = disposition.match(/(?:^|;)\s*filename="([^"]*)"/i)?.[1];
+
+    if (fieldName === 'backup' && (encodedFileName || regularFileName)) {
+      try {
+        fileName = encodedFileName ? decodeURIComponent(encodedFileName) : (regularFileName || '');
+      } catch {
+        fileName = regularFileName || '';
+      }
+      fileBuffer = body.subarray(dataStart, dataEnd);
+    } else if (fieldName === 'allowLegacy') {
+      allowLegacy = body.subarray(dataStart, dataEnd).toString('utf8').trim() === 'true';
+    }
+
+    cursor = body.indexOf(marker, dataEnd + 2);
+  }
+
+  if (!fileBuffer) throw new Error('MULTIPART_BACKUP_MISSING');
+  return { fileName, buffer: fileBuffer, allowLegacy };
+}
+
 export async function POST(request: NextRequest) {
   let restorePhase = 'AUTH';
   try {
@@ -66,13 +122,14 @@ export async function POST(request: NextRequest) {
     }
 
     const MAX_BACKUP_BYTES = 512 * 1024 * 1024;
-    const contentType = request.headers.get('content-type')?.toLowerCase() || '';
+    const contentType = request.headers.get('content-type') || '';
+    const normalizedContentType = contentType.toLowerCase();
     let fileName = '';
     let fileSize = 0;
     let allowLegacy = false;
     let buffer: Buffer;
 
-    if (contentType.includes('application/zip') || contentType.includes('application/octet-stream')) {
+    if (normalizedContentType.includes('application/zip') || normalizedContentType.includes('application/octet-stream')) {
       restorePhase = 'VALIDATE_UPLOAD';
       const encodedFileName = request.headers.get('x-backup-filename') || '';
       try {
@@ -93,25 +150,30 @@ export async function POST(request: NextRequest) {
       restorePhase = 'READ_ZIP_BUFFER';
       buffer = Buffer.from(await request.arrayBuffer());
       fileSize = buffer.length;
-    } else {
-      // Compatibilidad con clientes web anteriores. El desktop usa el cuerpo
-      // binario porque Request.formData() no es estable en el standalone.
+    } else if (normalizedContentType.includes('multipart/form-data')) {
+      // Compatibilidad con pantallas web anteriores que pueden permanecer en
+      // la caché de Electron. El parser nativo Request.formData() falla en el
+      // standalone; leer los bytes conserva intacto el ZIP.
       restorePhase = 'READ_MULTIPART';
-      const formData = await request.formData();
-      const file = formData.get('backup') as File | null;
-      allowLegacy = formData.get('allowLegacy') === 'true';
-
-      if (!file) {
+      const declaredSize = Number(request.headers.get('content-length') || 0);
+      if (declaredSize > MAX_BACKUP_BYTES + 1024 * 1024) {
         return NextResponse.json(
-          { code: 'INVALID_BACKUP_FILE', message: 'Archivo de backup requerido' },
+          { code: 'INVALID_BACKUP_FILE', message: 'Selecciona un respaldo ZIP válido de hasta 512 MB' },
           { status: 400 }
         );
       }
 
-      fileName = file.name;
-      fileSize = file.size;
-      restorePhase = 'READ_ZIP_BUFFER';
-      buffer = Buffer.from(await file.arrayBuffer());
+      const multipartBody = Buffer.from(await request.arrayBuffer());
+      const parsed = readMultipartBackup(multipartBody, contentType);
+      fileName = parsed.fileName;
+      buffer = parsed.buffer;
+      fileSize = buffer.length;
+      allowLegacy = parsed.allowLegacy;
+    } else {
+      return NextResponse.json(
+        { code: 'INVALID_BACKUP_FILE', message: 'Formato de carga no compatible' },
+        { status: 415 }
+      );
     }
 
     restorePhase = 'VALIDATE_UPLOAD';
