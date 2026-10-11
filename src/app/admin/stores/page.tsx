@@ -108,6 +108,10 @@ interface Store {
     planCode: PlanCode;
     status: string;
   } | null;
+  recoverableSubscription?: {
+    planCode: PlanCode;
+    sourceStoreName: string;
+  } | null;
 }
 
 interface OwnerAccessResult {
@@ -177,7 +181,10 @@ export default function AdminStoresPage() {
   useEffect(() => {
     if (!highlightedStoreId) return;
 
-    const row = document.getElementById(`store-${highlightedStoreId}`);
+    const matches = Array.from(
+      document.querySelectorAll<HTMLElement>(`[data-store-id="${highlightedStoreId}"]`)
+    );
+    const row = matches.find(element => element.offsetParent !== null) || matches[0];
     if (!row) return;
 
     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -391,6 +398,37 @@ export default function AdminStoresPage() {
     }
   }
 
+  async function handleRecoverSubscription(store: Store) {
+    const recovery = store.recoverableSubscription;
+    if (!recovery) return;
+
+    if (!confirm(
+      `Se transferirá el plan ${recovery.planCode} desde la tienda archivada "${recovery.sourceStoreName}" a "${store.name}". ¿Continuar?`
+    )) {
+      return;
+    }
+
+    setActioningStoreId(store.id);
+    try {
+      const res = await fetch(`/api/admin/stores/${store.id}/recover-subscription`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo recuperar el plan');
+        return;
+      }
+
+      toast.success(data.message || 'Plan recuperado correctamente');
+      await loadStores();
+    } catch {
+      toast.error('Error de red al recuperar el plan');
+    } finally {
+      setActioningStoreId(null);
+    }
+  }
+
   async function handleResetOwnerAccess(store: Store) {
     if (!confirm(`Se reemplazará la contraseña actual del OWNER de "${store.name}". ¿Continuar?`)) {
       return;
@@ -487,6 +525,74 @@ export default function AdminStoresPage() {
   // Helper para obtener info del perfil
   function getProfileInfo(profile: BusinessProfile) {
     return profiles.find(p => p.profile === profile) || { icon: '🏪', name: profile };
+  }
+
+  function renderPlanControls(store: Store) {
+    if (store.subscription) {
+      return (
+        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+          {store.subscription.planCode}
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => router.push('/admin/billing')}
+          className="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200"
+          title="Asigna el plan desde Planes y licencias"
+        >
+          Sin plan
+        </button>
+        {store.status === 'ACTIVE' && store.recoverableSubscription && (
+          <button
+            type="button"
+            onClick={() => handleRecoverSubscription(store)}
+            disabled={actioningStoreId === store.id}
+            className="rounded bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-800 hover:bg-purple-200 disabled:opacity-50"
+            title={`Transferir ${store.recoverableSubscription.planCode} desde ${store.recoverableSubscription.sourceStoreName}`}
+          >
+            {actioningStoreId === store.id
+              ? 'Recuperando...'
+              : `Recuperar ${store.recoverableSubscription.planCode}`}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  function renderStoreActions(store: Store, stacked = true) {
+    return (
+      <div className={stacked ? 'flex flex-col gap-2' : 'flex flex-wrap gap-2'}>
+        {store.status === 'ACTIVE' ? (
+          <button
+            onClick={() => handleArchiveStore(store.id)}
+            disabled={actioningStoreId === store.id}
+            className="rounded bg-orange-100 px-3 py-2 text-sm text-orange-700 hover:bg-orange-200 disabled:opacity-50"
+          >
+            {actioningStoreId === store.id ? 'Archivando...' : 'Archivar'}
+          </button>
+        ) : (
+          <button
+            onClick={() => handleReactivateStore(store.id)}
+            disabled={actioningStoreId === store.id}
+            className="rounded bg-green-100 px-3 py-2 text-sm text-green-700 hover:bg-green-200 disabled:opacity-50"
+          >
+            {actioningStoreId === store.id ? 'Reactivando...' : 'Reactivar'}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => handleResetOwnerAccess(store)}
+          disabled={resettingOwnerStoreId === store.id}
+          className="rounded bg-blue-100 px-3 py-2 text-sm text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+        >
+          {resettingOwnerStoreId === store.id ? 'Generando...' : 'Acceso OWNER'}
+        </button>
+      </div>
+    );
   }
 
   if (loading) {
@@ -915,11 +1021,102 @@ export default function AdminStoresPage() {
           </div>
         )}
 
-        {/* Tabla de tiendas */}
-        <p className="mb-2 text-xs text-gray-500 lg:hidden">
-          Desliza horizontalmente para ver todas las columnas y acciones.
-        </p>
-        <div className="overflow-x-auto rounded-lg bg-white shadow-md">
+        {/* Tarjetas para ventanas angostas */}
+        <div className="grid grid-cols-1 gap-4 xl:hidden">
+          {stores.length === 0 ? (
+            <div className="rounded-lg bg-white px-4 py-8 text-center text-gray-500 shadow-md">
+              {showArchived ? 'No hay tiendas archivadas' : 'No hay tiendas activas'}
+            </div>
+          ) : (
+            stores.map(store => (
+              <article
+                key={store.id}
+                data-store-id={store.id}
+                tabIndex={-1}
+                className={`rounded-lg border bg-white p-4 shadow-md transition-colors duration-500 focus:outline-none sm:p-5 ${
+                  highlightedStoreId === store.id
+                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500'
+                    : store.status === 'ARCHIVED'
+                      ? 'border-gray-200 bg-gray-50'
+                      : 'border-gray-100'
+                }`}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className={`text-lg font-semibold ${store.status === 'ARCHIVED' ? 'text-gray-500' : 'text-gray-900'}`}>
+                      {store.name}
+                    </h3>
+                    {store.address && <p className="mt-1 text-sm text-gray-500">{store.address}</p>}
+                    {store.users[0] && (
+                      <p className="mt-1 break-all text-xs text-gray-500">OWNER: {store.users[0].email}</p>
+                    )}
+                  </div>
+                  <span className={`self-start rounded-full px-2.5 py-1 text-xs font-medium ${
+                    store.status === 'ACTIVE'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-gray-200 text-gray-800'
+                  }`}>
+                    {store.status === 'ACTIVE' ? 'ACTIVA' : 'ARCHIVADA'}
+                  </span>
+                </div>
+
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
+                  <div className="col-span-2 sm:col-span-1">
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Rubro</dt>
+                    <dd className="mt-1 text-gray-800">
+                      {getProfileInfo(store.businessProfile).icon} {getProfileInfo(store.businessProfile).name}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">RUC</dt>
+                    <dd className="mt-1 text-gray-800">{store.ruc || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Plan</dt>
+                    <dd className="mt-1">{renderPlanControls(store)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Usuarios</dt>
+                    <dd className="mt-1 text-gray-800">{store._count.users}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Productos</dt>
+                    <dd className="mt-1 text-gray-800">{store._count.storeProducts}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Creada</dt>
+                    <dd className="mt-1 text-gray-800">{new Date(store.createdAt).toLocaleDateString('es-PE')}</dd>
+                  </div>
+                </dl>
+
+                {store.status === 'ACTIVE' && (
+                  <label className="mt-4 block text-xs font-medium text-gray-500">
+                    Cambiar rubro
+                    <select
+                      value={store.businessProfile}
+                      onChange={(event) => handleChangeProfile(store.id, event.target.value as BusinessProfile)}
+                      disabled={changingProfileStoreId === store.id}
+                      className="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800"
+                    >
+                      {profiles.map(profile => (
+                        <option key={profile.profile} value={profile.profile}>
+                          {profile.icon} {profile.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <div className="mt-4 border-t border-gray-200 pt-4">
+                  {renderStoreActions(store, false)}
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+
+        {/* Tabla para ventanas amplias */}
+        <div className="hidden overflow-x-auto rounded-lg bg-white shadow-md xl:block">
           <table className="w-full min-w-[1280px] table-fixed">
             <thead className="bg-gray-100 border-b">
               <tr>
@@ -945,6 +1142,7 @@ export default function AdminStoresPage() {
                 stores.map((store) => (
                   <tr
                     id={`store-${store.id}`}
+                    data-store-id={store.id}
                     tabIndex={-1}
                     key={store.id}
                     className={`border-b transition-colors duration-500 focus:outline-none ${
@@ -995,20 +1193,7 @@ export default function AdminStoresPage() {
                     </td>
                     <td className="px-4 py-4 align-top text-gray-700">{store.ruc || '-'}</td>
                     <td className="px-4 py-4 align-top">
-                      {store.subscription ? (
-                        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
-                          {store.subscription.planCode}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => router.push('/admin/billing')}
-                          className="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200"
-                          title="Asigna el plan desde Planes y licencias"
-                        >
-                          Sin plan
-                        </button>
-                      )}
+                      {renderPlanControls(store)}
                     </td>
                     <td className="px-4 py-4 align-top">
                       {store.status === 'ACTIVE' ? (
@@ -1027,33 +1212,7 @@ export default function AdminStoresPage() {
                       {new Date(store.createdAt).toLocaleDateString('es-PE')}
                     </td>
                     <td className="px-4 py-4 align-top">
-                      <div className="flex min-w-32 flex-col gap-2">
-                        {store.status === 'ACTIVE' ? (
-                          <button
-                            onClick={() => handleArchiveStore(store.id)}
-                            disabled={actioningStoreId === store.id}
-                            className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50"
-                          >
-                            {actioningStoreId === store.id ? 'Archivando...' : 'Archivar'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleReactivateStore(store.id)}
-                            disabled={actioningStoreId === store.id}
-                            className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
-                          >
-                            {actioningStoreId === store.id ? 'Reactivando...' : 'Reactivar'}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleResetOwnerAccess(store)}
-                          disabled={resettingOwnerStoreId === store.id}
-                          className="rounded bg-blue-100 px-3 py-1 text-sm text-blue-700 hover:bg-blue-200 disabled:opacity-50"
-                        >
-                          {resettingOwnerStoreId === store.id ? 'Generando...' : 'Acceso OWNER'}
-                        </button>
-                      </div>
+                      <div className="min-w-32">{renderStoreActions(store)}</div>
                     </td>
                   </tr>
                 ))

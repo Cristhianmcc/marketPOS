@@ -10,6 +10,7 @@ import { getProfileFlags, getDefaultCategoriesForProfile } from '@/lib/businessP
 import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
+import { findRecoverableSubscriptionSource } from '@/lib/restoredSubscription';
 
 // GET /api/admin/stores - Listar todas las tiendas (SUPERADMIN)
 export async function GET(request: NextRequest) {
@@ -34,40 +35,71 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const showArchived = searchParams.get('showArchived') === 'true';
 
-    const stores = await prisma.store.findMany({
-      where: showArchived ? {} : { status: 'ACTIVE' },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: {
-          select: {
-            users: true,
-            storeProducts: true,
+    const [stores, archivedSubscriptionSources] = await Promise.all([
+      prisma.store.findMany({
+        where: showArchived ? {} : { status: 'ACTIVE' },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: {
+              users: true,
+              storeProducts: true,
+            },
+          },
+          featureFlags: {
+            select: {
+              key: true,
+              enabled: true,
+            },
+          },
+          subscription: {
+            select: {
+              id: true,
+              planCode: true,
+              status: true,
+            },
+          },
+          users: {
+            where: { role: 'OWNER' },
+            select: {
+              email: true,
+              name: true,
+            },
+            take: 1,
           },
         },
-        featureFlags: {
-          select: {
-            key: true,
-            enabled: true,
+      }),
+      prisma.store.findMany({
+        where: {
+          status: 'ARCHIVED',
+          subscription: { isNot: null },
+        },
+        select: {
+          id: true,
+          name: true,
+          ruc: true,
+          status: true,
+          subscription: {
+            select: { id: true, planCode: true, status: true },
           },
         },
-        subscription: {
-          select: {
-            planCode: true,
-            status: true,
-          },
-        },
-        users: {
-          where: { role: 'OWNER' },
-          select: {
-            email: true,
-            name: true,
-          },
-          take: 1,
-        },
-      },
+      }),
+    ]);
+
+    const storesWithRecovery = stores.map(store => {
+      const source = findRecoverableSubscriptionSource(store, archivedSubscriptionSources);
+      return {
+        ...store,
+        recoverableSubscription: source?.subscription
+          ? {
+              planCode: source.subscription.planCode,
+              sourceStoreName: source.name,
+            }
+          : null,
+      };
     });
 
-    return NextResponse.json({ stores });
+    return NextResponse.json({ stores: storesWithRecovery });
   } catch (error) {
     console.error('Error fetching stores:', error);
     return NextResponse.json(

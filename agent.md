@@ -389,21 +389,28 @@ una base real como comprobación rutinaria.
 
 ### Punto de reanudacion SUNAT Beta (2026-10-11)
 
-- Rama aislada: `feature/sunat-beta`; ultimo cambio funcional guardado en
-  `0dec19f9` (`fix: complete restored store SUNAT activation`).
-- Portable comprobado en
-  `desktop/dist-electron/win-unpacked/Iniciar Monterrial POS SUNAT Beta.exe`.
-  Arranco con el servidor local y PostgreSQL empaquetado.
-- La tienda restaurada activa conserva sus datos y configuracion SUNAT, pero no
-  tiene una suscripcion asignada. La interfaz ya reconcilia el estado efectivo:
-  muestra SUNAT desactivado y el servidor rechaza activarlo hasta que exista un
-  plan `DEMO` o `BUSINESS` con `ENABLE_SUNAT`.
-- Al reanudar, comprobar desde la sesion SUPERADMIN que `/admin/billing` lista
-  exactamente la tienda restaurada activa, asignarle el plan y verificar que la
-  suscripcion use su `storeId`. Luego volver al OWNER y confirmar activacion y
-  emision sin reiniciar la aplicacion. Si sigue sin plan, revisar la respuesta
-  de PATCH de suscripcion y la identidad de tienda seleccionada; no repetir una
-  restauracion ni modificar la tienda original para diagnosticarlo.
+- Rama aislada: `feature/sunat-beta`. El proyecto principal no recibe estos
+  cambios mientras no se integre expresamente esta rama.
+- Los respaldos antiguos podian restaurar una tienda sin mover su suscripcion:
+  la tienda nueva quedaba sin plan y la licencia `BUSINESS` seguia asociada a la
+  tienda original archivada. El panel SUPERADMIN ahora detecta ese caso y ofrece
+  `Recuperar BUSINESS` en la tienda restaurada activa.
+- La deteccion exige simultaneamente: nombre con sufijo `(Restaurado fecha)`,
+  mismo nombre base, mismo RUC valido de 11 digitos, origen archivado con plan y
+  un unico candidato. Si hay ambiguedad no mueve nada. La recuperacion transfiere
+  la suscripcion y sus pagos a la nueva tienda dentro de una transaccion; despues
+  sincroniza los permisos del plan. Reactivar una restauracion archivada aplica
+  la misma recuperacion cuando corresponde.
+- El listado de tiendas usa tarjetas adaptables en ventanas menores a `xl` y la
+  tabla completa en pantallas amplias; correos largos ya no desbordan las acciones.
+- Portable actualizado en
+  `desktop/dist-electron-20261011-133256/win-unpacked/Iniciar Monterrial POS SUNAT Beta.exe`.
+  Build ID: `2026-10-11T18:32:20.842Z`. Incluye la ruta
+  `/api/admin/stores/[id]/recover-subscription`.
+- Prueba esperada: cerrar el BETA anterior, abrir este portable, entrar como
+  SUPERADMIN, pulsar `Recuperar BUSINESS` en la tienda restaurada activa y volver
+  a iniciar sesion como OWNER. La configuracion fiscal restaurada se conserva;
+  SUNAT se puede activar al quedar el plan vinculado al `storeId` correcto.
 
 1. Resolver cambio de identidad/tienda y retirar secretos de distribuciones.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual

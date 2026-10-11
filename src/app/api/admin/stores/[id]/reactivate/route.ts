@@ -3,6 +3,8 @@ import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
 import { prisma } from '@/infra/db/prisma';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
+import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
+import { transferRecoverableSubscription } from '@/lib/restoredSubscription';
 
 export async function POST(
   request: NextRequest,
@@ -49,19 +51,35 @@ export async function POST(
       );
     }
 
-    // Reactivate store
-    const updatedStore = await prisma.store.update({
-      where: { id: storeId },
-      data: {
-        status: 'ACTIVE',
-        archivedAt: null,
-      },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-      },
+    // Reactivar y, para respaldos antiguos, recuperar dentro de la misma
+    // transacción el plan que aún pertenece a la tienda original archivada.
+    const { updatedStore, subscriptionRecovery } = await prisma.$transaction(async tx => {
+      const updatedStore = await tx.store.update({
+        where: { id: storeId },
+        data: {
+          status: 'ACTIVE',
+          archivedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      });
+
+      const subscriptionRecovery = await transferRecoverableSubscription(tx, storeId);
+      return { updatedStore, subscriptionRecovery };
     });
+
+    let flagsSynced = true;
+    if (subscriptionRecovery.transferred) {
+      try {
+        await syncFeatureFlagsFromPlan(storeId);
+      } catch (error) {
+        flagsSynced = false;
+        console.error('Store reactivated and subscription recovered, but flag sync failed:', error);
+      }
+    }
 
     // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
     const { ip, userAgent } = getRequestMetadata(request);
@@ -76,6 +94,9 @@ export async function POST(
         storeName: updatedStore.name,
         reactivatedBy: session.email,
         previousStatus: store.status,
+        recoveredPlan: subscriptionRecovery.transferred
+          ? subscriptionRecovery.planCode
+          : null,
       },
       ip,
       userAgent,
@@ -83,8 +104,12 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: `Tienda "${updatedStore.name}" reactivada exitosamente`,
+      message: subscriptionRecovery.transferred
+        ? `Tienda "${updatedStore.name}" reactivada con su plan ${subscriptionRecovery.planCode}`
+        : `Tienda "${updatedStore.name}" reactivada exitosamente`,
       store: updatedStore,
+      subscriptionRecovered: subscriptionRecovery.transferred,
+      flagsSynced,
     });
   } catch (error) {
     console.error('Error reactivating store:', error);
