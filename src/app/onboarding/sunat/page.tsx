@@ -305,6 +305,9 @@ export default function SunatOnboardingPage() {
       await loadStatus();
     } catch (error: any) {
       toast.error(error.message);
+      // Releer el estado efectivo para no dejar el interruptor y el mensaje
+      // visual como activos cuando el servidor rechazó la operación.
+      await loadStatus();
     } finally {
       setSaving(false);
     }

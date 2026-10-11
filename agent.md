@@ -254,6 +254,10 @@ La activación SUNAT exige una suscripción cuyo plan incluya `ENABLE_SUNAT`
 después invalida la caché de permisos. El panel de tiendas muestra el plan o
 `Sin plan`, con acceso a `/admin/billing`, y su tabla usa anchos controlados y
 desplazamiento horizontal para conservar las acciones en ventanas estrechas.
+Las rutas de planes, suscripciones y pagos aceptan tanto la lista administrativa
+local como una sesión autenticada con rol de nube `SUPERADMIN`. El estado del
+asistente muestra SUNAT activo solo cuando también existe un plan compatible y
+vuelve a consultar el servidor después de una activación rechazada.
 
 Los módulos nativos `usb` y `@serialport` deben permanecer en `asarUnpack`; Electron
 no puede cargar sus archivos `.node` directamente desde `app.asar`.

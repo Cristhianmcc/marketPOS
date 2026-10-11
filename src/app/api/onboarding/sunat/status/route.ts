@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
+import { getPlanCapability } from '@/lib/planCapabilities';
 
 export async function GET(req: NextRequest) {
   try {
@@ -104,6 +105,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    const subscription = await prisma.subscription.findUnique({
+      where: { storeId: user.storeId! },
+      select: { planCode: true },
+    });
+    const planIncludesSunat = Boolean(
+      subscription && getPlanCapability(subscription.planCode, 'ENABLE_SUNAT')
+    );
+
     // 8. Calcular steps
     const steps = {
       fiscalData: settings.stepFiscalData,
@@ -122,7 +131,12 @@ export async function GET(req: NextRequest) {
       storeStatus: 'ACTIVE',
       configured,
       env: settings.env,
-      enabled: settings.enabled,
+      // Una configuración restaurada puede conservar enabled=true aunque el
+      // respaldo antiguo no tuviera suscripción. No mostrarla como activa ni
+      // permitir que la UI asuma que puede emitir hasta recuperar el plan.
+      enabled: settings.enabled && planIncludesSunat,
+      planCode: subscription?.planCode ?? null,
+      planIncludesSunat,
       steps,
       preferences: {
         autoEmitBoleta: settings.autoEmitBoleta,

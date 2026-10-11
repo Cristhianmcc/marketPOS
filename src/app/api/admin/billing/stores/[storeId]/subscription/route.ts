@@ -17,7 +17,7 @@ export async function PATCH(
     const session = await getSessionOrThrow();
 
     // Solo SUPERADMIN puede acceder
-    if (!isSuperAdmin(session.email)) {
+    if (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email)) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
