@@ -11,8 +11,17 @@ import { generateCreditNoteXML } from '../src/lib/sunat/ubl/creditNote';
 import { generateDebitNoteXML } from '../src/lib/sunat/ubl/debitNote';
 import { generateSummaryXML, getSummaryFilename } from '../src/lib/sunat/ubl/summary';
 import { generateVoidedXML, getVoidedFilename } from '../src/lib/sunat/ubl/voided';
+import { parseSunatReferenceDate } from '../src/lib/sunat/referenceDate';
 
 async function main() {
+  const peruDay = parseSunatReferenceDate('2026-10-11');
+  assert.ok(peruDay);
+  assert.equal(peruDay.dayStart.toISOString(), '2026-10-11T05:00:00.000Z');
+  assert.equal(peruDay.dayEnd.toISOString(), '2026-10-12T04:59:59.999Z');
+  assert.equal(peruDay.referenceDate.toISOString(), '2026-10-11T05:00:00.000Z');
+  assert.equal(parseSunatReferenceDate('2026-02-30'), null);
+  assert.equal(parseSunatReferenceDate('11/10/2026'), null);
+
   const generated = generateBetaCertificate('20123456789');
   const certificate = parsePfxCertificate(generated.pfxBase64, generated.password);
   const payload: SunatDocumentPayload = {

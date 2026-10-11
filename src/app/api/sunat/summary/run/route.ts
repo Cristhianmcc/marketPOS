@@ -25,9 +25,9 @@ import { generateSummaryXML, getSummaryFilename, validateSummaryPayload } from '
 import type { SummaryPayload, SummaryDocumentLine } from '@/lib/sunat/ubl/summary';
 import { signXml, SignatureError } from '@/lib/sunat/sign/signXmlCrypto';
 import { loadCertificate, CertificateError } from '@/lib/sunat/cert/loadCertificate';
-import { startOfDay, endOfDay, format } from 'date-fns';
 import { logAudit } from '@/lib/auditLog';
 import { getNextSunatNumber } from '@/domain/sunat/correlatives';
+import { parseSunatReferenceDate } from '@/lib/sunat/referenceDate';
 
 // Máximo de documentos por resumen (límite SUNAT)
 const MAX_DOCS_PER_SUMMARY = 500;
@@ -83,9 +83,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Buscar boletas ACCEPTED del día que no están reportadas
-    const refDate = new Date(referenceDate);
-    const dayStart = startOfDay(refDate);
-    const dayEnd = endOfDay(refDate);
+    const dateRange = parseSunatReferenceDate(referenceDate);
+    if (!dateRange) {
+      return NextResponse.json(
+        { error: 'referenceDate debe ser una fecha valida con formato YYYY-MM-DD' },
+        { status: 400 }
+      );
+    }
+    const { referenceDate: refDate, dayStart, dayEnd } = dateRange;
 
     const boletas = await prisma.electronicDocument.findMany({
       where: {
@@ -255,7 +260,7 @@ export async function POST(req: NextRequest) {
       summary: {
         id: summaryDoc.id,
         fullNumber,
-        referenceDate: format(refDate, 'yyyy-MM-dd'),
+        referenceDate,
         boletasCount: boletas.length,
         totalAmount: totals.total.toFixed(2),
         status: 'SIGNED',
@@ -300,9 +305,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const refDate = new Date(referenceDate);
-    const dayStart = startOfDay(refDate);
-    const dayEnd = endOfDay(refDate);
+    const dateRange = parseSunatReferenceDate(referenceDate);
+    if (!dateRange) {
+      return NextResponse.json(
+        { error: 'referenceDate debe ser una fecha valida con formato YYYY-MM-DD' },
+        { status: 400 }
+      );
+    }
+    const { dayStart, dayEnd } = dateRange;
 
     // Buscar boletas pendientes
     const boletas = await prisma.electronicDocument.findMany({

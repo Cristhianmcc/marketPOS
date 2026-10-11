@@ -389,6 +389,9 @@ una base real como comprobación rutinaria.
 
 ### Punto de reanudacion SUNAT Beta (2026-10-11)
 
+- El Resumen Diario valida `YYYY-MM-DD` y lo interpreta como fecha civil de Peru
+  (UTC-05:00). No usar `new Date('YYYY-MM-DD')` en filtros fiscales: en Lima
+  desplaza la medianoche al dia anterior y omite las boletas del dia elegido.
 - Rama aislada: `feature/sunat-beta`. El proyecto principal no recibe estos
   cambios mientras no se integre expresamente esta rama.
 - Los respaldos antiguos podian restaurar una tienda sin mover su suscripcion:
@@ -404,13 +407,14 @@ una base real como comprobación rutinaria.
 - El listado de tiendas usa tarjetas adaptables en ventanas menores a `xl` y la
   tabla completa en pantallas amplias; correos largos ya no desbordan las acciones.
 - Portable actualizado en
-  `desktop/dist-electron-20261011-133256/win-unpacked/Iniciar Monterrial POS SUNAT Beta.exe`.
-  Build ID: `2026-10-11T18:32:20.842Z`. Incluye la ruta
-  `/api/admin/stores/[id]/recover-subscription`.
-- Prueba esperada: cerrar el BETA anterior, abrir este portable, entrar como
-  SUPERADMIN, pulsar `Recuperar BUSINESS` en la tienda restaurada activa y volver
-  a iniciar sesion como OWNER. La configuracion fiscal restaurada se conserva;
-  SUNAT se puede activar al quedar el plan vinculado al `storeId` correcto.
+  `desktop/dist-electron/win-unpacked/Iniciar Monterrial POS SUNAT Beta.exe`.
+  Build ID: `2026-10-11T23:25:12.103Z`. Incluye la recuperacion de planes y la
+  correccion de fecha civil peruana de `/api/sunat/summary/run`.
+- Prueba esperada del Resumen Diario: cerrar el BETA anterior, abrir este
+  portable, entrar como OWNER, abrir Documentos Electronicos, elegir la fecha
+  local de las boletas pendientes y pulsar `Resumen de boletas`. Una boleta del
+  11/10/2026 debe encontrarse dentro del rango
+  `2026-10-11T05:00:00.000Z` a `2026-10-12T04:59:59.999Z`.
 
 1. Resolver cambio de identidad/tienda y retirar secretos de distribuciones.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
