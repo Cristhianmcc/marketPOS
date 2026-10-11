@@ -100,6 +100,17 @@ interface Store {
     users: number;
     storeProducts: number;
   };
+  users: Array<{
+    email: string;
+    name: string;
+  }>;
+}
+
+interface OwnerAccessResult {
+  storeId: string;
+  storeName: string;
+  ownerEmail: string;
+  tempPassword: string;
 }
 
 interface RestoreResult {
@@ -138,6 +149,8 @@ export default function AdminStoresPage() {
   const [restoreResult, setRestoreResult] = useState<RestoreResult | null>(null);
   const [highlightedStoreId, setHighlightedStoreId] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [resettingOwnerStoreId, setResettingOwnerStoreId] = useState<string | null>(null);
+  const [ownerAccessResult, setOwnerAccessResult] = useState<OwnerAccessResult | null>(null);
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -374,6 +387,39 @@ export default function AdminStoresPage() {
     }
   }
 
+  async function handleResetOwnerAccess(store: Store) {
+    if (!confirm(`Se reemplazará la contraseña actual del OWNER de "${store.name}". ¿Continuar?`)) {
+      return;
+    }
+
+    setResettingOwnerStoreId(store.id);
+    setOwnerAccessResult(null);
+    try {
+      const res = await fetch(`/api/admin/stores/${store.id}/owner/reset-password`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || data.message || 'No se pudo restablecer el acceso OWNER');
+        return;
+      }
+
+      setOwnerAccessResult({
+        storeId: store.id,
+        storeName: store.name,
+        ownerEmail: data.ownerEmail,
+        tempPassword: data.tempPassword,
+      });
+      setHighlightedStoreId(store.id);
+      toast.success('Acceso OWNER restablecido');
+    } catch {
+      toast.error('Error de red al restablecer el acceso OWNER');
+    } finally {
+      setResettingOwnerStoreId(null);
+    }
+  }
+
   async function handleLogout() {
     if (loggingOut) return;
 
@@ -582,6 +628,26 @@ export default function AdminStoresPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {ownerAccessResult && (
+          <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="font-semibold">Nuevo acceso OWNER: {ownerAccessResult.storeName}</p>
+                <p className="mt-2 text-sm"><strong>Usuario:</strong> <span className="select-all">{ownerAccessResult.ownerEmail}</span></p>
+                <p className="text-sm"><strong>Contraseña temporal:</strong> <code className="select-all">{ownerAccessResult.tempPassword}</code></p>
+                <p className="mt-2 text-xs text-amber-800">Guárdalas ahora. La contraseña anterior dejó de funcionar.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOwnerAccessResult(null)}
+                className="rounded bg-gray-700 px-4 py-2 text-sm text-white hover:bg-gray-800"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         )}
 
@@ -889,6 +955,9 @@ export default function AdminStoresPage() {
                         {store.address && (
                           <p className="text-sm text-gray-500">{store.address}</p>
                         )}
+                        {store.users[0] && (
+                          <p className="mt-1 break-all text-xs text-gray-500">OWNER: {store.users[0].email}</p>
+                        )}
                       </div>
                     </td>
                     {/* ✅ MÓDULO V1: Columna Rubro */}
@@ -934,23 +1003,33 @@ export default function AdminStoresPage() {
                       {new Date(store.createdAt).toLocaleDateString('es-PE')}
                     </td>
                     <td className="px-6 py-4">
-                      {store.status === 'ACTIVE' ? (
+                      <div className="flex min-w-36 flex-col gap-2">
+                        {store.status === 'ACTIVE' ? (
+                          <button
+                            onClick={() => handleArchiveStore(store.id)}
+                            disabled={actioningStoreId === store.id}
+                            className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50"
+                          >
+                            {actioningStoreId === store.id ? 'Archivando...' : 'Archivar'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleReactivateStore(store.id)}
+                            disabled={actioningStoreId === store.id}
+                            className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+                          >
+                            {actioningStoreId === store.id ? 'Reactivando...' : 'Reactivar'}
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleArchiveStore(store.id)}
-                          disabled={actioningStoreId === store.id}
-                          className="px-3 py-1 text-sm bg-orange-100 text-orange-700 rounded hover:bg-orange-200 disabled:opacity-50"
+                          type="button"
+                          onClick={() => handleResetOwnerAccess(store)}
+                          disabled={resettingOwnerStoreId === store.id}
+                          className="rounded bg-blue-100 px-3 py-1 text-sm text-blue-700 hover:bg-blue-200 disabled:opacity-50"
                         >
-                          {actioningStoreId === store.id ? 'Archivando...' : 'Archivar'}
+                          {resettingOwnerStoreId === store.id ? 'Generando...' : 'Acceso OWNER'}
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => handleReactivateStore(store.id)}
-                          disabled={actioningStoreId === store.id}
-                          className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
-                        >
-                          {actioningStoreId === store.id ? 'Reactivando...' : 'Reactivar'}
-                        </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { PrismaUserRepository } from '@/infra/db/repositories/PrismaUserRepository';
+import { prisma } from '@/infra/db/prisma';
 import { verifyPassword } from '@/lib/auth';
-import { setSession } from '@/lib/session';
+import { clearSession, setSession } from '@/lib/session';
 import { checkRateLimit, getClientIP, resetRateLimit } from '@/lib/rateLimit';
 import { logAudit } from '@/lib/auditLog';
 import bcrypt from 'bcrypt';
@@ -136,6 +137,22 @@ export async function POST(request: Request) {
         );
       }
 
+      const localStore = await prisma.store.findUnique({
+        where: { id: localUser.storeId },
+        select: { status: true },
+      });
+
+      if (!localStore || localStore.status === 'ARCHIVED') {
+        await clearSession();
+        return NextResponse.json(
+          {
+            error: 'Esta cuenta pertenece a una tienda archivada. Usa el acceso OWNER de la tienda activa o restablécelo desde SUPERADMIN.',
+            code: 'STORE_ARCHIVED',
+          },
+          { status: 403 }
+        );
+      }
+
       // ✅ Login LOCAL exitoso
       resetRateLimit('login', clientIP);
 
@@ -147,7 +164,7 @@ export async function POST(request: Request) {
         role: localUser.role,
       });
 
-      console.log('[Login] Local auth SUCCESS for:', email);
+      console.log('[Login] Local auth SUCCESS');
       return NextResponse.json({
         success: true,
         authType: 'LOCAL',

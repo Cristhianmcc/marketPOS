@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getIronSession } from 'iron-session';
-import { SessionData } from '@/lib/session';
+import { getSession } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { hash } from 'bcryptjs';
-
-const SUPERADMIN_EMAILS = process.env.SUPERADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
+import { generateTemporaryPassword, isSuperAdmin } from '@/lib/superadmin';
 
 export async function POST(
   request: NextRequest,
   props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getIronSession<SessionData>(request, NextResponse.next(), {
-      password: process.env.SESSION_SECRET || 'complex_password_at_least_32_characters_long_for_security',
-      cookieName: 'market_pos_session',
-      cookieOptions: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
-      },
-    });
+    const session = await getSession();
 
     if (!session.isLoggedIn || !session.email) {
       return NextResponse.json(
@@ -30,7 +19,7 @@ export async function POST(
     }
 
     // Check SUPERADMIN
-    if (!SUPERADMIN_EMAILS.includes(session.email)) {
+    if (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email)) {
       return NextResponse.json(
         { error: 'No autorizado. Solo SUPERADMIN puede resetear passwords.' },
         { status: 403 }
@@ -61,7 +50,7 @@ export async function POST(
     }
 
     // Generate temporary password
-    const tempPassword = `Temp${Math.random().toString(36).slice(2, 10)}!`;
+    const tempPassword = generateTemporaryPassword();
     const hashedPassword = await hash(tempPassword, 10);
 
     // Update password

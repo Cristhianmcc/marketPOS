@@ -50,6 +50,14 @@ export async function GET(request: NextRequest) {
             enabled: true,
           },
         },
+        users: {
+          where: { role: 'OWNER' },
+          select: {
+            email: true,
+            name: true,
+          },
+          take: 1,
+        },
       },
     });
 

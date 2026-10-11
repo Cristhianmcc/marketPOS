@@ -227,6 +227,15 @@ secretos en el ejecutable. El botón superior del panel cierra la sesión y vuel
 login; navegar simplemente a `/` devolvería al SUPERADMIN al mismo panel porque no
 tiene una tienda operativa asignada.
 
+Cada restauración crea usuarios nuevos con correos únicos; las credenciales del
+OWNER original siguen apuntando a la tienda original, incluso después de archivarla.
+El panel muestra el correo OWNER de cada fila y ofrece `Acceso OWNER`, que regenera
+una contraseña temporal para la tienda seleccionada y la enseña una sola vez. Las
+rutas de administración del OWNER aceptan la sesión firmada con rol `SUPERADMIN`.
+El login local verifica el estado de la tienda después de validar la contraseña y
+rechaza una cuenta vinculada a una tienda `ARCHIVED`, eliminando cualquier sesión
+anterior. La pantalla SUNAT archivada permite cerrar sesión de forma directa.
+
 En los builds desktop de esta rama, `next.config.ts` fija
 `NEXT_PUBLIC_ENABLE_SUNAT=true` durante la compilación para mostrar la sección de
 facturación electrónica en `/settings`. La disponibilidad efectiva y los permisos

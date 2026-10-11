@@ -354,6 +354,16 @@ export default function SunatOnboardingPage() {
           <p className="text-gray-600">
             No puedes configurar SUNAT en una tienda archivada.
           </p>
+          <button
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST' });
+              router.replace('/login');
+              router.refresh();
+            }}
+            className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Cerrar sesión
+          </button>
         </div>
       </div>
     );
