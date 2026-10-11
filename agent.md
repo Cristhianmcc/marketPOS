@@ -219,10 +219,13 @@ flujo completo desde el panel SUPERADMIN y la aparición de la copia archivada.
 La acción `Ver tienda archivada` cierra el resultado de restauración, desplaza la
 tabla hasta la copia creada y la resalta temporalmente.
 
-En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
-firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
-heredado. Esto permite que el administrador validado por el servicio cloud use el
-panel sin empaquetar su correo ni otros secretos en el ejecutable.
+En esta rama, `/api/admin/stores` y las acciones de archivar/reactivar autorizan al
+administrador cuando la sesión firmada tiene rol `SUPERADMIN`, además de conservar
+`SUPERADMIN_EMAILS` como mecanismo heredado. Esto permite que el administrador
+validado por el servicio cloud use todo el panel sin empaquetar su correo ni otros
+secretos en el ejecutable. El botón superior del panel cierra la sesión y vuelve al
+login; navegar simplemente a `/` devolvería al SUPERADMIN al mismo panel porque no
+tiene una tienda operativa asignada.
 
 En los builds desktop de esta rama, `next.config.ts` fija
 `NEXT_PUBLIC_ENABLE_SUNAT=true` durante la compilación para mostrar la sección de

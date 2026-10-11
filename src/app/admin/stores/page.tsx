@@ -137,6 +137,7 @@ export default function AdminStoresPage() {
   const [restoring, setRestoring] = useState(false);
   const [restoreResult, setRestoreResult] = useState<RestoreResult | null>(null);
   const [highlightedStoreId, setHighlightedStoreId] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -373,6 +374,27 @@ export default function AdminStoresPage() {
     }
   }
 
+  async function handleLogout() {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || 'No se pudo cerrar la sesión');
+        return;
+      }
+
+      router.replace('/login');
+      router.refresh();
+    } catch {
+      toast.error('Error de red al cerrar la sesión');
+    } finally {
+      setLoggingOut(false);
+    }
+  }
+
   function handleViewRestoredStore() {
     if (!restoreResult) return;
 
@@ -436,10 +458,12 @@ export default function AdminStoresPage() {
             <p className="text-gray-600 mt-2">SUPERADMIN Panel</p>
           </div>
           <button
-            onClick={() => router.push('/')}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Volver
+            {loggingOut ? 'Saliendo...' : 'Cerrar sesión'}
           </button>
         </div>
 
