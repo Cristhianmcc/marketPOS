@@ -136,6 +136,7 @@ export default function AdminStoresPage() {
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [restoreResult, setRestoreResult] = useState<RestoreResult | null>(null);
+  const [highlightedStoreId, setHighlightedStoreId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -154,6 +155,18 @@ export default function AdminStoresPage() {
     loadStores();
     loadProfiles(); // ✅ MÓDULO V1
   }, [showArchived]);
+
+  useEffect(() => {
+    if (!highlightedStoreId) return;
+
+    const row = document.getElementById(`store-${highlightedStoreId}`);
+    if (!row) return;
+
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.focus({ preventScroll: true });
+    const timer = window.setTimeout(() => setHighlightedStoreId(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [highlightedStoreId, stores]);
 
   // ✅ MÓDULO V1: Cargar perfiles disponibles
   async function loadProfiles() {
@@ -360,6 +373,17 @@ export default function AdminStoresPage() {
     }
   }
 
+  function handleViewRestoredStore() {
+    if (!restoreResult) return;
+
+    const restoredStoreId = restoreResult.store.id;
+    setShowArchived(true);
+    setShowRestoreForm(false);
+    setRestoreResult(null);
+    setRestoreFile(null);
+    setHighlightedStoreId(restoredStoreId);
+  }
+
   const archivedCount = stores.filter(s => s.status === 'ARCHIVED').length;
 
   // ✅ MÓDULO V1: Cambiar perfil de tienda
@@ -526,7 +550,7 @@ export default function AdminStoresPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowArchived(true)}
+                    onClick={handleViewRestoredStore}
                     className="px-5 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                   >
                     Ver tienda archivada
@@ -821,9 +845,17 @@ export default function AdminStoresPage() {
                 </tr>
               ) : (
                 stores.map((store) => (
-                  <tr 
-                    key={store.id} 
-                    className={`border-b hover:bg-gray-50 ${store.status === 'ARCHIVED' ? 'bg-gray-50' : ''}`}
+                  <tr
+                    id={`store-${store.id}`}
+                    tabIndex={-1}
+                    key={store.id}
+                    className={`border-b transition-colors duration-500 focus:outline-none ${
+                      highlightedStoreId === store.id
+                        ? 'bg-emerald-100 ring-2 ring-inset ring-emerald-500'
+                        : store.status === 'ARCHIVED'
+                          ? 'bg-gray-50 hover:bg-gray-100'
+                          : 'hover:bg-gray-50'
+                    }`}
                   >
                     <td className="px-6 py-4">
                       <div>

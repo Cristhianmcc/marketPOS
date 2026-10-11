@@ -216,6 +216,8 @@ existe en la base local; así se evita violar la FK de `AuditLog`. La resolució
 de ese usuario es tolerante y no puede convertir un `COMMIT` correcto en un error
 de restauración por una falla secundaria de auditoría. La prueba real confirmó el
 flujo completo desde el panel SUPERADMIN y la aparición de la copia archivada.
+La acción `Ver tienda archivada` cierra el resultado de restauración, desplaza la
+tabla hasta la copia creada y la resalta temporalmente.
 
 En esta rama, `/api/admin/stores` autoriza listar y crear tiendas cuando la sesión
 firmada tiene rol `SUPERADMIN`, además de conservar `SUPERADMIN_EMAILS` como mecanismo
