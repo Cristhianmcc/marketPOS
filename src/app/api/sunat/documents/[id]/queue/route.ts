@@ -75,6 +75,13 @@ export async function POST(
       );
     }
 
+    if (document.store.status !== 'ACTIVE') {
+      return NextResponse.json(
+        { error: 'No se pueden encolar documentos de una tienda archivada' },
+        { status: 409 }
+      );
+    }
+
     // 6. Validar que SUNAT esté habilitado para la tienda
     if (!document.store.sunatSettings?.enabled) {
       return NextResponse.json(

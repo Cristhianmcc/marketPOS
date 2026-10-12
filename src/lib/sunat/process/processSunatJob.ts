@@ -18,6 +18,7 @@ import { loadSolCredentials, sanitizeCredentialsForLog } from '../credentials/lo
 import { parseAdjustmentMetadata } from '../adjustmentMetadata';
 import { cancelSaleLocally } from '@/lib/sales/cancelSaleLocally';
 import { repairLegacyBatchDocument } from './repairLegacyBatchDocument';
+import { repairLegacyCpeDocument } from './repairLegacyCpeDocument';
 
 const prisma = new PrismaClient();
 
@@ -159,6 +160,10 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
   const { id: jobId, documentId, attempts } = job;
 
   try {
+    const legacyRepair = await repairLegacyCpeDocument(prisma, job, document);
+    document = legacyRepair.document;
+    const effectiveAttempts = legacyRepair.repaired ? 0 : attempts;
+
     // Validar que el XML esté firmado
     if (!document.xmlSigned) {
       await markJobFailed(jobId, 'XML_NOT_SIGNED', 'XML no está firmado', false);
@@ -205,7 +210,7 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
     // Si un intento anterior pudo llegar a SUNAT pero se perdio la respuesta,
     // recuperar primero el CDR evita reenviar el mismo comprobante a ciegas.
     let recoveredCdr: string | undefined;
-    if (attempts > 0 && soapConfig.environment === 'PROD') {
+    if (effectiveAttempts > 0 && soapConfig.environment === 'PROD') {
       const recovery = await getStatusCdr(soapConfig, {
         ruc: settings.ruc,
         docTypeCode: sunatCode,
@@ -867,6 +872,14 @@ async function validateJobExecution(document: any, jobType: string): Promise<{
       valid: false,
       code: 'FEATURE_DISABLED',
       message: 'SUNAT está deshabilitado globalmente',
+    };
+  }
+
+  if (document.store.status !== 'ACTIVE') {
+    return {
+      valid: false,
+      code: 'STORE_ARCHIVED',
+      message: 'No se enviarán documentos SUNAT de una tienda archivada',
     };
   }
 

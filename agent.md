@@ -276,7 +276,7 @@ entorno de prueba. Es una base
 vacía y descartable para pruebas; no debe tratarse como almacenamiento definitivo ni incluir
 datos reales de clientes.
 
-### Estado SUNAT de la rama Beta (11/10/2026)
+### Estado SUNAT de la rama Beta (12/10/2026)
 
 - Facturas, boletas, notas de crédito y notas de débito generan UBL, se firman,
   se verifican localmente y se encolan sin bloquear la venta. La representación
@@ -297,6 +297,10 @@ datos reales de clientes.
   para Resumen Diario y `RA` para Comunicación de Baja. El worker reconstruye
   y vuelve a firmar lotes antiguos `RC01`/`RA01` solo cuando no existe ticket,
   conservando fecha, correlativo y documentos de origen.
+- El worker también repara NC/ND antiguas que no incluyen `AddressTypeCode`, pero
+  únicamente si pertenecen a una tienda activa y todavía no tienen CDR ni ticket.
+  Conserva fecha y correlativo, vuelve a firmar el XML y reinicia el intento. Los
+  endpoints de cola y reintento rechazan documentos de tiendas archivadas.
 - Electron consulta la cola cada diez segundos. Sin conexión, el endpoint deja
   los trabajos intactos. En PROD, un reintento de factura o nota consulta primero
   `getStatusCdr`; si no puede reconciliar el intento anterior, no reenvía a
@@ -349,8 +353,9 @@ arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.
 Límites comprobados: el cálculo actual solo representa operaciones gravadas al
 18 % y precios finales con IGV. No hay clasificación persistida para exoneradas,
 inafectas, gratuitas, ISC o bolsas. La prueba local cubre UBL, firma, ZIP y CDR,
-pero aún falta una emisión controlada contra SUNAT BETA y validación con los XSD
-oficiales antes de considerar lista la salida a producción.
+y ya se verificaron emisiones controladas contra SUNAT BETA de facturas, boletas,
+notas y resúmenes. Antes de producción todavía se requiere validación con los XSD
+oficiales y una prueba controlada con certificado y credenciales SOL reales.
 
 ### Escritorio y persistencia
 
@@ -391,13 +396,17 @@ una base real como comprobación rutinaria.
 
 ## Estado y prioridades pendientes
 
-### Punto de reanudacion SUNAT Beta (2026-10-11)
+### Punto de reanudacion SUNAT Beta (2026-10-12)
 
 - El Resumen Diario valida `YYYY-MM-DD` y lo interpreta como fecha civil de Peru
   (UTC-05:00). No usar `new Date('YYYY-MM-DD')` en filtros fiscales: en Lima
   desplaza la medianoche al dia anterior y omite las boletas del dia elegido.
 - Rama aislada: `feature/sunat-beta`. El proyecto principal no recibe estos
   cambios mientras no se integre expresamente esta rama.
+- El 12/10/2026 se reparó y reenvió en BETA la única NC legada elegible de la
+  tienda restaurada activa: SUNAT respondió código `0`, se guardó el CDR, el job
+  terminó `DONE` y la reversión local de venta e inventario también terminó. Dos
+  copias archivadas con el mismo correlativo quedaron intactas.
 - Los respaldos antiguos podian restaurar una tienda sin mover su suscripcion:
   la tienda nueva quedaba sin plan y la licencia `BUSINESS` seguia asociada a la
   tienda original archivada. El panel SUPERADMIN ahora detecta ese caso y ofrece
@@ -411,9 +420,10 @@ una base real como comprobación rutinaria.
 - El listado de tiendas usa tarjetas adaptables en ventanas menores a `xl` y la
   tabla completa en pantallas amplias; correos largos ya no desbordan las acciones.
 - Portable actualizado en
-  `desktop/dist-electron/win-unpacked/Iniciar Monterrial POS SUNAT Beta.exe`.
-  Build ID: `2026-10-11T23:25:12.103Z`. Incluye la recuperacion de planes y la
-  correccion de fecha civil peruana de `/api/sunat/summary/run`.
+  `desktop/dist-electron/win-unpacked/Monterrial POS SUNAT Beta.exe`; el lanzador
+  `Iniciar Monterrial POS SUNAT Beta.exe` está en el mismo directorio.
+  Build ID: `2026-10-12T17:46:52.339Z`. Incluye la recuperación de planes, la
+  corrección de fecha civil peruana y la reparación segura de notas legadas.
 - Prueba esperada del Resumen Diario: cerrar el BETA anterior, abrir este
   portable, entrar como OWNER, abrir Documentos Electronicos, elegir la fecha
   local de las boletas pendientes y pulsar `Resumen de boletas`. Una boleta del

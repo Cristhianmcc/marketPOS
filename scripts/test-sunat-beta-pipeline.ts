@@ -13,6 +13,7 @@ import { generateSummaryXML, getSummaryFilename } from '../src/lib/sunat/ubl/sum
 import { generateVoidedXML, getVoidedFilename } from '../src/lib/sunat/ubl/voided';
 import { parseSunatReferenceDate } from '../src/lib/sunat/referenceDate';
 import { toSunatZipFilename } from '../src/lib/sunat/soap/sunatClient';
+import { needsLegacyAddressTypeRepair } from '../src/lib/sunat/process/repairLegacyCpeDocument';
 
 async function main() {
   const peruDay = parseSunatReferenceDate('2026-10-11');
@@ -102,7 +103,17 @@ async function main() {
   });
   assert.match(creditXml, /<cbc:ResponseCode>01<\/cbc:ResponseCode>/);
   assert.match(creditXml, /<cbc:DocumentTypeCode>03<\/cbc:DocumentTypeCode>/);
+  assert.match(creditXml, /<cbc:AddressTypeCode>0000<\/cbc:AddressTypeCode>/);
   assert.equal(verifyXmlSignature(signXml(creditXml, certificate, 'credit-note').signedXml, certificate), true);
+  assert.equal(needsLegacyAddressTypeRepair({
+    docType: 'NOTA_CREDITO', store: { status: 'ACTIVE' }, xmlSigned: '<CreditNote/>', cdrZip: null, sunatTicket: null,
+  }), true);
+  assert.equal(needsLegacyAddressTypeRepair({
+    docType: 'NOTA_CREDITO', store: { status: 'ARCHIVED' }, xmlSigned: '<CreditNote/>', cdrZip: null, sunatTicket: null,
+  }), false);
+  assert.equal(needsLegacyAddressTypeRepair({
+    docType: 'NOTA_CREDITO', store: { status: 'ACTIVE' }, xmlSigned: '<cbc:AddressTypeCode>0000</cbc:AddressTypeCode>', cdrZip: null, sunatTicket: null,
+  }), false);
 
   const debitXml = generateDebitNoteXML(
     { ...notePayload, metadata: { ...notePayload.metadata, docType: 'NOTA_DEBITO', series: 'BD01' } },
