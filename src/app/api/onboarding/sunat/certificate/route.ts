@@ -8,6 +8,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
+import {
+  extractRucFromCertificate,
+  parsePfxCertificate,
+  validateCertificateForSunat,
+} from '@/lib/sunat/cert/loadCertificate';
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -64,15 +69,37 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // 6. Validar que es Base64 válido
+    // 6. Abrir el PFX antes de guardarlo. Esto detecta archivos corruptos,
+    // contraseña incorrecta, ausencia de clave privada y vigencia inválida.
+    let parsedCertificate;
     try {
       const buffer = Buffer.from(certPfxBase64, 'base64');
       if (buffer.length < 100) {
         throw new Error('Certificado muy pequeño');
       }
-    } catch {
+      parsedCertificate = parsePfxCertificate(certPfxBase64, certPassword);
+      if (!validateCertificateForSunat(parsedCertificate)) {
+        throw new Error('El certificado no es apto para firmar documentos');
+      }
+    } catch (error) {
       return NextResponse.json(
-        { error: 'El certificado no es un Base64 válido' },
+        {
+          error: error instanceof Error
+            ? error.message
+            : 'El certificado PFX o su contraseña no son válidos',
+        },
+        { status: 400 }
+      );
+    }
+
+    const currentSettings = await prisma.sunatSettings.findUnique({
+      where: { storeId: user.storeId! },
+      select: { ruc: true },
+    });
+    const certificateRuc = extractRucFromCertificate(parsedCertificate);
+    if (certificateRuc && currentSettings?.ruc && certificateRuc !== currentSettings.ruc) {
+      return NextResponse.json(
+        { error: 'El RUC del certificado no coincide con el RUC fiscal de la tienda' },
         { status: 400 }
       );
     }

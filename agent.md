@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **11/10/2026**, zona America/Lima. Base Git observada:
+Última revisión: **12/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -310,6 +310,13 @@ datos reales de clientes.
   `SunatSettings` de la tienda. BETA usa MODDATOS y puede generar un certificado
   de prueba. Volver desde una restauración deja SUNAT desactivado y obliga a
   revisar credenciales y certificado antes de emitir.
+- El cambio a PRODUCCIÓN pasa por un control único reutilizado por onboarding y
+  `/api/sunat/settings/environment`. Exige RUC peruano con dígito verificador,
+  razón social y dirección, credenciales SOL propias (rechaza `MODDATOS`), PFX
+  vigente no autofirmado, clave RSA de al menos 2048 bits, clave privada
+  coincidente, RUC del certificado igual al de la tienda y una prueba de firma
+  completada con el certificado actual. También exige escribir
+  `ACTIVAR PRODUCCION`; SUPERADMIN no omite estos controles.
 - Cada ZIP nuevo incluye `fiscalArchive` dentro de `data.json` y lo protege el
   checksum general del respaldo, por lo que también viaja con la copia cloud.
   Contiene XML, CDR, respuestas, relaciones y correlativos, pero no contiene
@@ -320,7 +327,8 @@ datos reales de clientes.
 
 Comprobación local disponible: `npm run sunat:test:local`. Cubre generación,
 firma y verificación de factura, boleta identificada, consumidor final, NC, ND,
-Resumen Diario, Comunicación de Baja, nombres SUNAT y PDF con QR. No sustituye
+Resumen Diario, Comunicación de Baja, nombres SUNAT, PDF con QR y el rechazo en
+PROD de `MODDATOS` y del certificado autofirmado BETA. No sustituye
 una homologación ni una emisión controlada en PROD con certificado y SOL reales.
 El archivo temporal `--pwfile` de `initdb` también se crea dentro de `logs` en ese runtime y se
 elimina en `finally`; no usa `%TEMP%`, que está bloqueado para el proceso de baja integridad.
@@ -403,6 +411,13 @@ una base real como comprobación rutinaria.
   desplaza la medianoche al dia anterior y omite las boletas del dia elegido.
 - Rama aislada: `feature/sunat-beta`. El proyecto principal no recibe estos
   cambios mientras no se integre expresamente esta rama.
+- El panel de Documentos Electrónicos quedó verificado visualmente con 20
+  documentos aceptados, cero pendientes y cero errores. Es evidencia del flujo
+  BETA de esta tienda; no equivale a habilitación de PRODUCCIÓN.
+- La protección de PRODUCCIÓN valida datos fiscales, SOL, certificado y prueba de
+  firma tanto en interfaz como en servidor. La compilación segura `build:only` y
+  `sunat:test:local` pasaron el 12/10/2026. Sigue pendiente una emisión controlada
+  con el certificado y las credenciales reales de la empresa.
 - El 12/10/2026 se reparó y reenvió en BETA la única NC legada elegible de la
   tienda restaurada activa: SUNAT respondió código `0`, se guardó el CDR, el job
   terminó `DONE` y la reversión local de venta e inventario también terminó. Dos

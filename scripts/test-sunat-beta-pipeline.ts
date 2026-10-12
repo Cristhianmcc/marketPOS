@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { generateBetaCertificate } from '../src/lib/sunat/cert/generateBetaCertificate';
-import { parsePfxCertificate } from '../src/lib/sunat/cert/loadCertificate';
+import {
+  extractRucFromCertificate,
+  isSelfSignedCertificate,
+  parsePfxCertificate,
+} from '../src/lib/sunat/cert/loadCertificate';
 import { generateInvoiceXML } from '../src/lib/sunat/ubl/invoice';
 import { signXml, verifyXmlSignature } from '../src/lib/sunat/sign/signXmlCrypto';
 import { buildZip, extractFromZip } from '../src/lib/sunat/zip/buildZip';
@@ -14,6 +18,7 @@ import { generateVoidedXML, getVoidedFilename } from '../src/lib/sunat/ubl/voide
 import { parseSunatReferenceDate } from '../src/lib/sunat/referenceDate';
 import { toSunatZipFilename } from '../src/lib/sunat/soap/sunatClient';
 import { needsLegacyAddressTypeRepair } from '../src/lib/sunat/process/repairLegacyCpeDocument';
+import { validateProductionReadiness } from '../src/lib/sunat/validation/productionReadiness';
 
 async function main() {
   const peruDay = parseSunatReferenceDate('2026-10-11');
@@ -26,6 +31,25 @@ async function main() {
 
   const generated = generateBetaCertificate('20123456789');
   const certificate = parsePfxCertificate(generated.pfxBase64, generated.password);
+  assert.equal(extractRucFromCertificate(certificate), '20123456789');
+  assert.equal(isSelfSignedCertificate(certificate), true);
+
+  const productionReadiness = validateProductionReadiness({
+    ruc: '20123456786',
+    razonSocial: 'EMISOR DE PRUEBA SAC',
+    address: 'AV. PRUEBA 123',
+    solUser: 'MODDATOS',
+    solPass: 'moddatos',
+    certPfxBase64: generated.pfxBase64,
+    certPassword: generated.password,
+    stepTestSign: true,
+  });
+  assert.equal(productionReadiness.ready, false);
+  assert.equal(productionReadiness.checks.fiscalData.ok, true);
+  assert.equal(productionReadiness.checks.solCredentials.ok, false);
+  assert.equal(productionReadiness.checks.certificate.ok, false);
+  assert.match(productionReadiness.checks.solCredentials.message, /BETA/);
+  assert.match(productionReadiness.checks.certificate.message, /autofirmado/);
   const payload: SunatDocumentPayload = {
     issuer: {
       ruc: '20123456789',

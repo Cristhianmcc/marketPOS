@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { getPlanCapability } from '@/lib/planCapabilities';
+import { validateProductionReadiness } from '@/lib/sunat/validation/productionReadiness';
 
 export async function GET(req: NextRequest) {
   try {
@@ -124,6 +125,7 @@ export async function GET(req: NextRequest) {
 
     // 9. Verificar si está completamente configurado
     const configured = steps.fiscalData && steps.solCredentials && steps.certificate;
+    const prodReadiness = validateProductionReadiness(settings);
 
     // 10. Respuesta (SIN secretos)
     return NextResponse.json({
@@ -137,6 +139,7 @@ export async function GET(req: NextRequest) {
       enabled: settings.enabled && planIncludesSunat,
       planCode: subscription?.planCode ?? null,
       planIncludesSunat,
+      prodReadiness,
       steps,
       preferences: {
         autoEmitBoleta: settings.autoEmitBoleta,

@@ -22,6 +22,7 @@ import { isSuperAdmin } from '@/lib/superadmin';
 import { prisma } from '@/lib/prisma';
 import { logAudit } from '@/lib/auditLog';
 import { z } from 'zod';
+import { validateProductionReadiness } from '@/lib/sunat/validation/productionReadiness';
 
 /**
  * Confirmación requerida para activar PRODUCCIÓN
@@ -35,32 +36,6 @@ const EnvironmentChangeSchema = z.object({
   env: z.enum(['BETA', 'PROD']),
   confirmText: z.string().optional(),
 });
-
-/**
- * Verifica si las credenciales SOL están disponibles para la tienda.
- */
-function hasSolCredentials(settings: any): boolean {
-  const solUser = settings?.solUser;
-  const solPass = settings?.solPass;
-  return !!(solUser && solPass);
-}
-
-/**
- * Verifica si el certificado está disponible para la tienda.
- */
-function hasCertificate(settings: any): boolean {
-  const certPfx = settings?.certPfxBase64;
-  const certPass = settings?.certPassword;
-  return !!(certPfx && certPass);
-}
-
-/**
- * Valida que el RUC tenga 11 dígitos
- */
-function isValidRuc(ruc: string | null | undefined): boolean {
-  if (!ruc) return false;
-  return /^\d{11}$/.test(ruc);
-}
 
 /**
  * POST /api/sunat/settings/environment
@@ -124,8 +99,6 @@ export async function POST(req: NextRequest) {
 
     // 6. ⚠️ PROD LOCK — Validaciones adicionales para PROD
     if (env === 'PROD') {
-      const validationErrors: string[] = [];
-
       // 6.1 Validar confirmación tipada
       if (confirmText !== PROD_CONFIRM_TEXT) {
         return NextResponse.json(
@@ -138,25 +111,8 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 6.2 Validar RUC
-      if (!isValidRuc(settings.ruc)) {
-        validationErrors.push('RUC no configurado o inválido (debe tener 11 dígitos)');
-      }
-
-      // 6.3 Validar credenciales SOL
-      if (!hasSolCredentials(settings)) {
-        validationErrors.push('Credenciales SOL no configuradas para esta tienda');
-      }
-
-      // 6.4 Validar certificado digital
-      if (!hasCertificate(settings)) {
-        validationErrors.push('Certificado digital no configurado para esta tienda');
-      }
-
-      // 6.5 Validar datos del emisor
-      if (!settings.razonSocial) {
-        validationErrors.push('Razón social no configurada');
-      }
+      const readiness = validateProductionReadiness(settings);
+      const validationErrors = readiness.errors;
 
       // Si hay errores de validación, no permitir cambio a PROD
       if (validationErrors.length > 0) {
@@ -181,6 +137,7 @@ export async function POST(req: NextRequest) {
             error: 'No se puede activar PRODUCCIÓN. Complete la configuración primero.',
             code: 'PROD_REQUIREMENTS_NOT_MET',
             validationErrors,
+            prodReadiness: readiness,
           },
           { status: 400 }
         );
@@ -288,18 +245,15 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. Verificar requisitos para PROD
+    const prodReadiness = validateProductionReadiness(settings);
     const prodRequirements = {
-      hasValidRuc: isValidRuc(settings.ruc),
-      hasSolCredentials: hasSolCredentials(settings),
-      hasCertificate: hasCertificate(settings),
-      hasRazonSocial: !!settings.razonSocial,
+      hasValidRuc: prodReadiness.checks.fiscalData.ok,
+      hasSolCredentials: prodReadiness.checks.solCredentials.ok,
+      hasCertificate: prodReadiness.checks.certificate.ok,
+      hasRazonSocial: Boolean(settings.razonSocial?.trim()),
+      hasTestedSignature: prodReadiness.checks.signatureTest.ok,
     };
-
-    const canActivateProd = 
-      prodRequirements.hasValidRuc &&
-      prodRequirements.hasSolCredentials &&
-      prodRequirements.hasCertificate &&
-      prodRequirements.hasRazonSocial;
+    const canActivateProd = prodReadiness.ready;
 
     // 4. Verificar si es SUPERADMIN (solo ellos pueden cambiar a PROD)
     const isSuper = await isSuperAdmin(user.email);
@@ -308,6 +262,7 @@ export async function GET(req: NextRequest) {
       currentEnv: settings.env,
       enabled: settings.enabled,
       prodRequirements,
+      prodReadiness,
       canActivateProd,
       canSwitchEnv: isSuper,
       // Para activar PROD se necesita:

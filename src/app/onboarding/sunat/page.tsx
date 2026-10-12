@@ -53,8 +53,24 @@ interface OnboardingStatus {
     address: string;
     ubigeo: string;
   };
+  prodReadiness?: {
+    ready: boolean;
+    checks: Record<
+      'fiscalData' | 'solCredentials' | 'certificate' | 'signatureTest',
+      { ok: boolean; message: string }
+    >;
+    warnings: string[];
+    certificateExpiresAt: string | null;
+  };
   message?: string;
 }
+
+const PROD_CHECK_LABELS = {
+  fiscalData: 'Datos fiscales',
+  solCredentials: 'Credenciales SOL',
+  certificate: 'Certificado digital',
+  signatureTest: 'Prueba de firma',
+} as const;
 
 const STEPS = [
   { id: 'fiscal', title: 'Datos Fiscales', icon: Building2 },
@@ -837,6 +853,50 @@ export default function SunatOnboardingPage() {
                 </div>
               </div>
 
+              {activateEnv === 'PROD' && (
+                <div className="p-4 border border-gray-200 rounded-lg bg-white space-y-3">
+                  <div>
+                    <p className="font-medium text-gray-900">Control previo de PRODUCCIÓN</p>
+                    <p className="text-sm text-gray-500">
+                      Los cuatro controles deben estar aprobados antes de emitir documentos reales.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {(Object.keys(PROD_CHECK_LABELS) as Array<keyof typeof PROD_CHECK_LABELS>).map((key) => {
+                      const check = status?.prodReadiness?.checks[key];
+                      return (
+                        <div
+                          key={key}
+                          className={`p-3 rounded-lg border ${
+                            check?.ok
+                              ? 'border-green-200 bg-green-50 text-green-800'
+                              : 'border-red-200 bg-red-50 text-red-800'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {check?.ok ? (
+                              <Check className="w-4 h-4 mt-0.5 shrink-0" />
+                            ) : (
+                              <X className="w-4 h-4 mt-0.5 shrink-0" />
+                            )}
+                            <div>
+                              <p className="text-sm font-medium">{PROD_CHECK_LABELS[key]}</p>
+                              <p className="text-xs mt-0.5">{check?.message || 'Pendiente de verificar'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {status?.prodReadiness?.warnings.map((warning) => (
+                    <p key={warning} className="text-sm text-amber-700">
+                      <AlertTriangle className="w-4 h-4 inline mr-1" />
+                      {warning}
+                    </p>
+                  ))}
+                </div>
+              )}
+
               {activateEnv === 'PROD' && activateEnabled && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-700 mb-2">
@@ -855,7 +915,12 @@ export default function SunatOnboardingPage() {
 
               <button
                 onClick={toggleActivation}
-                disabled={saving || (activateEnv === 'PROD' && activateEnabled && confirmText !== 'ACTIVAR PRODUCCION')}
+                disabled={
+                  saving ||
+                  (activateEnv === 'PROD' && activateEnabled && (
+                    confirmText !== 'ACTIVAR PRODUCCION' || !status?.prodReadiness?.ready
+                  ))
+                }
                 className={`w-full py-2.5 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
                   activateEnabled
                     ? 'bg-green-600 text-white hover:bg-green-700'

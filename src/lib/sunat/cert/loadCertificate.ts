@@ -223,13 +223,9 @@ export function extractRucFromCertificate(cert: Certificate): string | null {
     
     // Buscar en los atributos del subject
     for (const attr of subject.attributes) {
-      if (attr.name === 'serialNumber' || attr.shortName === 'serialNumber') {
-        const value = attr.value as string;
-        // El RUC suele estar en el serialNumber
-        if (/^\d{11}$/.test(value)) {
-          return value;
-        }
-      }
+      const value = String(attr.value || '');
+      const match = value.match(/(?:^|\D)(\d{11})(?:\D|$)/);
+      if (match) return match[1];
     }
 
     return null;

@@ -8,10 +8,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
-import { isSuperAdmin } from '@/lib/superadmin';
 import { FeatureFlagKey } from '@prisma/client';
 import { invalidateStoreFlags } from '@/lib/featureFlags';
 import { getPlanCapability } from '@/lib/planCapabilities';
+import { validateProductionReadiness } from '@/lib/sunat/validation/productionReadiness';
 
 export async function PATCH(req: NextRequest) {
   try {
@@ -89,59 +89,29 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    // 7. Para PROD, requiere confirmación typed
+    // 7. Para PROD, validar la configuración real y exigir confirmación typed.
     if (env === 'PROD' && enabled) {
-      if (!settings.certPfxBase64 || !settings.certPassword) {
-        return NextResponse.json(
-          { error: 'Producción requiere un certificado digital real', code: 'PROD_CERT_REQUIRED' },
-          { status: 409 }
-        );
-      }
-
-      try {
-        const {
-          parsePfxCertificate,
-          extractRucFromCertificate,
-          isSelfSignedCertificate,
-        } = await import('@/lib/sunat/cert/loadCertificate');
-        const certificate = parsePfxCertificate(settings.certPfxBase64, settings.certPassword);
-        if (isSelfSignedCertificate(certificate)) {
-          return NextResponse.json(
-            { error: 'El certificado de prueba BETA no puede utilizarse en producción', code: 'BETA_CERT_IN_PROD' },
-            { status: 409 }
-          );
-        }
-        const certificateRuc = extractRucFromCertificate(certificate);
-        if (certificateRuc && settings.ruc && certificateRuc !== settings.ruc) {
-          return NextResponse.json(
-            { error: 'El RUC del certificado no coincide con el emisor', code: 'CERT_RUC_MISMATCH' },
-            { status: 409 }
-          );
-        }
-      } catch (error) {
+      const readiness = validateProductionReadiness(settings);
+      if (!readiness.ready) {
         return NextResponse.json(
           {
-            error: error instanceof Error ? error.message : 'Certificado digital inválido',
-            code: 'PROD_CERT_INVALID',
+            error: 'No se puede activar PRODUCCIÓN. Corrige los requisitos indicados.',
+            code: 'PROD_REQUIREMENTS_NOT_MET',
+            validationErrors: readiness.errors,
+            prodReadiness: readiness,
           },
           { status: 409 }
         );
       }
 
-      // Verificar si es SUPERADMIN o tiene permiso especial
-      const superAdmin = isSuperAdmin(user.email);
-      
-      if (!superAdmin) {
-        // OWNER normal necesita confirmación typed
-        if (confirmText !== 'ACTIVAR PRODUCCION') {
-          return NextResponse.json(
-            { 
-              error: 'Para activar PRODUCCIÓN, escribe "ACTIVAR PRODUCCION" para confirmar',
-              code: 'PROD_CONFIRM_REQUIRED',
-            },
-            { status: 400 }
-          );
-        }
+      if (confirmText !== 'ACTIVAR PRODUCCION') {
+        return NextResponse.json(
+          {
+            error: 'Para activar PRODUCCIÓN, escribe "ACTIVAR PRODUCCION" para confirmar',
+            code: 'PROD_CONFIRM_REQUIRED',
+          },
+          { status: 400 }
+        );
       }
     }
 
