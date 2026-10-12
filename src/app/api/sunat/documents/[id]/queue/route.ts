@@ -109,6 +109,34 @@ export async function POST(
       },
     });
 
+    if (existingJob?.status === 'QUEUED') {
+      // Una acción manual debe tener efecto inmediato. Si el trabajo estaba
+      // esperando el backoff de un fallo transitorio, reactivarlo sin crear un
+      // duplicado y sin heredar el contador de intentos agotado.
+      const resumedJob = await prisma.sunatJob.update({
+        where: { id: existingJob.id },
+        data: {
+          attempts: 0,
+          lastError: null,
+          nextRunAt: new Date(),
+          lockedAt: null,
+          lockedBy: null,
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        resumed: true,
+        message: 'Trabajo pendiente reactivado para envío inmediato',
+        job: {
+          id: resumedJob.id,
+          status: resumedJob.status,
+          type: resumedJob.type,
+          nextRunAt: resumedJob.nextRunAt,
+        },
+      });
+    }
+
     if (existingJob) {
       return NextResponse.json(
         { 

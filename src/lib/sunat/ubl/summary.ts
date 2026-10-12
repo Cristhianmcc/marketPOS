@@ -203,9 +203,11 @@ export function generateSummaryXML(payload: SummaryPayload, docId: string): stri
     // Total exonerado (si aplica) - por ahora asumimos todo gravado
     // Total inafecto (si aplica)
 
-    // AllowanceCharge (descuentos/cargos globales) - opcional
+    // SUNAT define este nodo como la sumatoria de otros cargos del item.
+    // En el Resumen Diario exige ChargeIndicator=true incluso cuando el monto
+    // es cero (Guia de Resumen Diario UBL 2.0, campo 20.1).
     const allowance = summaryLine.ele('cac:AllowanceCharge');
-    allowance.ele('cbc:ChargeIndicator').txt('false');
+    allowance.ele('cbc:ChargeIndicator').txt('true');
     allowance.ele('cbc:Amount', { currencyID: currency }).txt('0.00');
 
     // TaxTotal (IGV)

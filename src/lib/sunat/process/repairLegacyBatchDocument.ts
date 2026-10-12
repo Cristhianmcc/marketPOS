@@ -52,6 +52,13 @@ function isLegacyBatchName(document: any): boolean {
   );
 }
 
+function needsSummaryChargeIndicatorRepair(document: any): boolean {
+  return document.docType === 'SUMMARY'
+    && !document.sunatTicket
+    && typeof document.xmlSigned === 'string'
+    && document.xmlSigned.includes('<cbc:ChargeIndicator>false</cbc:ChargeIndicator>');
+}
+
 /**
  * Rehace los lotes creados por versiones que usaban RC01/RA01. Es seguro porque
  * esos nombres no son validos para SUNAT y solo se repara cuando no existe ticket.
@@ -62,7 +69,9 @@ export async function repairLegacyBatchDocument(
   document: any,
   settings: any,
 ): Promise<LegacyBatchRepairResult> {
-  if (!isLegacyBatchName(document) || document.sunatTicket) {
+  const needsNameRepair = isLegacyBatchName(document);
+  const needsChargeIndicatorRepair = needsSummaryChargeIndicatorRepair(document);
+  if ((!needsNameRepair && !needsChargeIndicatorRepair) || document.sunatTicket) {
     return { document, repaired: false };
   }
   if (!['SUMMARY', 'VOIDED'].includes(document.docType)) {

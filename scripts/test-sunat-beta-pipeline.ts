@@ -121,6 +121,8 @@ async function main() {
   }, 'summary-document');
   assert.equal(summaryName, '20123456789-RC-20261001-00001');
   assert.match(summaryXml, /<cbc:ID>RC-20261001-00001<\/cbc:ID>/);
+  assert.match(summaryXml, /<cbc:ChargeIndicator>true<\/cbc:ChargeIndicator>/);
+  assert.doesNotMatch(summaryXml, /<cbc:ChargeIndicator>false<\/cbc:ChargeIndicator>/);
   const signedSummaryXml = signXml(summaryXml, certificate, 'summary-document').signedXml;
   assert.equal(verifyXmlSignature(signedSummaryXml, certificate), true);
   assert.equal(extractFromZip(buildZip(summaryName, signedSummaryXml), `${summaryName}.xml`), signedSummaryXml);
