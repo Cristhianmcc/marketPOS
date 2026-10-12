@@ -330,6 +330,42 @@ firma y verificación de factura, boleta identificada, consumidor final, NC, ND,
 Resumen Diario, Comunicación de Baja, nombres SUNAT, PDF con QR y el rechazo en
 PROD de `MODDATOS` y del certificado autofirmado BETA. No sustituye
 una homologación ni una emisión controlada en PROD con certificado y SOL reales.
+
+### Criterio para pasar de BETA a PRODUCCIÓN
+
+El circuito BETA está funcional, pero no debe describirse como listo para uso
+fiscal real solamente por reemplazar los datos de prueba. Antes de habilitar una
+tienda en PRODUCCIÓN deben completarse y comprobarse todos estos puntos:
+
+1. Registrar el RUC, razón social y dirección fiscal reales de la empresa.
+2. Cargar el certificado digital real `.pfx` o `.p12` y su contraseña. Debe estar
+   vigente, contener clave privada, coincidir con el RUC y no ser autofirmado.
+3. Configurar un usuario SOL secundario autorizado para emisión electrónica y su
+   clave. No usar `MODDATOS`, credenciales BETA ni la cuenta personal principal.
+4. Completar `Test Firma`, seleccionar PRODUCCIÓN y escribir la confirmación
+   explícita exigida por la interfaz. Los controles también se repiten en servidor.
+5. Emitir primero comprobantes controlados de importe pequeño: una factura y una
+   boleta; después emitir una nota de crédito asociada. No hacer una emisión masiva.
+6. Confirmar en cada caso estado `ACEPTADO`, respuesta código `0`, XML descargable,
+   CDR guardado y representación PDF con QR. Revisar también el efecto local de la
+   nota sobre venta, inventario, cupón y fiado cuando corresponda.
+7. Validar los XML finales con los XSD oficiales vigentes de SUNAT. Esta validación
+   sigue pendiente y es necesaria antes de declarar la salida a PRODUCCIÓN cerrada.
+8. Hacer un respaldo posterior y verificar que conserva documentos, CDR y
+   correlativos sin incluir certificado privado, claves SOL ni contraseñas.
+
+Los documentos aceptados en BETA demuestran el flujo técnico, pero no tienen valor
+fiscal de PRODUCCIÓN. El soporte tributario actual cubre únicamente operaciones
+gravadas al 18 % con precios finales que incluyen IGV. Una tienda que necesite
+operaciones exoneradas, inafectas o gratuitas, ISC o bolsas sujetas a ICBPER no
+está lista: primero hay que modelar esos afectos, generar el UBL correspondiente y
+probarlo. Si la tienda trabaja exclusivamente con productos gravados al 18 %, la
+salida puede considerarse lista después de superar la validación XSD y la prueba
+controlada real descrita arriba.
+
+Nunca copiar a este archivo, commits, capturas o logs el certificado, sus
+contraseñas, el usuario/clave SOL ni otros secretos de la empresa.
+
 El archivo temporal `--pwfile` de `initdb` también se crea dentro de `logs` en ese runtime y se
 elimina en `finally`; no usa `%TEMP%`, que está bloqueado para el proceso de baja integridad.
 
