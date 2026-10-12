@@ -1108,8 +1108,8 @@ model SunatSettings {
   defaultNdSeries      String @default("FD01") @map("default_nd_series")
 
   // ✅ MÓDULO 18.6: Series para Summary y Voided
-  defaultSummarySeries String @default("RC01") @map("default_summary_series")
-  defaultVoidedSeries  String @default("RA01") @map("default_voided_series")
+  defaultSummarySeries String @default("RC") @map("default_summary_series")
+  defaultVoidedSeries  String @default("RA") @map("default_voided_series")
 
   // Correlativos
   nextFacturaNumber Int @default(1) @map("next_factura_number")

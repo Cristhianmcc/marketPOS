@@ -14,6 +14,9 @@ import { format } from 'date-fns';
 import { SUMMARY_NAMESPACES, SUMMARY_DOC_TYPES, SUMMARY_STATUS, UBL_NAMESPACES } from './types';
 import { formatUBLDate, formatUBLAmount, mapCustomerDocTypeToSunat } from './common';
 
+/** Prefijo fijo exigido por SUNAT para el Resumen Diario. */
+export const SUMMARY_SERIES = 'RC';
+
 export interface SummaryDocumentLine {
   /** ID único del documento en la BD */
   documentId: string;
@@ -52,7 +55,7 @@ export interface SummaryPayload {
   referenceDate: Date;
   /** Fecha de generación del resumen */
   issueDate: Date;
-  /** Serie del resumen (ej: RC01) */
+  /** Prefijo fijo del resumen (RC) */
   series: string;
   /** Número correlativo del resumen */
   number: number;
@@ -67,8 +70,9 @@ export interface SummaryPayload {
 export function getSummaryFilename(ruc: string, series: string, number: number, referenceDate: Date): string {
   const dateStr = format(referenceDate, 'yyyyMMdd');
   const paddedNumber = number.toString().padStart(5, '0');
+  void series;
   // Formato: 20123456789-RC-20240115-00001
-  return `${ruc}-${series}-${dateStr}-${paddedNumber}`;
+  return `${ruc}-${SUMMARY_SERIES}-${dateStr}-${paddedNumber}`;
 }
 
 /**
@@ -78,7 +82,8 @@ export function getSummaryFilename(ruc: string, series: string, number: number, 
 export function getSummaryId(series: string, referenceDate: Date, number: number): string {
   const dateStr = format(referenceDate, 'yyyyMMdd');
   const paddedNumber = number.toString().padStart(5, '0');
-  return `${series}-${dateStr}-${paddedNumber}`;
+  void series;
+  return `${SUMMARY_SERIES}-${dateStr}-${paddedNumber}`;
 }
 
 /**

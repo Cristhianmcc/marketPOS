@@ -149,9 +149,10 @@ export async function POST(
           storeId: document.storeId,
           type: jobType,
           status: 'QUEUED',
-          // Un valor mayor que cero obliga al procesador PROD a consultar el
-          // CDR antes de considerar un reenvío del mismo correlativo.
-          attempts: Math.max(lastJob?.attempts || 0, 1),
+          // El nuevo trabajo recibe su propio margen de reintentos. Un valor
+          // inicial de 1 conserva la reconciliación previa en PROD sin heredar
+          // un contador agotado del trabajo anterior.
+          attempts: 1,
           nextRunAt: new Date(),
         },
       });

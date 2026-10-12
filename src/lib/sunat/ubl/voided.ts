@@ -19,6 +19,9 @@ import { format } from 'date-fns';
 import { VOIDED_NAMESPACES, UBL_NAMESPACES } from './types';
 import { formatUBLDate } from './common';
 
+/** Prefijo fijo exigido por SUNAT para la Comunicacion de Baja. */
+export const VOIDED_SERIES = 'RA';
+
 export interface VoidedDocumentLine {
   /** ID único del documento electrónico en la BD */
   documentId: string;
@@ -42,7 +45,7 @@ export interface VoidedPayload {
   issueDate: Date;
   /** Fecha de emisión del documento a anular (referencia) */
   referenceDate: Date;
-  /** Serie de la comunicación de baja (ej: RA01) */
+  /** Prefijo fijo de la comunicación de baja (RA) */
   series: string;
   /** Número correlativo de la comunicación de baja */
   number: number;
@@ -57,7 +60,8 @@ export interface VoidedPayload {
 export function getVoidedFilename(ruc: string, series: string, number: number, issueDate: Date): string {
   const dateStr = format(issueDate, 'yyyyMMdd');
   const paddedNumber = number.toString().padStart(5, '0');
-  return `${ruc}-${series}-${dateStr}-${paddedNumber}`;
+  void series;
+  return `${ruc}-${VOIDED_SERIES}-${dateStr}-${paddedNumber}`;
 }
 
 /**
@@ -67,7 +71,8 @@ export function getVoidedFilename(ruc: string, series: string, number: number, i
 export function getVoidedId(series: string, issueDate: Date, number: number): string {
   const dateStr = format(issueDate, 'yyyyMMdd');
   const paddedNumber = number.toString().padStart(5, '0');
-  return `${series}-${dateStr}-${paddedNumber}`;
+  void series;
+  return `${VOIDED_SERIES}-${dateStr}-${paddedNumber}`;
 }
 
 /**

@@ -21,7 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
-import { generateSummaryXML, getSummaryFilename, validateSummaryPayload } from '@/lib/sunat/ubl/summary';
+import { generateSummaryXML, getSummaryFilename, SUMMARY_SERIES, validateSummaryPayload } from '@/lib/sunat/ubl/summary';
 import type { SummaryPayload, SummaryDocumentLine } from '@/lib/sunat/ubl/summary';
 import { signXml, SignatureError } from '@/lib/sunat/sign/signXmlCrypto';
 import { loadCertificate, CertificateError } from '@/lib/sunat/cert/loadCertificate';
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     // 3. Obtener siguiente número de resumen
     const nextNumber = await getNextSunatNumber(prisma, storeId, 'SUMMARY');
-    const series = settings.defaultSummarySeries || 'RC01';
+    const series = SUMMARY_SERIES;
 
     // 4. Construir payload del resumen
     const lines: SummaryDocumentLine[] = boletas.map(boleta => ({

@@ -94,11 +94,15 @@ export async function POST(
       );
     }
 
+    const jobType = document.docType === 'SUMMARY' || document.docType === 'VOIDED'
+      ? 'SEND_SUMMARY'
+      : 'SEND_CPE';
+
     // 8. Verificar que no exista un job QUEUED o DONE ya
     const existingJob = await prisma.sunatJob.findFirst({
       where: {
         documentId: documentId,
-        type: 'SEND_CPE',
+        type: jobType,
         status: {
           in: ['QUEUED', 'DONE'],
         },
@@ -121,7 +125,7 @@ export async function POST(
       data: {
         documentId: documentId,
         storeId: document.storeId,
-        type: 'SEND_CPE', // Factura/Boleta/NC/ND
+        type: jobType,
         status: 'QUEUED',
         attempts: 0,
         nextRunAt: new Date(), // Ejecutar inmediatamente

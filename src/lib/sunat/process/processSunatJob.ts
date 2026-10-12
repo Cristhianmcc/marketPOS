@@ -17,6 +17,7 @@ import { parseCdr, isAcceptedBysunat, getStatusMessage } from '../cdr/parseCdr';
 import { loadSolCredentials, sanitizeCredentialsForLog } from '../credentials/loadSolCredentials';
 import { parseAdjustmentMetadata } from '../adjustmentMetadata';
 import { cancelSaleLocally } from '@/lib/sales/cancelSaleLocally';
+import { repairLegacyBatchDocument } from './repairLegacyBatchDocument';
 
 const prisma = new PrismaClient();
 
@@ -381,8 +382,10 @@ async function processSendSummary(job: any, document: any, settings: any): Promi
   const { id: jobId, documentId, attempts } = job;
 
   try {
+    const legacyRepair = await repairLegacyBatchDocument(prisma, job, document, settings);
+    const currentDocument = legacyRepair.document;
     // Validar que el XML esté firmado
-    if (!document.xmlSigned) {
+    if (!currentDocument.xmlSigned) {
       await markJobFailed(jobId, 'XML_NOT_SIGNED', 'XML no está firmado', false);
       return {
         success: false,
@@ -392,7 +395,7 @@ async function processSendSummary(job: any, document: any, settings: any): Promi
       };
     }
 
-    if (attempts > 0 && settings.env === 'PROD' && !document.sunatTicket) {
+    if (attempts > 0 && settings.env === 'PROD' && !currentDocument.sunatTicket && !legacyRepair.repaired) {
       await markJobFailed(
         jobId,
         'AMBIGUOUS_SUMMARY_RETRY',
@@ -408,14 +411,14 @@ async function processSendSummary(job: any, document: any, settings: any): Promi
     }
 
     // BETA usa MODDATOS; PROD carga las credenciales de la tienda.
-    const solCredentials = await loadSolCredentials(prisma, document.storeId);
+    const solCredentials = await loadSolCredentials(prisma, currentDocument.storeId);
 
     // Construir nombre de archivo según tipo (SUMMARY o VOIDED)
     // fullNumber fue calculado antes de firmar. Debe ser tambien el nombre del ZIP.
-    const filename = document.fullNumber;
+    const filename = currentDocument.fullNumber;
 
     // Construir ZIP
-    const zipBase64 = buildZip(filename, document.xmlSigned);
+    const zipBase64 = buildZip(filename, currentDocument.xmlSigned);
 
     // Guardar ZIP enviado (opcional, solo en desarrollo)
     if (process.env.NODE_ENV === 'development') {
@@ -468,7 +471,7 @@ async function processSendSummary(job: any, document: any, settings: any): Promi
         where: { documentId, type: 'QUERY_TICKET', status: { in: ['QUEUED', 'RUNNING', 'DONE'] } },
       });
       if (!existingQuery) await tx.sunatJob.create({
-        data: { storeId: document.storeId, documentId, type: 'QUERY_TICKET', status: 'QUEUED', nextRunAt },
+        data: { storeId: currentDocument.storeId, documentId, type: 'QUERY_TICKET', status: 'QUEUED', nextRunAt },
       });
     });
 

@@ -3,7 +3,7 @@ import { generateBetaCertificate } from '../src/lib/sunat/cert/generateBetaCerti
 import { parsePfxCertificate } from '../src/lib/sunat/cert/loadCertificate';
 import { generateInvoiceXML } from '../src/lib/sunat/ubl/invoice';
 import { signXml, verifyXmlSignature } from '../src/lib/sunat/sign/signXmlCrypto';
-import { buildZip } from '../src/lib/sunat/zip/buildZip';
+import { buildZip, extractFromZip } from '../src/lib/sunat/zip/buildZip';
 import { parseCdr } from '../src/lib/sunat/cdr/parseCdr';
 import type { SunatDocumentPayload } from '../src/lib/sunat/types';
 import { validateBoletaData } from '../src/lib/sunat/validation/fiscalValidations';
@@ -12,6 +12,7 @@ import { generateDebitNoteXML } from '../src/lib/sunat/ubl/debitNote';
 import { generateSummaryXML, getSummaryFilename } from '../src/lib/sunat/ubl/summary';
 import { generateVoidedXML, getVoidedFilename } from '../src/lib/sunat/ubl/voided';
 import { parseSunatReferenceDate } from '../src/lib/sunat/referenceDate';
+import { toSunatZipFilename } from '../src/lib/sunat/soap/sunatClient';
 
 async function main() {
   const peruDay = parseSunatReferenceDate('2026-10-11');
@@ -118,8 +119,12 @@ async function main() {
     referenceDate, issueDate: referenceDate, series: 'RC01', number: 1,
     lines: [{ documentId: 'boleta-1', series: 'B001', number: 1, docType: 'BOLETA', customerDocType: 'DNI', customerDocNumber: '12345678', taxable: 8.47, igv: 1.53, total: 10 }],
   }, 'summary-document');
-  assert.equal(summaryName, '20123456789-RC01-20261001-00001');
-  assert.equal(verifyXmlSignature(signXml(summaryXml, certificate, 'summary-document').signedXml, certificate), true);
+  assert.equal(summaryName, '20123456789-RC-20261001-00001');
+  assert.match(summaryXml, /<cbc:ID>RC-20261001-00001<\/cbc:ID>/);
+  const signedSummaryXml = signXml(summaryXml, certificate, 'summary-document').signedXml;
+  assert.equal(verifyXmlSignature(signedSummaryXml, certificate), true);
+  assert.equal(extractFromZip(buildZip(summaryName, signedSummaryXml), `${summaryName}.xml`), signedSummaryXml);
+  assert.equal(toSunatZipFilename(summaryName), `${summaryName}.zip`);
 
   const voidedName = getVoidedFilename(payload.issuer.ruc, 'RA01', 1, referenceDate);
   const voidedXml = generateVoidedXML({
@@ -127,7 +132,8 @@ async function main() {
     referenceDate, issueDate: referenceDate, series: 'RA01', number: 1,
     lines: [{ documentId: 'invoice-1', documentTypeCode: '01', series: 'F001', number: 1, voidReason: 'ERROR EN LA OPERACION' }],
   }, 'voided-document');
-  assert.equal(voidedName, '20123456789-RA01-20261001-00001');
+  assert.equal(voidedName, '20123456789-RA-20261001-00001');
+  assert.match(voidedXml, /<cbc:ID>RA-20261001-00001<\/cbc:ID>/);
   assert.equal(verifyXmlSignature(signXml(voidedXml, certificate, 'voided-document').signedXml, certificate), true);
 
   const acceptedCdr = `<?xml version="1.0"?><ApplicationResponse xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><cbc:ResponseCode>0</cbc:ResponseCode><cbc:Description>Aceptado</cbc:Description></ApplicationResponse>`;

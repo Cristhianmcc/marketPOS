@@ -22,7 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
-import { generateVoidedXML, getVoidedFilename, validateVoidedPayload, mapDocTypeToCode } from '@/lib/sunat/ubl/voided';
+import { generateVoidedXML, getVoidedFilename, validateVoidedPayload, mapDocTypeToCode, VOIDED_SERIES } from '@/lib/sunat/ubl/voided';
 import type { VoidedPayload, VoidedDocumentLine } from '@/lib/sunat/ubl/voided';
 import { signXml, SignatureError } from '@/lib/sunat/sign/signXmlCrypto';
 import { loadCertificate, CertificateError } from '@/lib/sunat/cert/loadCertificate';
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Obtener siguiente número de baja
     const nextNumber = await getNextSunatNumber(prisma, storeId, 'VOIDED');
-    const series = settings.defaultVoidedSeries || 'RA01';
+    const series = VOIDED_SERIES;
     const issueDate = new Date();
 
     // La fecha de referencia es la fecha de emisión de los documentos

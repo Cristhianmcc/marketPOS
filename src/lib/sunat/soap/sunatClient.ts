@@ -93,6 +93,11 @@ export interface GetStatusCdrResult {
   errorMessage?: string;
 }
 
+/** Convierte el nombre base o XML al nombre ZIP que exige SUNAT. */
+export function toSunatZipFilename(filename: string): string {
+  return `${filename.replace(/\.(?:xml|zip)$/i, '')}.zip`;
+}
+
 function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -165,7 +170,7 @@ export async function sendBill(
 
     // Preparar parámetros
     const params = {
-      fileName: filename.replace('.xml', '.zip'), // Asegurar extensión .zip
+      fileName: toSunatZipFilename(filename),
       contentFile: zipBase64,
     };
 
@@ -234,7 +239,7 @@ export async function sendSummary(
     client.setSecurity(wsSecurity);
 
     const params = {
-      fileName: filename.replace('.xml', '.zip'),
+      fileName: toSunatZipFilename(filename),
       contentFile: zipBase64,
     };
 

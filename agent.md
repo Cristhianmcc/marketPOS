@@ -276,7 +276,7 @@ entorno de prueba. Es una base
 vacía y descartable para pruebas; no debe tratarse como almacenamiento definitivo ni incluir
 datos reales de clientes.
 
-### Estado SUNAT de la rama Beta (09/10/2026)
+### Estado SUNAT de la rama Beta (11/10/2026)
 
 - Facturas, boletas, notas de crédito y notas de débito generan UBL, se firman,
   se verifican localmente y se encolan sin bloquear la venta. La representación
@@ -293,6 +293,10 @@ datos reales de clientes.
   boletas y usa `SEND_SUMMARY` seguido de `QUERY_TICKET`. La Comunicación de Baja
   usa el mismo flujo para facturas y notas; las boletas se corrigen mediante
   Resumen Diario o nota de crédito según el caso.
+- Los nombres e IDs de lotes usan los prefijos fijos exigidos por SUNAT: `RC`
+  para Resumen Diario y `RA` para Comunicación de Baja. El worker reconstruye
+  y vuelve a firmar lotes antiguos `RC01`/`RA01` solo cuando no existe ticket,
+  conservando fecha, correlativo y documentos de origen.
 - Electron consulta la cola cada diez segundos. Sin conexión, el endpoint deja
   los trabajos intactos. En PROD, un reintento de factura o nota consulta primero
   `getStatusCdr`; si no puede reconciliar el intento anterior, no reenvía a

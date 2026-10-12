@@ -19,9 +19,10 @@ import AdmZip from 'adm-zip';
  */
 export function buildZip(filename: string, xmlContent: string): string {
   const zip = new AdmZip();
+  const xmlFilename = /\.xml$/i.test(filename) ? filename : `${filename}.xml`;
   
   // Agregar el XML al ZIP
-  zip.addFile(filename, Buffer.from(xmlContent, 'utf-8'));
+  zip.addFile(xmlFilename, Buffer.from(xmlContent, 'utf-8'));
   
   // Generar el ZIP como buffer
   const zipBuffer = zip.toBuffer();
