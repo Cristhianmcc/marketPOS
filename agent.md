@@ -354,9 +354,9 @@ El proceso principal aplica ese `userData` con `app.setPath` antes de solicitar 
 el argumento Chromium `--user-data-dir` por sí solo no aísla de forma fiable el bloqueo de
 Electron. Si una segunda ejecución termina con código 0, el lanzador lo considera un cierre
 normal y no muestra un error falso.
-Esta variante no copia `.env` dentro de `build-resources` ni del paquete. Para
-pruebas locales, la configuración externa debe suministrarse al proceso al
-arrancar; `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.
+La variante empaquetada genera un `.env` público dentro de `resources` con una
+sola clave: `CLOUD_URL`. No copia URLs de base de datos, claves API, certificados
+ni credenciales. `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.
 
 Límites comprobados: el cálculo actual solo representa operaciones gravadas al
 18 % y precios finales con IGV. No hay clasificación persistida para exoneradas,
@@ -435,10 +435,12 @@ una base real como comprobación rutinaria.
 - El listado de tiendas usa tarjetas adaptables en ventanas menores a `xl` y la
   tabla completa en pantallas amplias; correos largos ya no desbordan las acciones.
 - Portable actualizado en
-  `desktop/dist-electron/win-unpacked/Monterrial POS SUNAT Beta.exe`; el lanzador
-  `Iniciar Monterrial POS SUNAT Beta.exe` está en el mismo directorio.
-  Build ID: `2026-10-12T17:46:52.339Z`. Incluye la recuperación de planes, la
-  corrección de fecha civil peruana y la reparación segura de notas legadas.
+  `desktop/dist-electron-20261012-151436/win-unpacked/Monterrial POS SUNAT Beta.exe`;
+  el lanzador `Iniciar Monterrial POS SUNAT Beta.exe` está en el mismo directorio.
+  Build ID: `2026-10-12T20:13:56.374Z`. Incluye la recuperación de planes, la
+  corrección de fecha civil peruana, la reparación segura de notas legadas y el
+  control completo que impide activar PRODUCCIÓN con datos, SOL o certificado
+  de prueba. El paquete fue verificado con `CLOUD_URL` como única clave pública.
 - Prueba esperada del Resumen Diario: cerrar el BETA anterior, abrir este
   portable, entrar como OWNER, abrir Documentos Electronicos, elegir la fecha
   local de las boletas pendientes y pulsar `Resumen de boletas`. Una boleta del
