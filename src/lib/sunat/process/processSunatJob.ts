@@ -19,6 +19,7 @@ import { parseAdjustmentMetadata } from '../adjustmentMetadata';
 import { cancelSaleLocally } from '@/lib/sales/cancelSaleLocally';
 import { repairLegacyBatchDocument } from './repairLegacyBatchDocument';
 import { repairLegacyCpeDocument } from './repairLegacyCpeDocument';
+import { validateSunatXml } from '../validation/xsdValidation';
 
 const prisma = new PrismaClient();
 
@@ -173,6 +174,12 @@ async function processSendCpe(job: any, document: any, settings: any): Promise<P
         documentId,
         message: 'XML no está firmado',
       };
+    }
+
+    const xsdValidation = await validateSunatXml(document.docType, document.xmlSigned);
+    if (!xsdValidation.valid) {
+      await markJobFailed(jobId, xsdValidation.code!, xsdValidation.message!, false);
+      return { success: false, jobId, documentId, message: xsdValidation.message! };
     }
 
     // BETA usa MODDATOS; PROD carga las credenciales exclusivas de la tienda.
@@ -398,6 +405,12 @@ async function processSendSummary(job: any, document: any, settings: any): Promi
         documentId,
         message: 'XML del resumen no está firmado',
       };
+    }
+
+    const xsdValidation = await validateSunatXml(currentDocument.docType, currentDocument.xmlSigned);
+    if (!xsdValidation.valid) {
+      await markJobFailed(jobId, xsdValidation.code!, xsdValidation.message!, false);
+      return { success: false, jobId, documentId, message: xsdValidation.message! };
     }
 
     if (attempts > 0 && settings.env === 'PROD' && !currentDocument.sunatTicket && !legacyRepair.repaired) {

@@ -97,6 +97,19 @@ const COPY_TASKS = [
     to: path.join(BUILD_RESOURCES, 'server', 'sunat', 'wsdl'),
     name: 'SUNAT local WSDL files'
   },
+  {
+    from: path.join(ROOT_DIR, 'src', 'lib', 'sunat', 'xsd'),
+    to: path.join(BUILD_RESOURCES, 'server', 'sunat', 'xsd'),
+    name: 'SUNAT local XSD files'
+  },
+  {
+    // xmllint-wasm resolves xmllint.wasm relative to its Node entry point.
+    // Copy the complete package explicitly so the standalone desktop runtime
+    // never depends on Next.js file tracing for this native runtime asset.
+    from: path.join(ROOT_DIR, 'node_modules', 'xmllint-wasm'),
+    to: path.join(BUILD_RESOURCES, 'server', 'node_modules', 'xmllint-wasm'),
+    name: 'xmllint-wasm XSD validator'
+  },
   // Copy ALL @prisma packages at once to avoid missing sub-package errors
   {
     from: path.join(ROOT_DIR, 'node_modules', '@prisma'),

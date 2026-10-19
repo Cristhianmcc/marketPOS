@@ -4,6 +4,10 @@ import type { NextConfig } from "next";
 const isDesktopBuild = process.env.DESKTOP_BUILD === '1';
 
 const nextConfig: NextConfig = {
+  // Keep xmllint-wasm as a real Node package. It starts a worker and resolves
+  // xmllint-node.js/xmllint.wasm relative to its own __dirname; bundling it
+  // into a Next.js route would point that worker at the route directory.
+  serverExternalPackages: ['xmllint-wasm'],
   // Generar build standalone SOLO para Electron desktop
   ...(isDesktopBuild && { output: 'standalone' }),
   // La Beta desktop expone el acceso visual al onboarding SUNAT. Las APIs

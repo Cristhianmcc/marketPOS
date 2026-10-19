@@ -19,6 +19,15 @@ import { parseSunatReferenceDate } from '../src/lib/sunat/referenceDate';
 import { toSunatZipFilename } from '../src/lib/sunat/soap/sunatClient';
 import { needsLegacyAddressTypeRepair } from '../src/lib/sunat/process/repairLegacyCpeDocument';
 import { validateProductionReadiness } from '../src/lib/sunat/validation/productionReadiness';
+import { validateSunatXml } from '../src/lib/sunat/validation/xsdValidation';
+
+async function assertValidXsd(
+  docType: Parameters<typeof validateSunatXml>[0],
+  xml: string,
+): Promise<void> {
+  const result = await validateSunatXml(docType, xml);
+  assert.equal(result.valid, true, result.message || result.errors.join(' | '));
+}
 
 async function main() {
   const peruDay = parseSunatReferenceDate('2026-10-11');
@@ -104,6 +113,8 @@ async function main() {
   assert.equal(signed.signedXml.includes('MOCK_'), false);
   assert.ok(signed.digestValue);
   assert.ok(signed.signatureValue);
+  await assertValidXsd('BOLETA', signed.signedXml);
+  await assertValidXsd('FACTURA', signed.signedXml);
 
   const consumerFinalPayload: SunatDocumentPayload = {
     ...payload,
@@ -128,7 +139,9 @@ async function main() {
   assert.match(creditXml, /<cbc:ResponseCode>01<\/cbc:ResponseCode>/);
   assert.match(creditXml, /<cbc:DocumentTypeCode>03<\/cbc:DocumentTypeCode>/);
   assert.match(creditXml, /<cbc:AddressTypeCode>0000<\/cbc:AddressTypeCode>/);
-  assert.equal(verifyXmlSignature(signXml(creditXml, certificate, 'credit-note').signedXml, certificate), true);
+  const signedCreditXml = signXml(creditXml, certificate, 'credit-note').signedXml;
+  assert.equal(verifyXmlSignature(signedCreditXml, certificate), true);
+  await assertValidXsd('NOTA_CREDITO', signedCreditXml);
   assert.equal(needsLegacyAddressTypeRepair({
     docType: 'NOTA_CREDITO', store: { status: 'ACTIVE' }, xmlSigned: '<CreditNote/>', cdrZip: null, sunatTicket: null,
   }), true);
@@ -145,7 +158,9 @@ async function main() {
     { referencedDocType: 'BOLETA', referencedDocNumber: 'B001-00000001', debitNoteTypeCode: '01', debitNoteReason: 'INTERESES' },
   );
   assert.match(debitXml, /<cbc:ResponseCode>01<\/cbc:ResponseCode>/);
-  assert.equal(verifyXmlSignature(signXml(debitXml, certificate, 'debit-note').signedXml, certificate), true);
+  const signedDebitXml = signXml(debitXml, certificate, 'debit-note').signedXml;
+  assert.equal(verifyXmlSignature(signedDebitXml, certificate), true);
+  await assertValidXsd('NOTA_DEBITO', signedDebitXml);
 
   const referenceDate = new Date('2026-10-01T12:00:00-05:00');
   const summaryName = getSummaryFilename(payload.issuer.ruc, 'RC01', 1, referenceDate);
@@ -160,6 +175,7 @@ async function main() {
   assert.doesNotMatch(summaryXml, /<cbc:ChargeIndicator>false<\/cbc:ChargeIndicator>/);
   const signedSummaryXml = signXml(summaryXml, certificate, 'summary-document').signedXml;
   assert.equal(verifyXmlSignature(signedSummaryXml, certificate), true);
+  await assertValidXsd('SUMMARY', signedSummaryXml);
   assert.equal(extractFromZip(buildZip(summaryName, signedSummaryXml), `${summaryName}.xml`), signedSummaryXml);
   assert.equal(toSunatZipFilename(summaryName), `${summaryName}.zip`);
 
@@ -171,7 +187,10 @@ async function main() {
   }, 'voided-document');
   assert.equal(voidedName, '20123456789-RA-20261001-00001');
   assert.match(voidedXml, /<cbc:ID>RA-20261001-00001<\/cbc:ID>/);
-  assert.equal(verifyXmlSignature(signXml(voidedXml, certificate, 'voided-document').signedXml, certificate), true);
+  const signedVoidedXml = signXml(voidedXml, certificate, 'voided-document').signedXml;
+  assert.equal(verifyXmlSignature(signedVoidedXml, certificate), true);
+  await assertValidXsd('VOIDED', signedVoidedXml);
+  assert.equal((await validateSunatXml('FACTURA', '<Invoice/>')).valid, false);
 
   const acceptedCdr = `<?xml version="1.0"?><ApplicationResponse xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><cbc:ResponseCode>0</cbc:ResponseCode><cbc:Description>Aceptado</cbc:Description></ApplicationResponse>`;
   const observedCdr = `<?xml version="1.0"?><ApplicationResponse xmlns:x="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"><x:ResponseCode>0</x:ResponseCode><x:Description>Aceptado</x:Description><x:Note>Observación de prueba</x:Note></ApplicationResponse>`;

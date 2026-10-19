@@ -6,9 +6,14 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-const RUC = '10746250211';
-const USUARIO = 'USSER111';
-const PASSWORD = 'Qwert12345';
+const RUC = String(process.env.SUNAT_RUC || '').trim();
+const USUARIO = String(process.env.SUNAT_SOL_USER || '').trim();
+const PASSWORD = String(process.env.SUNAT_SOL_PASS || '');
+
+if (!/^\d{11}$/.test(RUC) || !USUARIO || !PASSWORD) {
+  console.error('Define SUNAT_RUC, SUNAT_SOL_USER y SUNAT_SOL_PASS antes de ejecutar este script.');
+  process.exit(1);
+}
 
 const solUser = RUC + USUARIO;
 const auth = Buffer.from(`${solUser}:${PASSWORD}`).toString('base64');

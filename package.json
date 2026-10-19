@@ -78,6 +78,7 @@
     "typescript": "^5",
     "xml-crypto": "^6.1.2",
     "xmlbuilder2": "^4.0.3",
+    "xmllint-wasm": "^5.1.0",
     "zod": "^4.2.1"
   },
   "devDependencies": {

@@ -2,9 +2,13 @@ const { PrismaClient } = require('@prisma/client');
 const p = new PrismaClient();
 
 async function main() {
-  const RUC = '10746250211';
-  const USUARIO_SOL = 'USSER111';
-  const PASSWORD_SOL = 'Qwert12345';
+  const RUC = String(process.env.SUNAT_RUC || '').trim();
+  const USUARIO_SOL = String(process.env.SUNAT_SOL_USER || '').trim();
+  const PASSWORD_SOL = String(process.env.SUNAT_SOL_PASS || '');
+
+  if (!/^\d{11}$/.test(RUC) || !USUARIO_SOL || !PASSWORD_SOL) {
+    throw new Error('Configura SUNAT_RUC, SUNAT_SOL_USER y SUNAT_SOL_PASS');
+  }
   
   // Usuario SOL completo: RUC + USUARIO
   const solUserCompleto = RUC + USUARIO_SOL;

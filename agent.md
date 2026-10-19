@@ -349,8 +349,10 @@ tienda en PRODUCCIÓN deben completarse y comprobarse todos estos puntos:
 6. Confirmar en cada caso estado `ACEPTADO`, respuesta código `0`, XML descargable,
    CDR guardado y representación PDF con QR. Revisar también el efecto local de la
    nota sobre venta, inventario, cupón y fiado cuando corresponda.
-7. Validar los XML finales con los XSD oficiales vigentes de SUNAT. Esta validación
-   sigue pendiente y es necesaria antes de declarar la salida a PRODUCCIÓN cerrada.
+7. Verificar que la validación XSD local continúe pasando para factura, boleta,
+   nota de crédito, nota de débito, Resumen Diario y Comunicación de Baja. Desde
+   el 18/10/2026 el worker falla antes de comprimir o enviar cuando el XML firmado
+   no satisface los esquemas empaquetados.
 8. Hacer un respaldo posterior y verificar que conserva documentos, CDR y
    correlativos sin incluir certificado privado, claves SOL ni contraseñas.
 
@@ -360,8 +362,8 @@ gravadas al 18 % con precios finales que incluyen IGV. Una tienda que necesite
 operaciones exoneradas, inafectas o gratuitas, ISC o bolsas sujetas a ICBPER no
 está lista: primero hay que modelar esos afectos, generar el UBL correspondiente y
 probarlo. Si la tienda trabaja exclusivamente con productos gravados al 18 %, la
-salida puede considerarse lista después de superar la validación XSD y la prueba
-controlada real descrita arriba.
+validación XSD ya está cubierta; la salida puede considerarse lista después de
+superar la prueba controlada real descrita arriba.
 
 Nunca copiar a este archivo, commits, capturas o logs el certificado, sus
 contraseñas, el usuario/clave SOL ni otros secretos de la empresa.
@@ -398,8 +400,9 @@ Límites comprobados: el cálculo actual solo representa operaciones gravadas al
 18 % y precios finales con IGV. No hay clasificación persistida para exoneradas,
 inafectas, gratuitas, ISC o bolsas. La prueba local cubre UBL, firma, ZIP y CDR,
 y ya se verificaron emisiones controladas contra SUNAT BETA de facturas, boletas,
-notas y resúmenes. Antes de producción todavía se requiere validación con los XSD
-oficiales y una prueba controlada con certificado y credenciales SOL reales.
+notas y resúmenes. Los seis formatos se validan además con XSD antes de salir a la
+red. Antes de producción todavía se requiere una prueba controlada con certificado
+y credenciales SOL reales.
 
 ### Escritorio y persistencia
 
@@ -439,6 +442,39 @@ No ejecutar `db:reset`, `force-reset`, semillas, importaciones o restauración e
 una base real como comprobación rutinaria.
 
 ## Estado y prioridades pendientes
+
+### Validación XSD y empaquetado SUNAT (2026-10-18)
+
+- `src/lib/sunat/validation/xsdValidation.ts` valida el XML ya firmado antes de
+  crear el ZIP o abrir una conexión. Cubre `FACTURA`, `BOLETA`, `NOTA_CREDITO`,
+  `NOTA_DEBITO`, `SUMMARY` y `VOIDED`; un formato desconocido o un fallo interno
+  del validador bloquea el envío y deja evidencia en el job.
+- Los esquemas están versionados en `src/lib/sunat/xsd`: UBL 2.1 de OASIS para
+  facturas y notas, y los esquemas UBL/SUNAT 2.0 requeridos por Resumen Diario y
+  Comunicación de Baja. Su procedencia y límites están en
+  `src/lib/sunat/xsd/README.md`.
+- `xmllint-wasm` se conserva como paquete Node externo porque abre
+  `xmllint-node.js` como worker y carga `xmllint.wasm` en tiempo de ejecución.
+  `desktop/scripts/prepare-build.js` copia el paquete completo y los 34 XSD al
+  servidor del portable; no dependerá de internet para validar.
+- `npm run sunat:test:local` pasó el 18/10/2026 e incluye los seis formatos y un
+  XML inválido que debe ser rechazado. `npm run build:only` también pasó; no se
+  ejecutó `prisma db push` ni se modificó una base real.
+- Portable de validación generado en
+  `desktop/dist-electron/win-unpacked/Iniciar Monterrial POS SUNAT Beta.exe`,
+  Build ID `2026-10-19T02:43:00.665Z`. Se comprobó que contiene los 34 XSD, el
+  binario `xmllint.wasm`, el worker Node y solamente `CLOUD_URL` como clave del
+  entorno público. Esta salida reemplaza al portable del 12/10/2026 para las
+  pruebas de la rama Beta.
+- Los descargadores, la prueba de autenticación y los actualizadores auxiliares
+  ya no contienen credenciales incrustadas: exigen `SUNAT_RUC`,
+  `SUNAT_SOL_USER` y `SUNAT_SOL_PASS` en el entorno. Si alguna credencial válida
+  estuvo versionada antes de esta corrección, debe rotarse aunque ya no aparezca
+  en los archivos actuales.
+- La validación estructural no amplía el modelo tributario. Siguen fuera de
+  alcance operaciones exoneradas, inafectas o gratuitas, ISC e ICBPER.
+- Para cerrar la salida a PRODUCCIÓN falta la emisión controlada con RUC, SOL y
+  certificado reales: factura, boleta y nota asociada aceptadas, con CDR y PDF.
 
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
