@@ -324,6 +324,7 @@ export default function POSPage() {
   const batchExpiryEnabled = isFlagOn('ENABLE_BATCH_EXPIRY');
   // ✅ MÓDULO PH4: Paciente / receptor de medicamentos
   const patientsEnabled = isFlagOn('ENABLE_PATIENTS');
+  const controlledBookEnabled = isFlagOn('ENABLE_CONTROLLED_BOOK');
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
   const [posTab, setPosTab] = useState<'products' | 'services'>('products');
@@ -1643,6 +1644,24 @@ export default function POSPage() {
       }
     }
 
+    const controlledCartItems = cart.filter(
+      (item) =>
+        !item.isService &&
+        !item.isFreeItem &&
+        item.storeProduct.product.requiresPrescription
+    );
+    if (controlledBookEnabled && controlledCartItems.length > 0) {
+      if (!selectedPatient) {
+        toast.error('Selecciona un paciente para la venta controlada');
+        openPatientModal();
+        return;
+      }
+      if (controlledCartItems.some((item) => !item.rxPrescriptionNumber?.trim())) {
+        toast.error('Todos los productos controlados requieren número de receta');
+        return;
+      }
+    }
+
     // ✅ MÓDULO 16.1: Prevención de doble submit - deshabilitar botón inmediatamente
     setProcessing(true);
     setShowPaymentModal(false);
@@ -1713,7 +1732,7 @@ export default function POSPage() {
       }
 
       // ✅ MÓDULO PH4: Enviar paciente/receptor si está seleccionado
-      if (patientsEnabled && selectedPatient) {
+      if ((patientsEnabled || controlledBookEnabled) && selectedPatient) {
         checkoutData.patientId = selectedPatient.id;
         if (patientConsultReason.trim()) {
           checkoutData.consultReason = patientConsultReason.trim();
@@ -1865,29 +1884,6 @@ export default function POSPage() {
       // ✅ MÓDULO 18.2: Prefetch del ticket para carga instantánea
       // Precargar datos del ticket mientras el usuario ve el modal
       fetch(`/api/sales/${data.saleId}`).catch(() => {});
-
-      // ✅ MÓDULO PH4: Fallback client-side para registrar dispensación
-      // Garantiza registro aunque el fire-and-forget del servidor falle
-      if (patientsEnabled && selectedPatient) {
-        const patientItems = cart
-          .filter((i) => !i.isService && i.storeProduct)
-          .map((i) => ({
-            productName: i.storeProduct.product.name,
-            genericName: (i.storeProduct.product as any).genericName || null,
-            concentration: (i.storeProduct.product as any).concentration || null,
-            quantity: i.quantity,
-          }));
-        fetch('/api/patients/medication', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patientId: selectedPatient.id,
-            saleId: data.saleId,
-            consultReason: patientConsultReason || null,
-            items: patientItems,
-          }),
-        }).catch(() => {});
-      }
 
       clearCart();
       setProducts([]);
@@ -2656,7 +2652,7 @@ export default function POSPage() {
               )}
 
               {/* ✅ MÓDULO PH4: Receptor de medicamentos (farmacia/ONG) */}
-              {patientsEnabled && (
+              {(patientsEnabled || controlledBookEnabled) && (
                 <div className="bg-teal-50 rounded-lg p-3 border border-teal-200">
                   <label className="block text-sm font-medium text-teal-800 mb-2">
                     Receptor / Paciente
@@ -3497,7 +3493,12 @@ export default function POSPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">
-                  Número de receta <span className="text-gray-400">(opcional)</span>
+                  Número de receta{' '}
+                  {controlledBookEnabled ? (
+                    <span className="text-red-500">(obligatorio)</span>
+                  ) : (
+                    <span className="text-gray-400">(opcional)</span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -3534,6 +3535,10 @@ export default function POSPage() {
               </button>
               <button
                 onClick={() => {
+                  if (controlledBookEnabled && !rxPrescriptionNumber.trim()) {
+                    toast.error('Ingresa el número de receta');
+                    return;
+                  }
                   const sp = rxPendingProduct;
                   const rx = {
                     observation: rxObservation,

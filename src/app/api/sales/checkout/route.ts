@@ -26,6 +26,7 @@ import { checkRateLimit } from '@/lib/rateLimit'; // ✅ MÓDULO 16.1: Rate Limi
 import { getIdempotentResult, saveIdempotentResult } from '@/lib/idempotency'; // ✅ MÓDULO 16.1: Idempotency
 import { acquireCheckoutLock, releaseCheckoutLock } from '@/lib/checkoutLock'; // ✅ MÓDULO 16.1: Checkout Lock
 import { normalizeToBaseUnit } from '@/lib/units'; // ✅ MÓDULO V2: Conversiones de unidades
+import { PharmacyTraceError, registerPharmacyTrace } from '@/lib/sales/pharmacyTrace';
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -98,7 +99,11 @@ async function executeCheckout(
   customerId?: string, // ✅ Para FIADO
   discountTotal?: number, // Módulo 14: descuento global
   couponCode?: string, // ✅ Módulo 14.2-A: cupón
-  paymentSplits?: PaymentSplit[] // ✅ Pago Mixto: desglose
+  paymentSplits?: PaymentSplit[], // ✅ Pago Mixto: desglose
+  patientId?: string,
+  prescribedBy?: string,
+  cmpNumber?: string,
+  consultReason?: string
 ): Promise<{ sale: any; saleItems: any[]; receivable?: any }> {
   return await prisma.$transaction(async (tx) => {
     // 1. Verificar si la tienda está en Demo Mode
@@ -1105,6 +1110,45 @@ async function executeCheckout(
 
     const saleItems = [...productSaleItems, ...serviceSaleItems, ...freeItemSaleItems];
 
+    // La trazabilidad farmacéutica forma parte de la misma transacción que la venta.
+    // Una referencia inválida revierte también la venta y el descuento de stock.
+    try {
+      await registerPharmacyTrace(tx, {
+        storeId: session.storeId,
+        userId: session.userId,
+        sale: {
+          id: sale.id,
+          saleNumber: sale.saleNumber,
+          createdAt: sale.createdAt,
+        },
+        productLines: itemsWithDiscounts.map((item, index) => {
+          const sp = storeProducts.find((product) => product.id === item.storeProductId)!;
+          const saleItem = productSaleItems[index];
+          return {
+            saleItemId: saleItem.id,
+            productName: sp.product.name,
+            genericName: sp.product.genericName || null,
+            concentration: sp.product.concentration || null,
+            laboratory: sp.product.laboratory || null,
+            quantity: saleItem.quantity,
+            batchBreakdown: saleItem.batchBreakdown ?? null,
+            requiresPrescription: sp.product.requiresPrescription,
+            prescriptionNumber: item.rxPrescriptionNumber,
+            observation: item.rxObservation,
+          };
+        }),
+        patientId,
+        prescribedBy,
+        cmpNumber,
+        consultReason,
+      });
+    } catch (error) {
+      if (error instanceof PharmacyTraceError) {
+        throw new CheckoutError(error.code, error.statusCode, error.message);
+      }
+      throw error;
+    }
+
     // 7. Crear Movements — SOLO PRODUCTOS
     // Si FEFO está activo y el item tiene asignación de lotes: un movement por lote consumido.
     // Si no, un único movement por item (flujo original).
@@ -1522,7 +1566,11 @@ export async function POST(req: NextRequest) {
           customerId,
           discountTotal,
           couponCode,
-          paymentSplits
+          paymentSplits,
+          patientId,
+          prescribedBy,
+          cmpNumber,
+          consultReason
         );
         break; // Éxito, salir del bucle
       } catch (error: any) {
@@ -1611,84 +1659,6 @@ export async function POST(req: NextRequest) {
       }).catch(err => {
         console.error('[AuditLog] Failed to log RECEIVABLE_CREATED:', err);
       });
-    }
-
-    // ✅ FARMACIA: Registrar PatientMedication + ControlledBookEntry (fire-and-forget)
-    if (patientId || items.some(i => i.rxPrescriptionNumber)) {
-      (async () => {
-        try {
-          // Obtener info de productos vendidos
-          const productIds = items.filter(i => i.storeProductId).map(i => i.storeProductId!);
-          const soldProducts = await prisma.storeProduct.findMany({
-            where: { id: { in: productIds }, storeId: session.storeId },
-            include: { product: { select: { name: true, genericName: true, concentration: true, laboratory: true, requiresPrescription: true } } },
-          });
-
-          const userName = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true } });
-          let patientInfo: { name: string; dni: string } | null = null;
-          if (patientId) {
-            const p = await prisma.patient.findFirst({ where: { id: patientId, storeId: session.storeId }, select: { name: true, dni: true } });
-            patientInfo = p;
-          }
-
-          // Registrar PatientMedication
-          if (patientId) {
-            const medEntries = items.filter(i => i.storeProductId).map(item => {
-              const sp = soldProducts.find(p => p.id === item.storeProductId);
-              if (!sp) return null;
-              return {
-                patientId,
-                saleId: result.sale.id,
-                productName: sp.product.name,
-                genericName: sp.product.genericName || null,
-                concentration: sp.product.concentration || null,
-                quantity: new Prisma.Decimal(item.quantity),
-                prescribedBy: prescribedBy || item.rxPatientName || null,
-                dosage: null as string | null,
-                consultReason: consultReason?.trim() || null,
-              };
-            }).filter(Boolean);
-
-            if (medEntries.length > 0) {
-              await prisma.patientMedication.createMany({ data: medEntries as any });
-            }
-          }
-
-          // Registrar ControlledBookEntry
-          const enableControlled = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_CONTROLLED_BOOK);
-          if (enableControlled) {
-            const controlledEntries = items.filter(i => i.storeProductId).map(item => {
-              const sp = soldProducts.find(p => p.id === item.storeProductId);
-              if (!sp || !sp.product.requiresPrescription) return null;
-              return {
-                storeId: session.storeId,
-                saleId: result.sale.id,
-                saleNumber: result.sale.saleNumber,
-                saleDate: new Date(),
-                productName: sp.product.name,
-                genericName: sp.product.genericName || null,
-                concentration: sp.product.concentration || null,
-                laboratory: sp.product.laboratory || null,
-                quantity: new Prisma.Decimal(item.quantity),
-                prescriptionNumber: item.rxPrescriptionNumber || null,
-                prescribedBy: prescribedBy || null,
-                cmpNumber: cmpNumber || null,
-                patientId: patientId || null,
-                patientName: patientInfo?.name || item.rxPatientName || null,
-                patientDni: patientInfo?.dni || null,
-                dispensedById: session.userId,
-                dispensedByName: userName?.name || null,
-              };
-            }).filter(Boolean);
-
-            if (controlledEntries.length > 0) {
-              await prisma.controlledBookEntry.createMany({ data: controlledEntries as any });
-            }
-          }
-        } catch (err) {
-          console.error('[Farmacia] Error registrando datos post-venta:', err);
-        }
-      })();
     }
 
     return NextResponse.json(

@@ -533,6 +533,162 @@ async function main() {
     && Number(purchaseReceptionState.items.find(item => item.id === 'item-b').quantityReceived) === Number(beforeOverReceipt.items.find(item => item.id === 'item-b').quantityReceived);
   console.log(`${overReceiptDenied ? 'PASS' : 'FAIL'} H10: over-reception is rejected without changing stock. status=${overReceipt.status}`);
   if (!overReceiptDenied) failures++;
+
+  const { registerPharmacyTrace } = loadRoute('src/lib/sales/pharmacyTrace.ts', {
+    '@prisma/client': {
+      FeatureFlagKey: { ENABLE_CONTROLLED_BOOK: 'ENABLE_CONTROLLED_BOOK' },
+      Prisma: {},
+    },
+  });
+  const pharmacyState = {
+    patientMedications: new Map(),
+    controlledBookEntries: new Map(),
+  };
+  const pharmacyTx = {
+    featureFlag: {
+      findUnique: async ({ where }) => where.storeId_key.storeId === 'store-a'
+        ? { enabled: true }
+        : null,
+    },
+    patient: {
+      findFirst: async ({ where }) => where.id === 'patient-a'
+        && where.storeId === 'store-a'
+        && where.active === true
+        ? { id: 'patient-a', name: 'Audit Patient', dni: '12345678' }
+        : null,
+    },
+    user: {
+      findFirst: async ({ where }) => where.id === 'owner-a'
+        && where.storeId === 'store-a'
+        && where.active === true
+        ? { id: 'owner-a', name: 'Audit Dispenser' }
+        : null,
+    },
+    patientMedication: {
+      createMany: async ({ data, skipDuplicates }) => {
+        let count = 0;
+        for (const entry of data) {
+          if (pharmacyState.patientMedications.has(entry.id)) {
+            if (skipDuplicates) continue;
+            throw new Error('duplicate patient medication');
+          }
+          pharmacyState.patientMedications.set(entry.id, entry);
+          count++;
+        }
+        return { count };
+      },
+    },
+    controlledBookEntry: {
+      createMany: async ({ data, skipDuplicates }) => {
+        let count = 0;
+        for (const entry of data) {
+          if (pharmacyState.controlledBookEntries.has(entry.id)) {
+            if (skipDuplicates) continue;
+            throw new Error('duplicate controlled book entry');
+          }
+          pharmacyState.controlledBookEntries.set(entry.id, entry);
+          count++;
+        }
+        return { count };
+      },
+    },
+  };
+  const validPharmacyTrace = {
+    storeId: 'store-a',
+    userId: 'owner-a',
+    sale: {
+      id: 'sale-a',
+      saleNumber: 81,
+      createdAt: new Date('2026-10-19T12:00:00.000Z'),
+    },
+    patientId: 'patient-a',
+    prescribedBy: 'Audit Doctor',
+    cmpNumber: 'CMP-AUDIT',
+    consultReason: 'Audit only',
+    productLines: [{
+      saleItemId: 'sale-item-a',
+      productName: 'Controlled Audit Product',
+      genericName: 'Audit Generic',
+      concentration: '1 mg',
+      laboratory: 'Audit Laboratory',
+      quantity: new Decimal(2),
+      batchBreakdown: [{ batchNumber: 'LOT-AUDIT', qty: 2 }],
+      requiresPrescription: true,
+      prescriptionNumber: 'RX-AUDIT',
+      observation: 'Audit observation',
+    }],
+  };
+
+  let foreignPatientError;
+  try {
+    await registerPharmacyTrace(pharmacyTx, {
+      ...validPharmacyTrace,
+      patientId: 'patient-from-store-b',
+    });
+  } catch (error) {
+    foreignPatientError = error;
+  }
+  const foreignPatientDenied = foreignPatientError?.code === 'PATIENT_NOT_FOUND'
+    && pharmacyState.patientMedications.size === 0
+    && pharmacyState.controlledBookEntries.size === 0;
+  console.log(`${foreignPatientDenied ? 'PASS' : 'FAIL'} H11: pharmacy trace rejects a patient outside the sale store before writing history.`);
+  if (!foreignPatientDenied) failures++;
+
+  let missingPrescriptionError;
+  try {
+    await registerPharmacyTrace(pharmacyTx, {
+      ...validPharmacyTrace,
+      productLines: validPharmacyTrace.productLines.map(line => ({
+        ...line,
+        prescriptionNumber: ' ',
+      })),
+    });
+  } catch (error) {
+    missingPrescriptionError = error;
+  }
+  const missingPrescriptionDenied = missingPrescriptionError?.code === 'PRESCRIPTION_REQUIRED'
+    && pharmacyState.patientMedications.size === 0
+    && pharmacyState.controlledBookEntries.size === 0;
+  console.log(`${missingPrescriptionDenied ? 'PASS' : 'FAIL'} H11: controlled products require a prescription before trace records are written.`);
+  if (!missingPrescriptionDenied) failures++;
+
+  const firstTrace = await registerPharmacyTrace(pharmacyTx, validPharmacyTrace);
+  const replayedTrace = await registerPharmacyTrace(pharmacyTx, validPharmacyTrace);
+  const medication = pharmacyState.patientMedications.get('patient-med:patient-a:sale-item-a');
+  const controlledEntry = pharmacyState.controlledBookEntries.get('controlled:sale-item-a');
+  const pharmacyTraceIdempotent = firstTrace.patientMedications === 1
+    && firstTrace.controlledBookEntries === 1
+    && replayedTrace.patientMedications === 0
+    && replayedTrace.controlledBookEntries === 0
+    && pharmacyState.patientMedications.size === 1
+    && pharmacyState.controlledBookEntries.size === 1
+    && medication?.saleId === 'sale-a'
+    && Number(medication?.quantity) === 2
+    && controlledEntry?.storeId === 'store-a'
+    && controlledEntry?.patientId === 'patient-a'
+    && controlledEntry?.dispensedById === 'owner-a'
+    && controlledEntry?.batchNumber === 'LOT-AUDIT';
+  console.log(`${pharmacyTraceIdempotent ? 'PASS' : 'FAIL'} H11: pharmacy history and controlled book entries use persisted sale items and deterministic idempotency keys.`);
+  if (!pharmacyTraceIdempotent) failures++;
+
+  const checkoutSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/api/sales/checkout/route.ts'),
+    'utf8'
+  );
+  const posSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/pos/page.tsx'),
+    'utf8'
+  );
+  const transactionStart = checkoutSource.indexOf('return await prisma.$transaction');
+  const traceCall = checkoutSource.indexOf('await registerPharmacyTrace(tx');
+  const movementCreation = checkoutSource.indexOf('// 7. Crear Movements');
+  const transactionallyLinked = transactionStart >= 0
+    && traceCall > transactionStart
+    && movementCreation > traceCall
+    && !posSource.includes("fetch('/api/patients/medication'");
+  console.log(`${transactionallyLinked ? 'PASS' : 'FAIL'} H11: pharmacy trace is inside checkout transaction and the duplicate client fallback is absent.`);
+  if (!transactionallyLinked) failures++;
+
   process.exitCode = failures ? 1 : 0;
 }
 

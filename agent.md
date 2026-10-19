@@ -428,7 +428,7 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/prisma/build/index.js validate` | Valida esquema sin migrar datos; pasó |
 | `node node_modules/typescript/bin/tsc -p desktop/tsconfig.json --noEmit --incremental false` | Tipos Electron; pasó |
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
-| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09 y H10 con dependencias simuladas; pasaron el 19/10/2026 |
+| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10 y H11 con dependencias simuladas; pasaron el 19/10/2026 |
 | `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
 | `node scripts/test-backup-restore-isolated.cjs <zip> [--multipart]` | Ejecuta el endpoint de restauración contra Prisma simulado en transporte ZIP crudo o multipart; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
@@ -494,6 +494,23 @@ una base real como comprobación rutinaria.
   duplicado y sin fuga de lote, carrera concurrente con un solo ganador, y rechazo
   de sobre-recepción sin cambios parciales. Las pruebas pasaron el 19/10/2026.
 
+### Trazabilidad farmacéutica transaccional (2026-10-19)
+
+- El checkout crea `PatientMedication` y `ControlledBookEntry` dentro de la misma
+  transacción que confirma la venta y modifica inventario. Un fallo de validación
+  o escritura revierte el conjunto completo.
+- Paciente y dispensador deben estar activos y pertenecer a la tienda de la venta.
+  Cuando el libro de control está habilitado, cada producto controlado exige un
+  paciente y un número de receta antes de iniciar las escrituras.
+- Los registros se derivan de los `SaleItem` persistidos y usan identificadores
+  deterministas por item. Un reintento exacto no duplica historial ni libro.
+- Se eliminaron la tarea posterior sin `await` y el fallback duplicado del POS.
+  La ruta heredada de medicación queda solo para compatibilidad y vuelve a validar
+  tenant, paciente y venta usando los items persistidos.
+- `scripts/audit-pos-isolated.cjs` cubre rechazo de paciente ajeno, receta ausente,
+  creación correcta y repetición idempotente. La auditoría y `build:only` pasaron
+  el 19/10/2026 sin ejecutar migraciones ni escribir una base real.
+
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
 - El Resumen Diario valida `YYYY-MM-DD` y lo interpreta como fecha civil de Peru
@@ -542,10 +559,11 @@ una base real como comprobación rutinaria.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
    (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
    estrategia de migraciones sin aceptación automática de pérdida de datos.
-3. Corregir trazabilidad farmacéutica H11 e inventario concurrente H14. Las
-   anulaciones H06/H07, los abonos concurrentes H08, el aislamiento H09 y la
-   recepción atómica/idempotente H10 quedaron cubiertos por pruebas aisladas;
-   mantener esas invariantes al modificar ventas, fiados, lotes o compras.
+3. Corregir inventario concurrente H14. Las anulaciones H06/H07, los abonos
+   concurrentes H08, el aislamiento H09, la recepción atómica/idempotente H10 y
+   la trazabilidad farmacéutica transaccional H11 quedaron cubiertos por pruebas
+   aisladas; mantener esas invariantes al modificar ventas, fiados, lotes,
+   compras o farmacia.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
 5. Verificar CORS/entrada de impresión, sesión, reportes, idempotencia y turnos.
 
