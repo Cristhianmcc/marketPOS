@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **12/10/2026**, zona America/Lima. Base Git observada:
+Última revisión: **19/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -428,7 +428,7 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/prisma/build/index.js validate` | Valida esquema sin migrar datos; pasó |
 | `node node_modules/typescript/bin/tsc -p desktop/tsconfig.json --noEmit --incremental false` | Tipos Electron; pasó |
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
-| `node scripts/audit-pos-isolated.cjs` | Dos pruebas con dependencias simuladas; actualmente falla en ambos controles de autorización |
+| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09 y H10 con dependencias simuladas; pasaron el 19/10/2026 |
 | `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
 | `node scripts/test-backup-restore-isolated.cjs <zip> [--multipart]` | Ejecuta el endpoint de restauración contra Prisma simulado en transporte ZIP crudo o multipart; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
@@ -476,6 +476,23 @@ una base real como comprobación rutinaria.
   alcance operaciones exoneradas, inafectas o gratuitas, ISC e ICBPER.
 - Para cerrar la salida a PRODUCCIÓN falta la emisión controlada con RUC, SOL y
   certificado reales: factura, boleta y nota asociada aceptadas, con CDR y PDF.
+
+### Recepción segura de órdenes de compra (2026-10-19)
+
+- La recepción valida que cada producto activo pertenezca a la tienda y que cada
+  item pertenezca a la orden. Rechaza cantidades no positivas, con más de dos
+  decimales o superiores a la cantidad pendiente.
+- El lote se resuelve dentro de cada item. Un item sin lote ya no puede heredar
+  el lote creado para otro producto de la misma recepción.
+- La transición se ejecuta en una transacción serializable y reclama la versión
+  observada de la orden antes de modificar stock. Dos recepciones simultáneas no
+  pueden aplicar dos veces la misma cantidad pendiente.
+- Cada intento de la interfaz conserva una clave de idempotencia. Los movimientos
+  usan identificadores deterministas vinculados a esa clave; repetir exactamente
+  una recepción confirmada devuelve el resultado previo sin duplicar existencias.
+- `scripts/audit-pos-isolated.cjs` verifica tres casos: reintento exacto sin stock
+  duplicado y sin fuga de lote, carrera concurrente con un solo ganador, y rechazo
+  de sobre-recepción sin cambios parciales. Las pruebas pasaron el 19/10/2026.
 
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
@@ -525,10 +542,10 @@ una base real como comprobación rutinaria.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
    (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
    estrategia de migraciones sin aceptación automática de pérdida de datos.
-3. Corregir trazabilidad farmacéutica. Las anulaciones H06/H07, los abonos
-   concurrentes H08 y el aislamiento H09 al crear órdenes de compra quedaron
-   cubiertos por pruebas aisladas el 18/10/2026; mantener esas invariantes al
-   modificar ventas, fiados, lotes o recepción de compras.
+3. Corregir trazabilidad farmacéutica H11 e inventario concurrente H14. Las
+   anulaciones H06/H07, los abonos concurrentes H08, el aislamiento H09 y la
+   recepción atómica/idempotente H10 quedaron cubiertos por pruebas aisladas;
+   mantener esas invariantes al modificar ventas, fiados, lotes o compras.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
 5. Verificar CORS/entrada de impresión, sesión, reportes, idempotencia y turnos.
 

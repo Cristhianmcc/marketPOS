@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFlags } from '@/hooks/useFlags';
 import { Plus, Search, Package, Truck, CheckCircle2, XCircle, Clock, ClipboardList, X, Check, Calendar, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
@@ -63,6 +63,7 @@ export default function PurchaseOrdersPage() {
   // Formulario recepción
   const [receiveData, setReceiveData] = useState<{ itemId: string; quantityReceived: string; batchNumber: string; expiryDate: string }[]>([]);
   const [receiving, setReceiving] = useState(false);
+  const receiveIdempotencyKey = useRef<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     try {
@@ -137,6 +138,7 @@ export default function PurchaseOrdersPage() {
 
   // ═══ Recepcionar ═══
   const openReceiveModal = (order: PurchaseOrder) => {
+    receiveIdempotencyKey.current = crypto.randomUUID();
     setReceiveOrderId(order.id);
     setReceiveData(
       order.items
@@ -157,15 +159,22 @@ export default function PurchaseOrdersPage() {
 
     setReceiving(true);
     try {
+      if (!receiveIdempotencyKey.current) {
+        receiveIdempotencyKey.current = crypto.randomUUID();
+      }
       const res = await fetch(`/api/purchase-orders/${receiveOrderId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': receiveIdempotencyKey.current,
+        },
         body: JSON.stringify({ action: 'receive', receivedItems: validItems }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       const data = await res.json();
       toast.success(data.message);
       setReceiveOrderId(null);
+      receiveIdempotencyKey.current = null;
       loadOrders();
     } catch (err: any) { toast.error(err.message); } finally { setReceiving(false); }
   };

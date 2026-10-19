@@ -239,6 +239,11 @@ async function main() {
     constructor(value) { this.value = Number(value); }
     valueOf() { return this.value; }
     toNumber() { return this.value; }
+    minus(other) { return new Decimal(this.value - Number(other)); }
+    mul(other) { return new Decimal(this.value * Number(other)); }
+    lte(other) { return this.value <= Number(other); }
+    gt(other) { return this.value > Number(other); }
+    gte(other) { return this.value >= Number(other); }
   }
   const receivableState = {
     id: 'receivable-a', storeId: 'store-a', customerId: 'customer-a',
@@ -325,6 +330,209 @@ async function main() {
     && replayedPayment.body.replayed === true;
   console.log(`${concurrentPaymentSafe ? 'PASS' : 'FAIL'} H08: concurrent receivable payments decrement atomically and retries are idempotent. balance=${receivableState.balance}, payments=${receivableState.payments.size}, replayed=${replayedPayment.body.replayed === true}`);
   if (!concurrentPaymentSafe) failures++;
+
+  const purchaseReceptionState = {
+    order: {
+      id: 'order-a', storeId: 'store-a', orderNumber: 12, status: 'SENT',
+      updatedAt: new Date('2026-10-18T12:00:00.000Z'), receivedAt: null,
+    },
+    items: [
+      { id: 'item-a', purchaseOrderId: 'order-a', storeProductId: 'product-a', quantityOrdered: new Decimal(3), quantityReceived: new Decimal(0), unitCost: new Decimal(2), batchNumber: null, expiryDate: null },
+      { id: 'item-b', purchaseOrderId: 'order-a', storeProductId: 'product-b', quantityOrdered: new Decimal(2), quantityReceived: new Decimal(0), unitCost: new Decimal(5), batchNumber: null, expiryDate: null },
+    ],
+    products: new Map([
+      ['product-a', { id: 'product-a', storeId: 'store-a', active: true, stock: 0, costPrice: 0 }],
+      ['product-b', { id: 'product-b', storeId: 'store-a', active: true, stock: 0, costPrice: 0 }],
+    ]),
+    batches: new Map(),
+    movements: new Map(),
+    version: 0,
+  };
+  const cloneReceptionState = () => ({
+    order: { ...purchaseReceptionState.order, updatedAt: new Date(purchaseReceptionState.order.updatedAt), receivedAt: purchaseReceptionState.order.receivedAt ? new Date(purchaseReceptionState.order.receivedAt) : null },
+    items: purchaseReceptionState.items.map(item => ({ ...item, quantityOrdered: new Decimal(item.quantityOrdered), quantityReceived: new Decimal(item.quantityReceived), unitCost: new Decimal(item.unitCost), expiryDate: item.expiryDate ? new Date(item.expiryDate) : null })),
+    products: new Map(Array.from(purchaseReceptionState.products, ([id, product]) => [id, { ...product, costPrice: new Decimal(product.costPrice) }])),
+    batches: new Map(Array.from(purchaseReceptionState.batches, ([id, batch]) => [id, { ...batch, quantityInitial: new Decimal(batch.quantityInitial), quantityAvailable: new Decimal(batch.quantityAvailable), unitCost: new Decimal(batch.unitCost), expiryDate: new Date(batch.expiryDate) }])),
+    movements: new Map(Array.from(purchaseReceptionState.movements, ([id, movement]) => [id, { ...movement, quantity: new Decimal(movement.quantity), unitPrice: new Decimal(movement.unitPrice), total: new Decimal(movement.total) }])),
+    version: purchaseReceptionState.version,
+  });
+  const restoreReceptionState = snapshot => {
+    purchaseReceptionState.order = snapshot.order;
+    purchaseReceptionState.items = snapshot.items;
+    purchaseReceptionState.products = snapshot.products;
+    purchaseReceptionState.batches = snapshot.batches;
+    purchaseReceptionState.movements = snapshot.movements;
+    purchaseReceptionState.version = snapshot.version;
+  };
+  const receptionOrder = includeItems => ({
+    ...purchaseReceptionState.order,
+    ...(includeItems ? { items: purchaseReceptionState.items } : {}),
+  });
+  const purchaseReceptionDb = {
+    purchaseOrder: {
+      findFirst: async ({ where, include }) => where.id === purchaseReceptionState.order.id
+        && where.storeId === purchaseReceptionState.order.storeId
+        ? receptionOrder(Boolean(include?.items))
+        : null,
+    },
+    movement: {
+      findMany: async ({ where }) => Array.from(purchaseReceptionState.movements.values())
+        .filter(movement => movement.storeId === where.storeId
+          && movement.type === where.type
+          && movement.notes.includes(where.notes.contains))
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map(({ id, storeProductId, quantity }) => ({ id, storeProductId, quantity })),
+    },
+    $transaction: async callback => {
+      const before = cloneReceptionState();
+      const tx = {
+        purchaseOrder: {
+          updateMany: async ({ where }) => {
+            const expectedTime = new Date(where.updatedAt).getTime();
+            if (where.id !== purchaseReceptionState.order.id
+              || where.storeId !== purchaseReceptionState.order.storeId
+              || purchaseReceptionState.order.updatedAt.getTime() !== expectedTime
+              || !where.status.in.includes(purchaseReceptionState.order.status)) return { count: 0 };
+            purchaseReceptionState.version += 1;
+            purchaseReceptionState.order.updatedAt = new Date(expectedTime + purchaseReceptionState.version);
+            return { count: 1 };
+          },
+          findFirst: async ({ where, include }) => where.id === purchaseReceptionState.order.id
+            && where.storeId === purchaseReceptionState.order.storeId
+            ? receptionOrder(Boolean(include?.items))
+            : null,
+          update: async ({ data }) => {
+            purchaseReceptionState.order.status = data.status;
+            if (data.receivedAt) purchaseReceptionState.order.receivedAt = data.receivedAt;
+            return receptionOrder(false);
+          },
+        },
+        storeProduct: {
+          findMany: async ({ where }) => where.id.in
+            .map(id => purchaseReceptionState.products.get(id))
+            .filter(product => product && product.storeId === where.storeId && product.active === where.active)
+            .map(product => ({ id: product.id })),
+          update: async ({ where, data }) => {
+            const product = purchaseReceptionState.products.get(where.id);
+            product.stock += Number(data.stock.increment);
+            product.costPrice = new Decimal(data.costPrice);
+            return product;
+          },
+        },
+        productBatch: {
+          upsert: async ({ where, create, update }) => {
+            const key = Object.values(where)[0];
+            let batch = Array.from(purchaseReceptionState.batches.values()).find(candidate => (
+              candidate.storeId === key.storeId
+              && candidate.storeProductId === key.storeProductId
+              && candidate.batchNumber === key.batchNumber
+              && candidate.expiryDate.getTime() === new Date(key.expiryDate).getTime()
+            ));
+            if (!batch) {
+              batch = { id: `batch-${purchaseReceptionState.batches.size + 1}`, ...create, quantityInitial: new Decimal(create.quantityInitial), quantityAvailable: new Decimal(create.quantityAvailable), unitCost: new Decimal(create.unitCost) };
+              purchaseReceptionState.batches.set(batch.id, batch);
+            } else {
+              batch.quantityInitial = new Decimal(Number(batch.quantityInitial) + Number(update.quantityInitial.increment));
+              batch.quantityAvailable = new Decimal(Number(batch.quantityAvailable) + Number(update.quantityAvailable.increment));
+              batch.unitCost = new Decimal(update.unitCost);
+              batch.active = update.active;
+            }
+            return batch;
+          },
+        },
+        purchaseOrderItem: {
+          update: async ({ where, data }) => {
+            const item = purchaseReceptionState.items.find(candidate => candidate.id === where.id);
+            item.quantityReceived = new Decimal(Number(item.quantityReceived) + Number(data.quantityReceived.increment));
+            item.batchNumber = data.batchNumber;
+            item.expiryDate = data.expiryDate;
+            return item;
+          },
+          findMany: async () => purchaseReceptionState.items,
+        },
+        movement: {
+          create: async ({ data }) => {
+            if (purchaseReceptionState.movements.has(data.id)) {
+              const error = new Error('Unique constraint');
+              error.code = 'P2002';
+              throw error;
+            }
+            purchaseReceptionState.movements.set(data.id, data);
+            return data;
+          },
+        },
+      };
+      try {
+        return await callback(tx);
+      } catch (error) {
+        restoreReceptionState(before);
+        throw error;
+      }
+    },
+  };
+  const receptionRoute = loadRoute('src/app/api/purchase-orders/[id]/route.ts', {
+    crypto: require('crypto'),
+    'next/server': next,
+    '@/lib/session': { getCurrentUser: async () => ({ userId: 'owner-a', storeId: 'store-a', role: 'OWNER' }) },
+    '@/infra/db/prisma': { prisma: purchaseReceptionDb },
+    '@/lib/featureFlags': { isFeatureEnabled: async () => true },
+    '@prisma/client': {
+      FeatureFlagKey: { ENABLE_SUPPLIERS: 'ENABLE_SUPPLIERS', ENABLE_BATCH_EXPIRY: 'ENABLE_BATCH_EXPIRY' },
+      Prisma: { Decimal, TransactionIsolationLevel: { Serializable: 'Serializable' } },
+    },
+  });
+  const receptionRequest = (key, receivedItems) => ({
+    headers: { get: name => name.toLowerCase() === 'idempotency-key' ? key : null },
+    json: async () => ({ action: 'receive', receivedItems }),
+  });
+  const receptionParams = { params: { id: 'order-a' } };
+  const firstReceiptItems = [
+    { itemId: 'item-a', quantityReceived: '1', batchNumber: 'LOT-A', expiryDate: '2027-05-01' },
+    { itemId: 'item-b', quantityReceived: '1', batchNumber: '', expiryDate: '' },
+  ];
+  const firstReceipt = await receptionRoute.PATCH(
+    receptionRequest('receipt-audit-key-1', firstReceiptItems), receptionParams
+  );
+  const replayedReceipt = await receptionRoute.PATCH(
+    receptionRequest('receipt-audit-key-1', firstReceiptItems), receptionParams
+  );
+  const firstMovements = Array.from(purchaseReceptionState.movements.values())
+    .sort((a, b) => a.storeProductId.localeCompare(b.storeProductId));
+  const correctPerItemBatch = firstMovements.length === 2
+    && firstMovements[0].storeProductId === 'product-a'
+    && Boolean(firstMovements[0].batchId)
+    && firstMovements[1].storeProductId === 'product-b'
+    && firstMovements[1].batchId === null;
+  const firstReceiptSafe = firstReceipt.status === 200
+    && replayedReceipt.status === 200
+    && replayedReceipt.body.replayed === true
+    && purchaseReceptionState.products.get('product-a').stock === 1
+    && purchaseReceptionState.products.get('product-b').stock === 1
+    && correctPerItemBatch;
+  console.log(`${firstReceiptSafe ? 'PASS' : 'FAIL'} H10: exact reception retries do not duplicate stock and each movement keeps its own batch. movements=${firstMovements.length}, replayed=${replayedReceipt.body.replayed === true}`);
+  if (!firstReceiptSafe) failures++;
+
+  const beforeConcurrentStock = purchaseReceptionState.products.get('product-a').stock;
+  const concurrentReceipts = await Promise.all([
+    receptionRoute.PATCH(receptionRequest('receipt-audit-key-2', [{ itemId: 'item-a', quantityReceived: '1', batchNumber: '', expiryDate: '' }]), receptionParams),
+    receptionRoute.PATCH(receptionRequest('receipt-audit-key-3', [{ itemId: 'item-a', quantityReceived: '1', batchNumber: '', expiryDate: '' }]), receptionParams),
+  ]);
+  const concurrentReceiptSafe = concurrentReceipts.filter(response => response.status === 200).length === 1
+    && concurrentReceipts.filter(response => response.status === 409).length === 1
+    && purchaseReceptionState.products.get('product-a').stock === beforeConcurrentStock + 1;
+  console.log(`${concurrentReceiptSafe ? 'PASS' : 'FAIL'} H10: concurrent receptions cannot apply the same pending stock twice. statuses=${concurrentReceipts.map(response => response.status).join(',')}, stock=${purchaseReceptionState.products.get('product-a').stock}`);
+  if (!concurrentReceiptSafe) failures++;
+
+  const beforeOverReceipt = cloneReceptionState();
+  const overReceipt = await receptionRoute.PATCH(
+    receptionRequest('receipt-audit-key-4', [{ itemId: 'item-b', quantityReceived: '2', batchNumber: '', expiryDate: '' }]),
+    receptionParams
+  );
+  const overReceiptDenied = overReceipt.status === 400
+    && purchaseReceptionState.products.get('product-b').stock === beforeOverReceipt.products.get('product-b').stock
+    && Number(purchaseReceptionState.items.find(item => item.id === 'item-b').quantityReceived) === Number(beforeOverReceipt.items.find(item => item.id === 'item-b').quantityReceived);
+  console.log(`${overReceiptDenied ? 'PASS' : 'FAIL'} H10: over-reception is rejected without changing stock. status=${overReceipt.status}`);
+  if (!overReceiptDenied) failures++;
   process.exitCode = failures ? 1 : 0;
 }
 
