@@ -146,6 +146,185 @@ async function main() {
   const productDenied = purchase.status >= 400 && !createdOrder;
   console.log(`${productDenied ? 'PASS' : 'FAIL'} H09: purchase order must reject a foreign store product. Observed status=${purchase.status}, ownershipLookups=${productOwnershipLookups}`);
   if (!productDenied) failures++;
+
+  const { cancelSaleLocally } = loadRoute('src/lib/sales/cancelSaleLocally.ts', {});
+  const cancellationState = {
+    total: 30,
+    subtotal: 30,
+    tax: 0,
+    stock: 7,
+    batches: new Map([
+      ['LOT-A', { id: 'batch-a', quantityAvailable: 2 }],
+      ['LOT-B', { id: 'batch-b', quantityAvailable: 5 }],
+    ]),
+    movements: [],
+  };
+  const cancelledSale = {
+    id: 'sale-with-two-batches',
+    storeId: 'store-a',
+    saleNumber: 41,
+    total: 30,
+    subtotal: 30,
+    tax: 0,
+    paymentMethod: 'CASH',
+    couponCode: null,
+    couponDiscount: 0,
+    items: [{
+      storeProductId: 'product-a',
+      isService: false,
+      quantity: 3,
+      batchBreakdown: [
+        { batchNumber: 'LOT-A', qty: 1 },
+        { batchNumber: 'LOT-B', qty: 2 },
+      ],
+    }],
+  };
+  const cancellationDb = {
+    sale: {
+      findUnique: async () => ({
+        ...cancelledSale,
+        total: cancellationState.total,
+        subtotal: cancellationState.subtotal,
+        tax: cancellationState.tax,
+        items: cancelledSale.items.map(item => ({
+          ...item,
+          batchBreakdown: item.batchBreakdown.map(entry => ({ ...entry })),
+        })),
+      }),
+    },
+    $transaction: async callback => callback({
+      sale: {
+        updateMany: async () => {
+          if (cancellationState.total === 0) return { count: 0 };
+          cancellationState.total = 0;
+          cancellationState.subtotal = 0;
+          cancellationState.tax = 0;
+          return { count: 1 };
+        },
+      },
+      coupon: { findUnique: async () => null, update: async () => null },
+      receivable: { updateMany: async () => ({ count: 0 }) },
+      storeProduct: {
+        update: async ({ data }) => {
+          cancellationState.stock += Number(data.stock.increment);
+        },
+      },
+      productBatch: {
+        findFirst: async ({ where }) => cancellationState.batches.get(where.batchNumber) || null,
+        update: async ({ where, data }) => {
+          const batch = Array.from(cancellationState.batches.values()).find(entry => entry.id === where.id);
+          batch.quantityAvailable += Number(data.quantityAvailable.increment);
+        },
+      },
+      movement: {
+        create: async ({ data }) => { cancellationState.movements.push(data); },
+      },
+    }),
+  };
+
+  const cancellationResults = await Promise.all([
+    cancelSaleLocally(cancellationDb, cancelledSale.id, 'owner-a', 'audit probe'),
+    cancelSaleLocally(cancellationDb, cancelledSale.id, 'owner-a', 'audit probe'),
+  ]);
+  const cancellationWinners = cancellationResults.filter(result => result.cancelled).length;
+  const exactBatchRollback = cancellationState.stock === 10
+    && cancellationState.batches.get('LOT-A').quantityAvailable === 3
+    && cancellationState.batches.get('LOT-B').quantityAvailable === 7
+    && cancellationState.movements.length === 2;
+  const cancellationSafe = cancellationWinners === 1 && exactBatchRollback;
+  console.log(`${cancellationSafe ? 'PASS' : 'FAIL'} H06/H07: cancellation restores both FEFO batches exactly once under concurrent requests. winners=${cancellationWinners}, stock=${cancellationState.stock}, movements=${cancellationState.movements.length}`);
+  if (!cancellationSafe) failures++;
+
+  class Decimal {
+    constructor(value) { this.value = Number(value); }
+    valueOf() { return this.value; }
+    toNumber() { return this.value; }
+  }
+  const receivableState = {
+    id: 'receivable-a', storeId: 'store-a', customerId: 'customer-a',
+    balance: 100, status: 'OPEN', payments: new Map(),
+  };
+  const receivableSnapshot = () => ({
+    id: receivableState.id,
+    storeId: receivableState.storeId,
+    customerId: receivableState.customerId,
+    balance: receivableState.balance,
+    status: receivableState.status,
+    customer: { id: 'customer-a', name: 'Audit Customer' },
+    sale: { saleNumber: 77, total: 100 },
+  });
+  const paymentWithReceivable = payment => payment
+    ? { ...payment, receivable: receivableSnapshot() }
+    : null;
+  const paymentDb = {
+    receivablePayment: {
+      findUnique: async ({ where }) => paymentWithReceivable(receivableState.payments.get(where.id)),
+    },
+    $transaction: async callback => callback({
+      receivable: {
+        updateMany: async ({ where, data }) => {
+          const decrement = Number(data.balance.decrement);
+          if (where.id !== receivableState.id
+            || where.storeId !== receivableState.storeId
+            || receivableState.status !== 'OPEN'
+            || receivableState.balance < decrement) return { count: 0 };
+          receivableState.balance -= decrement;
+          return { count: 1 };
+        },
+        findFirst: async ({ where }) => where.id === receivableState.id
+          && where.storeId === receivableState.storeId
+          ? receivableSnapshot()
+          : null,
+        update: async ({ data }) => {
+          receivableState.status = data.status;
+          return receivableSnapshot();
+        },
+      },
+      receivablePayment: {
+        create: async ({ data }) => {
+          if (receivableState.payments.has(data.id)) {
+            const error = new Error('Unique constraint');
+            error.code = 'P2002';
+            throw error;
+          }
+          const payment = { ...data, amount: Number(data.amount), createdAt: new Date('2026-10-18T12:00:00Z') };
+          receivableState.payments.set(data.id, payment);
+          return payment;
+        },
+      },
+    }),
+  };
+  const paymentRoute = loadRoute('src/app/api/receivables/[id]/pay/route.ts', {
+    'next/server': next,
+    '@/infra/db/prisma': { prisma: paymentDb },
+    '@/lib/session': { getSession: async () => ({ userId: 'owner-a', storeId: 'store-a' }) },
+    '@prisma/client': { Prisma: { Decimal } },
+    '@/infra/db/repositories/PrismaShiftRepository': {
+      PrismaShiftRepository: class { async getCurrentShift() { return { id: 'shift-a' }; } },
+    },
+    '@/lib/auditLog': { logAudit: async () => {}, getRequestMetadata: () => ({}) },
+    '@/lib/rateLimit': { checkRateLimit: () => ({ allowed: true, resetAt: Date.now() }) },
+    crypto: require('crypto'),
+  });
+  const paymentRequest = (key, amount = 30) => ({
+    headers: { get: name => name.toLowerCase() === 'idempotency-key' ? key : null },
+    json: async () => ({ amount, method: 'CASH', notes: null }),
+  });
+  const paymentParams = { params: Promise.resolve({ id: receivableState.id }) };
+  const concurrentPayments = await Promise.all([
+    paymentRoute.POST(paymentRequest('payment-audit-key-1'), paymentParams),
+    paymentRoute.POST(paymentRequest('payment-audit-key-2'), paymentParams),
+  ]);
+  const replayedPayment = await paymentRoute.POST(
+    paymentRequest('payment-audit-key-1'), paymentParams
+  );
+  const concurrentPaymentSafe = concurrentPayments.every(response => response.status === 200)
+    && receivableState.balance === 40
+    && receivableState.payments.size === 2
+    && replayedPayment.status === 200
+    && replayedPayment.body.replayed === true;
+  console.log(`${concurrentPaymentSafe ? 'PASS' : 'FAIL'} H08: concurrent receivable payments decrement atomically and retries are idempotent. balance=${receivableState.balance}, payments=${receivableState.payments.size}, replayed=${replayedPayment.body.replayed === true}`);
+  if (!concurrentPaymentSafe) failures++;
   process.exitCode = failures ? 1 : 0;
 }
 

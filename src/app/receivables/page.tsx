@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Download } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
@@ -44,6 +44,7 @@ export default function ReceivablesPage() {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [processing, setProcessing] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const paymentRequestId = useRef('');
 
   useEffect(() => {
     loadReceivables();
@@ -65,6 +66,8 @@ export default function ReceivablesPage() {
   };
 
   const handleOpenPaymentModal = (receivable: Receivable) => {
+    paymentRequestId.current = globalThis.crypto?.randomUUID?.()
+      ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     setSelectedReceivable(receivable);
     setPaymentAmount(receivable.balance.toString());
     setPaymentMethod('CASH');
@@ -90,7 +93,10 @@ export default function ReceivablesPage() {
       setProcessing(true);
       const res = await fetch(`/api/receivables/${selectedReceivable.id}/pay`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': paymentRequestId.current,
+        },
         body: JSON.stringify({
           amount,
           method: paymentMethod,

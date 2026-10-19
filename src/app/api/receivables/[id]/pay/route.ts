@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
 import { checkRateLimit } from '@/lib/rateLimit'; // ✅ MÓDULO 16.1: Rate Limiting
+import { createHash } from 'crypto';
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -24,6 +25,84 @@ export async function POST(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
       );
+    }
+
+    const idempotencyKey = request.headers.get('Idempotency-Key')?.trim();
+    if (!idempotencyKey || idempotencyKey.length < 8 || idempotencyKey.length > 128
+      || !/^[A-Za-z0-9._:-]+$/.test(idempotencyKey)) {
+      return NextResponse.json(
+        { code: 'INVALID_IDEMPOTENCY_KEY', message: 'Identificador de pago inválido' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { amount, method, notes } = body;
+
+    // Dinero con máximo dos decimales. Evita importes no finitos y residuos
+    // binarios antes de convertirlos a Decimal.
+    const amountInCents = typeof amount === 'number' && Number.isFinite(amount)
+      ? Math.round(amount * 100)
+      : 0;
+    if (amountInCents <= 0 || Math.abs(amount * 100 - amountInCents) > 1e-8) {
+      return NextResponse.json(
+        { code: 'INVALID_AMOUNT', message: 'El monto debe ser mayor a 0 y tener máximo 2 decimales' },
+        { status: 400 }
+      );
+    }
+    const normalizedAmount = amountInCents / 100;
+
+    if (!method || !['CASH', 'YAPE', 'PLIN', 'CARD'].includes(method)) {
+      return NextResponse.json(
+        { code: 'INVALID_PAYMENT_METHOD', message: 'Método de pago inválido' },
+        { status: 400 }
+      );
+    }
+
+    // El ID determinista hace persistente la idempotencia sin agregar una
+    // columna ni requerir una migración de la base instalada.
+    const paymentId = `rp_${createHash('sha256')
+      .update(`${session.storeId}:${receivableId}:${idempotencyKey}`)
+      .digest('hex')}`;
+
+    const existingPayment = await prisma.receivablePayment.findUnique({
+      where: { id: paymentId },
+      include: {
+        receivable: {
+          include: {
+            customer: true,
+            sale: { select: { saleNumber: true, total: true } },
+          },
+        },
+      },
+    });
+    if (existingPayment) {
+      if (existingPayment.storeId !== session.storeId
+        || existingPayment.receivableId !== receivableId
+        || Number(existingPayment.amount) !== normalizedAmount
+        || existingPayment.method !== method) {
+        return NextResponse.json(
+          { code: 'IDEMPOTENCY_KEY_REUSED', message: 'El identificador ya fue usado para otro pago' },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        replayed: true,
+        payment: {
+          id: existingPayment.id,
+          amount: Number(existingPayment.amount),
+          method: existingPayment.method,
+          createdAt: existingPayment.createdAt,
+        },
+        receivable: {
+          id: existingPayment.receivable.id,
+          balance: Number(existingPayment.receivable.balance),
+          status: existingPayment.receivable.status,
+          customer: existingPayment.receivable.customer.name,
+          saleNumber: existingPayment.receivable.sale.saleNumber,
+        },
+      });
     }
 
     // ✅ MÓDULO 16.1: Rate Limiting
@@ -54,24 +133,6 @@ export async function POST(
       );
     }
 
-    const body = await request.json();
-    const { amount, method, notes } = body;
-
-    // Validaciones
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
-      return NextResponse.json(
-        { code: 'INVALID_AMOUNT', message: 'El monto debe ser mayor a 0' },
-        { status: 400 }
-      );
-    }
-
-    if (!method || !['CASH', 'YAPE', 'PLIN', 'CARD'].includes(method)) {
-      return NextResponse.json(
-        { code: 'INVALID_PAYMENT_METHOD', message: 'Método de pago inválido' },
-        { status: 400 }
-      );
-    }
-
     // Validar que hay turno abierto
     const currentShift = await shiftRepo.getCurrentShift(
       session.storeId,
@@ -86,70 +147,112 @@ export async function POST(
     }
 
     // Ejecutar pago en transacción ACID
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Obtener receivable con lock
-      const receivable = await tx.receivable.findFirst({
+    let result;
+    try {
+      result = await prisma.$transaction(async (tx) => {
+      const paymentAmount = new Prisma.Decimal(normalizedAmount);
+
+      // La condición y el decremento ocurren en una sola sentencia. Dos cobros
+      // concurrentes ya no pueden leer el mismo saldo y sobrescribirse.
+      const claimed = await tx.receivable.updateMany({
         where: {
           id: receivableId,
           storeId: session.storeId,
+          status: 'OPEN',
+          balance: { gte: paymentAmount },
         },
-        include: {
-          customer: true,
-          sale: {
-            select: {
-              saleNumber: true,
-              total: true,
-            },
-          },
-        },
+        data: { balance: { decrement: paymentAmount } },
       });
 
-      if (!receivable) {
-        throw new Error('RECEIVABLE_NOT_FOUND');
-      }
-
-      if (receivable.status === 'CANCELLED') {
-        throw new Error('RECEIVABLE_CANCELLED');
-      }
-
-      if (receivable.status === 'PAID') {
-        throw new Error('RECEIVABLE_ALREADY_PAID');
-      }
-
-      const currentBalance = Number(receivable.balance);
-
-      // 2. Validar que el monto no exceda el saldo
-      if (amount > currentBalance) {
+      if (claimed.count !== 1) {
+        const current = await tx.receivable.findFirst({
+          where: { id: receivableId, storeId: session.storeId },
+          select: { status: true, balance: true },
+        });
+        if (!current) throw new Error('RECEIVABLE_NOT_FOUND');
+        if (current.status === 'CANCELLED') throw new Error('RECEIVABLE_CANCELLED');
+        if (current.status === 'PAID') throw new Error('RECEIVABLE_ALREADY_PAID');
         throw new Error('OVERPAYMENT');
       }
 
-      // 3. Crear pago
       const payment = await tx.receivablePayment.create({
         data: {
+          id: paymentId,
           storeId: session.storeId,
-          receivableId: receivable.id,
+          receivableId,
           shiftId: currentShift.id,
-          amount: new Prisma.Decimal(amount),
+          amount: paymentAmount,
           method,
           notes: notes?.trim() || null,
           createdById: session.userId,
         },
       });
 
-      // 4. Reducir balance
-      const newBalance = currentBalance - amount;
-      const newStatus = newBalance === 0 ? 'PAID' : 'OPEN';
-
-      const updatedReceivable = await tx.receivable.update({
-        where: { id: receivable.id },
-        data: {
-          balance: new Prisma.Decimal(newBalance),
-          status: newStatus,
+      let updatedReceivable = await tx.receivable.findFirst({
+        where: { id: receivableId, storeId: session.storeId },
+        include: {
+          customer: true,
+          sale: { select: { saleNumber: true, total: true } },
         },
       });
+      if (!updatedReceivable) throw new Error('RECEIVABLE_NOT_FOUND');
 
-      return { payment, updatedReceivable, receivable };
-    });
+      if (Number(updatedReceivable.balance) === 0) {
+        updatedReceivable = await tx.receivable.update({
+          where: { id: updatedReceivable.id },
+          data: { status: 'PAID' },
+          include: {
+            customer: true,
+            sale: { select: { saleNumber: true, total: true } },
+          },
+        });
+      }
+
+        return { payment, updatedReceivable, receivable: updatedReceivable };
+      });
+    } catch (transactionError: any) {
+      // Dos solicitudes idénticas pueden llegar antes de que cualquiera vea el
+      // pago existente. La PK determinista deja ganar una sola transacción; la
+      // otra se revierte completa y responde con el resultado ya confirmado.
+      if (transactionError?.code !== 'P2002') throw transactionError;
+
+      const replayedPayment = await prisma.receivablePayment.findUnique({
+        where: { id: paymentId },
+        include: {
+          receivable: {
+            include: {
+              customer: true,
+              sale: { select: { saleNumber: true, total: true } },
+            },
+          },
+        },
+      });
+      if (!replayedPayment
+        || replayedPayment.storeId !== session.storeId
+        || replayedPayment.receivableId !== receivableId
+        || Number(replayedPayment.amount) !== normalizedAmount
+        || replayedPayment.method !== method) {
+        throw transactionError;
+      }
+
+      return NextResponse.json({
+        success: true,
+        replayed: true,
+        payment: {
+          id: replayedPayment.id,
+          amount: Number(replayedPayment.amount),
+          method: replayedPayment.method,
+          createdAt: replayedPayment.createdAt,
+        },
+        receivable: {
+          id: replayedPayment.receivable.id,
+          balance: Number(replayedPayment.receivable.balance),
+          status: replayedPayment.receivable.status,
+          customer: replayedPayment.receivable.customer.name,
+          saleNumber: replayedPayment.receivable.sale.saleNumber,
+        },
+      });
+    }
 
     // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
     const { ip, userAgent } = getRequestMetadata(request);
@@ -164,7 +267,7 @@ export async function POST(
         customerId: result.receivable.customerId,
         customerName: result.receivable.customer.name,
         saleNumber: result.receivable.sale.saleNumber,
-        paymentAmount: amount,
+        paymentAmount: normalizedAmount,
         paymentMethod: method,
         remainingBalance: Number(result.updatedReceivable.balance),
         isPaidInFull: result.updatedReceivable.status === 'PAID',

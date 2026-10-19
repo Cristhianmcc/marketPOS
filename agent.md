@@ -525,9 +525,10 @@ una base real como comprobación rutinaria.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
    (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
    estrategia de migraciones sin aceptación automática de pérdida de datos.
-3. Corregir anulaciones/lotes, abonos concurrentes y trazabilidad farmacéutica.
-   El aislamiento H09 al crear órdenes de compra quedó corregido y probado el
-   18/10/2026; mantener la validación de tienda durante la recepción.
+3. Corregir trazabilidad farmacéutica. Las anulaciones H06/H07, los abonos
+   concurrentes H08 y el aislamiento H09 al crear órdenes de compra quedaron
+   cubiertos por pruebas aisladas el 18/10/2026; mantener esas invariantes al
+   modificar ventas, fiados, lotes o recepción de compras.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
 5. Verificar CORS/entrada de impresión, sesión, reportes, idempotencia y turnos.
 
