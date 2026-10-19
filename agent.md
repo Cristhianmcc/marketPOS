@@ -114,8 +114,9 @@ Login busca primero usuario local y valida activo/contraseña. Si no existe,
 puede autenticar usando cloud o configuración de superadmin. Se guarda sesión
 cifrada durante siete días. El middleware excluye `/api`: cada ruta necesita sus
 propios controles. Provisioning permite crear la primera tienda cuando no hay
-usuarios. `setup/switch-store` tiene un defecto crítico abierto; no reutilizarlo
-como patrón de autorización.
+usuarios. En `feature/sunat-beta`, `setup/switch-store` exige SUPERADMIN, tienda
+activa y OWNER activo perteneciente a esa tienda. La prueba aislada H01 cubre
+los roles y cruces de tienda que deben seguir rechazándose.
 
 ### Checkout
 
@@ -519,12 +520,14 @@ una base real como comprobación rutinaria.
   11/10/2026 debe encontrarse dentro del rango
   `2026-10-11T05:00:00.000Z` a `2026-10-12T04:59:59.999Z`.
 
-1. Resolver cambio de identidad/tienda y retirar secretos de distribuciones.
+1. Retirar secretos de distribuciones. El cambio de identidad/tienda H01 quedó
+   corregido y cubierto por pruebas aisladas el 18/10/2026.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
    (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
    estrategia de migraciones sin aceptación automática de pérdida de datos.
-3. Corregir anulaciones/lotes, abonos concurrentes, aislamiento en compras y
-   trazabilidad farmacéutica.
+3. Corregir anulaciones/lotes, abonos concurrentes y trazabilidad farmacéutica.
+   El aislamiento H09 al crear órdenes de compra quedó corregido y probado el
+   18/10/2026; mantener la validación de tienda durante la recepción.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
 5. Verificar CORS/entrada de impresión, sesión, reportes, idempotencia y turnos.
 

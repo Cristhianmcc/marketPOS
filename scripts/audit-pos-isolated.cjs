@@ -19,7 +19,7 @@ function loadRoute(relativePath, dependencies) {
       if (!(name in dependencies)) throw new Error(`Unmocked dependency: ${name}`);
       return dependencies[name];
     },
-    console: { log() {}, error() {} },
+    console: { log() {}, info() {}, error() {} },
   }, { filename });
   return exports;
 }
@@ -28,23 +28,101 @@ const next = { NextResponse: { json: (body, options = {}) => ({ body, status: op
 
 async function main() {
   let failures = 0;
-  let adoptedSession;
-  const route = loadRoute('src/app/api/setup/switch-store/route.ts', {
-    'next/server': next,
-    '@/lib/prisma': { prisma: {
-      store: { findUnique: async () => ({ id: 'store-b', name: 'Test B', users: [
-        { id: 'owner-b', email: 'owner-b@example.invalid', name: 'Test Owner', role: 'OWNER', storeId: 'store-b' },
-      ] }) },
-    } },
-    '@/lib/session': {
-      getCurrentUser: async () => ({ userId: 'cashier-a', storeId: 'store-a', role: 'CASHIER', isLoggedIn: true }),
-      setSession: async data => { adoptedSession = data; },
-    },
+  const activeOwner = {
+    id: 'owner-b', email: 'owner-b@example.invalid', name: 'Test Owner',
+    role: 'OWNER', storeId: 'store-b', active: true,
+  };
+
+  async function probeSwitchStore({ sessionUser, body, store, requestedUser }) {
+    let adoptedSession;
+    let targetUserQuery;
+    const route = loadRoute('src/app/api/setup/switch-store/route.ts', {
+      'next/server': next,
+      '@/lib/prisma': { prisma: {
+        store: { findUnique: async () => store },
+        user: { findFirst: async args => {
+          targetUserQuery = args;
+          if (!requestedUser) return null;
+          const where = args.where || {};
+          return requestedUser.id === where.id
+            && requestedUser.storeId === where.storeId
+            && requestedUser.role === where.role
+            && requestedUser.active === where.active
+            ? requestedUser
+            : null;
+        } },
+      } },
+      '@/lib/session': {
+        getCurrentUser: async () => sessionUser,
+        setSession: async data => { adoptedSession = data; },
+      },
+      '@/lib/superadmin': {
+        isSuperAdmin: email => email === 'admin@example.invalid',
+      },
+    });
+    const result = await route.POST({ json: async () => body });
+    return { result, adoptedSession, targetUserQuery };
+  }
+
+  const activeStore = { id: 'store-b', name: 'Test B', status: 'ACTIVE', users: [activeOwner] };
+  const forbiddenRoles = [
+    { userId: 'cashier-a', storeId: 'store-a', email: 'cashier@example.invalid', role: 'CASHIER', isLoggedIn: true },
+    { userId: 'owner-a', storeId: 'store-a', email: 'owner@example.invalid', role: 'OWNER', isLoggedIn: true },
+  ];
+  for (const sessionUser of forbiddenRoles) {
+    const { result, adoptedSession } = await probeSwitchStore({
+      sessionUser, body: { storeId: 'store-b' }, store: activeStore,
+    });
+    const denied = result.status === 403 && !adoptedSession;
+    console.log(`${denied ? 'PASS' : 'FAIL'} H01: ${sessionUser.role} cannot adopt an OWNER session. Observed status=${result.status}`);
+    if (!denied) failures++;
+  }
+
+  const superadmin = {
+    userId: 'admin@example.invalid', storeId: null, email: 'admin@example.invalid',
+    role: 'SUPERADMIN', isLoggedIn: true,
+  };
+  const allowed = await probeSwitchStore({
+    sessionUser: superadmin, body: { storeId: 'store-b' }, store: activeStore,
   });
-  const result = await route.POST({ json: async () => ({ storeId: 'store-b' }) });
-  const denied = result.status === 403 && !adoptedSession;
-  console.log(`${denied ? 'PASS' : 'FAIL'} H01: CASHIER switching to another store must be denied. Observed status=${result.status}, adoptedRole=${adoptedSession?.role || 'none'}`);
-  if (!denied) failures++;
+  const validAdoption = allowed.result.status === 200
+    && allowed.adoptedSession?.userId === activeOwner.id
+    && allowed.adoptedSession?.storeId === activeStore.id;
+  console.log(`${validAdoption ? 'PASS' : 'FAIL'} H01: SUPERADMIN can adopt the active OWNER of an active store.`);
+  if (!validAdoption) failures++;
+
+  const crossStore = await probeSwitchStore({
+    sessionUser: superadmin,
+    body: { storeId: 'store-b', userId: 'owner-a' },
+    store: activeStore,
+    requestedUser: { ...activeOwner, id: 'owner-a', storeId: 'store-a' },
+  });
+  const crossStoreDenied = crossStore.result.status === 404
+    && !crossStore.adoptedSession
+    && crossStore.targetUserQuery?.where?.storeId === activeStore.id;
+  console.log(`${crossStoreDenied ? 'PASS' : 'FAIL'} H01: SUPERADMIN cannot adopt a user outside the requested store.`);
+  if (!crossStoreDenied) failures++;
+
+  const inactive = await probeSwitchStore({
+    sessionUser: superadmin,
+    body: { storeId: 'store-b', userId: 'owner-b' },
+    store: activeStore,
+    requestedUser: { ...activeOwner, active: false },
+  });
+  const inactiveDenied = inactive.result.status === 404
+    && !inactive.adoptedSession
+    && inactive.targetUserQuery?.where?.active === true;
+  console.log(`${inactiveDenied ? 'PASS' : 'FAIL'} H01: inactive OWNER accounts cannot be adopted.`);
+  if (!inactiveDenied) failures++;
+
+  const archived = await probeSwitchStore({
+    sessionUser: superadmin,
+    body: { storeId: 'store-b' },
+    store: { ...activeStore, status: 'ARCHIVED' },
+  });
+  const archivedDenied = archived.result.status === 409 && !archived.adoptedSession;
+  console.log(`${archivedDenied ? 'PASS' : 'FAIL'} H01: archived stores cannot be adopted.`);
+  if (!archivedDenied) failures++;
 
   let createdOrder;
   let productOwnershipLookups = 0;

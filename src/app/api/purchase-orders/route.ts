@@ -71,6 +71,52 @@ export async function POST(req: NextRequest) {
     });
     if (!supplier) return NextResponse.json({ error: 'Proveedor no encontrado' }, { status: 404 });
 
+    const hasInvalidItem = items.some((item: {
+      storeProductId?: unknown;
+      quantityOrdered?: unknown;
+      unitCost?: unknown;
+    }) => (
+      typeof item.storeProductId !== 'string'
+      || !item.storeProductId.trim()
+      || typeof item.quantityOrdered !== 'number'
+      || !Number.isFinite(item.quantityOrdered)
+      || item.quantityOrdered <= 0
+      || typeof item.unitCost !== 'number'
+      || !Number.isFinite(item.unitCost)
+      || item.unitCost < 0
+    ));
+
+    if (hasInvalidItem) {
+      return NextResponse.json({ error: 'Productos inválidos en la orden' }, { status: 400 });
+    }
+
+    const requestedProductIds = Array.from(new Set(
+      items
+        .map((item: { storeProductId?: unknown }) => item.storeProductId)
+        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+    ));
+
+    if (requestedProductIds.length === 0) {
+      return NextResponse.json({ error: 'Productos inválidos en la orden' }, { status: 400 });
+    }
+
+    const ownedProducts = await prisma.storeProduct.findMany({
+      where: {
+        storeId: user.storeId,
+        id: { in: requestedProductIds },
+      },
+      select: { id: true },
+    });
+    const ownedProductIds = new Set(ownedProducts.map(product => product.id));
+    const foreignOrMissingProduct = requestedProductIds.find(id => !ownedProductIds.has(id));
+
+    if (foreignOrMissingProduct) {
+      return NextResponse.json(
+        { error: 'Uno o más productos no pertenecen a esta tienda' },
+        { status: 400 }
+      );
+    }
+
     // Generar número correlativo
     const lastOrder = await prisma.purchaseOrder.findFirst({
       where: { storeId: user.storeId },
