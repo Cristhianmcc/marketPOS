@@ -37,6 +37,9 @@ public/uploads/
 # misc
 .DS_Store
 *.pem
+*.pfx
+*.p12
+*.key
 
 # debug
 npm-debug.log*

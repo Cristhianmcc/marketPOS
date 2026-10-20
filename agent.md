@@ -24,7 +24,7 @@ es `docs/audits/2026-09-26-pos.md`.
 - Interfaz: Tailwind CSS 3, lucide-react, sonner; páginas cliente grandes.
 - Persistencia: PostgreSQL, Prisma **5.22**; 44 modelos en `prisma/schema.prisma`.
 - Sesiones: iron-session en cookie `market_pos_session`; contraseñas con bcrypt.
-- Escritorio: Electron 28, electron-builder/NSIS Windows x64, versión **0.1.0**.
+- Escritorio: Electron 28, electron-builder/NSIS Windows x64, versión **0.2.0**.
 - Impresión: ESC/POS USB/red/Bluetooth, raster/HTML; servicio local adicional.
 - Integraciones: SUNAT SOAP/XML/ZIP, Cloudinary, respaldos S3, catálogo remoto,
   licencias y conexión opcional a base de datos cloud.
@@ -613,8 +613,29 @@ una base real como comprobación rutinaria.
   diferente del origen activo, un host de prefijo engañoso, URL inválida y
   protocolos externos o bloqueados. Pasó junto con toda la suite aislada y
   TypeScript de Electron el 20/10/2026, sin base real ni red.
-- Punto de reanudación: H19 queda cerrado. El siguiente hallazgo es H20,
-  trazabilidad y configuración segura de las distribuciones y actualizaciones.
+- H19 queda cerrado y verificado. H20 también quedó cerrado el 20/10/2026; el
+  siguiente hallazgo a tratar es H04, migraciones reproducibles, siempre sobre
+  una base desechable y sin ejecutar `prisma db push` contra datos reales.
+
+### Entregas desktop trazables y actualizaciones controladas (2026-10-20)
+
+- La versión de la aplicación y del paquete Electron está sincronizada en
+  **0.2.0**. Para una entrega nueva se usa `npm run desktop:version -- X.Y.Z`.
+- `desktop/scripts/prepare-build.js` valida la política de entrega y genera
+  `build-id.txt` y `release-manifest.json` con versión, commit, fecha UTC y estado
+  limpio/sucio. Al terminar, `artifact-manifest.json` registra tamaño y SHA-256
+  de cada ejecutable o instalador.
+- El origen de actualizaciones se fija al compilar con
+  `MONTERIAL_UPDATE_FEED_URL`. Debe ser HTTPS, queda incorporado en el manifiesto
+  y no puede modificarse desde el renderer. Sin ese valor, el actualizador queda
+  deshabilitado de forma explícita.
+- Los alias antiguos `electron:*` delegan al flujo `desktop:*`, que usa
+  `build:only`; el `.bat` de compatibilidad ya no contiene la versión manual.
+- El certificado privado que estaba seguido por Git fue retirado del árbol sin
+  abrirlo. `.pfx`, `.p12`, `.pem` y `.key` no deben entrar al repositorio; si una
+  clave real estuvo en el historial, debe reemplazarse antes de producción.
+- La guía operativa está en `docs/DESKTOP_RELEASE.md`. La prueba H20 valida esta
+  política y comprueba el hash de un artefacto aislado sin usar base ni red.
 
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
@@ -673,8 +694,9 @@ una base real como comprobación rutinaria.
    sesión, H17 de autenticación interna y H18 de turnos quedaron corregidos y
    cubiertos por pruebas aisladas. H19 también quedó corregido y verificado:
    Electron limita la navegación al origen exacto del servidor iniciado.
-6. El siguiente trabajo es H20: identificar cada entrega por versión, commit y
-   manifiesto, y eliminar destinos de actualización de ejemplo.
+6. H20 quedó corregido: cada entrega queda identificada por versión, commit y
+   manifiestos, sin destinos de actualización de ejemplo. El siguiente trabajo
+   es H04, diseñar migraciones reproducibles y probarlas en una base desechable.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

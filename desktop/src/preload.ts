@@ -338,6 +338,7 @@ interface PrintResult {
 
 // Tipos D7: Updater
 interface UpdateStatus {
+  configured: boolean;
   checking: boolean;
   available: boolean;
   downloaded: boolean;
@@ -351,7 +352,6 @@ interface UpdateConfig {
   autoDownload: boolean;
   autoInstallOnQuit: boolean;
   checkInterval: number;
-  feedUrl?: string;
 }
 
 // Tipos D6-USB, D6.1-NET, D6.2-Raster: ESC/POS
@@ -499,7 +499,7 @@ const desktopAPI: DesktopAPI = {
   // Información básica del sistema
   platform: process.platform,
   isDesktop: true,
-  version: process.env.npm_package_version || '0.1.0',
+  version: process.env.npm_package_version || 'unknown',
 
   // Control de ventana
   window: {

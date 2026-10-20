@@ -3,7 +3,10 @@
  * Exit 1 means the security invariant is currently violated.
  */
 const fs = require('fs');
+const crypto = require('crypto');
+const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const vm = require('vm');
 const ts = require('typescript');
 
@@ -1214,6 +1217,108 @@ async function main() {
     && desktopUsesOriginPolicy;
   console.log(`${desktopNavigationIsConstrained ? 'PASS' : 'FAIL'} H19: desktop navigation and ticket windows use the exact running server origin.`);
   if (!desktopNavigationIsConstrained) failures++;
+
+  const releaseTools = require('../desktop/scripts/release-metadata');
+  const rootPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
+  const desktopPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'desktop/package.json'), 'utf8'));
+  const updaterSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/src/updater/autoUpdater.ts'),
+    'utf8'
+  );
+  const preloadSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/src/preload.ts'),
+    'utf8'
+  );
+  const releaseDocs = fs.readFileSync(
+    path.resolve(__dirname, '..', 'docs/DESKTOP_RELEASE.md'),
+    'utf8'
+  );
+  const trackedFiles = execFileSync('git', ['ls-files'], {
+    cwd: path.resolve(__dirname, '..'),
+    encoding: 'utf8',
+  }).split(/\r?\n/).filter(Boolean);
+
+  let unsafeOriginsRejected = false;
+  try {
+    const validOrigin = releaseTools.validateUpdateFeedUrl('https://updates.example.invalid/pos/');
+    const unsafeOrigins = [
+      'http://updates.example.invalid/pos',
+      'https://user:secret@updates.example.invalid/pos',
+      'https://updates.example.invalid/pos#override',
+    ];
+    unsafeOriginsRejected = validOrigin === 'https://updates.example.invalid/pos'
+      && unsafeOrigins.every(origin => {
+        try {
+          releaseTools.validateUpdateFeedUrl(origin);
+          return false;
+        } catch {
+          return true;
+        }
+      });
+  } catch {
+    unsafeOriginsRejected = false;
+  }
+
+  const packagePolicyIsTraceable = releaseTools.SEMVER_PATTERN.test(rootPackage.version)
+    && rootPackage.version !== '0.1.0'
+    && desktopPackage.version === rootPackage.version
+    && rootPackage.scripts['electron:dev'] === 'npm run desktop:dev'
+    && rootPackage.scripts['electron:build'] === 'npm run desktop:build'
+    && rootPackage.scripts['electron:pack'] === 'npm run desktop:portable'
+    && !desktopPackage.build.publish
+    && desktopPackage.build.extraResources.some(resource => resource.to === 'release-manifest.json');
+  const updaterOriginIsImmutable = updaterSource.includes("path.join(process.resourcesPath, 'release-manifest.json')")
+    && updaterSource.includes("parsed.protocol !== 'https:'")
+    && updaterSource.includes('if (!this.trustedUpdateOrigin)')
+    && !updaterSource.includes('feedUrl')
+    && !preloadSource.includes('feedUrl');
+  const privateCertificatesAreUntracked = !trackedFiles.some(file => /\.(pfx|p12|pem|key)$/i.test(file));
+  const releasePolicyDocumented = releaseDocs.includes('artifact-manifest.json')
+    && releaseDocs.includes('npm run build:only')
+    && !releaseDocs.includes('your-org')
+    && !releaseDocs.includes('certificatePassword');
+  const releasePolicySafe = unsafeOriginsRejected
+    && packagePolicyIsTraceable
+    && updaterOriginIsImmutable
+    && privateCertificatesAreUntracked
+    && releasePolicyDocumented;
+  console.log(`${releasePolicySafe ? 'PASS' : 'FAIL'} H20: release versions, update origin and private-certificate policy are controlled.`);
+  if (!releasePolicySafe) failures++;
+
+  const artifactSandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'monterrial-release-audit-'));
+  try {
+    const buildResourcesDir = path.join(artifactSandbox, 'build-resources');
+    const outputDir = path.join(artifactSandbox, 'output');
+    const unpackedDir = path.join(outputDir, 'win-unpacked');
+    fs.mkdirSync(buildResourcesDir, { recursive: true });
+    fs.mkdirSync(unpackedDir, { recursive: true });
+    const releaseMetadata = releaseTools.createReleaseMetadata({
+      rootDir: path.resolve(__dirname, '..'),
+      desktopDir: path.resolve(__dirname, '..', 'desktop'),
+      now: new Date('2026-10-20T12:00:00.000Z'),
+    });
+    fs.writeFileSync(
+      path.join(buildResourcesDir, 'release-manifest.json'),
+      JSON.stringify(releaseMetadata)
+    );
+    const fakeArtifact = path.join(unpackedDir, 'Monterrial POS SUNAT Beta.exe');
+    fs.writeFileSync(fakeArtifact, 'isolated release artifact');
+    const artifactManifest = releaseTools.writeArtifactManifest({ outputDir, buildResourcesDir });
+    const expectedHash = crypto.createHash('sha256')
+      .update(fs.readFileSync(fakeArtifact))
+      .digest('hex');
+    const generatedArtifactIsTraceable = releaseMetadata.version === rootPackage.version
+      && releaseMetadata.buildId.startsWith(`${rootPackage.version}+`)
+      && releaseMetadata.sourceCommit.length >= 12
+      && artifactManifest.release.buildId === releaseMetadata.buildId
+      && artifactManifest.artifacts.length === 1
+      && artifactManifest.artifacts[0].sha256 === expectedHash
+      && artifactManifest.artifacts[0].path === 'win-unpacked/Monterrial POS SUNAT Beta.exe';
+    console.log(`${generatedArtifactIsTraceable ? 'PASS' : 'FAIL'} H20: artifact manifest records build identity, size and SHA-256.`);
+    if (!generatedArtifactIsTraceable) failures++;
+  } finally {
+    fs.rmSync(artifactSandbox, { recursive: true, force: true });
+  }
 
   if (originalDesktopInternalToken === undefined) delete process.env.DESKTOP_INTERNAL_TOKEN;
   else process.env.DESKTOP_INTERNAL_TOKEN = originalDesktopInternalToken;

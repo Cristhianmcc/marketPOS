@@ -1,6 +1,7 @@
 /**
- * D7 - Auto Updater Module
- * Handles automatic updates via GitHub Releases or custom server
+ * D7 - Auto Updater
+ * The update destination is embedded in the packaged release manifest.
+ * Renderer input can only change user preferences, never the download origin.
  */
 
 import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater';
@@ -8,9 +9,8 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// ============== Types ==============
-
 export interface UpdateStatus {
+  configured: boolean;
   checking: boolean;
   available: boolean;
   downloaded: boolean;
@@ -23,34 +23,96 @@ export interface UpdateStatus {
 export interface UpdateConfig {
   autoDownload: boolean;
   autoInstallOnQuit: boolean;
-  checkInterval: number; // minutes
-  feedUrl?: string;      // custom update server
+  checkInterval: number;
 }
 
-// ============== Update Manager ==============
+const DEFAULT_CONFIG: UpdateConfig = {
+  autoDownload: true,
+  autoInstallOnQuit: true,
+  checkInterval: 60,
+};
+
+function normalizeConfig(input: unknown, current: UpdateConfig = DEFAULT_CONFIG): UpdateConfig {
+  if (!input || typeof input !== 'object') return { ...current };
+  const candidate = input as Record<string, unknown>;
+  const parsedInterval = Number(candidate.checkInterval);
+  const checkInterval = Number.isFinite(parsedInterval)
+    ? Math.min(1440, Math.max(15, Math.round(parsedInterval)))
+    : current.checkInterval;
+
+  return {
+    autoDownload:
+      typeof candidate.autoDownload === 'boolean'
+        ? candidate.autoDownload
+        : current.autoDownload,
+    autoInstallOnQuit:
+      typeof candidate.autoInstallOnQuit === 'boolean'
+        ? candidate.autoInstallOnQuit
+        : current.autoInstallOnQuit,
+    checkInterval,
+  };
+}
+
+function trustedHttpsUrl(value: unknown): string | null {
+  const candidate = typeof value === 'string' ? value.trim() : '';
+  if (!candidate) return null;
+
+  try {
+    const parsed = new URL(candidate);
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.username ||
+      parsed.password ||
+      parsed.hash
+    ) {
+      return null;
+    }
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
+function loadPackagedUpdateOrigin(): string | null {
+  try {
+    if (!app.isPackaged) {
+      return trustedHttpsUrl(process.env.MONTERIAL_UPDATE_FEED_URL);
+    }
+
+    const manifestPath = path.join(process.resourcesPath, 'release-manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      updateFeed?: unknown;
+    };
+    return trustedHttpsUrl(manifest.updateFeed);
+  } catch (error) {
+    console.warn('[Updater] Updates disabled: release manifest has no trusted HTTPS origin');
+    return null;
+  }
+}
 
 class UpdateManager {
   private static instance: UpdateManager;
   private mainWindow: BrowserWindow | null = null;
-  private status: UpdateStatus = {
-    checking: false,
-    available: false,
-    downloaded: false,
-    downloading: false,
-    progress: 0,
-    version: null,
-    error: null,
-  };
-  private config: UpdateConfig = {
-    autoDownload: true,
-    autoInstallOnQuit: true,
-    checkInterval: 60, // check every hour
-  };
+  private readonly trustedUpdateOrigin: string | null;
+  private status: UpdateStatus;
+  private config: UpdateConfig = { ...DEFAULT_CONFIG };
   private checkTimer: NodeJS.Timeout | null = null;
-  private configPath: string;
+  private initialCheckTimer: NodeJS.Timeout | null = null;
+  private readonly configPath: string;
 
   private constructor() {
     this.configPath = path.join(app.getPath('userData'), 'update-config.json');
+    this.trustedUpdateOrigin = loadPackagedUpdateOrigin();
+    this.status = {
+      configured: Boolean(this.trustedUpdateOrigin),
+      checking: false,
+      available: false,
+      downloaded: false,
+      downloading: false,
+      progress: 0,
+      version: null,
+      error: null,
+    };
     this.loadConfig();
     this.setupAutoUpdater();
   }
@@ -62,16 +124,14 @@ class UpdateManager {
     return UpdateManager.instance;
   }
 
-  // ============== Config ==============
-
   private loadConfig(): void {
     try {
       if (fs.existsSync(this.configPath)) {
-        const data = fs.readFileSync(this.configPath, 'utf-8');
-        this.config = { ...this.config, ...JSON.parse(data) };
+        const data = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
+        this.config = normalizeConfig(data, this.config);
       }
     } catch (error) {
-      console.error('[Updater] Error loading config:', error);
+      console.error('[Updater] Error loading preferences:', error);
     }
   }
 
@@ -79,7 +139,7 @@ class UpdateManager {
     try {
       fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
     } catch (error) {
-      console.error('[Updater] Error saving config:', error);
+      console.error('[Updater] Error saving preferences:', error);
     }
   }
 
@@ -88,85 +148,69 @@ class UpdateManager {
   }
 
   updateConfig(config: Partial<UpdateConfig>): void {
-    this.config = { ...this.config, ...config };
+    this.config = normalizeConfig(config, this.config);
     this.saveConfig();
-    
-    // Apply settings
     autoUpdater.autoDownload = this.config.autoDownload;
     autoUpdater.autoInstallOnAppQuit = this.config.autoInstallOnQuit;
-    
-    if (this.config.feedUrl) {
-      autoUpdater.setFeedURL({ provider: 'generic', url: this.config.feedUrl });
-    }
-    
-    // Restart check timer if interval changed
     this.startPeriodicCheck();
   }
 
-  // ============== Setup ==============
-
   private setupAutoUpdater(): void {
-    // Configure
     autoUpdater.autoDownload = this.config.autoDownload;
     autoUpdater.autoInstallOnAppQuit = this.config.autoInstallOnQuit;
     autoUpdater.allowDowngrade = false;
     autoUpdater.allowPrerelease = false;
 
-    // Custom feed URL if configured
-    if (this.config.feedUrl) {
-      autoUpdater.setFeedURL({ provider: 'generic', url: this.config.feedUrl });
+    if (this.trustedUpdateOrigin) {
+      autoUpdater.setFeedURL({
+        provider: 'generic',
+        url: this.trustedUpdateOrigin,
+      });
     }
 
-    // Events
     autoUpdater.on('checking-for-update', () => {
-      console.log('[Updater] Checking for update...');
       this.status.checking = true;
       this.status.error = null;
       this.notifyRenderer();
     });
 
     autoUpdater.on('update-available', (info: UpdateInfo) => {
-      console.log('[Updater] Update available:', info.version);
       this.status.checking = false;
       this.status.available = true;
       this.status.version = info.version;
       this.notifyRenderer();
-      
-      // Show notification if not auto-downloading
+
       if (!this.config.autoDownload && this.mainWindow) {
-        this.showUpdateAvailableDialog(info);
+        void this.showUpdateAvailableDialog(info);
       }
     });
 
     autoUpdater.on('update-not-available', (info: UpdateInfo) => {
-      console.log('[Updater] No update available. Current:', info.version);
       this.status.checking = false;
       this.status.available = false;
+      this.status.version = info.version;
       this.notifyRenderer();
     });
 
     autoUpdater.on('download-progress', (progress: ProgressInfo) => {
-      console.log(`[Updater] Download: ${progress.percent.toFixed(1)}%`);
       this.status.downloading = true;
       this.status.progress = progress.percent;
       this.notifyRenderer();
     });
 
     autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
-      console.log('[Updater] Update downloaded:', info.version);
       this.status.downloading = false;
       this.status.downloaded = true;
       this.status.progress = 100;
+      this.status.version = info.version;
       this.notifyRenderer();
-      
-      // Show install dialog
+
       if (this.mainWindow) {
-        this.showInstallDialog(info);
+        void this.showInstallDialog(info);
       }
     });
 
     autoUpdater.on('error', (error: Error) => {
-      console.error('[Updater] Error:', error.message);
       this.status.checking = false;
       this.status.downloading = false;
       this.status.error = error.message;
@@ -174,35 +218,31 @@ class UpdateManager {
     });
   }
 
-  // ============== Main Window ==============
-
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
   }
 
   private notifyRenderer(): void {
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send('updater:status', this.status);
+      this.mainWindow.webContents.send('updater:status', { ...this.status });
     }
   }
-
-  // ============== Dialogs ==============
 
   private async showUpdateAvailableDialog(info: UpdateInfo): Promise<void> {
     if (!this.mainWindow) return;
 
     const result = await dialog.showMessageBox(this.mainWindow, {
       type: 'info',
-      title: 'Actualización Disponible',
-      message: `Versión ${info.version} está disponible`,
-      detail: `Versión actual: ${app.getVersion()}\n\n¿Desea descargar la actualización ahora?`,
+      title: 'Actualización disponible',
+      message: `La versión ${info.version} está disponible`,
+      detail: `Versión actual: ${app.getVersion()}\n\n¿Desea descargarla ahora?`,
       buttons: ['Descargar', 'Más tarde'],
       defaultId: 0,
       cancelId: 1,
     });
 
     if (result.response === 0) {
-      this.downloadUpdate();
+      await this.downloadUpdate();
     }
   }
 
@@ -211,10 +251,10 @@ class UpdateManager {
 
     const result = await dialog.showMessageBox(this.mainWindow, {
       type: 'info',
-      title: 'Actualización Lista',
-      message: `Versión ${info.version} descargada`,
-      detail: 'La actualización se instalará al reiniciar la aplicación.\n\n¿Desea reiniciar ahora?',
-      buttons: ['Reiniciar Ahora', 'Más tarde'],
+      title: 'Actualización lista',
+      message: `La versión ${info.version} fue descargada`,
+      detail: 'Se instalará al reiniciar la aplicación.\n\n¿Desea reiniciar ahora?',
+      buttons: ['Reiniciar ahora', 'Más tarde'],
       defaultId: 0,
       cancelId: 1,
     });
@@ -224,41 +264,48 @@ class UpdateManager {
     }
   }
 
-  // ============== Actions ==============
-
-  async checkForUpdates(silent: boolean = false): Promise<UpdateStatus> {
-    try {
-      if (this.status.checking) {
-        return this.status;
-      }
-
-      await autoUpdater.checkForUpdates();
-      return this.status;
-    } catch (error) {
-      this.status.error = error instanceof Error ? error.message : 'Unknown error';
+  async checkForUpdates(silent = false): Promise<UpdateStatus> {
+    if (!this.trustedUpdateOrigin) {
+      this.status.error = 'Actualizaciones automáticas no configuradas para esta compilación.';
       this.status.checking = false;
-      
+      this.notifyRenderer();
       if (!silent && this.mainWindow) {
-        dialog.showErrorBox('Error de Actualización', this.status.error);
+        dialog.showErrorBox('Actualizaciones deshabilitadas', this.status.error);
       }
-      
-      return this.status;
+      return { ...this.status };
     }
+
+    try {
+      if (!this.status.checking) {
+        await autoUpdater.checkForUpdates();
+      }
+    } catch (error) {
+      this.status.error = error instanceof Error ? error.message : 'Error desconocido';
+      this.status.checking = false;
+      this.notifyRenderer();
+      if (!silent && this.mainWindow) {
+        dialog.showErrorBox('Error de actualización', this.status.error);
+      }
+    }
+
+    return { ...this.status };
   }
 
   async downloadUpdate(): Promise<void> {
+    if (!this.trustedUpdateOrigin || !this.status.available) return;
+
     try {
       await autoUpdater.downloadUpdate();
     } catch (error) {
-      console.error('[Updater] Download error:', error);
-      this.status.error = error instanceof Error ? error.message : 'Download failed';
+      this.status.error = error instanceof Error ? error.message : 'No se pudo descargar';
       this.notifyRenderer();
     }
   }
 
   installUpdate(): void {
-    // This will quit and install
-    autoUpdater.quitAndInstall(false, true);
+    if (this.status.downloaded) {
+      autoUpdater.quitAndInstall(false, true);
+    }
   }
 
   getStatus(): UpdateStatus {
@@ -269,34 +316,29 @@ class UpdateManager {
     return app.getVersion();
   }
 
-  // ============== Periodic Check ==============
-
   startPeriodicCheck(): void {
-    // Clear existing timer
-    if (this.checkTimer) {
-      clearInterval(this.checkTimer);
-    }
+    this.stopPeriodicCheck();
+    if (!this.trustedUpdateOrigin) return;
 
-    // Check immediately on start (after a delay)
-    setTimeout(() => {
-      this.checkForUpdates(true);
-    }, 30000); // Wait 30 seconds after app start
+    this.initialCheckTimer = setTimeout(() => {
+      void this.checkForUpdates(true);
+    }, 30000);
 
-    // Then check periodically
-    const intervalMs = this.config.checkInterval * 60 * 1000;
     this.checkTimer = setInterval(() => {
-      this.checkForUpdates(true);
-    }, intervalMs);
+      void this.checkForUpdates(true);
+    }, this.config.checkInterval * 60 * 1000);
   }
 
   stopPeriodicCheck(): void {
+    if (this.initialCheckTimer) {
+      clearTimeout(this.initialCheckTimer);
+      this.initialCheckTimer = null;
+    }
     if (this.checkTimer) {
       clearInterval(this.checkTimer);
       this.checkTimer = null;
     }
   }
-
-  // ============== Cleanup ==============
 
   cleanup(): void {
     this.stopPeriodicCheck();
@@ -304,47 +346,24 @@ class UpdateManager {
   }
 }
 
-// ============== IPC Handlers ==============
-
 export function setupUpdaterIpcHandlers(): void {
   const updater = UpdateManager.getInstance();
 
-  ipcMain.handle('updater:check', async () => {
-    return updater.checkForUpdates(false);
-  });
-
-  ipcMain.handle('updater:check-silent', async () => {
-    return updater.checkForUpdates(true);
-  });
-
+  ipcMain.handle('updater:check', () => updater.checkForUpdates(false));
+  ipcMain.handle('updater:check-silent', () => updater.checkForUpdates(true));
   ipcMain.handle('updater:download', async () => {
     await updater.downloadUpdate();
     return updater.getStatus();
   });
-
-  ipcMain.handle('updater:install', () => {
-    updater.installUpdate();
-  });
-
-  ipcMain.handle('updater:get-status', () => {
-    return updater.getStatus();
-  });
-
-  ipcMain.handle('updater:get-version', () => {
-    return updater.getVersion();
-  });
-
-  ipcMain.handle('updater:get-config', () => {
-    return updater.getConfig();
-  });
-
+  ipcMain.handle('updater:install', () => updater.installUpdate());
+  ipcMain.handle('updater:get-status', () => updater.getStatus());
+  ipcMain.handle('updater:get-version', () => updater.getVersion());
+  ipcMain.handle('updater:get-config', () => updater.getConfig());
   ipcMain.handle('updater:update-config', (_event, config: Partial<UpdateConfig>) => {
     updater.updateConfig(config);
     return updater.getConfig();
   });
 }
-
-// ============== Initialization ==============
 
 export function initUpdater(mainWindow: BrowserWindow): UpdateManager {
   const updater = UpdateManager.getInstance();
@@ -357,4 +376,4 @@ export function cleanupUpdater(): void {
   UpdateManager.getInstance().cleanup();
 }
 
-export { UpdateManager };
+export { UpdateManager, normalizeConfig, trustedHttpsUrl };

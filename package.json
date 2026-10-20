@@ -1,6 +1,6 @@
 {
   "name": "monterrial-pos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -23,16 +23,17 @@
     "images:upload": "tsx scripts/uploadImagesToCloudinary.ts",
     "sunat:worker": "tsx src/worker/sunatWorker.ts",
     "sunat:test:local": "tsx scripts/test-sunat-beta-pipeline.ts",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:download-pg": "node electron/download-postgres.js",
-    "electron:build": "npm run build && node electron/prepare-build.js && electron-builder --win --x64",
-    "electron:pack": "electron-builder --dir",
+    "electron:dev": "npm run desktop:dev",
+    "electron:download-pg": "cd desktop && npm run setup:postgres",
+    "electron:build": "npm run desktop:build",
+    "electron:pack": "npm run desktop:portable",
     "desktop:dev": "npm run desktop:db && concurrently --kill-others \"npm run dev\" \"wait-on http://localhost:3000 && cd desktop && npm run dev\"",
     "desktop:build": "cross-env DESKTOP_BUILD=1 npm run build:only && cd desktop && npm run build",
     "desktop:portable": "cross-env DESKTOP_BUILD=1 npm run build:only && cd desktop && npm run pack",
     "desktop:standalone": "cross-env DESKTOP_BUILD=1 npm run build:only",
     "desktop:db": "powershell -ExecutionPolicy Bypass -File scripts/desktop/db-init.ps1",
-    "desktop:db:unix": "bash scripts/desktop/db-init.sh"
+    "desktop:db:unix": "bash scripts/desktop/db-init.sh",
+    "desktop:version": "node scripts/set-desktop-version.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.989.0",

@@ -1,395 +1,110 @@
-# Instalador y Auto-Update (D7)
+﻿# Entrega de Monterrial POS Desktop
 
-## Resumen
+Este es el procedimiento admitido para compilar y reconocer una entrega de la
+aplicación de escritorio. La versión vigente de esta rama es **0.2.0**.
 
-El módulo D7 proporciona:
-- ✅ Instalador NSIS profesional para Windows
-- ✅ Auto-update via GitHub Releases o servidor privado
-- ✅ Preflight checks (PostgreSQL, migraciones)
-- ✅ API para gestionar actualizaciones desde la UI
+## Reglas de seguridad
 
----
+- Ejecutar el flujo desde `feature/sunat-beta`.
+- No usar `npm run build` para preparar el escritorio: ese comando incluye
+  `prisma db push`. La compilación web segura es `npm run build:only`.
+- No guardar certificados privados, contraseñas, archivos `.pfx`, `.p12`,
+  `.pem` o `.key` en Git ni dentro del instalador.
+- La URL de actualizaciones no se puede cambiar desde la interfaz ni desde el
+  renderer de Electron. Se fija durante la compilación y solo se acepta HTTPS.
+- Sin una URL HTTPS configurada, el autoactualizador permanece deshabilitado.
 
-## Instalador (NSIS)
+## Preparar una versión
 
-### Características
-- Instalación con progreso visual
-- Permite elegir directorio de instalación
-- Crea accesos directos (escritorio + menú inicio)
-- Ejecuta app automáticamente después de instalar
-- Desinstalador incluido
+Actualizar los cuatro archivos de paquete con un único comando:
 
-### Configuración (package.json)
-
-```json
-{
-  "build": {
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "MarketPOS",
-      "installerIcon": "../public/icons/icon-512.png",
-      "runAfterFinish": true,
-      "perMachine": false
-    }
-  }
-}
+```powershell
+npm run desktop:version -- 0.2.1
 ```
 
----
+Comprobar la política de entrega antes de compilar:
 
-## Auto-Update
-
-### Providers Soportados
-
-#### GitHub Releases (Recomendado)
-
-```json
-{
-  "build": {
-    "publish": {
-      "provider": "github",
-      "owner": "your-org",
-      "repo": "marketpos-desktop",
-      "releaseType": "release"
-    }
-  }
-}
+```powershell
+Set-Location desktop
+npm run release:check
+Set-Location ..
 ```
 
-#### Servidor Privado
+El control falla si las versiones no coinciden, existe una clave privada seguida
+por Git, los alias antiguos no delegan al flujo desktop o la URL configurada no
+es HTTPS.
 
-```typescript
-// En la app, configurar servidor personalizado
-await window.desktop.updater.updateConfig({
-  feedUrl: 'https://updates.tu-empresa.com/marketpos'
-});
+## Configurar el origen de actualizaciones
+
+Solo cuando exista un servidor real que publique los artefactos compatibles con
+`electron-updater`, definir la variable en la terminal que hará el build:
+
+```powershell
+$env:MONTERIAL_UPDATE_FEED_URL = 'https://updates.example.com/monterrial'
 ```
 
-El servidor debe servir un archivo `latest.yml`:
+La variable se valida y se copia a `release-manifest.json`. No se consulta como
+configuración de usuario durante la ejecución. Borrar la variable produce una
+compilación válida con actualizaciones automáticas deshabilitadas.
 
-```yaml
-version: 1.2.0
-files:
-  - url: MarketPOS-Setup-1.2.0.exe
-    sha512: <hash>
-    size: 85000000
-path: MarketPOS-Setup-1.2.0.exe
-sha512: <hash>
-releaseDate: '2026-02-13T10:00:00.000Z'
+## Compilar
+
+Instalador NSIS:
+
+```powershell
+npm run desktop:build
 ```
 
----
+Portable sin instalador:
 
-## API Desktop
-
-### Verificar Actualizaciones
-
-```typescript
-// Con diálogo de confirmación
-const status = await window.desktop.updater.checkForUpdates();
-
-// Silencioso (background)
-const status = await window.desktop.updater.checkSilent();
+```powershell
+npm run desktop:portable
 ```
 
-### Estado de Actualización
+Ambos comandos ejecutan `npm run build:only`, preparan el servidor standalone,
+compilan Electron y generan los artefactos. Los alias `electron:build` y
+`electron:pack` delegan a estos mismos flujos.
 
-```typescript
-interface UpdateStatus {
-  checking: boolean;      // Verificando...
-  available: boolean;     // Hay update disponible
-  downloaded: boolean;    // Update descargado
-  downloading: boolean;   // Descargando...
-  progress: number;       // Progreso 0-100
-  version: string | null; // Nueva versión
-  error: string | null;   // Error si hubo
-}
+## Identidad y verificación
 
-const status = await window.desktop.updater.getStatus();
-```
+Cada paquete incorpora:
 
-### Descargar e Instalar
+- `build-id.txt`: versión, commit y fecha UTC del build.
+- `release-manifest.json`: versión, commit completo, estado limpio/sucio,
+  fecha UTC, identificador de aplicación y origen de updates.
+- `artifact-manifest.json`: archivo externo junto a la distribución con tamaño
+  y SHA-256 de cada instalador o ejecutable generado.
 
-```typescript
-// Descargar update
-await window.desktop.updater.download();
+Antes de publicar, comprobar que:
 
-// Instalar (cierra y reinicia la app)
-window.desktop.updater.install();
-```
+1. `sourceDirty` sea `false` en `release-manifest.json`.
+2. La versión coincida con la etiqueta de la entrega.
+3. Los SHA-256 de `artifact-manifest.json` coincidan con los archivos que se
+   enviarán al servidor.
+4. El instalador se pruebe en una máquina limpia y sobre una copia de una versión
+   anterior.
+5. La aplicación muestre el mismo `buildId` que el manifiesto incluido.
 
-### Configuración
+## Certificados
 
-```typescript
-interface UpdateConfig {
-  autoDownload: boolean;       // Auto-descargar updates
-  autoInstallOnQuit: boolean;  // Instalar al cerrar
-  checkInterval: number;       // Minutos entre checks
-  feedUrl?: string;            // URL servidor custom
-}
+El certificado fiscal de cada tienda se carga desde la configuración SUNAT y se
+guarda mediante el mecanismo de la aplicación. No forma parte del código fuente.
+El certificado de firma de Windows, cuando exista, debe inyectarse desde un
+almacén seguro del proceso de publicación.
 
-// Leer config
-const config = await window.desktop.updater.getConfig();
+Si alguna clave privada estuvo alguna vez en Git, retirarla del árbol actual no
+elimina sus copias del historial. Debe tratarse como expuesta y reemplazarse si
+era real.
 
-// Actualizar
-await window.desktop.updater.updateConfig({
-  autoDownload: false,
-  checkInterval: 120 // cada 2 horas
-});
-```
+## Publicación y actualizaciones
 
-### Eventos
+No hay un proveedor ficticio dentro de `desktop/package.json`. Una entrega sin
+`MONTERIAL_UPDATE_FEED_URL` no intenta conectarse a ningún servidor de updates.
+Con un origen HTTPS configurado, Electron lee únicamente el valor incluido en el
+manifiesto empaquetado, descarga la metadata de actualización, verifica las
+firmas/hashes suministrados por `electron-updater` y permite instalar después
+de completar la descarga.
 
-```typescript
-// Escuchar cambios de estado
-window.desktop.on('updater:status', (status: UpdateStatus) => {
-  if (status.available) {
-    console.log('Nueva versión:', status.version);
-  }
-  if (status.downloaded) {
-    console.log('Listo para instalar');
-  }
-});
-```
-
----
-
-## Preflight Checks
-
-Al iniciar en modo producción, se ejecutan verificaciones automáticas:
-
-| Check | Crítico | Descripción |
-|-------|---------|-------------|
-| PostgreSQL | ✅ | Puerto 5432 activo |
-| Base de Datos | ⚠️ | `marketpos_desktop` existe |
-| Migraciones | ⚠️ | Prisma migrations presentes |
-| Archivos Servidor | ✅ | `server.js` existe |
-| Puerto 3001 | ⚠️ | Disponible para servidor |
-
-Si un check crítico falla, la app no inicia.
-Si hay warnings, se muestra diálogo con opción de continuar.
-
----
-
-## Flujo de Release
-
-### 1. Actualizar Versión
-
-```bash
-cd desktop
-npm version patch  # 0.1.0 -> 0.1.1
-# o
-npm version minor  # 0.1.1 -> 0.2.0
-# o
-npm version major  # 0.2.0 -> 1.0.0
-```
-
-### 2. Build del Instalador
-
-```bash
-# Primero, build del Next.js standalone
-cd ..
-npm run build
-
-# Luego, build del instalador
-cd desktop
-npm run build
-```
-
-Output: `desktop/dist-electron/MarketPOS-Setup-X.X.X.exe`
-
-### 3. Publicar Release
-
-#### GitHub Releases
-
-```bash
-# Con gh cli
-gh release create v1.0.0 \
-  ./dist-electron/MarketPOS-Setup-1.0.0.exe \
-  --title "MarketPOS v1.0.0" \
-  --notes "Descripción del release"
-```
-
-O manualmente en GitHub:
-1. Ir a Releases > Draft new release
-2. Tag: `v1.0.0`
-3. Upload: `MarketPOS-Setup-1.0.0.exe`
-4. Publish
-
-#### Servidor Privado
-
-```bash
-# Copiar archivos al servidor
-scp ./dist-electron/MarketPOS-Setup-1.0.0.exe user@server:/updates/
-scp ./dist-electron/latest.yml user@server:/updates/
-```
-
-### 4. Verificar Update
-
-En una instalación existente:
-1. Abrir MarketPOS
-2. Ir a Configuración > Actualizaciones
-3. Click "Buscar Actualizaciones"
-4. Debería detectar la nueva versión
-
----
-
-## UI: Componente de Actualizaciones
-
-```tsx
-// components/settings/UpdateSettings.tsx
-'use client';
-
-import { useEffect, useState } from 'react';
-
-export function UpdateSettings() {
-  const [status, setStatus] = useState<UpdateStatus | null>(null);
-  const [config, setConfig] = useState<UpdateConfig | null>(null);
-  const [checking, setChecking] = useState(false);
-
-  useEffect(() => {
-    if (!window.desktop?.updater) return;
-    
-    loadStatus();
-    loadConfig();
-    
-    // Escuchar cambios
-    window.desktop.on('updater:status', setStatus);
-    
-    return () => {
-      window.desktop.off('updater:status', setStatus);
-    };
-  }, []);
-
-  const loadStatus = async () => {
-    const s = await window.desktop.updater.getStatus();
-    setStatus(s);
-  };
-
-  const loadConfig = async () => {
-    const c = await window.desktop.updater.getConfig();
-    setConfig(c);
-  };
-
-  const handleCheck = async () => {
-    setChecking(true);
-    await window.desktop.updater.checkForUpdates();
-    setChecking(false);
-  };
-
-  const handleInstall = () => {
-    window.desktop.updater.install();
-  };
-
-  if (!window.desktop?.updater) {
-    return <p>Solo disponible en app desktop</p>;
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h3>Versión Actual</h3>
-          <p className="text-gray-500">{status?.version || 'Cargando...'}</p>
-        </div>
-        
-        <button 
-          onClick={handleCheck}
-          disabled={checking || status?.checking}
-        >
-          {checking ? 'Buscando...' : 'Buscar Actualizaciones'}
-        </button>
-      </div>
-
-      {status?.available && !status.downloaded && (
-        <div className="bg-blue-50 p-4 rounded">
-          <p>Nueva versión disponible: {status.version}</p>
-          {status.downloading ? (
-            <div className="mt-2">
-              <div className="bg-blue-200 rounded-full h-2">
-                <div 
-                  className="bg-blue-600 h-2 rounded-full" 
-                  style={{ width: `${status.progress}%` }}
-                />
-              </div>
-              <p className="text-sm mt-1">{status.progress.toFixed(0)}%</p>
-            </div>
-          ) : (
-            <button onClick={() => window.desktop.updater.download()}>
-              Descargar
-            </button>
-          )}
-        </div>
-      )}
-
-      {status?.downloaded && (
-        <div className="bg-green-50 p-4 rounded">
-          <p>Actualización lista para instalar</p>
-          <button 
-            onClick={handleInstall}
-            className="bg-green-600 text-white px-4 py-2 rounded mt-2"
-          >
-            Reiniciar e Instalar
-          </button>
-        </div>
-      )}
-
-      <div className="border-t pt-4">
-        <h4>Configuración</h4>
-        <label className="flex items-center gap-2 mt-2">
-          <input 
-            type="checkbox"
-            checked={config?.autoDownload}
-            onChange={(e) => {
-              window.desktop.updater.updateConfig({ 
-                autoDownload: e.target.checked 
-              });
-              loadConfig();
-            }}
-          />
-          Descargar actualizaciones automáticamente
-        </label>
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-## Troubleshooting
-
-### "Error: spawn UNKNOWN"
-PostgreSQL no está instalado o no inició. Instalar PostgreSQL 16+ y asegurar que el servicio esté corriendo.
-
-### "No se encontraron actualizaciones"
-1. Verificar que el tag de GitHub coincide (`vX.X.X`)
-2. Verificar que el release no es draft
-3. Check `publish.provider` en package.json
-
-### "Error de firma" (Windows)
-En desarrollo no firmamos el exe. Para producción, configurar:
-```json
-{
-  "win": {
-    "signAndEditExecutable": true,
-    "certificateFile": "./cert.pfx",
-    "certificatePassword": "xxx"
-  }
-}
-```
-
----
-
-## Archivos Relacionados
-
-| Archivo | Propósito |
-|---------|-----------|
-| [desktop/src/updater/autoUpdater.ts](../desktop/src/updater/autoUpdater.ts) | Auto-update manager |
-| [desktop/src/updater/preflight.ts](../desktop/src/updater/preflight.ts) | Preflight checks |
-| [desktop/package.json](../desktop/package.json) | Build config NSIS |
-| [desktop/src/main.ts](../desktop/src/main.ts) | Integración |
-| [desktop/src/preload.ts](../desktop/src/preload.ts) | API expuesta |
+Nunca publicar una carpeta `dist-electron*` usando solamente su fecha como
+identidad. Conservar el instalador, su metadata de actualización y
+`artifact-manifest.json` como un solo conjunto.

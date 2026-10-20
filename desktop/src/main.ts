@@ -17,7 +17,7 @@ import { initTaskQueue, getTaskQueue, TaskType } from './taskQueue';
 import { initPrinterManager, getPrinterManager, PrinterConfig, PrintOptions } from './printing/printTicket';
 import { initEscposPrintManager, getEscposPrintManager, EscposConfig, BtPortInfo } from './printing/escpos';
 import { RasterPrintManager, closeBrowser } from './printing/raster';
-import { setupUpdaterIpcHandlers, initUpdater, cleanupUpdater, UpdateConfig } from './updater/autoUpdater';
+import { setupUpdaterIpcHandlers, initUpdater, cleanupUpdater } from './updater/autoUpdater';
 import { createPreflightManager, PreflightManager } from './updater/preflight';
 import { 
   ensurePostgres, 

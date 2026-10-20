@@ -9,8 +9,11 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
+const { writeArtifactManifest } = require('./release-metadata');
 
 const argv = process.argv.slice(2);
+const desktopDir = path.resolve(__dirname, '..');
+const buildResourcesDir = path.join(desktopDir, 'build-resources');
 
 const isWindows = process.platform === 'win32';
 const builderBin = path.resolve(
@@ -87,9 +90,17 @@ function runBuilder(extraArgs, label) {
   });
 }
 
+function finalizeArtifacts(outputName) {
+  const outputDir = path.resolve(desktopDir, outputName);
+  const manifest = writeArtifactManifest({ outputDir, buildResourcesDir });
+  console.log(`[build] Wrote artifact manifest with ${manifest.artifacts.length} file(s):`);
+  console.log(path.join(outputDir, 'artifact-manifest.json'));
+}
+
 async function main() {
   try {
     await runBuilder([], 'primary');
+    finalizeArtifacts('dist-electron');
     return;
   } catch (err) {
     const captured = (err && err._builderOutput) || '';
@@ -101,6 +112,7 @@ async function main() {
     console.log('');
 
     await runBuilder([`-c.directories.output=${freshOutput}`], 'retry-fresh-output');
+    finalizeArtifacts(freshOutput);
   }
 }
 

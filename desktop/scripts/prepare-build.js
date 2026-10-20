@@ -8,6 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { writeReleaseMetadata } = require('./release-metadata');
+const { validateRelease } = require('./validate-release');
 
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const DESKTOP_DIR = path.join(__dirname, '..');
@@ -32,12 +34,6 @@ function writePublicDesktopEnv() {
   // other secrets must remain outside the desktop package.
   fs.writeFileSync(path.join(BUILD_RESOURCES, '.env'), `CLOUD_URL=${cloudUrl}\n`, 'utf8');
   console.log('Created desktop public environment (CLOUD_URL only)');
-}
-
-function writeBuildId() {
-  const buildId = new Date().toISOString();
-  fs.writeFileSync(path.join(BUILD_RESOURCES, 'build-id.txt'), `${buildId}\n`, 'utf8');
-  console.log('Created desktop build identifier');
 }
 
 function buildWindowsLauncher() {
@@ -179,6 +175,8 @@ function main() {
   console.log('='.repeat(60));
   console.log('');
   
+  validateRelease();
+
   // Verify standalone exists
   const standalonePath = path.join(ROOT_DIR, '.next', 'standalone', 'server.js');
   if (!fs.existsSync(standalonePath)) {
@@ -226,7 +224,12 @@ function main() {
   }
 
   writePublicDesktopEnv();
-  writeBuildId();
+  const release = writeReleaseMetadata({
+    rootDir: ROOT_DIR,
+    desktopDir: DESKTOP_DIR,
+    buildResourcesDir: BUILD_RESOURCES,
+  });
+  console.log(`Created release manifest ${release.buildId}`);
   buildWindowsLauncher();
   
   console.log('='.repeat(60));
