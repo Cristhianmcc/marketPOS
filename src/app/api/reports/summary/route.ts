@@ -13,6 +13,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!session.storeId) {
+      return NextResponse.json(
+        { code: 'STORE_REQUIRED', message: 'No hay una tienda activa' },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const from = searchParams.get('from');
     const to = searchParams.get('to');
@@ -22,7 +29,7 @@ export async function GET(request: NextRequest) {
     const toDate = to ? new Date(to + 'T23:59:59.999-05:00') : new Date();
 
     // Build where clause
-    const where: any = {
+    const where: Prisma.SaleWhereInput = {
       storeId: session.storeId,
       createdAt: {
         gte: fromDate,
@@ -56,6 +63,9 @@ export async function GET(request: NextRequest) {
               quantity: true,
               subtotal: true,
               promotionDiscount: true,
+              categoryPromoDiscount: true,
+              volumePromoDiscount: true,
+              nthPromoDiscount: true,
             },
           },
         },
@@ -114,53 +124,25 @@ export async function GET(request: NextRequest) {
       return sum + Number(s.couponDiscount || 0);
     }, 0);
 
-    // ✅ Calcular promos categoría totales (Módulo 14.2-B)
-    const totalCategoryPromotions = await prisma.saleItem.aggregate({
-      where: {
-        sale: {
-          storeId: session.storeId,
-          createdAt: {
-            gte: fromDate,
-            lt: toDate,
-          },
-        },
-      },
-      _sum: {
-        categoryPromoDiscount: true,
-      },
-    }).then(result => Number(result._sum.categoryPromoDiscount || 0));
+    // Las promociones especializadas se calculan sobre las mismas ventas ya
+    // filtradas. Así no se incluyen anulaciones ni ventas de otros cajeros.
+    const totalCategoryPromotions = sales.reduce((sum, sale) => {
+      return sum + sale.items.reduce((itemSum, item) => {
+        return itemSum + Number(item.categoryPromoDiscount || 0);
+      }, 0);
+    }, 0);
 
-    // ✅ Calcular promos volumen totales (Módulo 14.2-C1)
-    const totalVolumePromotions = await prisma.saleItem.aggregate({
-      where: {
-        sale: {
-          storeId: session.storeId,
-          createdAt: {
-            gte: fromDate,
-            lt: toDate,
-          },
-        },
-      },
-      _sum: {
-        volumePromoDiscount: true,
-      },
-    }).then(result => Number(result._sum.volumePromoDiscount || 0));
+    const totalVolumePromotions = sales.reduce((sum, sale) => {
+      return sum + sale.items.reduce((itemSum, item) => {
+        return itemSum + Number(item.volumePromoDiscount || 0);
+      }, 0);
+    }, 0);
 
-    // ✅ Calcular promos n-ésimo totales (Módulo 14.2-C2)
-    const totalNthPromotions = await prisma.saleItem.aggregate({
-      where: {
-        sale: {
-          storeId: session.storeId,
-          createdAt: {
-            gte: fromDate,
-            lt: toDate,
-          },
-        },
-      },
-      _sum: {
-        nthPromoDiscount: true,
-      } as any,
-    }).then(result => Number((result._sum as any)?.nthPromoDiscount || 0));
+    const totalNthPromotions = sales.reduce((sum, sale) => {
+      return sum + sale.items.reduce((itemSum, item) => {
+        return itemSum + Number(item.nthPromoDiscount || 0);
+      }, 0);
+    }, 0);
     
     const ticketCount = sales.length;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;

@@ -437,7 +437,7 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/prisma/build/index.js validate` | Valida esquema sin migrar datos; pasó |
 | `node node_modules/typescript/bin/tsc -p desktop/tsconfig.json --noEmit --incremental false` | Tipos Electron; pasó |
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
-| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10 y H11 con dependencias simuladas; pasaron el 19/10/2026 |
+| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10, H11, H14 y H15 con dependencias simuladas; pasaron el 19/10/2026 |
 | `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
 | `node scripts/test-backup-restore-isolated.cjs <zip> [--multipart]` | Ejecuta el endpoint de restauración contra Prisma simulado en transporte ZIP crudo o multipart; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
@@ -537,6 +537,19 @@ una base real como comprobación rutinaria.
   no sustituye TypeScript ni lint: `next.config.ts` aún los omite y H05 sigue
   pendiente.
 
+### Resumen de reportes consistente (2026-10-19)
+
+- `src/app/api/reports/summary/route.ts` obtiene promociones generales, de
+  categoría, de volumen y n-ésimo desde el mismo conjunto de ventas. Ese conjunto
+  siempre pertenece a la tienda activa, excluye ventas anuladas y usa el mismo
+  rango inclusivo de fechas.
+- Para un `CASHIER`, todos esos totales se limitan a sus propias ventas. Para un
+  `OWNER`, el resumen conserva el alcance de toda la tienda. Una sesión sin tienda
+  recibe `STORE_REQUIRED` y no puede ejecutar accidentalmente un reporte global.
+- La prueba aislada H15 verifica ambos roles, los límites de fecha, la exclusión
+  de ventas con total cero y los tres descuentos especializados. Pasó el
+  19/10/2026 junto con el resto de invariantes del script de auditoría.
+
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
 - El Resumen Diario valida `YYYY-MM-DD` y lo interpreta como fecha civil de Peru
@@ -590,7 +603,8 @@ una base real como comprobación rutinaria.
    farmacéutica transaccional H11. Mantener esas invariantes al modificar ventas,
    fiados, lotes, compras, ajustes o farmacia.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
-5. Verificar CORS/entrada de impresión, sesión, reportes, idempotencia y turnos.
+5. Verificar CORS/entrada de impresión, sesión, idempotencia y turnos. H15 de
+   reportes quedó corregido y cubierto por prueba aislada el 19/10/2026.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

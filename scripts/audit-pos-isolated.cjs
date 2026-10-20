@@ -15,6 +15,7 @@ function loadRoute(relativePath, dependencies) {
   const exports = {};
   vm.runInNewContext(compiled, {
     exports,
+    URL,
     require(name) {
       if (!(name in dependencies)) throw new Error(`Unmocked dependency: ${name}`);
       return dependencies[name];
@@ -655,6 +656,90 @@ async function main() {
     && stockRouteSource.includes('await adjustStockAtomically(tx');
   console.log(`${inventoryRoutesUseAtomicMutations ? 'PASS' : 'FAIL'} H14: checkout and manual adjustments use guarded atomic mutations inside transactions.`);
   if (!inventoryRoutesUseAtomicMutations) failures++;
+
+  let reportRole = 'CASHIER';
+  let reportStoreId = 'store-a';
+  const capturedReportQueries = [];
+  const reportSql = (strings, ...values) => ({ strings: Array.from(strings), values });
+  const reportSummaryRoute = loadRoute('src/app/api/reports/summary/route.ts', {
+    'next/server': next,
+    '@/lib/session': {
+      getSession: async () => ({
+        userId: 'cashier-a',
+        storeId: reportStoreId,
+        role: reportRole,
+      }),
+    },
+    '@/infra/db/prisma': { prisma: {
+      sale: {
+        findMany: async args => {
+          capturedReportQueries.push(args);
+          return [{
+            id: 'sale-a',
+            total: 20,
+            discountTotal: 5,
+            couponDiscount: 1,
+            paymentMethod: 'CASH',
+            items: [{
+              productName: 'Audit product',
+              productContent: null,
+              quantity: 1,
+              subtotal: 20,
+              promotionDiscount: 1,
+              categoryPromoDiscount: 2,
+              volumePromoDiscount: 3,
+              nthPromoDiscount: 4,
+            }],
+          }];
+        },
+      },
+      $queryRaw: async () => [],
+      receivablePayment: { aggregate: async () => ({ _sum: { amount: 0 } }) },
+      receivable: { aggregate: async () => ({ _sum: { balance: 0 } }) },
+    } },
+    '@prisma/client': {
+      Prisma: { sql: reportSql, empty: reportSql`` },
+    },
+  });
+
+  const cashierSummaryResponse = await reportSummaryRoute.GET({
+    url: 'http://localhost/api/reports/summary?from=2026-10-01&to=2026-10-19',
+  });
+  const cashierWhere = capturedReportQueries[0]?.where;
+  const cashierSummary = cashierSummaryResponse.body?.summary;
+  const cashierReportIsolated = cashierSummaryResponse.status === 200
+    && cashierWhere?.storeId === 'store-a'
+    && cashierWhere?.userId === 'cashier-a'
+    && cashierWhere?.total?.gt === 0
+    && typeof cashierWhere?.createdAt?.gte?.toISOString === 'function'
+    && typeof cashierWhere?.createdAt?.lte?.toISOString === 'function'
+    && cashierSummary?.totalCategoryPromotions === 2
+    && cashierSummary?.totalVolumePromotions === 3
+    && cashierSummary?.totalNthPromotions === 4;
+  console.log(`${cashierReportIsolated ? 'PASS' : 'FAIL'} H15: cashier summary and every promotion total share store, user, date, and active-sale filters.`);
+  if (!cashierReportIsolated) failures++;
+
+  reportRole = 'OWNER';
+  const ownerSummaryResponse = await reportSummaryRoute.GET({
+    url: 'http://localhost/api/reports/summary?from=2026-10-01&to=2026-10-19',
+  });
+  const ownerWhere = capturedReportQueries[1]?.where;
+  const ownerReportStoreWide = ownerSummaryResponse.status === 200
+    && ownerWhere?.storeId === 'store-a'
+    && !Object.prototype.hasOwnProperty.call(ownerWhere, 'userId')
+    && ownerWhere?.total?.gt === 0;
+  console.log(`${ownerReportStoreWide ? 'PASS' : 'FAIL'} H15: OWNER summary remains store-wide while excluding cancelled sales.`);
+  if (!ownerReportStoreWide) failures++;
+
+  reportStoreId = null;
+  const storelessSummaryResponse = await reportSummaryRoute.GET({
+    url: 'http://localhost/api/reports/summary',
+  });
+  const storelessReportDenied = storelessSummaryResponse.status === 403
+    && storelessSummaryResponse.body?.code === 'STORE_REQUIRED'
+    && capturedReportQueries.length === 2;
+  console.log(`${storelessReportDenied ? 'PASS' : 'FAIL'} H15: a session without an active store cannot run a global report.`);
+  if (!storelessReportDenied) failures++;
 
   const { registerPharmacyTrace } = loadRoute('src/lib/sales/pharmacyTrace.ts', {
     '@prisma/client': {
