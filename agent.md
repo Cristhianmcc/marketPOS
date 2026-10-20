@@ -596,8 +596,25 @@ una base real como comprobación rutinaria.
 - La prueba H18 ejecuta dos aperturas concurrentes y comprueba un solo registro,
   respuesta `201/409`, caja inicial cero, cierre exacto e historial con ceros.
   Pasó junto con la suite aislada el 20/10/2026, sin base real ni red.
-- Punto de reanudación: H18 queda cerrado. El siguiente hallazgo es H19,
-  alinear la política de navegación Electron con el origen exacto del servidor.
+- H18 quedó cerrado en la rama aislada y guardado en el commit `7d769b25`.
+
+### Navegación segura de Electron (2026-10-20)
+
+- `desktop/src/security/navigationPolicy.ts` compara URL y servidor por origen
+  completo: protocolo, host y puerto. Esto acepta el `127.0.0.1` y puerto
+  dinámico que devuelve el servidor embebido, sin confiar en prefijos de texto.
+- La navegación principal permite login, logout y redirecciones solo dentro del
+  origen del servidor actualmente iniciado. Otro puerto, otro nombre de host o
+  una URL inválida se bloquean.
+- Las ventanas nuevas del mismo origen se permiten para la representación del
+  ticket. Los enlaces HTTP(S) y `mailto:` externos se abren con el sistema; los
+  protocolos restantes, incluidos `javascript:`, `data:` y `file:`, se bloquean.
+- La prueba H19 cubre rutas internas, ticket, puerto diferente, `localhost`
+  diferente del origen activo, un host de prefijo engañoso, URL inválida y
+  protocolos externos o bloqueados. Pasó junto con toda la suite aislada y
+  TypeScript de Electron el 20/10/2026, sin base real ni red.
+- Punto de reanudación: H19 queda cerrado. El siguiente hallazgo es H20,
+  trazabilidad y configuración segura de las distribuciones y actualizaciones.
 
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
@@ -654,8 +671,10 @@ una base real como comprobación rutinaria.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
 5. Verificar CORS/entrada de impresión e idempotencia. H15 de reportes, H16 de
    sesión, H17 de autenticación interna y H18 de turnos quedaron corregidos y
-   cubiertos por pruebas aisladas. El siguiente trabajo es H19, navegación
-   desktop limitada al origen exacto del servidor iniciado.
+   cubiertos por pruebas aisladas. H19 también quedó corregido y verificado:
+   Electron limita la navegación al origen exacto del servidor iniciado.
+6. El siguiente trabajo es H20: identificar cada entrega por versión, commit y
+   manifiesto, y eliminar destinos de actualización de ejemplo.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

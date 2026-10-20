@@ -1182,6 +1182,39 @@ async function main() {
   console.log(`${zeroValuesArePreserved ? 'PASS' : 'FAIL'} H18: exact cash close and history keep monetary zero values instead of null.`);
   if (!zeroValuesArePreserved) failures++;
 
+  const navigationPolicy = loadRoute('desktop/src/security/navigationPolicy.ts', {});
+  const runningServerUrl = 'http://127.0.0.1:43123';
+  const legitimateDesktopNavigation = [
+    `${runningServerUrl}/login`,
+    `${runningServerUrl}/`,
+    `${runningServerUrl}/receipt/sale-a`,
+  ].every(url => navigationPolicy.isAppServerUrl(url, runningServerUrl));
+  const foreignOriginsAreRejected = [
+    'http://127.0.0.1:43124/login',
+    'http://localhost:43123/login',
+    'http://127.0.0.1.evil.invalid:43123/login',
+    'not a url',
+  ].every(url => !navigationPolicy.isAppServerUrl(url, runningServerUrl));
+  const popupPolicyIsExact = navigationPolicy.classifyWindowOpenUrl(
+    `${runningServerUrl}/receipt/sale-a`, runningServerUrl
+  ) === 'app'
+    && navigationPolicy.classifyWindowOpenUrl('https://example.invalid/help', runningServerUrl) === 'external'
+    && navigationPolicy.classifyWindowOpenUrl('mailto:support@example.invalid', runningServerUrl) === 'external'
+    && navigationPolicy.classifyWindowOpenUrl('javascript:alert(1)', runningServerUrl) === 'blocked'
+    && navigationPolicy.classifyWindowOpenUrl('file:///C:/Windows/System32', runningServerUrl) === 'blocked';
+  const desktopUsesOriginPolicy = desktopMainSource.includes(
+    "import { classifyWindowOpenUrl, isAppServerUrl } from './security/navigationPolicy'"
+  )
+    && desktopMainSource.includes('isAppServerUrl(navigationUrl, serverUrl)')
+    && desktopMainSource.includes("if (disposition === 'app')")
+    && desktopMainSource.includes("if (disposition === 'external')");
+  const desktopNavigationIsConstrained = legitimateDesktopNavigation
+    && foreignOriginsAreRejected
+    && popupPolicyIsExact
+    && desktopUsesOriginPolicy;
+  console.log(`${desktopNavigationIsConstrained ? 'PASS' : 'FAIL'} H19: desktop navigation and ticket windows use the exact running server origin.`);
+  if (!desktopNavigationIsConstrained) failures++;
+
   if (originalDesktopInternalToken === undefined) delete process.env.DESKTOP_INTERNAL_TOKEN;
   else process.env.DESKTOP_INTERNAL_TOKEN = originalDesktopInternalToken;
   if (originalNodeEnv === undefined) delete process.env.NODE_ENV;

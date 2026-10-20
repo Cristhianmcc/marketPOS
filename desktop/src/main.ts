@@ -48,6 +48,7 @@ import { initCloudBackupSync, getCloudBackupSync } from './sync';
 // D9 - License Checker
 import { checkLicense, LicenseState } from './licenseChecker';
 import { SunatProcessor } from './sunatProcessor';
+import { classifyWindowOpenUrl, isAppServerUrl } from './security/navigationPolicy';
 
 // ============================================================================
 // CONSTANTES Y CONFIGURACIÓN
@@ -208,28 +209,29 @@ async function syncLocalImages(serverUrl: string): Promise<void> {
  * Estas configuraciones protegen contra ataques comunes.
  */
 function setupSecurityPolicies(): void {
-  // Deshabilitar navegación a URLs externas desde la app
+  // Limitar la navegación al origen exacto del servidor iniciado. El origen se
+  // consulta en cada evento porque el puerto puede cambiar tras un reinicio.
   app.on('web-contents-created', (_, contents) => {
     contents.on('will-navigate', (event, navigationUrl) => {
-      const parsedUrl = new URL(navigationUrl);
-      
-      // Solo permitir navegación a localhost (nuestro servidor)
-      if (parsedUrl.hostname !== 'localhost') {
+      if (!isAppServerUrl(navigationUrl, serverUrl)) {
         event.preventDefault();
         console.warn(`[Security] Blocked navigation to: ${navigationUrl}`);
       }
     });
 
-    // Prevenir apertura de nuevas ventanas no autorizadas
+    // Los comprobantes internos pueden abrir una ventana Electron. Los enlaces
+    // externos se entregan al navegador del sistema y los demás se bloquean.
     contents.setWindowOpenHandler(({ url }) => {
-      // Abrir enlaces externos en el navegador del sistema
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        // Permitir localhost (nuestro servidor)
-        if (!url.startsWith('http://127.0.0.1') && !url.startsWith('http://localhost')) {
-          shell.openExternal(url);
-          return { action: 'deny' };
-        }
+      const disposition = classifyWindowOpenUrl(url, serverUrl);
+
+      if (disposition === 'app') {
+        return { action: 'allow' };
       }
+
+      if (disposition === 'external') {
+        void shell.openExternal(url);
+      }
+
       return { action: 'deny' };
     });
   });
