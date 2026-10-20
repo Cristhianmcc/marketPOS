@@ -5,7 +5,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push && next build",
+    "build": "npm run build:only",
     "build:only": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
@@ -13,6 +13,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
+    "test:migrations:isolated": "node scripts/test-migrations-isolated.cjs",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:catalog": "tsx scripts/seedCatalog.ts",

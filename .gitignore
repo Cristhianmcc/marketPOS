@@ -64,8 +64,7 @@ market_pos_backup.sql
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
-prisma/migrations
+# Prisma migrations are versioned and bundled with desktop releases.
 prisma/schema.sql
 
 # archivos de importacion (demasiado grandes para GitHub)

@@ -1221,6 +1221,36 @@ async function main() {
   const releaseTools = require('../desktop/scripts/release-metadata');
   const rootPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
   const desktopPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'desktop/package.json'), 'utf8'));
+  const migrationRunnerSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/src/updater/runMigrations.ts'),
+    'utf8'
+  );
+  const migrationsDir = path.resolve(__dirname, '..', 'prisma/migrations');
+  const timestampedMigrations = fs.readdirSync(migrationsDir)
+    .filter(name => /^\d{14}_/.test(name) && fs.statSync(path.join(migrationsDir, name)).isDirectory());
+  const baselineSql = timestampedMigrations.length === 1
+    ? fs.readFileSync(path.join(migrationsDir, timestampedMigrations[0], 'migration.sql'), 'utf8')
+    : '';
+  const migrationProbe = fs.readFileSync(
+    path.resolve(__dirname, '..', 'scripts/test-migrations-isolated.cjs'),
+    'utf8'
+  );
+  const migrationPolicySafe = rootPackage.scripts.build === 'npm run build:only'
+    && timestampedMigrations.length === 1
+    && baselineSql.length > 10000
+    && baselineSql.includes('CREATE TABLE "stores"')
+    && baselineSql.includes('CREATE TABLE "sales"')
+    && !migrationRunnerSource.includes('execPrismaDbPush')
+    && !migrationRunnerSource.includes("'--accept-data-loss'")
+    && !migrationRunnerSource.includes('await this.runSchemaPatch(databaseUrl)')
+    && migrationRunnerSource.includes('assertLegacySchemaMatches')
+    && migrationRunnerSource.includes("'--from-schema-datasource'")
+    && migrationRunnerSource.includes("'--exit-code'")
+    && migrationRunnerSource.includes('execPrismaMigrateResolve')
+    && migrationProbe.includes("['h04_clean', 'h04_legacy', 'h04_drift']")
+    && rootPackage.scripts['test:migrations:isolated'] === 'node scripts/test-migrations-isolated.cjs';
+  console.log(`${migrationPolicySafe ? 'PASS' : 'FAIL'} H04: schema changes use a complete baseline and verified legacy adoption without db push.`);
+  if (!migrationPolicySafe) failures++;
   const updaterSource = fs.readFileSync(
     path.resolve(__dirname, '..', 'desktop/src/updater/autoUpdater.ts'),
     'utf8'

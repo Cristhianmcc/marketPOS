@@ -178,7 +178,7 @@ export class MigrationRunner {
     const migrationFolders = fs.readdirSync(migrationsPath)
       .filter((f) => {
         const fullPath = path.join(migrationsPath, f);
-        return fs.statSync(fullPath).isDirectory() && f.match(/^\d{4}_|^\d{14}_/);
+        return fs.statSync(fullPath).isDirectory() && /^\d{14}_/.test(f);
       })
       .sort();
 
@@ -679,35 +679,13 @@ export class MigrationRunner {
       const schemaPath = this.getPrismaSchemaPath();
       const databaseUrl = this.getDatabaseUrl();
 
-      // Apply SQL patches for columns missing in older installs
-      await this.runSchemaPatch(databaseUrl);
-      
       console.log(`[MigrationRunner] Schema: ${schemaPath}`);
       console.log(`[MigrationRunner] Database: ${databaseUrl.replace(/:[^:@]+@/, ':****@')}`);
 
       // Check if migrations folder exists
       const migrationsPath = path.join(path.dirname(schemaPath), 'migrations');
       if (!fs.existsSync(migrationsPath)) {
-        // No migrations folder - use prisma db push instead
-        console.log('[MigrationRunner] No migrations folder - using db push');
-        const output = await this.execPrismaDbPush(schemaPath, databaseUrl);
-        
-        // No seed automático - el usuario debe pasar por /setup para provisionar
-        console.log('[MigrationRunner] Schema created. User must complete /setup to provision store.');
-
-        // Seed global catalog
-        try {
-          await this.seedGlobalCatalog(databaseUrl);
-        } catch (seedErr) {
-          console.error('[MigrationRunner] Catalog seed error (non-fatal):', seedErr);
-        }
-
-        return {
-          success: true,
-          migrationsApplied: 1,
-          migrationsSkipped: 0,
-          message: 'Schema pushed successfully (db push)',
-        };
+        throw new Error('No se encontraron migraciones versionadas. La base no fue modificada.');
       }
 
       // Count real (14-digit timestamp) migration folders
@@ -719,26 +697,8 @@ export class MigrationRunner {
 
       console.log(`[MigrationRunner] Found ${migrationFolders.length} real migration(s)`);
 
-      // If only baseline migrations exist (0001_init style with empty SQL),
-      // fall through to db push so fresh installs get all tables created.
       if (migrationFolders.length === 0) {
-        console.log('[MigrationRunner] Only baseline migrations found - using db push for schema creation');
-        await this.execPrismaDbPush(schemaPath, databaseUrl);
-
-        console.log('[MigrationRunner] Schema created via db push. User must complete /setup to provision store.');
-
-        try {
-          await this.seedGlobalCatalog(databaseUrl);
-        } catch (seedErr) {
-          console.error('[MigrationRunner] Catalog seed error (non-fatal):', seedErr);
-        }
-
-        return {
-          success: true,
-          migrationsApplied: 1,
-          migrationsSkipped: 0,
-          message: 'Schema pushed successfully (db push — baseline only)',
-        };
+        throw new Error('No hay migraciones con marca de tiempo válida. La base no fue modificada.');
       }
 
       // Run prisma migrate deploy
@@ -752,7 +712,8 @@ export class MigrationRunner {
         if (isP3005) {
           const firstMigration = this.getFirstMigrationName(schemaPath);
           if (firstMigration) {
-            console.warn(`[MigrationRunner] Detected existing DB. Baseline with migration: ${firstMigration}`);
+            console.warn(`[MigrationRunner] Existing database detected. Verifying schema before baseline: ${firstMigration}`);
+            await this.assertLegacySchemaMatches(schemaPath, databaseUrl);
             await this.execPrismaMigrateResolve(schemaPath, databaseUrl, firstMigration);
             output = await this.execPrismaMigrate(schemaPath, databaseUrl);
           } else {
@@ -1042,62 +1003,44 @@ export class MigrationRunner {
   }
 
   /**
-   * Execute prisma db push command
-   * Used when no migrations folder exists
+   * A database created by an older desktop release has no migration history.
+   * It can adopt the baseline only when its live schema exactly matches the
+   * current datamodel. Prisma exits with 0 for no difference and 2 when a
+   * difference exists.
    */
-  private async execPrismaDbPush(schemaPath: string, databaseUrl: string): Promise<string> {
+  private async assertLegacySchemaMatches(schemaPath: string, databaseUrl: string): Promise<void> {
     const prismaCliJs = this.getPrismaCliJsPath();
     const prismaBin = prismaCliJs ? process.execPath : this.getPrismaBinary();
     const isNpx = !prismaCliJs && prismaBin.includes('npx');
 
     const args = isNpx
-      ? [`prisma@${this.prismaVersion}`, 'db', 'push', '--schema', schemaPath, '--accept-data-loss']
-      : ['db', 'push', '--schema', schemaPath, '--accept-data-loss'];
+      ? [`prisma@${this.prismaVersion}`, 'migrate', 'diff', '--from-schema-datasource', schemaPath,
+          '--to-schema-datamodel', schemaPath, '--exit-code']
+      : ['migrate', 'diff', '--from-schema-datasource', schemaPath,
+          '--to-schema-datamodel', schemaPath, '--exit-code'];
     const fullArgs = prismaCliJs ? [prismaCliJs, ...args] : args;
 
-    let cmd = isNpx
+    const cmd = isNpx
       ? (process.platform === 'win32' ? 'npx.cmd' : 'npx')
       : prismaBin;
-    let cmdArgs = fullArgs;
+    const cmdArgs = fullArgs;
     let useShell = false;
 
-    // On Windows with .cmd files, use shell mode directly (more reliable)
     if (process.platform === 'win32' && cmd.toLowerCase().endsWith('.cmd')) {
       useShell = true;
     }
 
-    console.log(`[MigrationRunner] Running: ${cmd} ${cmdArgs.join(' ')}`);
+    console.log('[MigrationRunner] Comparing legacy schema with the versioned baseline...');
 
     try {
-      return await this.runPrismaProcess(cmd, cmdArgs, databaseUrl, !!prismaCliJs, useShell);
+      await this.runPrismaProcess(cmd, cmdArgs, databaseUrl, !!prismaCliJs, useShell);
     } catch (err) {
-      console.error('[MigrationRunner] First attempt failed, trying fallback...');
-      
-      // Fallback 1: if using node-cli on Windows fails, try prisma.cmd with shell
-      if (prismaCliJs && process.platform === 'win32') {
-        const fallbackBin = this.getPrismaBinary();
-        if (fallbackBin.toLowerCase().endsWith('.cmd')) {
-          console.log('[MigrationRunner] Trying prisma.cmd with shell...');
-          const fallbackArgs = ['db', 'push', '--schema', schemaPath, '--accept-data-loss'];
-          try {
-            return await this.runPrismaProcess(fallbackBin, fallbackArgs, databaseUrl, false, true);
-          } catch (fallbackErr) {
-            console.error('[MigrationRunner] Fallback 1 failed:', fallbackErr);
-          }
-        }
-      }
-      
-      // Fallback 2: Try with shell mode if we haven't yet
-      if (!useShell && process.platform === 'win32') {
-        console.log('[MigrationRunner] Trying with shell mode as last resort...');
-        try {
-          return await this.runPrismaProcess(cmd, cmdArgs, databaseUrl, !!prismaCliJs, true);
-        } catch (shellErr) {
-          console.error('[MigrationRunner] Shell fallback also failed:', shellErr);
-        }
-      }
-      
-      throw err;
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        'La base existente no coincide exactamente con el esquema versionado. ' +
+        'No se marcó ninguna migración ni se modificaron datos. Restaura un respaldo ' +
+        `o prepara una migración de compatibilidad antes de continuar. Detalle: ${detail}`
+      );
     }
   }
 

@@ -613,9 +613,29 @@ una base real como comprobación rutinaria.
   diferente del origen activo, un host de prefijo engañoso, URL inválida y
   protocolos externos o bloqueados. Pasó junto con toda la suite aislada y
   TypeScript de Electron el 20/10/2026, sin base real ni red.
-- H19 queda cerrado y verificado. H20 también quedó cerrado el 20/10/2026; el
-  siguiente hallazgo a tratar es H04, migraciones reproducibles, siempre sobre
-  una base desechable y sin ejecutar `prisma db push` contra datos reales.
+- H19 queda cerrado y verificado. H20 también quedó cerrado el 20/10/2026.
+
+### Migraciones reproducibles y adopción segura (2026-10-20)
+
+- H04 quedó cerrado en la rama aislada. `prisma/migrations/20261020000000_baseline`
+  contiene el esquema PostgreSQL completo y `migration_lock.toml` fija el
+  proveedor. Una instalación vacía usa exclusivamente `prisma migrate deploy`.
+- El inicio desktop ya no ejecuta los parches SQL heredados ni cae a
+  `prisma db push --accept-data-loss`. Si faltan migraciones versionadas, se
+  detiene antes de modificar la base.
+- Una instalación antigua sin historial solo puede adoptar la migración base
+  después de que `prisma migrate diff --exit-code` confirme que su esquema
+  coincide exactamente. Si existe cualquier diferencia, no se marca la
+  migración y se exige respaldo y una migración de compatibilidad explícita.
+- `npm run build` ahora delega a `build:only`; compilar no despliega ni cambia el
+  esquema de la base configurada.
+- `npm run test:migrations:isolated` inicia el PostgreSQL incluido en una carpeta
+  temporal y verificó: instalación limpia de 45 tablas, adopción exacta de una
+  base legada y rechazo de una base con deriva. La prueba elimina su entorno al
+  finalizar y no usa Supabase ni una base del usuario.
+- El auditor general comprueba estáticamente que no reaparezcan `db push`,
+  `--accept-data-loss` o la ejecución de los parches heredados. El siguiente
+  punto de trabajo es H03, respaldo diario programado y visible.
 
 ### Entregas desktop trazables y actualizaciones controladas (2026-10-20)
 
@@ -695,8 +715,9 @@ una base real como comprobación rutinaria.
    cubiertos por pruebas aisladas. H19 también quedó corregido y verificado:
    Electron limita la navegación al origen exacto del servidor iniciado.
 6. H20 quedó corregido: cada entrega queda identificada por versión, commit y
-   manifiestos, sin destinos de actualización de ejemplo. El siguiente trabajo
-   es H04, diseñar migraciones reproducibles y probarlas en una base desechable.
+   manifiestos, sin destinos de actualización de ejemplo.
+7. H04 quedó corregido con migración base completa, adopción legada verificada y
+   prueba PostgreSQL desechable. El siguiente trabajo es H03, respaldo diario.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 
