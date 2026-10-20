@@ -27,6 +27,7 @@ import { getIdempotentResult, saveIdempotentResult } from '@/lib/idempotency'; /
 import { acquireCheckoutLock, releaseCheckoutLock } from '@/lib/checkoutLock'; // ✅ MÓDULO 16.1: Checkout Lock
 import { normalizeToBaseUnit } from '@/lib/units'; // ✅ MÓDULO V2: Conversiones de unidades
 import { PharmacyTraceError, registerPharmacyTrace } from '@/lib/sales/pharmacyTrace';
+import { consumeSaleInventory, InventoryMutationError } from '@/lib/inventory/stockMutations';
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -1197,42 +1198,38 @@ async function executeCheckout(
       })
     );
 
-    // 7b. ✅ MÓDULO PH3: Actualizar quantityAvailable en lotes consumidos por FEFO
-    if (fefoAllocation.size > 0) {
-      const batchUpdates: Array<{ id: string; newQty: number }> = [];
-      for (const [, consumed] of fefoAllocation) {
-        for (const bc of consumed) {
-          const batch = await tx.productBatch.findUnique({
-            where: { id: bc.batchId },
-            select: { quantityAvailable: true },
-          });
-          const current = batch?.quantityAvailable.toNumber() ?? 0;
-          batchUpdates.push({ id: bc.batchId, newQty: Math.max(0, current - bc.quantity) });
-        }
+    // 7b/8. Consumir stock general y lotes con updates condicionales atómicos.
+    // Si otra operación consumió existencias desde la lectura inicial, el helper
+    // falla y toda la transacción de venta se revierte.
+    try {
+      await consumeSaleInventory(tx, {
+        storeId: session.storeId,
+        products: itemsWithDiscounts
+          .filter((item) => Boolean(item.storeProductId))
+          .map((item) => {
+            const sp = storeProducts.find((product) => product.id === item.storeProductId)!;
+            return {
+              storeProductId: item.storeProductId!,
+              productName: sp.product.name,
+              quantity: item.quantityBase,
+              tracksStock: sp.stock !== null,
+            };
+          }),
+        batches: [...fefoAllocation.entries()].flatMap(([storeProductId, consumed]) =>
+          consumed.map((batch) => ({
+            storeProductId,
+            batchId: batch.batchId,
+            batchNumber: batch.batchNumber,
+            quantity: batch.quantity,
+          }))
+        ),
+      });
+    } catch (error) {
+      if (error instanceof InventoryMutationError) {
+        throw new CheckoutError(error.code, 409, error.message, error.details);
       }
-      await Promise.all(
-        batchUpdates.map((u) =>
-          tx.productBatch.update({
-            where: { id: u.id },
-            data: { quantityAvailable: new Prisma.Decimal(u.newQty) },
-          })
-        )
-      );
+      throw error;
     }
-
-    // 8. Actualizar stock
-    await Promise.all(
-      itemsWithDiscounts.map((item) => {
-        const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
-        const currentStock = sp.stock ? sp.stock.toNumber() : 0;
-        const newStock = currentStock - item.quantityBase; // ✅ V2: Usar quantityBase para inventario
-
-        return tx.storeProduct.update({
-          where: { id: item.storeProductId },
-          data: { stock: new Prisma.Decimal(newStock) },
-        });
-      })
-    );
 
     // 9. Si es FIADO, crear Receivable
     let receivable = null;

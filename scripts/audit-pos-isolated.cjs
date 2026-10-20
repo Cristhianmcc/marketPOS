@@ -238,9 +238,13 @@ async function main() {
   class Decimal {
     constructor(value) { this.value = Number(value); }
     valueOf() { return this.value; }
+    toString() { return String(this.value); }
     toNumber() { return this.value; }
+    plus(other) { return new Decimal(this.value + Number(other)); }
     minus(other) { return new Decimal(this.value - Number(other)); }
     mul(other) { return new Decimal(this.value * Number(other)); }
+    abs() { return new Decimal(Math.abs(this.value)); }
+    isNegative() { return this.value < 0; }
     lte(other) { return this.value <= Number(other); }
     gt(other) { return this.value > Number(other); }
     gte(other) { return this.value >= Number(other); }
@@ -533,6 +537,124 @@ async function main() {
     && Number(purchaseReceptionState.items.find(item => item.id === 'item-b').quantityReceived) === Number(beforeOverReceipt.items.find(item => item.id === 'item-b').quantityReceived);
   console.log(`${overReceiptDenied ? 'PASS' : 'FAIL'} H10: over-reception is rejected without changing stock. status=${overReceipt.status}`);
   if (!overReceiptDenied) failures++;
+
+  const { consumeSaleInventory, adjustStockAtomically } = loadRoute(
+    'src/lib/inventory/stockMutations.ts',
+    { '@prisma/client': { Prisma: { Decimal } } }
+  );
+  const inventoryState = {
+    products: new Map([
+      ['product-receipt', { id: 'product-receipt', storeId: 'store-a', active: true, stock: 10 }],
+      ['product-race', { id: 'product-race', storeId: 'store-a', active: true, stock: 5 }],
+      ['product-mixed', { id: 'product-mixed', storeId: 'store-a', active: true, stock: 5 }],
+      ['product-untracked', { id: 'product-untracked', storeId: 'store-a', active: true, stock: null }],
+    ]),
+    batches: new Map([
+      ['batch-a', { id: 'batch-a', storeId: 'store-a', storeProductId: 'product-receipt', active: true, quantityAvailable: 4 }],
+    ]),
+  };
+  const matchesDecimalFilter = (value, filter) => {
+    if (!filter) return true;
+    if ('gte' in filter && (value === null || value < Number(filter.gte))) return false;
+    if ('not' in filter && filter.not === null && value === null) return false;
+    return true;
+  };
+  const inventoryTx = {
+    storeProduct: {
+      updateMany: async ({ where, data }) => {
+        const product = inventoryState.products.get(where.id);
+        if (!product
+          || product.storeId !== where.storeId
+          || product.active !== where.active
+          || !matchesDecimalFilter(product.stock, where.stock)) return { count: 0 };
+        if (data.stock.increment !== undefined) product.stock += Number(data.stock.increment);
+        if (data.stock.decrement !== undefined) product.stock -= Number(data.stock.decrement);
+        return { count: 1 };
+      },
+    },
+    productBatch: {
+      updateMany: async ({ where, data }) => {
+        const batch = inventoryState.batches.get(where.id);
+        if (!batch
+          || batch.storeId !== where.storeId
+          || batch.storeProductId !== where.storeProductId
+          || batch.active !== where.active
+          || !matchesDecimalFilter(batch.quantityAvailable, where.quantityAvailable)) return { count: 0 };
+        batch.quantityAvailable -= Number(data.quantityAvailable.decrement);
+        return { count: 1 };
+      },
+    },
+  };
+  const saleInput = (storeProductId, quantity, extra = {}) => ({
+    storeId: 'store-a',
+    products: [{ storeProductId, productName: storeProductId, quantity, tracksStock: true }],
+    batches: [],
+    ...extra,
+  });
+
+  // Una recepción posterior a la lectura inicial no puede perderse por una asignación absoluta.
+  inventoryState.products.get('product-receipt').stock += 5;
+  await consumeSaleInventory(inventoryTx, saleInput('product-receipt', 3));
+  const receiptPreserved = inventoryState.products.get('product-receipt').stock === 12;
+  console.log(`${receiptPreserved ? 'PASS' : 'FAIL'} H14: sale decrement preserves a concurrent receipt increment. stock=${inventoryState.products.get('product-receipt').stock}`);
+  if (!receiptPreserved) failures++;
+
+  const concurrentSales = await Promise.allSettled([
+    consumeSaleInventory(inventoryTx, saleInput('product-race', 4)),
+    consumeSaleInventory(inventoryTx, saleInput('product-race', 4)),
+  ]);
+  const concurrentSaleSafe = concurrentSales.filter(result => result.status === 'fulfilled').length === 1
+    && concurrentSales.filter(result => result.status === 'rejected').length === 1
+    && inventoryState.products.get('product-race').stock === 1;
+  console.log(`${concurrentSaleSafe ? 'PASS' : 'FAIL'} H14: two concurrent sales cannot overdraw the same stock. stock=${inventoryState.products.get('product-race').stock}`);
+  if (!concurrentSaleSafe) failures++;
+
+  await Promise.all([
+    adjustStockAtomically(inventoryTx, { storeId: 'store-a', storeProductId: 'product-mixed', quantity: 3 }),
+    consumeSaleInventory(inventoryTx, saleInput('product-mixed', 4)),
+  ]);
+  const mixedMutationSafe = inventoryState.products.get('product-mixed').stock === 4;
+  console.log(`${mixedMutationSafe ? 'PASS' : 'FAIL'} H14: concurrent manual adjustment and sale preserve both deltas. stock=${inventoryState.products.get('product-mixed').stock}`);
+  if (!mixedMutationSafe) failures++;
+
+  let batchConflict;
+  try {
+    await consumeSaleInventory(inventoryTx, {
+      storeId: 'store-a',
+      products: [],
+      batches: [{ storeProductId: 'product-receipt', batchId: 'batch-a', batchNumber: 'LOT-A', quantity: 5 }],
+    });
+  } catch (error) {
+    batchConflict = error;
+  }
+  const batchGuarded = batchConflict?.code === 'INSUFFICIENT_BATCH_STOCK'
+    && inventoryState.batches.get('batch-a').quantityAvailable === 4;
+  console.log(`${batchGuarded ? 'PASS' : 'FAIL'} H14: a stale FEFO allocation cannot overdraw a batch.`);
+  if (!batchGuarded) failures++;
+
+  await consumeSaleInventory(inventoryTx, {
+    storeId: 'store-a',
+    products: [{ storeProductId: 'product-untracked', productName: 'untracked', quantity: 99, tracksStock: false }],
+    batches: [],
+  });
+  const untrackedUntouched = inventoryState.products.get('product-untracked').stock === null;
+  console.log(`${untrackedUntouched ? 'PASS' : 'FAIL'} H14: products without stock control remain unmodified.`);
+  if (!untrackedUntouched) failures++;
+
+  const stockRouteSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/api/store-products/[id]/stock/route.ts'),
+    'utf8'
+  );
+  const checkoutInventorySource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/api/sales/checkout/route.ts'),
+    'utf8'
+  );
+  const inventoryRoutesUseAtomicMutations = checkoutInventorySource.includes('await consumeSaleInventory(tx')
+    && !checkoutInventorySource.includes('data: { stock: new Prisma.Decimal(newStock) }')
+    && stockRouteSource.includes('await prisma.$transaction')
+    && stockRouteSource.includes('await adjustStockAtomically(tx');
+  console.log(`${inventoryRoutesUseAtomicMutations ? 'PASS' : 'FAIL'} H14: checkout and manual adjustments use guarded atomic mutations inside transactions.`);
+  if (!inventoryRoutesUseAtomicMutations) failures++;
 
   const { registerPharmacyTrace } = loadRoute('src/lib/sales/pharmacyTrace.ts', {
     '@prisma/client': {

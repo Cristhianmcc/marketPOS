@@ -40,7 +40,7 @@ es `docs/audits/2026-09-26-pos.md`.
 | `src/components` | POS, inventario, catálogo, permisos visuales, layouts |
 | `src/domain`, `src/repositories` | Tipos, esquemas y contratos; no concentran toda la lógica |
 | `src/infra/db` | Cliente Prisma y repositorios de usuarios, productos, stock y turnos |
-| `src/lib` | Sesión, flags, límites, descuentos, unidades, SUNAT y utilidades |
+| `src/lib` | Sesión, flags, límites, descuentos, unidades, SUNAT y utilidades; `inventory/stockMutations.ts` concentra mutaciones atómicas de stock |
 | `src/modules/pos` | Tipos y cálculos extraídos del POS; comprobar uso real al modificar |
 | `src/modules/catalog` | Capas de catálogo público, publicación y sincronización |
 | `src/worker/sunatWorker.ts` | Worker separado que procesa trabajos fiscales |
@@ -103,6 +103,15 @@ es `docs/audits/2026-09-26-pos.md`.
   redondeo y descuento global al cambiar dinero o reportes.
 - `Sale` tiene correlativo único por tienda; checkout reintenta colisiones.
   No confundir este mecanismo con un bloqueo general de inventario.
+- Las salidas de inventario no deben volver a escribirse como valores absolutos
+  calculados desde una lectura anterior. Checkout y ajustes manuales comparten
+  `src/lib/inventory/stockMutations.ts`, que aplica deltas condicionados por
+  tienda, estado activo y existencia suficiente.
+- El stock general y los lotes FEFO se consumen dentro de la transacción del
+  checkout. Un conflicto revierte venta, items, movimientos y stock. El ajuste
+  manual también registra su `Movement` dentro de la misma transacción.
+- `stock = null` identifica productos sin control de existencias y debe
+  conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,
   sin un estado explícito de venta. Los reportes suelen excluir `total <= 0`.
 
@@ -511,6 +520,23 @@ una base real como comprobación rutinaria.
   creación correcta y repetición idempotente. La auditoría y `build:only` pasaron
   el 19/10/2026 sin ejecutar migraciones ni escribir una base real.
 
+### Mutaciones atómicas de inventario (2026-10-19)
+
+- Checkout ya no vuelve a escribir el stock general ni los lotes FEFO con un
+  valor absoluto calculado desde una lectura anterior. Usa decrementos
+  condicionales dentro de la transacción y rechaza el checkout completo si otra
+  operación dejó existencias insuficientes.
+- La ruta de ajuste manual aplica el delta de stock y crea el movimiento dentro
+  de una misma transacción. Una venta o un segundo ajuste concurrente no puede
+  ser sobrescrito por una asignación obsoleta.
+- `scripts/audit-pos-isolated.cjs` cubre cinco invariantes H14: conservar una
+  recepción concurrente, impedir dos ventas sobre el mismo saldo, preservar un
+  ajuste concurrente con una venta, impedir sobreconsumo de lote y no tocar
+  productos sin control de stock. Todas pasaron el 19/10/2026.
+- `npx next build` compiló la implementación y generó 206 páginas. Esta evidencia
+  no sustituye TypeScript ni lint: `next.config.ts` aún los omite y H05 sigue
+  pendiente.
+
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
 - El Resumen Diario valida `YYYY-MM-DD` y lo interpreta como fecha civil de Peru
@@ -559,11 +585,10 @@ una base real como comprobación rutinaria.
 2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
    (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
    estrategia de migraciones sin aceptación automática de pérdida de datos.
-3. Corregir inventario concurrente H14. Las anulaciones H06/H07, los abonos
-   concurrentes H08, el aislamiento H09, la recepción atómica/idempotente H10 y
-   la trazabilidad farmacéutica transaccional H11 quedaron cubiertos por pruebas
-   aisladas; mantener esas invariantes al modificar ventas, fiados, lotes,
-   compras o farmacia.
+3. H14 quedó corregido junto con las anulaciones H06/H07, los abonos concurrentes
+   H08, el aislamiento H09, la recepción atómica/idempotente H10 y la trazabilidad
+   farmacéutica transaccional H11. Mantener esas invariantes al modificar ventas,
+   fiados, lotes, compras, ajustes o farmacia.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
 5. Verificar CORS/entrada de impresión, sesión, reportes, idempotencia y turnos.
 
