@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getIronSession } from 'iron-session';
-import { SessionData } from './lib/session';
+import type { SessionData } from './lib/session';
+import { getSessionOptions } from './lib/sessionConfig';
 
 const protectedRoutes = ['/pos', '/inventory', '/admin', '/settings'];
 const authRoutes = ['/login'];
@@ -15,16 +16,7 @@ export async function middleware(request: NextRequest) {
 
   // Get session
   const response = NextResponse.next();
-  const session = await getIronSession<SessionData>(request, response, {
-    password: process.env.SESSION_SECRET || 'complex_password_at_least_32_characters_long_for_security',
-    cookieName: 'market_pos_session',
-    cookieOptions: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
-    },
-  });
+  const session = await getIronSession<SessionData>(request, response, getSessionOptions());
 
   const isLoggedIn = session.isLoggedIn === true;
   const hasStore = !!session.storeId;

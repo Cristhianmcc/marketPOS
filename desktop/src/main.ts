@@ -1433,7 +1433,10 @@ app.whenReady().then(async () => {
   
   // Generar o recuperar SESSION_SECRET único por instalación
   // Se guarda en userData para persistir entre reinicios
-  if (!process.env.SESSION_SECRET) {
+  const hasValidDevelopmentSecret = isDev
+    && typeof process.env.SESSION_SECRET === 'string'
+    && process.env.SESSION_SECRET.length >= 32;
+  if (!hasValidDevelopmentSecret) {
     const secretsFile = path.join(USER_DATA_PATH, 'app-secrets.json');
     let secrets: Record<string, string> = {};
     try {
@@ -1444,16 +1447,12 @@ app.whenReady().then(async () => {
 
     if (!secrets.sessionSecret || secrets.sessionSecret.length < 32) {
       secrets.sessionSecret = crypto.randomBytes(48).toString('hex');
-      try {
-        fs.mkdirSync(USER_DATA_PATH, { recursive: true });
-        fs.writeFileSync(secretsFile, JSON.stringify(secrets, null, 2), { mode: 0o600 });
-        console.log('[App] SESSION_SECRET generado para esta instalación');
-      } catch (e) {
-        console.warn('[App] No se pudo guardar SESSION_SECRET:', e);
-      }
+      fs.mkdirSync(USER_DATA_PATH, { recursive: true });
+      fs.writeFileSync(secretsFile, JSON.stringify(secrets, null, 2), { mode: 0o600 });
+      console.log('[App] Secreto de sesión generado para esta instalación');
     }
     process.env.SESSION_SECRET = secrets.sessionSecret;
-    console.log('[App] SESSION_SECRET cargado desde userData');
+    console.log('[App] Secreto de sesión cargado desde userData');
   }
 
   // En producción: iniciar servidor local

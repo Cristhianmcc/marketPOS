@@ -896,6 +896,55 @@ async function main() {
   console.log(`${transactionallyLinked ? 'PASS' : 'FAIL'} H11: pharmacy trace is inside checkout transaction and the duplicate client fallback is absent.`);
   if (!transactionallyLinked) failures++;
 
+  const sessionConfig = loadRoute('src/lib/sessionConfig.ts', {});
+  let missingSecretRejected = false;
+  let shortSecretRejected = false;
+  try { sessionConfig.requireSessionSecret(undefined); } catch { missingSecretRejected = true; }
+  try { sessionConfig.requireSessionSecret('short'); } catch { shortSecretRejected = true; }
+  const validSecret = 's'.repeat(48);
+  const validSecretAccepted = sessionConfig.requireSessionSecret(validSecret) === validSecret;
+
+  const sessionSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/lib/session.ts'),
+    'utf8'
+  );
+  const middlewareSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/middleware.ts'),
+    'utf8'
+  );
+  const desktopMainSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/src/main.ts'),
+    'utf8'
+  );
+  const desktopServerSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/src/server.ts'),
+    'utf8'
+  );
+  const buildPreparationSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/scripts/prepare-build.js'),
+    'utf8'
+  );
+
+  const noPublicFallback = missingSecretRejected
+    && shortSecretRejected
+    && validSecretAccepted
+    && !sessionSource.includes('complex_password_at_least')
+    && !middlewareSource.includes('complex_password_at_least')
+    && sessionSource.includes('getSessionOptions()')
+    && middlewareSource.includes('getSessionOptions()');
+  console.log(`${noPublicFallback ? 'PASS' : 'FAIL'} H16: web sessions reject missing or short secrets and have no public fallback.`);
+  if (!noPublicFallback) failures++;
+
+  const desktopSecretIsPerInstall = desktopMainSource.includes('const hasValidDevelopmentSecret = isDev')
+    && desktopMainSource.includes("path.join(USER_DATA_PATH, 'app-secrets.json')")
+    && desktopMainSource.includes("fs.writeFileSync(secretsFile")
+    && desktopServerSource.includes('const sessionSecret = process.env.SESSION_SECRET')
+    && desktopServerSource.indexOf('env.SESSION_SECRET = sessionSecret')
+      > desktopServerSource.indexOf('...envVars')
+    && !buildPreparationSource.includes('SESSION_SECRET=');
+  console.log(`${desktopSecretIsPerInstall ? 'PASS' : 'FAIL'} H16: packaged desktop preserves a persisted per-install session secret.`);
+  if (!desktopSecretIsPerInstall) failures++;
+
   process.exitCode = failures ? 1 : 0;
 }
 

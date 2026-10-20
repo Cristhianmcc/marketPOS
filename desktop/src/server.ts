@@ -434,6 +434,10 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   // ⚠️ IMPORTANTE: DATABASE_URL de process.env tiene prioridad sobre .env
   // porque ensurePostgres() lo configura dinámicamente con el puerto correcto
   const databaseUrl = process.env.DATABASE_URL;
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret || sessionSecret.length < 32) {
+    throw new Error('SESSION_SECRET de la instalacion no esta disponible');
+  }
   const internalToken = crypto.randomBytes(32).toString('hex');
   
   // Directorio de datos de la app
@@ -461,6 +465,8 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
     env.DIRECT_URL = databaseUrl;
     console.log(`[LocalServer] Using embedded PostgreSQL DATABASE_URL`);
   }
+  // El secreto por instalacion siempre prevalece sobre cualquier archivo .env.
+  env.SESSION_SECRET = sessionSecret;
   
   // Lanzar proceso
   const { bin: nodeExec, extraEnv } = getNodeExecutable(isPackaged);

@@ -550,6 +550,21 @@ una base real como comprobación rutinaria.
   de ventas con total cero y los tres descuentos especializados. Pasó el
   19/10/2026 junto con el resto de invariantes del script de auditoría.
 
+### Secreto de sesión por instalación (2026-10-19)
+
+- Web, middleware y las rutas heredadas de turnos usan
+  `src/lib/sessionConfig.ts`; no existe una contraseña pública de reserva. Un
+  proceso web sin `SESSION_SECRET` de al menos 32 caracteres falla cerrado.
+- En el desktop empaquetado, `desktop/src/main.ts` genera un secreto aleatorio y
+  lo persiste en `userData/app-secrets.json`. `desktop/src/server.ts` conserva ese
+  valor después de cargar el entorno del paquete, de modo que el `.env` público
+  no puede reemplazarlo. Un fallo al persistirlo detiene el arranque.
+- Las rutas de turnos rechazan sesiones sin tienda con `STORE_REQUIRED` antes de
+  consultar o modificar caja. Rotar el secreto invalida las sesiones existentes
+  y obliga a iniciar sesión nuevamente.
+- La prueba aislada H16, TypeScript de Electron y la comprobación TypeScript
+  dirigida de los archivos web afectados pasaron el 19/10/2026.
+
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
 - El Resumen Diario valida `YYYY-MM-DD` y lo interpreta como fecha civil de Peru
@@ -603,8 +618,9 @@ una base real como comprobación rutinaria.
    farmacéutica transaccional H11. Mantener esas invariantes al modificar ventas,
    fiados, lotes, compras, ajustes o farmacia.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
-5. Verificar CORS/entrada de impresión, sesión, idempotencia y turnos. H15 de
-   reportes quedó corregido y cubierto por prueba aislada el 19/10/2026.
+5. Verificar CORS/entrada de impresión, idempotencia y turnos. H15 de reportes y
+   H16 de sesión quedaron corregidos y cubiertos por pruebas aisladas el
+   19/10/2026.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

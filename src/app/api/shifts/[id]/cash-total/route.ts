@@ -3,7 +3,8 @@
 
 import { NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
-import { SessionData, sessionOptions } from '@/lib/session';
+import type { SessionData } from '@/lib/session';
+import { getSessionOptions } from '@/lib/sessionConfig';
 import { cookies } from 'next/headers';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 
@@ -14,12 +15,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), getSessionOptions());
 
     if (!session.isLoggedIn) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
+      );
+    }
+
+    if (!session.storeId) {
+      return NextResponse.json(
+        { code: 'STORE_REQUIRED', message: 'Selecciona una tienda para consultar el turno' },
+        { status: 403 }
       );
     }
 
@@ -32,7 +40,7 @@ export async function GET(
       );
     }
 
-    const shift = await shiftRepo.findById(shiftId, session.storeId!);
+    const shift = await shiftRepo.findById(shiftId, session.storeId);
     if (!shift) {
       return NextResponse.json(
         { code: 'SHIFT_NOT_FOUND', message: 'Turno no encontrado' },

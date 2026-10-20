@@ -3,7 +3,8 @@
 
 import { NextResponse } from 'next/server';
 import { getIronSession } from 'iron-session';
-import { SessionData, sessionOptions } from '@/lib/session';
+import type { SessionData } from '@/lib/session';
+import { getSessionOptions } from '@/lib/sessionConfig';
 import { cookies } from 'next/headers';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
@@ -17,12 +18,19 @@ interface OpenShiftRequest {
 
 export async function POST(request: Request) {
   try {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), getSessionOptions());
 
     if (!session.isLoggedIn) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
+      );
+    }
+
+    if (!session.storeId) {
+      return NextResponse.json(
+        { code: 'STORE_REQUIRED', message: 'Selecciona una tienda para abrir un turno' },
+        { status: 403 }
       );
     }
 
@@ -109,7 +117,7 @@ export async function POST(request: Request) {
     // ✅ MÓDULO 15: Log de fallo (fire-and-forget)
     try {
       const { ip, userAgent } = getRequestMetadata(request);
-      const sessionData = await getIronSession<SessionData>(await cookies(), sessionOptions);
+      const sessionData = await getIronSession<SessionData>(await cookies(), getSessionOptions());
       
       logAudit({
         storeId: sessionData.storeId || undefined,
