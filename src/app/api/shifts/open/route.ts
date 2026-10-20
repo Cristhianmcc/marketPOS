@@ -75,10 +75,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar que no haya turno abierto
-    const hasOpenShift = await shiftRepo.hasOpenShift(session.storeId, session.userId);
+    // La comprobación y creación ocurren juntas bajo un lock transaccional.
+    const shift = await shiftRepo.createIfNone(session.storeId, session.userId, {
+      openingCash: body.openingCash,
+    });
 
-    if (hasOpenShift) {
+    if (!shift) {
       return NextResponse.json(
         {
           code: 'SHIFT_ALREADY_OPEN',
@@ -87,11 +89,6 @@ export async function POST(request: Request) {
         { status: 409 }
       );
     }
-
-    // Crear turno
-    const shift = await shiftRepo.create(session.storeId, session.userId, {
-      openingCash: body.openingCash,
-    });
 
     // ✅ MÓDULO 15: Log de auditoría (fire-and-forget)
     const { ip, userAgent } = getRequestMetadata(request);

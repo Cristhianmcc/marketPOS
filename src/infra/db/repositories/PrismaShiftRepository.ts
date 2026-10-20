@@ -21,17 +21,35 @@ export class PrismaShiftRepository implements IShiftRepository {
     return this.toDomain(shift);
   }
 
-  async create(storeId: string, userId: string, data: OpenShiftData): Promise<Shift> {
-    const shift = await prisma.shift.create({
-      data: {
-        storeId,
-        openedById: userId,
-        openingCash: new Prisma.Decimal(data.openingCash),
-        openedAt: new Date(),
-      },
-    });
+  async createIfNone(storeId: string, userId: string, data: OpenShiftData): Promise<Shift | null> {
+    return prisma.$transaction(async (tx) => {
+      // Serializa únicamente la apertura de este cajero en esta tienda. El lock
+      // dura hasta el final de la transacción y evita el intervalo entre leer y crear.
+      const lockKey = `shift-open:${storeId}:${userId}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
-    return this.toDomain(shift);
+      const existingShift = await tx.shift.findFirst({
+        where: {
+          storeId,
+          openedById: userId,
+          closedAt: null,
+        },
+        orderBy: { openedAt: 'desc' },
+      });
+
+      if (existingShift) return null;
+
+      const shift = await tx.shift.create({
+        data: {
+          storeId,
+          openedById: userId,
+          openingCash: new Prisma.Decimal(data.openingCash),
+          openedAt: new Date(),
+        },
+      });
+
+      return this.toDomain(shift);
+    });
   }
 
   async findById(shiftId: string, storeId: string): Promise<Shift | null> {
@@ -137,9 +155,9 @@ export class PrismaShiftRepository implements IShiftRepository {
         openedAt: s.openedAt,
         closedAt: s.closedAt,
         openingCash: s.openingCash.toNumber(),
-        closingCash: s.closingCash?.toNumber() || null,
-        expectedCash: s.expectedCash?.toNumber() || null,
-        difference: s.difference?.toNumber() || null,
+        closingCash: s.closingCash?.toNumber() ?? null,
+        expectedCash: s.expectedCash?.toNumber() ?? null,
+        difference: s.difference?.toNumber() ?? null,
         notes: s.notes,
         openedBy: s.openedBy,
         closedBy: s.closedBy,
@@ -359,9 +377,9 @@ export class PrismaShiftRepository implements IShiftRepository {
       openedAt: shift.openedAt,
       closedAt: shift.closedAt,
       openingCash: shift.openingCash.toNumber(),
-      closingCash: shift.closingCash?.toNumber() || null,
-      expectedCash: shift.expectedCash?.toNumber() || null,
-      difference: shift.difference?.toNumber() || null,
+      closingCash: shift.closingCash?.toNumber() ?? null,
+      expectedCash: shift.expectedCash?.toNumber() ?? null,
+      difference: shift.difference?.toNumber() ?? null,
       notes: shift.notes,
     };
   }

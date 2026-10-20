@@ -1061,6 +1061,127 @@ async function main() {
   console.log(`${debugIsClosed ? 'PASS' : 'FAIL'} H17: catalog diagnostics are closed in production and do not expose exception details.`);
   if (!debugIsClosed) failures++;
 
+  class TestDecimal {
+    constructor(value) { this.value = Number(value); }
+    toNumber() { return this.value; }
+  }
+
+  const shiftRows = [];
+  let shiftSequence = 0;
+  let advisoryTail = Promise.resolve();
+  let advisoryCalls = 0;
+  const zeroClosedRow = {
+    id: 'shift-zero',
+    storeId: 'store-a',
+    openedById: 'cashier-a',
+    closedById: 'cashier-a',
+    openedAt: new Date('2026-10-20T10:00:00.000Z'),
+    closedAt: new Date('2026-10-20T11:00:00.000Z'),
+    openingCash: new TestDecimal(0),
+    closingCash: new TestDecimal(0),
+    expectedCash: new TestDecimal(0),
+    difference: new TestDecimal(0),
+    notes: null,
+    openedBy: { id: 'cashier-a', name: 'Cashier A', email: 'cashier-a@example.invalid' },
+    closedBy: { id: 'cashier-a', name: 'Cashier A', email: 'cashier-a@example.invalid' },
+  };
+  const shiftModel = {
+    findFirst: async ({ where }) => shiftRows.find(row => row.storeId === where.storeId
+      && row.openedById === where.openedById && row.closedAt === null) || null,
+    create: async ({ data }) => {
+      const row = {
+        id: `shift-${++shiftSequence}`,
+        ...data,
+        closedById: null,
+        closedAt: null,
+        closingCash: null,
+        expectedCash: null,
+        difference: null,
+        notes: null,
+      };
+      shiftRows.push(row);
+      return row;
+    },
+    update: async ({ data }) => ({ ...zeroClosedRow, ...data }),
+    findMany: async () => [zeroClosedRow],
+    count: async () => 1,
+  };
+  const shiftPrisma = {
+    shift: shiftModel,
+    $transaction: async callback => {
+      let releaseAdvisoryLock;
+      const tx = {
+        shift: shiftModel,
+        $executeRaw: async () => {
+          advisoryCalls++;
+          const previous = advisoryTail;
+          advisoryTail = new Promise(resolve => { releaseAdvisoryLock = resolve; });
+          await previous;
+          return 1;
+        },
+      };
+      try {
+        return await callback(tx);
+      } finally {
+        if (releaseAdvisoryLock) releaseAdvisoryLock();
+      }
+    },
+  };
+  const shiftRepositoryModule = loadRoute('src/infra/db/repositories/PrismaShiftRepository.ts', {
+    '@prisma/client': { Prisma: { Decimal: TestDecimal } },
+    '@/infra/db/prisma': { prisma: shiftPrisma },
+    '@/repositories/IShiftRepository': {},
+    '@/domain/types': {},
+  });
+  const shiftRoute = loadRoute('src/app/api/shifts/open/route.ts', {
+    'next/server': next,
+    'iron-session': { getIronSession: async () => ({
+      isLoggedIn: true,
+      storeId: 'store-a',
+      userId: 'cashier-a',
+      role: 'CASHIER',
+    }) },
+    '@/lib/session': {},
+    '@/lib/sessionConfig': { getSessionOptions: () => ({}) },
+    'next/headers': { cookies: async () => ({}) },
+    '@/infra/db/repositories/PrismaShiftRepository': shiftRepositoryModule,
+    '@/lib/auditLog': {
+      logAudit: async () => {},
+      getRequestMetadata: () => ({ ip: '127.0.0.1', userAgent: 'audit' }),
+    },
+    '@/lib/rateLimit': { checkRateLimit: () => ({ allowed: true }) },
+  });
+  const openRequest = () => ({ json: async () => ({ openingCash: 0 }) });
+  const concurrentOpenResults = await Promise.all([
+    shiftRoute.POST(openRequest()),
+    shiftRoute.POST(openRequest()),
+  ]);
+  const openStatuses = concurrentOpenResults.map(result => result.status).sort((a, b) => a - b);
+  const concurrentOpenIsAtomic = openStatuses.join(',') === '201,409'
+    && shiftRows.length === 1
+    && shiftRows[0].openingCash.toNumber() === 0
+    && advisoryCalls === 2;
+  console.log(`${concurrentOpenIsAtomic ? 'PASS' : 'FAIL'} H18: concurrent requests create one open shift and preserve zero opening cash.`);
+  if (!concurrentOpenIsAtomic) failures++;
+
+  const shiftRepository = new shiftRepositoryModule.PrismaShiftRepository();
+  const closedAtZero = await shiftRepository.close(
+    'shift-zero',
+    'cashier-a',
+    { closingCash: 0 },
+    0,
+    0
+  );
+  const zeroHistory = await shiftRepository.getHistory('store-a', null);
+  const zeroValuesArePreserved = closedAtZero.closingCash === 0
+    && closedAtZero.expectedCash === 0
+    && closedAtZero.difference === 0
+    && zeroHistory.shifts[0].closingCash === 0
+    && zeroHistory.shifts[0].expectedCash === 0
+    && zeroHistory.shifts[0].difference === 0;
+  console.log(`${zeroValuesArePreserved ? 'PASS' : 'FAIL'} H18: exact cash close and history keep monetary zero values instead of null.`);
+  if (!zeroValuesArePreserved) failures++;
+
   if (originalDesktopInternalToken === undefined) delete process.env.DESKTOP_INTERNAL_TOKEN;
   else process.env.DESKTOP_INTERNAL_TOKEN = originalDesktopInternalToken;
   if (originalNodeEnv === undefined) delete process.env.NODE_ENV;

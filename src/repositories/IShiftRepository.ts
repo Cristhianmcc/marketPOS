@@ -9,9 +9,10 @@ export interface IShiftRepository {
   getCurrentShift(storeId: string, userId: string): Promise<Shift | null>;
 
   /**
-   * Create a new shift
+   * Create a shift only when the same user has no open shift in the store.
+   * Returns null when another request already opened it.
    */
-  create(storeId: string, userId: string, data: OpenShiftData): Promise<Shift>;
+  createIfNone(storeId: string, userId: string, data: OpenShiftData): Promise<Shift | null>;
 
   /**
    * Find shift by ID

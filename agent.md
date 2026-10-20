@@ -437,7 +437,7 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/prisma/build/index.js validate` | Valida esquema sin migrar datos; pasó |
 | `node node_modules/typescript/bin/tsc -p desktop/tsconfig.json --noEmit --incremental false` | Tipos Electron; pasó |
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
-| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10, H11 y H14-H17 con dependencias simuladas; pasaron el 20/10/2026 |
+| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10, H11 y H14-H18 con dependencias simuladas; pasaron el 20/10/2026 |
 | `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
 | `node scripts/test-backup-restore-isolated.cjs <zip> [--multipart]` | Ejecuta el endpoint de restauración contra Prisma simulado en transporte ZIP crudo o multipart; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
@@ -581,9 +581,23 @@ una base real como comprobación rutinaria.
   aceptación del token correcto, todos los caminos desktop anteriores y el
   cierre del diagnóstico. La suite aislada y TypeScript de Electron pasaron sin
   usar base real ni red.
-- Punto de reanudación: H17 queda cerrado en la rama aislada. El siguiente
-  hallazgo es H18: impedir aperturas concurrentes del mismo turno y conservar
-  correctamente una caja inicial igual a cero. Todavía no está implementado.
+- H17 quedó cerrado en la rama aislada y guardado en el commit `f8403d2b`.
+
+### Apertura atómica y valores cero de turnos (2026-10-20)
+
+- `PrismaShiftRepository.createIfNone` abre una transacción y obtiene un
+  `pg_advisory_xact_lock` derivado de tienda y cajero antes de comprobar y crear
+  el turno. Dos solicitudes simultáneas para el mismo cajero quedan serializadas:
+  una crea el turno y la otra recibe conflicto, sin exigir una migración.
+- La ruta `POST /api/shifts/open` usa esa única operación atómica. Ya no separa
+  `hasOpenShift` de `create`, que era el intervalo donde podían crearse dos turnos.
+- El mapeo de cierre e historial usa `?? null`; por ello caja de cierre,
+  efectivo esperado y diferencia iguales a `0` se conservan como cero.
+- La prueba H18 ejecuta dos aperturas concurrentes y comprueba un solo registro,
+  respuesta `201/409`, caja inicial cero, cierre exacto e historial con ceros.
+  Pasó junto con la suite aislada el 20/10/2026, sin base real ni red.
+- Punto de reanudación: H18 queda cerrado. El siguiente hallazgo es H19,
+  alinear la política de navegación Electron con el origen exacto del servidor.
 
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
@@ -638,10 +652,10 @@ una base real como comprobación rutinaria.
    farmacéutica transaccional H11. Mantener esas invariantes al modificar ventas,
    fiados, lotes, compras, ajustes o farmacia.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
-5. Verificar CORS/entrada de impresión, idempotencia y turnos. H15 de reportes,
-   H16 de sesión y H17 de autenticación interna quedaron corregidos y cubiertos
-   por pruebas aisladas. El siguiente trabajo es H18, apertura atómica de turnos
-   y preservación de caja inicial cero.
+5. Verificar CORS/entrada de impresión e idempotencia. H15 de reportes, H16 de
+   sesión, H17 de autenticación interna y H18 de turnos quedaron corregidos y
+   cubiertos por pruebas aisladas. El siguiente trabajo es H19, navegación
+   desktop limitada al origen exacto del servidor iniciado.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 
