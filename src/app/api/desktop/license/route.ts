@@ -2,13 +2,14 @@
  * GET /api/desktop/license
  *
  * Endpoint local solo para el desktop (Electron main process).
- * No requiere sesión — protegido por header x-desktop-app.
+ * No requiere sesión de usuario: exige el token efímero del servidor local.
  *
  * Retorna: storeId + estado de suscripción local
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
+import { hasValidDesktopInternalToken } from '@/lib/desktopInternalAuth';
 import {
   computeEffectiveStatus,
   isStoreAllowedToOperate,
@@ -16,9 +17,8 @@ import {
 } from '@/lib/subscriptionStatus';
 
 export async function GET(req: NextRequest) {
-  // Solo desde el proceso desktop
-  if (req.headers.get('x-desktop-app') !== 'true') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!hasValidDesktopInternalToken(req)) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
   try {

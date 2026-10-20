@@ -12,16 +12,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { hasValidDesktopInternalToken } from '@/lib/desktopInternalAuth';
 
 const CATALOG_CLOUD_URL = process.env.CATALOG_CLOUD_URL || '';
 const CATALOG_SYNC_API_KEY = process.env.CATALOG_SYNC_API_KEY || '';
 
 export async function POST(req: NextRequest) {
   try {
-    // Solo permitir desde la app desktop (header interno)
-    const isDesktop = req.headers.get('x-desktop-app') === 'true';
-    if (!isDesktop) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!hasValidDesktopInternalToken(req)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     const payload = await req.json() as { type: string; data: unknown };

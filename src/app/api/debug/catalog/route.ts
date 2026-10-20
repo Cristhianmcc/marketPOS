@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getCurrentUser } from '@/lib/session';
+import { isSuperAdmin } from '@/lib/superadmin';
 
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
+  }
+
   try {
+    const user = await getCurrentUser();
+    if (!user || (user.role !== 'SUPERADMIN' && !isSuperAdmin(user.email))) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+    }
+
     const catalogSettings = await prisma.catalogSettings.findMany({
       select: {
         id: true,
@@ -40,9 +51,7 @@ export async function GET() {
       products: products.slice(0, 5),
     });
   } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-    }, { status: 500 });
+    console.error('[debug/catalog] Error interno:', error);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

@@ -40,6 +40,7 @@ export interface TaskQueueConfig {
   maxRetries: number;            // Reintentos máximos por tarea
   retryDelayMs: number;          // Delay entre reintentos
   serverUrl: string;             // URL del servidor local
+  internalToken: string;         // Token efímero del servidor local
 }
 
 export interface TaskQueueStats {
@@ -59,6 +60,7 @@ const DEFAULT_CONFIG: TaskQueueConfig = {
   maxRetries: 5,
   retryDelayMs: 60000,           // 1 minuto
   serverUrl: 'http://localhost:3000',
+  internalToken: '',
 };
 
 // ============================================================================
@@ -78,6 +80,11 @@ export class TaskQueue {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.queuePath = path.join(app.getPath('userData'), 'task-queue.json');
     this.loadQueue();
+  }
+
+  updateServerConnection(serverUrl: string, internalToken: string): void {
+    this.config.serverUrl = serverUrl;
+    this.config.internalToken = internalToken;
   }
 
   // --------------------------------------------------------------------------
@@ -321,12 +328,16 @@ export class TaskQueue {
   }
 
   private async processSyncTask(task: QueuedTask): Promise<boolean> {
+    if (!this.config.internalToken) {
+      throw new Error('Token interno del servidor local no disponible');
+    }
+
     // Generic sync task - call sync endpoint
     const response = await fetch(`${this.config.serverUrl}/api/sync/push`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-desktop-app': 'true',
+        'x-desktop-internal-token': this.config.internalToken,
         ...(this.authToken && { Cookie: this.authToken }),
       },
       body: JSON.stringify(task.payload),
@@ -466,6 +477,8 @@ let taskQueueInstance: TaskQueue | null = null;
 export function initTaskQueue(config?: Partial<TaskQueueConfig>): TaskQueue {
   if (!taskQueueInstance) {
     taskQueueInstance = new TaskQueue(config);
+  } else if (config?.serverUrl && config.internalToken !== undefined) {
+    taskQueueInstance.updateServerConnection(config.serverUrl, config.internalToken);
   }
   return taskQueueInstance;
 }

@@ -16,11 +16,13 @@ function loadRoute(relativePath, dependencies) {
   vm.runInNewContext(compiled, {
     exports,
     URL,
+    Buffer,
+    process,
     require(name) {
       if (!(name in dependencies)) throw new Error(`Unmocked dependency: ${name}`);
       return dependencies[name];
     },
-    console: { log() {}, info() {}, error() {} },
+    console: { log() {}, info() {}, warn() {}, error() {} },
   }, { filename });
   return exports;
 }
@@ -944,6 +946,125 @@ async function main() {
     && !buildPreparationSource.includes('SESSION_SECRET=');
   console.log(`${desktopSecretIsPerInstall ? 'PASS' : 'FAIL'} H16: packaged desktop preserves a persisted per-install session secret.`);
   if (!desktopSecretIsPerInstall) failures++;
+
+  const originalDesktopInternalToken = process.env.DESKTOP_INTERNAL_TOKEN;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const validDesktopInternalToken = 'd'.repeat(64);
+  process.env.DESKTOP_INTERNAL_TOKEN = validDesktopInternalToken;
+
+  const desktopInternalAuth = loadRoute('src/lib/desktopInternalAuth.ts', {
+    crypto: { default: require('crypto') },
+  });
+  const internalRequest = (token, body = { type: 'unknown', data: {} }) => ({
+    headers: {
+      get: name => name === desktopInternalAuth.DESKTOP_INTERNAL_TOKEN_HEADER ? token : null,
+    },
+    json: async () => body,
+  });
+  const internalTokenIsSafe = desktopInternalAuth.hasValidDesktopInternalToken(
+    internalRequest(validDesktopInternalToken)
+  )
+    && !desktopInternalAuth.hasValidDesktopInternalToken(internalRequest('true'))
+    && !desktopInternalAuth.hasValidDesktopInternalToken(internalRequest('x'.repeat(64)));
+
+  let licenseQueries = 0;
+  const licenseRoute = loadRoute('src/app/api/desktop/license/route.ts', {
+    'next/server': next,
+    '@/infra/db/prisma': { prisma: {
+      store: { findMany: async () => { licenseQueries++; return []; } },
+      subscription: { findUnique: async () => null },
+    } },
+    '@/lib/desktopInternalAuth': desktopInternalAuth,
+    '@/lib/subscriptionStatus': {
+      computeEffectiveStatus: value => value,
+      isStoreAllowedToOperate: () => true,
+      getDaysUntilExpiration: () => 0,
+    },
+  });
+  const deniedLicense = await licenseRoute.GET(internalRequest('true'));
+  const allowedLicense = await licenseRoute.GET(internalRequest(validDesktopInternalToken));
+
+  const syncRoute = loadRoute('src/app/api/sync/push/route.ts', {
+    'next/server': next,
+    '@/lib/desktopInternalAuth': desktopInternalAuth,
+  });
+  const deniedSync = await syncRoute.POST(internalRequest('true'));
+  const allowedSync = await syncRoute.POST(internalRequest(validDesktopInternalToken));
+  const internalEndpointsProtected = internalTokenIsSafe
+    && deniedLicense.status === 401
+    && allowedLicense.status === 200
+    && licenseQueries === 1
+    && deniedSync.status === 401
+    && allowedSync.status === 200
+    && allowedSync.body?.skipped === true;
+  console.log(`${internalEndpointsProtected ? 'PASS' : 'FAIL'} H17: internal endpoints reject the spoofable boolean header and require the server token.`);
+  if (!internalEndpointsProtected) {
+    console.log(JSON.stringify({
+      internalTokenIsSafe,
+      deniedLicenseStatus: deniedLicense.status,
+      allowedLicenseStatus: allowedLicense.status,
+      licenseQueries,
+      deniedSyncStatus: deniedSync.status,
+      allowedSyncStatus: allowedSync.status,
+      allowedSyncBody: allowedSync.body,
+    }));
+  }
+  if (!internalEndpointsProtected) failures++;
+
+  const desktopTaskQueueSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/src/taskQueue.ts'),
+    'utf8'
+  );
+  const callersPropagateToken = desktopMainSource.includes('setLicenseServerUrl(serverUrl, savedState.internalToken)')
+    && desktopMainSource.includes('initTaskQueue({ serverUrl, internalToken: savedState.internalToken })')
+    && desktopMainSource.includes('setLicenseServerUrl(serverUrl, localServer.internalToken)')
+    && desktopServerSource.includes('startCloudSyncPolling(url, monterrialDataDir, envVars, internalToken)')
+    && desktopServerSource.includes("'x-desktop-internal-token': internalToken")
+    && desktopTaskQueueSource.includes("'x-desktop-internal-token': this.config.internalToken")
+    && desktopTaskQueueSource.includes('updateServerConnection(serverUrl: string, internalToken: string)');
+  console.log(`${callersPropagateToken ? 'PASS' : 'FAIL'} H17: Electron propagates and rotates the internal token across startup and queue paths.`);
+  if (!callersPropagateToken) failures++;
+
+  let debugUser = null;
+  let debugQueryMode = 'ok';
+  let debugQueries = 0;
+  const debugRoute = loadRoute('src/app/api/debug/catalog/route.ts', {
+    'next/server': next,
+    '@/lib/prisma': { prisma: {
+      catalogSettings: { findMany: async () => {
+        debugQueries++;
+        if (debugQueryMode === 'throw') throw new Error('sensitive database detail');
+        return [];
+      } },
+      storeProduct: { findMany: async () => { debugQueries++; return []; } },
+    } },
+    '@/lib/session': { getCurrentUser: async () => debugUser },
+    '@/lib/superadmin': { isSuperAdmin: email => email === 'admin@example.invalid' },
+  });
+  process.env.NODE_ENV = 'production';
+  const productionDebug = await debugRoute.GET();
+  const productionQueries = debugQueries;
+  process.env.NODE_ENV = 'development';
+  const unauthenticatedDebug = await debugRoute.GET();
+  debugUser = { role: 'SUPERADMIN', email: 'admin@example.invalid' };
+  const authorizedDebug = await debugRoute.GET();
+  debugQueryMode = 'throw';
+  const failedDebug = await debugRoute.GET();
+  const debugIsClosed = productionDebug.status === 404
+    && productionQueries === 0
+    && unauthenticatedDebug.status === 403
+    && authorizedDebug.status === 200
+    && failedDebug.status === 500
+    && failedDebug.body?.error === 'Error interno'
+    && !JSON.stringify(failedDebug.body).includes('sensitive database detail')
+    && !Object.hasOwn(failedDebug.body || {}, 'stack');
+  console.log(`${debugIsClosed ? 'PASS' : 'FAIL'} H17: catalog diagnostics are closed in production and do not expose exception details.`);
+  if (!debugIsClosed) failures++;
+
+  if (originalDesktopInternalToken === undefined) delete process.env.DESKTOP_INTERNAL_TOKEN;
+  else process.env.DESKTOP_INTERNAL_TOKEN = originalDesktopInternalToken;
+  if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+  else process.env.NODE_ENV = originalNodeEnv;
 
   process.exitCode = failures ? 1 : 0;
 }

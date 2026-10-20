@@ -1,20 +1,10 @@
-import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hasValidDesktopInternalToken } from '@/lib/desktopInternalAuth';
 import { processSunatJob } from '@/lib/sunat/process/processSunatJob';
 import { SUNAT_ENDPOINTS, type SunatEnvironment } from '@/lib/sunat/config/endpoints';
 
 export const dynamic = 'force-dynamic';
-
-function hasValidDesktopToken(req: NextRequest): boolean {
-  const expected = process.env.DESKTOP_INTERNAL_TOKEN;
-  const received = req.headers.get('x-desktop-internal-token');
-  if (!expected || !received) return false;
-  const expectedBuffer = Buffer.from(expected);
-  const receivedBuffer = Buffer.from(received);
-  return expectedBuffer.length === receivedBuffer.length &&
-    crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
-}
 
 async function canReachSunat(env: SunatEnvironment): Promise<boolean> {
   try {
@@ -32,7 +22,7 @@ async function canReachSunat(env: SunatEnvironment): Promise<boolean> {
 }
 
 export async function POST(req: NextRequest) {
-  if (!hasValidDesktopToken(req)) {
+  if (!hasValidDesktopInternalToken(req)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 

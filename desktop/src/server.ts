@@ -238,11 +238,12 @@ async function retryPendingRegistrations(
  * Devuelve array — vacío si aún no hay tiendas.
  */
 async function getAllLocalStores(
-  serverUrl: string
+  serverUrl: string,
+  internalToken: string
 ): Promise<Array<{ storeId: string; storeName: string; ownerEmail: string; ownerName?: string }>> {
   try {
     const res = await (fetch as any)(`${serverUrl}/api/desktop/license`, {
-      headers: { 'x-desktop-app': 'true' },
+      headers: { 'x-desktop-internal-token': internalToken },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];
@@ -283,7 +284,8 @@ async function getAllLocalStores(
 function startCloudSyncPolling(
   serverUrl: string,
   dataDir: string,
-  envVars: Record<string, string>
+  envVars: Record<string, string>,
+  internalToken: string
 ): void {
   const cloudUrl = envVars['CLOUD_URL'] || process.env.CLOUD_URL || '';
   const apiKey = envVars['LICENSE_API_KEY'] || process.env.LICENSE_API_KEY || '';
@@ -318,7 +320,7 @@ function startCloudSyncPolling(
     attempts++;
     const syncedIds = loadSyncedIds();
 
-    const allStores = await getAllLocalStores(serverUrl);
+    const allStores = await getAllLocalStores(serverUrl, internalToken);
     if (!allStores.length) {
       console.log(`[CloudSync] Attempt ${attempts}: No stores yet, will retry...`);
       return false;
@@ -505,7 +507,7 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   // Reintentar registros de tiendas pendientes + iniciar polling de sync con cloud
   const url = `http://127.0.0.1:${port}`;
   retryPendingRegistrations(monterrialDataDir, envVars).catch(() => {});
-  startCloudSyncPolling(url, monterrialDataDir, envVars);
+  startCloudSyncPolling(url, monterrialDataDir, envVars, internalToken);
   
   console.log(`[LocalServer] READY ${url}`);
   

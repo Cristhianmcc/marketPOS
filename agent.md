@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **19/10/2026**, zona America/Lima. Base Git observada:
+Última revisión: **20/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -437,7 +437,7 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/prisma/build/index.js validate` | Valida esquema sin migrar datos; pasó |
 | `node node_modules/typescript/bin/tsc -p desktop/tsconfig.json --noEmit --incremental false` | Tipos Electron; pasó |
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
-| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10, H11, H14 y H15 con dependencias simuladas; pasaron el 19/10/2026 |
+| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10, H11 y H14-H17 con dependencias simuladas; pasaron el 20/10/2026 |
 | `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
 | `node scripts/test-backup-restore-isolated.cjs <zip> [--multipart]` | Ejecuta el endpoint de restauración contra Prisma simulado en transporte ZIP crudo o multipart; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
@@ -565,6 +565,26 @@ una base real como comprobación rutinaria.
 - La prueba aislada H16, TypeScript de Electron y la comprobación TypeScript
   dirigida de los archivos web afectados pasaron el 19/10/2026.
 
+### Autenticación interna y diagnóstico desktop (2026-10-20)
+
+- `src/lib/desktopInternalAuth.ts` centraliza la validación de
+  `x-desktop-internal-token`. Requiere el token efímero que Electron genera para
+  cada arranque del servidor local y lo compara en tiempo constante.
+- `/api/desktop/license`, `/api/sync/push` y el procesamiento interno de trabajos
+  SUNAT ya no confían en `x-desktop-app: true`. El token se propaga por arranque
+  normal, estado rápido, rearranque del servidor, licencia, sincronización cloud
+  y `desktop/src/taskQueue.ts`; nunca se entrega al renderer.
+- `/api/debug/catalog` queda inaccesible en producción. En desarrollo exige una
+  sesión SUPERADMIN y sus fallos devuelven un mensaje genérico, sin stack ni
+  detalles de base de datos.
+- `scripts/audit-pos-isolated.cjs` prueba el rechazo del header anterior, la
+  aceptación del token correcto, todos los caminos desktop anteriores y el
+  cierre del diagnóstico. La suite aislada y TypeScript de Electron pasaron sin
+  usar base real ni red.
+- Punto de reanudación: H17 queda cerrado en la rama aislada. El siguiente
+  hallazgo es H18: impedir aperturas concurrentes del mismo turno y conservar
+  correctamente una caja inicial igual a cero. Todavía no está implementado.
+
 ### Punto de reanudacion SUNAT Beta (2026-10-12)
 
 - El Resumen Diario valida `YYYY-MM-DD` y lo interpreta como fecha civil de Peru
@@ -618,9 +638,10 @@ una base real como comprobación rutinaria.
    farmacéutica transaccional H11. Mantener esas invariantes al modificar ventas,
    fiados, lotes, compras, ajustes o farmacia.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
-5. Verificar CORS/entrada de impresión, idempotencia y turnos. H15 de reportes y
-   H16 de sesión quedaron corregidos y cubiertos por pruebas aisladas el
-   19/10/2026.
+5. Verificar CORS/entrada de impresión, idempotencia y turnos. H15 de reportes,
+   H16 de sesión y H17 de autenticación interna quedaron corregidos y cubiertos
+   por pruebas aisladas. El siguiente trabajo es H18, apertura atómica de turnos
+   y preservación de caja inicial cero.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

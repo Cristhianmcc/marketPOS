@@ -517,7 +517,8 @@ async function respawnServer(): Promise<void> {
     sunatProcessor?.stop();
     sunatProcessor = new SunatProcessor(serverUrl, localServer.internalToken);
     sunatProcessor.start();
-    setLicenseServerUrl(serverUrl);
+    setLicenseServerUrl(serverUrl, localServer.internalToken);
+    initTaskQueue({ serverUrl, internalToken: localServer.internalToken });
     attachServerCrashWatcher(localServer);
     saveServerState({
       port: localServer.port,
@@ -557,7 +558,11 @@ function attachServerCrashWatcher(server: LocalServer): void {
 
 // URL del servidor local (se actualiza cuando el servidor arranca)
 let _licenseServerUrl = 'http://localhost:3001';
-export function setLicenseServerUrl(url: string) { _licenseServerUrl = url; }
+let _desktopInternalToken = process.env.DESKTOP_INTERNAL_TOKEN || '';
+export function setLicenseServerUrl(url: string, internalToken?: string) {
+  _licenseServerUrl = url;
+  if (internalToken) _desktopInternalToken = internalToken;
+}
 
 function setupLicenseIpcHandlers(): void {
   // Verificar licencia (híbrido: cloud → caché → local BD)
@@ -565,7 +570,7 @@ function setupLicenseIpcHandlers(): void {
     try {
       // Obtener storeId desde la BD local
       const res = await fetch(`${_licenseServerUrl}/api/desktop/license`, {
-        headers: { 'x-desktop-app': 'true' },
+        headers: { 'x-desktop-internal-token': _desktopInternalToken },
         signal: AbortSignal.timeout(5_000),
       }).catch(() => null);
 
@@ -1317,7 +1322,7 @@ app.whenReady().then(async () => {
         console.log('[App] Fast path activo — servidor listo, conectando...');
         serverUrl = savedState.url;
         process.env.DATABASE_URL = savedState.databaseUrl;
-        setLicenseServerUrl(serverUrl);
+        setLicenseServerUrl(serverUrl, savedState.internalToken);
         const scheduler = initBackupScheduler(serverUrl);
         scheduler.startScheduler();
         const cloudSync = initCloudBackupSync(serverUrl);
@@ -1326,7 +1331,7 @@ app.whenReady().then(async () => {
         const onlineMonitor = initOnlineMonitor();
         onlineMonitor.start();
         onlineMonitor.onStatusChange((isOnline) => { if (isOnline) syncLocalImages(serverUrl); });
-        initTaskQueue({ serverUrl }).start();
+        initTaskQueue({ serverUrl, internalToken: savedState.internalToken }).start();
         sunatProcessor = new SunatProcessor(serverUrl, savedState.internalToken);
         sunatProcessor.start();
         initPrinterManager(serverUrl);
@@ -1461,7 +1466,7 @@ app.whenReady().then(async () => {
       console.log('[App] Starting local server...');
       localServer = await startLocalServer(RESOURCES_PATH, app.isPackaged);
       serverUrl = localServer.url;
-      setLicenseServerUrl(serverUrl);
+      setLicenseServerUrl(serverUrl, localServer.internalToken);
       attachServerCrashWatcher(localServer);
       console.log(`[App] Local server ready at: ${serverUrl}`);
       
@@ -1490,7 +1495,7 @@ app.whenReady().then(async () => {
       });
       
       // Inicializar TaskQueue (D5)
-      const taskQueue = initTaskQueue({ serverUrl });
+      const taskQueue = initTaskQueue({ serverUrl, internalToken: localServer.internalToken });
       taskQueue.start();
       console.log('[App] TaskQueue initialized');
 
@@ -1543,7 +1548,8 @@ app.whenReady().then(async () => {
     }
   } else {
     console.log(`[App] Using development server: ${serverUrl}`);
-    setLicenseServerUrl(serverUrl);
+    const devInternalToken = process.env.DESKTOP_INTERNAL_TOKEN || '';
+    setLicenseServerUrl(serverUrl, devInternalToken);
     
     // En desarrollo también inicializamos los módulos
     const scheduler = initBackupScheduler(serverUrl);
@@ -1570,7 +1576,7 @@ app.whenReady().then(async () => {
     });
     
     // TaskQueue (D5)
-    const taskQueue = initTaskQueue({ serverUrl });
+    const taskQueue = initTaskQueue({ serverUrl, internalToken: devInternalToken });
     taskQueue.start();
     console.log('[App] TaskQueue initialized (dev mode)');
     
