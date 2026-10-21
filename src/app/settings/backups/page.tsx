@@ -2,7 +2,94 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Download, AlertTriangle, Upload, CheckCircle2 } from 'lucide-react';
+import { Download, AlertTriangle, Upload, CheckCircle2, Clock3, FolderOpen, RefreshCw } from 'lucide-react';
+
+type DesktopBackupStatus = {
+  state: 'disabled' | 'idle' | 'running' | 'success' | 'error';
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  nextRunAt: string | null;
+  lastError: string | null;
+  lastFiles: Array<{ storeName: string; fileName: string }>;
+};
+
+type DesktopBackupBridge = {
+  getStatus: () => Promise<DesktopBackupStatus | null>;
+  runScheduledNow: () => Promise<{ success: boolean; error?: string }>;
+  openBackupFolder: (storeName: string) => Promise<void>;
+};
+
+function DesktopBackupStatusCard() {
+  const [bridge, setBridge] = useState<DesktopBackupBridge | null>(null);
+  const [status, setStatus] = useState<DesktopBackupStatus | null>(null);
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    const desktop = (window as unknown as { desktop?: { backup?: DesktopBackupBridge } }).desktop?.backup;
+    if (!desktop) return;
+    setBridge(desktop);
+    let active = true;
+    const refresh = async () => {
+      const current = await desktop.getStatus();
+      if (active) setStatus(current);
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  if (!bridge) return null;
+
+  const formatDate = (value: string | null) => value
+    ? new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+    : 'Todavia no ejecutado';
+
+  const runNow = async () => {
+    setRunning(true);
+    const result = await bridge.runScheduledNow();
+    setStatus(await bridge.getStatus());
+    setRunning(false);
+    if (result.success) toast.success('Respaldo automatico completado');
+    else toast.error(result.error || 'No se pudo crear el respaldo');
+  };
+
+  return (
+    <section className="bg-white border border-emerald-200 rounded-lg p-6 mb-6">
+      <div className="flex flex-col gap-5">
+        <div className="flex items-start gap-4">
+          <Clock3 className="w-6 h-6 text-emerald-600 mt-1 shrink-0" />
+          <div>
+            <h2 className="text-xl font-semibold">Respaldo automatico del escritorio</h2>
+            <p className="text-gray-600">Protege diariamente todas las tiendas activas de esta computadora.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-lg bg-gray-50 p-3"><span className="block text-gray-500">Estado</span><strong>{status?.state || 'Cargando...'}</strong></div>
+          <div className="rounded-lg bg-gray-50 p-3"><span className="block text-gray-500">Ultimo respaldo correcto</span><strong>{formatDate(status?.lastSuccessAt || null)}</strong></div>
+          <div className="rounded-lg bg-gray-50 p-3"><span className="block text-gray-500">Proxima ejecucion</span><strong>{formatDate(status?.nextRunAt || null)}</strong></div>
+        </div>
+        {status?.lastError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{status.lastError}</div>
+        )}
+        {status && status.lastFiles.length > 0 && (
+          <p className="text-sm text-gray-600">Ultima ejecucion: {status.lastFiles.length} archivo(s) creado(s).</p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button onClick={() => void runNow()} disabled={running || status?.state === 'running'} className="inline-flex justify-center items-center gap-2 px-5 py-3 rounded-lg bg-emerald-600 text-white font-medium disabled:opacity-50">
+            <RefreshCw className={`w-5 h-5 ${running ? 'animate-spin' : ''}`} />
+            {running ? 'Creando respaldo...' : 'Crear respaldo ahora'}
+          </button>
+          <button onClick={() => void bridge.openBackupFolder('')} className="inline-flex justify-center items-center gap-2 px-5 py-3 rounded-lg border border-gray-300 font-medium">
+            <FolderOpen className="w-5 h-5" /> Abrir carpeta
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function BackupsPage() {
   const [exporting, setExporting] = useState(false);
@@ -71,6 +158,8 @@ export default function BackupsPage() {
       <p className="text-gray-600 mb-8">
         Gestiona copias de seguridad de tu tienda
       </p>
+
+      <DesktopBackupStatusCard />
 
       {/* Export Backup */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">

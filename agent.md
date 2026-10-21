@@ -437,14 +437,15 @@ convierte el PWA web en un POS offline: `public/sw.js` no almacena llamadas API.
 | `node node_modules/prisma/build/index.js validate` | Valida esquema sin migrar datos; pasó |
 | `node node_modules/typescript/bin/tsc -p desktop/tsconfig.json --noEmit --incremental false` | Tipos Electron; pasó |
 | `node node_modules/typescript/bin/tsc -p print-service/tsconfig.json --noEmit --incremental false` | Tipos impresión; pasó |
-| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H06/H07, H08, H09, H10, H11 y H14-H18 con dependencias simuladas; pasaron el 20/10/2026 |
-| `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó en `feature/sunat-beta` |
+| `node scripts/audit-pos-isolated.cjs` | Pruebas aisladas H01, H03, H06/H07, H08, H09, H10, H11 y H14-H18 con dependencias simuladas; pasaron el 20/10/2026 |
+| `npm run test:backups:isolated` | Prueba el ciclo programado de todas las tiendas activas, autenticación interna, ZIP, checksum, archivo fiscal, persistencia tras reinicio y fallo visible; no usa base real |
+| `npm run build:only` | Genera cliente Prisma y compila web sin `db push`; pasó con 207 páginas en `feature/sunat-beta` el 20/10/2026 |
 | `node scripts/test-backup-restore-isolated.cjs <zip> [--multipart]` | Ejecuta el endpoint de restauración contra Prisma simulado en transporte ZIP crudo o multipart; no escribe una base real |
 | `npm run sunat:test:local` | Prueba aislada: certificado BETA, UBL, firma/verificación, ZIP y CDR; no usa base ni red |
-| `npm run build` | **Modifica esquema con `prisma db push`** antes de compilar |
+| `npm run build` | Delega a `build:only`; compila sin desplegar ni modificar el esquema |
 | `npm run desktop:build` | Standalone + preparación + tsc + empaquetado Windows |
 | `npm run desktop:portable` | Empaquetado en directorio (`--dir`), no instalador portable de un solo EXE |
-| `npm run db:migrate:deploy` | No considerar suficiente para base vacía: baseline actual vacío |
+| `npm run db:migrate:deploy` | Aplica migraciones versionadas; una base legada exige primero la adopción verificada descrita en H04 |
 
 No existe script `test` principal. Hay listas manuales y scripts de integración
 que pueden crear/modificar datos o comunicarse con SUNAT. Leerlos antes de usarlos.
@@ -634,8 +635,30 @@ una base real como comprobación rutinaria.
   base legada y rechazo de una base con deriva. La prueba elimina su entorno al
   finalizar y no usa Supabase ni una base del usuario.
 - El auditor general comprueba estáticamente que no reaparezcan `db push`,
-  `--accept-data-loss` o la ejecución de los parches heredados. El siguiente
-  punto de trabajo es H03, respaldo diario programado y visible.
+  `--accept-data-loss` o la ejecución de los parches heredados. H03 quedó
+  cerrado después de este punto; el siguiente frente de código es H05.
+
+### Respaldo automático programado y visible (2026-10-20)
+
+- H03 quedó cerrado en la rama aislada. Electron obtiene todas las tiendas
+  activas desde `/api/desktop/backup-context` y autentica esa consulta y cada
+  exportación con el token efímero del servidor local. El flujo web conserva
+  sesión, rol y límite de solicitudes.
+- El ciclo diario respalda cada tienda activa, evita dos ejecuciones programadas
+  simultáneas y reintenta después de un fallo. El ZIP debe contener el archivo
+  fiscal y mantiene el checksum que valida el restaurador.
+- `backup-status.json`, dentro de `userData`, conserva último intento, último
+  éxito, próxima ejecución, archivos y error aun después de reiniciar Electron.
+  Configuración > Respaldos presenta ese estado, permite ejecutar el ciclo en el
+  momento y abre la carpeta de copias.
+- `npm run test:backups:isolated` verificó dos tiendas, autenticación, ZIP,
+  checksum, archivo fiscal, reinicio y error visible. El restaurador se probó
+  aparte por ZIP directo y multipart con Prisma transaccional simulado; no se
+  conectó a una base real.
+- La auditoría aislada, TypeScript de Electron, `git diff --check` y
+  `npm run build:only` pasaron; la compilación segura generó 207 páginas. Antes
+  de distribuir, queda observar la ejecución por intervalo en un paquete y
+  restaurar una copia en una instalación desechable.
 
 ### Entregas desktop trazables y actualizaciones controladas (2026-10-20)
 
@@ -716,8 +739,8 @@ una base real como comprobación rutinaria.
    Electron limita la navegación al origen exacto del servidor iniciado.
 6. H20 quedó corregido: cada entrega queda identificada por versión, commit y
    manifiestos, sin destinos de actualización de ejemplo.
-7. H04 quedó corregido con migración base completa, adopción legada verificada y
-   prueba PostgreSQL desechable. El siguiente trabajo es H03, respaldo diario.
+7. H03 y H04 quedaron corregidos. El siguiente trabajo es H05: recuperar los
+   controles de tipos y lint antes de generar otra distribución.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

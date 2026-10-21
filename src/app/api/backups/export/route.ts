@@ -5,7 +5,7 @@ import archiver from 'archiver';
 import { Readable } from 'stream';
 import crypto from 'crypto';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit';
-import { logAudit } from '@/lib/auditLog';
+import { hasValidDesktopInternalToken } from '@/lib/desktopInternalAuth';
 
 // Verificar si es SUPERADMIN
 function isSuperAdmin(email: string): boolean {
@@ -15,48 +15,55 @@ function isSuperAdmin(email: string): boolean {
 
 export async function GET(request: NextRequest) {
   try {
-    // ✅ MÓDULO S8: Rate limit backup export
-    const clientIP = getClientIP(request);
-    const rateLimitResult = checkRateLimit('backup-export', clientIP);
-    
-    if (!rateLimitResult.allowed) {
-      const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
-      return NextResponse.json(
-        { code: 'TOO_MANY_REQUESTS', message: `Demasiadas solicitudes. Intenta en ${waitSeconds}s` },
-        { status: 429, headers: { 'Retry-After': String(waitSeconds) } }
-      );
-    }
-
-    const session = await getSession();
-    if (!session.userId) {
-      return NextResponse.json(
-        { code: 'UNAUTHORIZED', message: 'No autenticado' },
-        { status: 401 }
-      );
-    }
-
+    const internalRequest = hasValidDesktopInternalToken(request);
     const { searchParams } = new URL(request.url);
     const requestedStoreId = searchParams.get('storeId');
-
-    // Determinar qué tienda exportar
     let storeIdToExport: string;
-    
-    if (isSuperAdmin(session.email)) {
-      // SUPERADMIN puede exportar cualquier tienda
-      storeIdToExport = requestedStoreId || session.storeId;
-    } else if (session.role === 'OWNER') {
-      // OWNER solo puede exportar su propia tienda
-      storeIdToExport = session.storeId;
+
+    if (internalRequest) {
+      if (!requestedStoreId) {
+        return NextResponse.json(
+          { code: 'STORE_REQUIRED', message: 'El proceso de respaldo debe indicar una tienda' },
+          { status: 400 }
+        );
+      }
+      storeIdToExport = requestedStoreId;
     } else {
-      return NextResponse.json(
-        { code: 'FORBIDDEN', message: 'Solo OWNER o SUPERADMIN pueden exportar backups' },
-        { status: 403 }
-      );
+      const clientIP = getClientIP(request);
+      const rateLimitResult = checkRateLimit('backup-export', clientIP);
+      if (!rateLimitResult.allowed) {
+        const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
+        return NextResponse.json(
+          { code: 'TOO_MANY_REQUESTS', message: `Demasiadas solicitudes. Intenta en ${waitSeconds}s` },
+          { status: 429, headers: { 'Retry-After': String(waitSeconds) } }
+        );
+      }
+
+      const session = await getSession();
+      if (!session.userId) {
+        return NextResponse.json(
+          { code: 'UNAUTHORIZED', message: 'No autenticado' },
+          { status: 401 }
+        );
+      }
+
+      if (isSuperAdmin(session.email)) {
+        storeIdToExport = requestedStoreId || session.storeId;
+      } else if (session.role === 'OWNER') {
+        storeIdToExport = session.storeId;
+      } else {
+        return NextResponse.json(
+          { code: 'FORBIDDEN', message: 'Solo OWNER o SUPERADMIN pueden exportar backups' },
+          { status: 403 }
+        );
+      }
     }
 
     // Obtener datos del store
-    const store = await prisma.store.findUnique({
-      where: { id: storeIdToExport },
+    const store = await prisma.store.findFirst({
+      where: internalRequest
+        ? { id: storeIdToExport, status: 'ACTIVE' }
+        : { id: storeIdToExport },
       include: {
         settings: true,
       },

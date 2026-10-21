@@ -1028,6 +1028,48 @@ async function main() {
   console.log(`${callersPropagateToken ? 'PASS' : 'FAIL'} H17: Electron propagates and rotates the internal token across startup and queue paths.`);
   if (!callersPropagateToken) failures++;
 
+  let backupContextQueries = 0;
+  const backupContextRoute = loadRoute('src/app/api/desktop/backup-context/route.ts', {
+    'next/server': next,
+    '@/infra/db/prisma': { prisma: {
+      store: { findMany: async () => {
+        backupContextQueries++;
+        return [{ id: 'store-a', name: 'Store A', ruc: null, address: null, phone: null }];
+      } },
+    } },
+    '@/lib/desktopInternalAuth': desktopInternalAuth,
+  });
+  const deniedBackupContext = await backupContextRoute.GET(internalRequest('true'));
+  const allowedBackupContext = await backupContextRoute.GET(internalRequest(validDesktopInternalToken));
+  const backupSchedulerSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'desktop/src/backupScheduler.ts'),
+    'utf8'
+  );
+  const backupSettingsSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/settings/backups/page.tsx'),
+    'utf8'
+  );
+  const backupProbeSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'scripts/test-backup-scheduler-isolated.cjs'),
+    'utf8'
+  );
+  const backupPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
+  const scheduledBackupsAreObservable = deniedBackupContext.status === 401
+    && allowedBackupContext.status === 200
+    && allowedBackupContext.body?.stores?.length === 1
+    && backupContextQueries === 1
+    && !backupSchedulerSource.includes('/api/store/current')
+    && backupSchedulerSource.includes('/api/desktop/backup-context')
+    && backupSchedulerSource.includes("path.join(app.getPath('userData'), 'backup-status.json')")
+    && backupSchedulerSource.includes('runScheduledBackupNow()')
+    && backupSettingsSource.includes('Ultimo respaldo correcto')
+    && backupSettingsSource.includes('Crear respaldo ahora')
+    && backupProbeSource.includes('restartPersistenceVerified')
+    && backupProbeSource.includes('visibleFailureVerified')
+    && backupPackage.scripts['test:backups:isolated'] === 'node scripts/test-backup-scheduler-isolated.cjs';
+  console.log(`${scheduledBackupsAreObservable ? 'PASS' : 'FAIL'} H03: scheduled backups cover active stores, persist status and expose failures.`);
+  if (!scheduledBackupsAreObservable) failures++;
+
   let debugUser = null;
   let debugQueryMode = 'ok';
   let debugQueries = 0;

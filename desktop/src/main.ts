@@ -653,6 +653,20 @@ function setupBackupIpcHandlers(): void {
     return scheduler.getConfig();
   });
 
+  ipcMain.handle('backup:get-status', async () => {
+    const scheduler = getBackupScheduler();
+    if (!scheduler) return null;
+    return scheduler.getStatus();
+  });
+
+  ipcMain.handle('backup:run-scheduled-now', async () => {
+    const scheduler = getBackupScheduler();
+    if (!scheduler) {
+      return { success: false, error: 'BackupScheduler no inicializado' };
+    }
+    return await scheduler.runScheduledBackupNow();
+  });
+
   // Actualizar configuración
   ipcMain.handle('backup:update-config', async (_event, config: Partial<BackupConfig>) => {
     const scheduler = getBackupScheduler();
@@ -672,9 +686,8 @@ function setupBackupIpcHandlers(): void {
     const scheduler = getBackupScheduler();
     if (!scheduler) return;
     const dir = scheduler.getBackupDir_public(storeName);
-    if (fs.existsSync(dir)) {
-      shell.openPath(dir);
-    }
+    fs.mkdirSync(dir, { recursive: true });
+    await shell.openPath(dir);
   });
 
   // Seleccionar carpeta personalizada para backups (D4)
@@ -1325,7 +1338,7 @@ app.whenReady().then(async () => {
         serverUrl = savedState.url;
         process.env.DATABASE_URL = savedState.databaseUrl;
         setLicenseServerUrl(serverUrl, savedState.internalToken);
-        const scheduler = initBackupScheduler(serverUrl);
+        const scheduler = initBackupScheduler(serverUrl, savedState.internalToken);
         scheduler.startScheduler();
         const cloudSync = initCloudBackupSync(serverUrl);
         const backupDir = scheduler.getBackupDir_public('');
@@ -1473,7 +1486,7 @@ app.whenReady().then(async () => {
       console.log(`[App] Local server ready at: ${serverUrl}`);
       
       // Inicializar BackupScheduler
-      const scheduler = initBackupScheduler(serverUrl);
+      const scheduler = initBackupScheduler(serverUrl, localServer.internalToken);
       scheduler.startScheduler();
       console.log('[App] BackupScheduler initialized');
       
@@ -1554,7 +1567,7 @@ app.whenReady().then(async () => {
     setLicenseServerUrl(serverUrl, devInternalToken);
     
     // En desarrollo también inicializamos los módulos
-    const scheduler = initBackupScheduler(serverUrl);
+    const scheduler = initBackupScheduler(serverUrl, devInternalToken);
     scheduler.startScheduler();
     console.log('[App] BackupScheduler initialized (dev mode)');
     

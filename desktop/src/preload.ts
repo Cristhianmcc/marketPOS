@@ -50,6 +50,8 @@ interface DesktopAPI {
     list: (storeName: string) => Promise<BackupFileInfo[]>;
     restore: (filePath: string) => Promise<RestoreResult>;
     getConfig: () => Promise<BackupConfig>;
+    getStatus: () => Promise<BackupRunStatus | null>;
+    runScheduledNow: () => Promise<BackupResult>;
     updateConfig: (config: Partial<BackupConfig>) => Promise<void>;
     getBackupDir: (storeName: string) => Promise<string>;
     openBackupFolder: (storeName: string) => Promise<void>;
@@ -220,6 +222,22 @@ interface BackupConfig {
   onShiftClose: boolean;
   maxBackups: number;
   customPath?: string;
+}
+
+interface BackupRunStatus {
+  state: 'disabled' | 'idle' | 'running' | 'success' | 'error';
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  nextRunAt: string | null;
+  lastError: string | null;
+  lastTrigger: BackupTrigger | null;
+  lastFiles: Array<{
+    storeId: string;
+    storeName: string;
+    filePath: string;
+    fileName: string;
+    size: number;
+  }>;
 }
 
 // Tipos D8: Cloud Backup Sync
@@ -534,6 +552,10 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke('backup:restore', filePath),
     getConfig: () => 
       ipcRenderer.invoke('backup:get-config'),
+    getStatus: () =>
+      ipcRenderer.invoke('backup:get-status'),
+    runScheduledNow: () =>
+      ipcRenderer.invoke('backup:run-scheduled-now'),
     updateConfig: (config: Partial<BackupConfig>) => 
       ipcRenderer.invoke('backup:update-config', config),
     getBackupDir: (storeName: string) => 

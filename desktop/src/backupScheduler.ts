@@ -50,6 +50,26 @@ export interface BackupResult {
   size?: number;
 }
 
+export type BackupRunState = 'disabled' | 'idle' | 'running' | 'success' | 'error';
+
+export interface BackupStatusFile {
+  storeId: string;
+  storeName: string;
+  filePath: string;
+  fileName: string;
+  size: number;
+}
+
+export interface BackupRunStatus {
+  state: BackupRunState;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  nextRunAt: string | null;
+  lastError: string | null;
+  lastTrigger: 'manual' | 'shift-close' | 'scheduled' | null;
+  lastFiles: BackupStatusFile[];
+}
+
 export interface StoreInfo {
   id: string;
   name: string;
@@ -69,6 +89,21 @@ const DEFAULT_BACKUP_CONFIG: BackupConfig = {
   maxBackups: 30,           // Retener últimos 30 backups
 };
 
+const DEFAULT_BACKUP_STATUS: BackupRunStatus = {
+  state: 'idle',
+  lastAttemptAt: null,
+  lastSuccessAt: null,
+  nextRunAt: null,
+  lastError: null,
+  lastTrigger: null,
+  lastFiles: [],
+};
+
+const STARTUP_DELAY_MS = 5_000;
+const ERROR_RETRY_MS = 15 * 60 * 1000;
+const MAX_TIMER_DELAY_MS = 2_147_000_000;
+
+
 // ============================================================================
 // BACKUP SCHEDULER CLASS
 // ============================================================================
@@ -76,14 +111,21 @@ const DEFAULT_BACKUP_CONFIG: BackupConfig = {
 export class BackupScheduler {
   private config: BackupConfig;
   private configPath: string;
+  private status: BackupRunStatus;
+  private statusPath: string;
   private intervalTimer: NodeJS.Timeout | null = null;
   private serverUrl: string;
+  private internalToken: string;
   private authToken: string | null = null;
+  private running = false;
 
-  constructor(serverUrl: string) {
+  constructor(serverUrl: string, internalToken: string) {
     this.serverUrl = serverUrl;
+    this.internalToken = internalToken;
     this.configPath = path.join(app.getPath('userData'), 'backup-config.json');
+    this.statusPath = path.join(app.getPath('userData'), 'backup-status.json');
     this.config = this.loadConfig();
+    this.status = this.loadStatus();
   }
 
   // --------------------------------------------------------------------------
@@ -114,8 +156,49 @@ export class BackupScheduler {
     }
   }
 
+  private loadStatus(): BackupRunStatus {
+    try {
+      if (fs.existsSync(this.statusPath)) {
+        const parsed = JSON.parse(fs.readFileSync(this.statusPath, 'utf-8')) as Partial<BackupRunStatus>;
+        const loaded = { ...DEFAULT_BACKUP_STATUS, ...parsed };
+        if (loaded.state === 'running') {
+          loaded.state = 'error';
+          loaded.lastError = 'La aplicacion se cerro durante el respaldo anterior';
+          loaded.nextRunAt = null;
+        }
+        return loaded;
+      }
+    } catch (error) {
+      console.error('[BackupScheduler] Error loading status:', error);
+    }
+    return { ...DEFAULT_BACKUP_STATUS };
+  }
+
+  private saveStatus(): void {
+    try {
+      fs.mkdirSync(path.dirname(this.statusPath), { recursive: true });
+      fs.writeFileSync(this.statusPath, JSON.stringify(this.status, null, 2));
+    } catch (error) {
+      console.error('[BackupScheduler] Error saving status:', error);
+    }
+  }
+
+  private updateStatus(updates: Partial<BackupRunStatus>): void {
+    this.status = { ...this.status, ...updates };
+    this.saveStatus();
+  }
+
   getConfig(): BackupConfig {
     return { ...this.config };
+  }
+
+  getStatus(): BackupRunStatus {
+    return { ...this.status, lastFiles: [...this.status.lastFiles] };
+  }
+
+  updateConnection(serverUrl: string, internalToken: string): void {
+    this.serverUrl = serverUrl;
+    this.internalToken = internalToken;
   }
 
   updateConfig(updates: Partial<BackupConfig>): void {
@@ -162,13 +245,23 @@ export class BackupScheduler {
 
   async createBackup(
     storeInfo: StoreInfo,
-    trigger: 'manual' | 'shift-close' | 'scheduled'
+    trigger: 'manual' | 'shift-close' | 'scheduled',
+    trackStatus = true
   ): Promise<BackupResult> {
     if (!this.config.enabled && trigger !== 'manual') {
       return { success: false, error: 'Backups deshabilitados' };
     }
 
     try {
+      if (trackStatus) {
+        this.updateStatus({
+          state: 'running',
+          lastAttemptAt: new Date().toISOString(),
+          lastError: null,
+          lastTrigger: trigger,
+          lastFiles: [],
+        });
+      }
       console.log(`[BackupScheduler] Creating ${trigger} backup for store: ${storeInfo.name}`);
 
       // Obtener datos del servidor local
@@ -192,9 +285,10 @@ export class BackupScheduler {
       // El archivo fiscal forma parte del mismo ZIP para que el respaldo pueda
       // recuperarse en otra PC y también viaje con la copia en la nube. No
       // contiene credenciales SOL ni el certificado privado.
-      const fiscalArchive = backupData.fiscalArchive && typeof backupData.fiscalArchive === 'object'
-        ? backupData.fiscalArchive as Record<string, unknown>
-        : await this.fetchFiscalArchive();
+      if (!backupData.fiscalArchive || typeof backupData.fiscalArchive !== 'object') {
+        throw new Error('El respaldo no contiene el archivo fiscal de la tienda');
+      }
+      const fiscalArchive = backupData.fiscalArchive as Record<string, unknown>;
       const completeBackupData = { ...backupData, fiscalArchive };
 
       // Crear checksum
@@ -228,15 +322,33 @@ export class BackupScheduler {
       // Limpiar backups antiguos
       await this.cleanupOldBackups(storeInfo.name);
 
-      return {
+      const result = {
         success: true,
         filePath,
         fileName,
         size: stats.size,
       };
+      if (trackStatus) {
+        this.updateStatus({
+          state: 'success',
+          lastSuccessAt: new Date().toISOString(),
+          lastError: null,
+          lastFiles: [{
+            storeId: storeInfo.id,
+            storeName: storeInfo.name,
+            filePath,
+            fileName,
+            size: stats.size,
+          }],
+        });
+      }
+      return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('[BackupScheduler] Backup failed:', errorMessage);
+      if (trackStatus) {
+        this.updateStatus({ state: 'error', lastError: errorMessage });
+      }
       return { success: false, error: errorMessage };
     }
   }
@@ -245,43 +357,47 @@ export class BackupScheduler {
     return zipPath.replace(/\.zip$/i, '.sunat-fiscal');
   }
 
-  private async fetchFiscalArchive(): Promise<Record<string, unknown>> {
-    const response = await fetch(`${this.serverUrl}/api/sunat/archive/export`, {
-      headers: { 'x-desktop-app': 'true', ...(this.authToken && { Cookie: this.authToken }) },
-    });
-    if (!response.ok) throw new Error('No se pudo obtener el respaldo fiscal de la tienda');
-    return await response.json() as Record<string, unknown>;
+  private getApiHeaders(contentType = false): Record<string, string> {
+    return {
+      'x-desktop-app': 'true',
+      'x-desktop-internal-token': this.internalToken,
+      ...(contentType ? { 'Content-Type': 'application/json' } : {}),
+      ...(this.authToken ? { Cookie: this.authToken } : {}),
+    };
   }
 
-  private async fetchBackupData(storeId: string): Promise<Record<string, unknown> | null> {
-    try {
-      const response = await fetch(`${this.serverUrl}/api/backups/export?storeId=${storeId}`, {
-        method: 'GET',
-        headers: {
-          ...(this.authToken && { Cookie: this.authToken }),
-        },
-      });
+  private async fetchBackupData(storeId: string): Promise<Record<string, unknown>> {
+    const response = await fetch(`${this.serverUrl}/api/backups/export?storeId=${encodeURIComponent(storeId)}`, {
+      method: 'GET',
+      headers: this.getApiHeaders(),
+    });
 
-      if (!response.ok) {
-        console.error('[BackupScheduler] API error:', response.status, response.statusText);
-        return null;
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const body = await response.json() as { message?: string; error?: string };
+        detail = body.message || body.error || '';
+      } catch {
+        detail = response.statusText;
       }
+      throw new Error(`No se pudo exportar el respaldo (${response.status})${detail ? `: ${detail}` : ''}`);
+    }
 
       // El endpoint devuelve un ZIP, necesitamos obtener el data.json
       // Para desktop, vamos a hacer un endpoint alternativo que retorne JSON
       const contentType = response.headers.get('content-type');
       
-      if (contentType?.includes('application/json')) {
-        return await response.json() as Record<string, unknown>;
-      }
+    if (contentType?.includes('application/json')) {
+      return await response.json() as Record<string, unknown>;
+    }
 
       // Si es ZIP, extraer data.json
-      const buffer = await response.arrayBuffer();
-      return await this.extractDataFromZip(Buffer.from(buffer));
-    } catch (error) {
-      console.error('[BackupScheduler] Fetch error:', error);
-      return null;
+    const buffer = await response.arrayBuffer();
+    const data = await this.extractDataFromZip(Buffer.from(buffer));
+    if (!data) {
+      throw new Error('El ZIP exportado no contiene un data.json valido');
     }
+    return data;
   }
 
   private async extractDataFromZip(buffer: Buffer): Promise<Record<string, unknown> | null> {
@@ -381,25 +497,100 @@ export class BackupScheduler {
 
     if (!this.config.enabled || this.config.intervalHours <= 0) {
       console.log('[BackupScheduler] Scheduled backups disabled');
+      this.updateStatus({ state: 'disabled', nextRunAt: null });
       return;
     }
 
     const intervalMs = this.config.intervalHours * 60 * 60 * 1000;
-    
-    console.log(`[BackupScheduler] Starting scheduler - interval: ${this.config.intervalHours}h`);
-    
-    this.intervalTimer = setInterval(async () => {
-      // Obtener store info del servidor
-      const storeInfo = await this.getCurrentStoreInfo();
-      if (storeInfo) {
-        await this.createBackup(storeInfo, 'scheduled');
+    const lastSuccess = this.status.lastSuccessAt ? Date.parse(this.status.lastSuccessAt) : 0;
+    const dueAt = lastSuccess > 0 ? lastSuccess + intervalMs : Date.now() + STARTUP_DELAY_MS;
+    const delay = Math.max(STARTUP_DELAY_MS, dueAt - Date.now());
+    this.scheduleNext(delay);
+  }
+
+  private scheduleNext(delayMs: number): void {
+    if (!this.config.enabled || this.config.intervalHours <= 0) return;
+    const safeDelay = Math.min(Math.max(STARTUP_DELAY_MS, delayMs), MAX_TIMER_DELAY_MS);
+    const nextRunAt = new Date(Date.now() + safeDelay).toISOString();
+    this.updateStatus({
+      state: this.status.state === 'running' ? 'running' : 'idle',
+      nextRunAt,
+    });
+    console.log(`[BackupScheduler] Next scheduled backup: ${nextRunAt}`);
+    this.intervalTimer = setTimeout(async () => {
+      this.intervalTimer = null;
+      const result = await this.runScheduledBackupNow();
+      const nextDelay = result.success
+        ? this.config.intervalHours * 60 * 60 * 1000
+        : ERROR_RETRY_MS;
+      this.scheduleNext(nextDelay);
+    }, safeDelay);
+  }
+
+  async runScheduledBackupNow(): Promise<BackupResult> {
+    if (this.running) {
+      return { success: false, error: 'Ya hay un respaldo automatico en curso' };
+    }
+    if (!this.config.enabled) {
+      return { success: false, error: 'Backups deshabilitados' };
+    }
+
+    this.running = true;
+    this.updateStatus({
+      state: 'running',
+      lastAttemptAt: new Date().toISOString(),
+      lastError: null,
+      lastTrigger: 'scheduled',
+      lastFiles: [],
+    });
+
+    try {
+      const stores = await this.getActiveStores();
+      if (stores.length === 0) {
+        throw new Error('No hay tiendas activas para respaldar');
       }
-    }, intervalMs);
+
+      const files: BackupStatusFile[] = [];
+      const errors: string[] = [];
+      for (const store of stores) {
+        const result = await this.createBackup(store, 'scheduled', false);
+        if (result.success && result.filePath && result.fileName && typeof result.size === 'number') {
+          files.push({
+            storeId: store.id,
+            storeName: store.name,
+            filePath: result.filePath,
+            fileName: result.fileName,
+            size: result.size,
+          });
+        } else {
+          errors.push(`${store.name}: ${result.error || 'error desconocido'}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        throw new Error(`Respaldo incompleto. ${errors.join('; ')}`);
+      }
+
+      const completedAt = new Date().toISOString();
+      this.updateStatus({
+        state: 'success',
+        lastSuccessAt: completedAt,
+        lastError: null,
+        lastFiles: files,
+      });
+      return { success: true, filePath: files[0]?.filePath, fileName: files[0]?.fileName, size: files[0]?.size };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.updateStatus({ state: 'error', lastError: message });
+      return { success: false, error: message };
+    } finally {
+      this.running = false;
+    }
   }
 
   stopScheduler(): void {
     if (this.intervalTimer) {
-      clearInterval(this.intervalTimer);
+      clearTimeout(this.intervalTimer);
       this.intervalTimer = null;
       console.log('[BackupScheduler] Scheduler stopped');
     }
@@ -410,21 +601,15 @@ export class BackupScheduler {
     this.startScheduler();
   }
 
-  private async getCurrentStoreInfo(): Promise<StoreInfo | null> {
-    try {
-      const response = await fetch(`${this.serverUrl}/api/store/current`, {
-        headers: {
-          ...(this.authToken && { Cookie: this.authToken }),
-        },
-      });
-
-      if (!response.ok) return null;
-      
-      const data = await response.json() as { store: StoreInfo };
-      return data.store;
-    } catch {
-      return null;
+  private async getActiveStores(): Promise<StoreInfo[]> {
+    const response = await fetch(`${this.serverUrl}/api/desktop/backup-context`, {
+      headers: this.getApiHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`No se pudo obtener la lista de tiendas activas (${response.status})`);
     }
+    const data = await response.json() as { stores?: StoreInfo[] };
+    return Array.isArray(data.stores) ? data.stores : [];
   }
 
   // --------------------------------------------------------------------------
@@ -498,11 +683,7 @@ export class BackupScheduler {
       // Enviar al servidor para restaurar
       const response = await fetch(`${this.serverUrl}/api/backups/restore/local`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-desktop-app': 'true',
-          ...(this.authToken && { Cookie: this.authToken }),
-        },
+        headers: this.getApiHeaders(true),
         body: JSON.stringify({ metadata, data }),
       });
 
@@ -524,7 +705,7 @@ export class BackupScheduler {
       if (fiscalPayload) {
         const fiscalResponse = await fetch(`${this.serverUrl}/api/sunat/archive/restore`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-desktop-app': 'true', ...(this.authToken && { Cookie: this.authToken }) },
+          headers: this.getApiHeaders(true),
           body: JSON.stringify(fiscalPayload),
         });
         if (!fiscalResponse.ok) {
@@ -559,9 +740,11 @@ export class BackupScheduler {
 
 let backupSchedulerInstance: BackupScheduler | null = null;
 
-export function initBackupScheduler(serverUrl: string): BackupScheduler {
+export function initBackupScheduler(serverUrl: string, internalToken: string): BackupScheduler {
   if (!backupSchedulerInstance) {
-    backupSchedulerInstance = new BackupScheduler(serverUrl);
+    backupSchedulerInstance = new BackupScheduler(serverUrl, internalToken);
+  } else {
+    backupSchedulerInstance.updateConnection(serverUrl, internalToken);
   }
   return backupSchedulerInstance;
 }
