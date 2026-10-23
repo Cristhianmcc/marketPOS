@@ -662,6 +662,9 @@ una base real como comprobación rutinaria.
 
 ### Controles de calidad y sesión tipada por tienda (2026-10-23)
 
+- Punto de reanudación confirmado: commit `7ecfa76c` (`fix: restore enforced
+  quality gates`). El siguiente trabajo comienza en H12/H13; H05 no requiere
+  repetir la migración de sesiones.
 - H05 quedó cerrado en `feature/sunat-beta`. `StoreSessionData`,
   `getCurrentStoreUser` y `getStoreSessionOrThrow` garantizan `storeId: string`
   dentro de rutas tenant. Los endpoints globales de SUPERADMIN mantienen la
