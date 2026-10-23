@@ -260,7 +260,7 @@ export default function SettingsPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Producto aparece como "Por vencer" cuando queden menos de estos días.
+                        Producto aparece como &quot;Por vencer&quot; cuando queden menos de estos días.
                       </p>
                     </div>
 
@@ -277,7 +277,7 @@ export default function SettingsPage() {
                         <option value="ALLOW_EXPIRED">Permitir venta de lotes vencidos</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        Con "Bloquear", si todos los lotes están vencidos el cajero no puede vender.
+                        Con &quot;Bloquear&quot;, si todos los lotes están vencidos el cajero no puede vender.
                       </p>
                     </div>
                   </div>

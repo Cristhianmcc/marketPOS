@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey, Prisma, RoundingMode } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { 
   requireStoreActive, 
   requireFlag, 
@@ -27,7 +27,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
     requireRole(session.role, ['OWNER']);
@@ -121,7 +121,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
     requireRole(session.role, ['OWNER']);

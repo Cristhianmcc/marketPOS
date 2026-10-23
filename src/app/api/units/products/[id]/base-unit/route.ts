@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { 
   requireStoreActive, 
   requireFlag, 
@@ -32,7 +32,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: productId } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_ADVANCED_UNITS);
 
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: productId } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_ADVANCED_UNITS);
     requireRole(session.role, ['OWNER']);

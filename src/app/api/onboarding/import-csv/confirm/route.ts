@@ -2,7 +2,7 @@
 // ✅ MÓDULO 16.2: Onboarding - Confirmar import CSV
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { createAuditLog } from '@/domain/audit-log/audit-log-service';
 import { Prisma } from '@prisma/client';
@@ -25,7 +25,7 @@ interface ProductToImport {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     // Solo OWNER
     if (session.role !== 'OWNER') {
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
     
     // Auditoría de error
     try {
-      const session = await getSessionOrThrow();
+      const session = await getStoreSessionOrThrow();
       await createAuditLog({
         storeId: session.storeId,
         userId: session.userId,

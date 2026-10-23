@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let targetUser = store.users[0];
+    let targetUser: (typeof store.users)[number] | null = store.users[0] ?? null;
     if (userId) {
       targetUser = await prisma.user.findFirst({
         where: {
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
           role: 'OWNER',
           active: true,
         },
-      }) ?? undefined;
+      });
     }
 
     if (!targetUser) {

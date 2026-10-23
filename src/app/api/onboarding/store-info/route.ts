@@ -2,7 +2,7 @@
 // ✅ MÓDULO 16.2: Onboarding - Actualizar información de la tienda
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { createAuditLog } from '@/domain/audit-log/audit-log-service';
 
@@ -12,7 +12,7 @@ import { createAuditLog } from '@/domain/audit-log/audit-log-service';
  */
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     // Solo OWNER
     if (session.role !== 'OWNER') {

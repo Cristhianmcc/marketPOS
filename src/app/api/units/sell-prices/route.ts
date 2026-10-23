@@ -12,13 +12,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { FeatureFlagKey } from '@prisma/client';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     
     const { searchParams } = new URL(req.url);
     const productMasterId = searchParams.get('productMasterId');
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     
     // Solo OWNER puede configurar precios
     if (session.role !== 'OWNER') {

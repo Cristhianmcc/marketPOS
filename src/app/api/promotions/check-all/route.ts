@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { applyBestPromotion, type Promotion } from '@/lib/promotions';
 import { computeCategoryPromoDiscount } from '@/lib/categoryPromotions';
@@ -16,8 +16,8 @@ import { isFeatureEnabled } from '@/lib/featureFlags';
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session.userId) {
+    const session = await getCurrentStoreUser();
+    if (!session) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }

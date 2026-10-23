@@ -2,7 +2,7 @@
 // MÓDULO 16: Obtener estado de billing para owner
 
 import { NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { 
   getSubscription, 
   computeEffectiveStatus, 
@@ -12,7 +12,7 @@ import {
 
 export async function GET() {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     const subscription = await getSubscription(session.storeId);
 
     if (!subscription) {

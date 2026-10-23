@@ -367,7 +367,7 @@ export default function DemoModePage() {
                 <li className="flex items-start gap-2">
                   <span className="font-bold text-blue-600">1.</span>
                   <span>
-                    <strong>Activar Demo Mode:</strong> Click en "Activar Demo" para cargar datos ficticios
+                    <strong>Activar Demo Mode:</strong> Click en &quot;Activar Demo&quot; para cargar datos ficticios
                   </span>
                 </li>
                 <li className="flex items-start gap-2">

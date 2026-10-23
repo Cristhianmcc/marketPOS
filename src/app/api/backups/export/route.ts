@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const internalRequest = hasValidDesktopInternalToken(request);
     const { searchParams } = new URL(request.url);
     const requestedStoreId = searchParams.get('storeId');
-    let storeIdToExport: string;
+    let storeIdToExport: string | null = null;
 
     if (internalRequest) {
       if (!requestedStoreId) {
@@ -57,6 +57,13 @@ export async function GET(request: NextRequest) {
           { status: 403 }
         );
       }
+    }
+
+    if (!storeIdToExport) {
+      return NextResponse.json(
+        { code: 'STORE_REQUIRED', message: 'No hay una tienda seleccionada para exportar' },
+        { status: 400 }
+      );
     }
 
     // Obtener datos del store

@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { 
   requireStoreActive, 
   requireFlag, 
@@ -30,7 +30,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_SERVICES);
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_SERVICES);
     requireRole(session.role, ['OWNER']);
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_SERVICES);
     requireRole(session.role, ['OWNER']);
@@ -292,7 +292,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_SERVICES);
     requireRole(session.role, ['OWNER']);

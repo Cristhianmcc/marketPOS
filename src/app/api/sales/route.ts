@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { FeatureFlagKey } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session.userId) {
+    const session = await getCurrentStoreUser();
+    if (!session) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { PrismaMovementRepository } from '@/infra/db/repositories/PrismaMovementRepository';
 
 const movementRepo = new PrismaMovementRepository();
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }

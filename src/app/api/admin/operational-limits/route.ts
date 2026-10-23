@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const isSuper = isSuperAdmin(session.email);
 
     // Determinar el storeId a usar
-    let targetStoreId: string;
+    let targetStoreId: string | null;
     
     if (isSuper) {
       targetStoreId = requestedStoreId || session.storeId;

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature } from '@/lib/featureFlags';
 
 export async function GET(
@@ -15,7 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }

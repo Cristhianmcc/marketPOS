@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { ProductRepository } from '@/repositories/IProductRepository';
 import { PrismaProductRepository } from '@/infra/db/repositories/PrismaProductRepository';
 import { IStoreProductRepository } from '@/repositories/IStoreProductRepository';
@@ -35,7 +35,7 @@ const movementRepo: IMovementRepository = new PrismaMovementRepository();
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
 
     if (!session || session.role !== 'OWNER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
           productId: product.id,
           storeId: session.storeId,
           price: row.price,
+          costPrice: null,
           stock: row.stock !== undefined ? row.stock : null,
           minStock: row.minStock !== undefined ? row.minStock : null,
           active: true,
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
               productId: existingProduct.id,
               storeId: session.storeId,
               price: row.price,
+              costPrice: null,
               stock: row.stock !== undefined ? row.stock : null,
               minStock: row.minStock !== undefined ? row.minStock : null,
               active: true,

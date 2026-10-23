@@ -2,7 +2,7 @@
 // Validar cupón antes de checkout (para feedback UI en tiempo real)
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { getCurrentStoreUser } from "@/lib/session";
 import { prisma } from "@/infra/db/prisma";
 import {
   normalizeCouponCode,
@@ -12,7 +12,7 @@ import {
 import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
+  const session = await getCurrentStoreUser();
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }

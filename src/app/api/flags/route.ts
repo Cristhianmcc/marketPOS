@@ -8,14 +8,14 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { getAllFeatureFlags } from '@/lib/featureFlags';
 import { requireStoreActive, guardErrorToResponse } from '@/lib/guards/requireFlag';
 
 export async function GET() {
   try {
     // 1. Verificar autenticación
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     // 2. Verificar que la tienda esté activa
     if (!session.storeId) {

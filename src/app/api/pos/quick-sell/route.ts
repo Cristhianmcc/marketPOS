@@ -1,13 +1,13 @@
 // src/app/api/pos/quick-sell/route.ts
 // ✅ MÓDULO 17.2: Quick Sell POS - Productos rápidos para venta
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 // ✅ GET /api/pos/quick-sell - Obtener productos rápidos para POS
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user) {
       return NextResponse.json(
         { error: 'No autorizado' },

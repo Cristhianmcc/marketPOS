@@ -197,7 +197,7 @@ export function Step2Content(props: Step2Props) {
       <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
         <p className="font-medium text-gray-900 mb-2">💡 Tips:</p>
         <ul className="space-y-1 list-disc list-inside">
-          <li>Si vendes mayormente al contado, usa "Efectivo" como predeterminado</li>
+          <li>Si vendes mayormente al contado, usa &quot;Efectivo&quot; como predeterminado</li>
           <li>Puedes cambiar el método de pago en cada venta si es necesario</li>
           <li>Los turnos ayudan a detectar faltantes o sobrantes de caja</li>
         </ul>

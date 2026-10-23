@@ -1,114 +1,61 @@
 /**
- * API Route: GET /api/print/sale/[saleId]
- * Returns sale data formatted for ESC/POS ticket printing
- * Used by Electron desktop app for thermal printing
+ * GET /api/print/sale/[saleId]
+ * Devuelve el snapshot de una venta de la tienda autenticada para imprimirlo
+ * desde Electron. Los importes Decimal se serializan como numeros.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ saleId: string }> }
+  _request: NextRequest,
+  { params }: { params: Promise<{ saleId: string }> },
 ) {
   try {
-    // Validate session
-    const session = await getSession();
-    if (!session?.userId) {
-      return NextResponse.json(
-        { error: 'No autorizado' },
-        { status: 401 }
-      );
+    const session = await getCurrentStoreUser();
+    if (!session) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
     const { saleId } = await params;
-
-    // Fetch sale with all related data
-    const sale = await prisma.sale.findUnique({
-      where: { id: saleId },
+    const sale = await prisma.sale.findFirst({
+      where: { id: saleId, storeId: session.storeId },
       include: {
-        items: {
-          include: {
-            product: true,
-          },
-        },
+        items: true,
         store: true,
-        user: {
-          select: { name: true },
-        },
-        customer: {
-          select: { 
-            name: true,
-            balance: true,
-          },
-        },
-        couponUsages: {
-          include: {
-            coupon: true,
-          },
-        },
+        user: { select: { name: true } },
+        customer: { select: { name: true } },
+        receivable: { select: { balance: true } },
       },
     });
 
     if (!sale) {
-      return NextResponse.json(
-        { error: 'Venta no encontrada' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
     }
 
-    // Verify store access
-    if (session.storeId && sale.storeId !== session.storeId) {
-      return NextResponse.json(
-        { error: 'No autorizado para esta tienda' },
-        { status: 403 }
-      );
-    }
-
-    // Format store info
-    const store = {
-      name: sale.store.name,
-      ruc: sale.store.ruc || undefined,
-      address: sale.store.address || undefined,
-      phone: sale.store.phone || undefined,
-    };
-
-    // Format date and time
     const saleDate = new Date(sale.createdAt);
-    const date = saleDate.toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-    const time = saleDate.toLocaleTimeString('es-PE', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-
-    // Format items
-    const items = sale.items.map(item => ({
-      name: item.product?.name || item.description || 'Producto',
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      subtotal: item.subtotal,
-      discount: item.discount || 0,
-      unit: item.unit || undefined,
+    const items = sale.items.map((item) => ({
+      name: item.productContent
+        ? `${item.productName} ${item.productContent}`
+        : item.productName,
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice),
+      subtotal: Number(item.totalLine || item.subtotal),
+      discount: Number(item.discountAmount),
+      unit: item.unitSymbol || item.unitType,
     }));
 
-    // Calculate totals
-    const subtotal = items.reduce((sum, item) => sum + item.subtotal + (item.discount || 0), 0);
-    
-    // Collect discounts
     const discounts: Array<{
       type: 'item' | 'order' | 'coupon' | 'promo';
       description: string;
       amount: number;
     }> = [];
 
-    // Item discounts
-    const itemDiscounts = items.reduce((sum, item) => sum + (item.discount || 0), 0);
+    const itemDiscounts = sale.items.reduce(
+      (sum, item) => sum + Number(item.discountAmount),
+      0,
+    );
     if (itemDiscounts > 0) {
       discounts.push({
         type: 'item',
@@ -117,83 +64,79 @@ export async function GET(
       });
     }
 
-    // Order discount
-    if (sale.discount && sale.discount > 0) {
+    const couponDiscount = Number(sale.couponDiscount);
+    if (couponDiscount > 0) {
       discounts.push({
-        type: 'order',
-        description: 'Descuento general',
-        amount: sale.discount,
+        type: 'coupon',
+        description: sale.couponCode || 'Cupon',
+        amount: couponDiscount,
       });
     }
 
-    // Coupon discount
-    if (sale.couponUsages && sale.couponUsages.length > 0) {
-      for (const usage of sale.couponUsages) {
-        discounts.push({
-          type: 'coupon',
-          description: usage.coupon.code,
-          amount: usage.discountAmount,
-        });
-      }
+    const discountTotal = Number(sale.discountTotal);
+    const remainingDiscount = Math.max(0, discountTotal - itemDiscounts - couponDiscount);
+    if (remainingDiscount > 0) {
+      discounts.push({
+        type: 'order',
+        description: 'Descuento general',
+        amount: remainingDiscount,
+      });
     }
 
-    const totalDiscount = discounts.reduce((sum, d) => sum + d.amount, 0);
-
-    // Format payment
     const payment: {
       method: string;
       amountPaid?: number;
       change?: number;
       customerName?: string;
       customerBalance?: number;
-    } = {
-      method: sale.paymentMethod,
-    };
+    } = { method: sale.paymentMethod };
 
     if (sale.paymentMethod === 'CASH') {
-      payment.amountPaid = sale.amountPaid || sale.total;
-      payment.change = sale.change || 0;
+      payment.amountPaid = Number(sale.amountPaid ?? sale.total);
+      payment.change = Number(sale.changeAmount ?? 0);
     }
-
     if (sale.paymentMethod === 'FIADO' && sale.customer) {
       payment.customerName = sale.customer.name;
-      payment.customerBalance = sale.customer.balance || 0;
+      payment.customerBalance = Number(sale.receivable?.balance ?? 0);
     }
 
-    // Get store footer from settings
-    let footer: string | undefined;
-    try {
-      const settings = await prisma.storeSettings.findFirst({
-        where: { storeId: sale.storeId },
-        select: { receiptFooter: true },
-      });
-      footer = settings?.receiptFooter || undefined;
-    } catch {
-      // Settings might not exist
-    }
+    const settings = await prisma.storeSettings.findUnique({
+      where: { storeId: sale.storeId },
+      select: { ticketFooter: true },
+    });
 
-    // Build response
-    const printData = {
-      store,
-      saleNumber: sale.saleNumber || sale.id.substring(0, 8).toUpperCase(),
-      date,
-      time,
+    return NextResponse.json({
+      store: {
+        name: sale.store.name,
+        ruc: sale.store.ruc || undefined,
+        address: sale.store.address || undefined,
+        phone: sale.store.phone || undefined,
+      },
+      saleNumber: String(sale.saleNumber),
+      date: saleDate.toLocaleDateString('es-PE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }),
+      time: saleDate.toLocaleTimeString('es-PE', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
       items,
-      subtotal,
-      totalDiscount,
-      total: sale.total,
+      subtotal: Number(sale.totalBeforeDiscount || sale.subtotal),
+      totalDiscount: discountTotal,
+      total: Number(sale.total),
       discounts: discounts.length > 0 ? discounts : undefined,
       payment,
-      cashierName: sale.user?.name || undefined,
-      footer,
-    };
-
-    return NextResponse.json(printData);
+      cashierName: sale.user.name,
+      footer: settings?.ticketFooter || undefined,
+    });
   } catch (error) {
     console.error('[Print API] Error:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

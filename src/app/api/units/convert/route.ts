@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey } from '@prisma/client';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { 
   requireStoreActive, 
   requireFlag, 
@@ -27,7 +27,7 @@ import { normalizeToBaseUnit } from '@/lib/units';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
 

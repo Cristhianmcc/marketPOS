@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey, UnitKind } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow, getCurrentUser } from '@/lib/session';
+import { getStoreSessionOrThrow, getCurrentUser } from '@/lib/session';
 import { 
   requireStoreActive, 
   requireFlag, 
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // 1. Verificar autenticación
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     // 2. Verificar tienda activa
     await requireStoreActive(session.storeId);

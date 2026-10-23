@@ -7,13 +7,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { logAudit } from '@/lib/auditLog';
 import { guardErrorToResponse } from '@/lib/guards/requireFlag';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     const body = await req.json();
     const { saleId, productId, observation, patientName, prescriptionNumber } = body;

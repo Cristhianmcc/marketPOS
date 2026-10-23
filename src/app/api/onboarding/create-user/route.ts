@@ -2,7 +2,7 @@
 // ✅ MÓDULO 16.2: Onboarding - Crear cajero durante onboarding
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { createAuditLog } from '@/domain/audit-log/audit-log-service';
 import bcrypt from 'bcryptjs';
@@ -13,7 +13,7 @@ import bcrypt from 'bcryptjs';
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     // Solo OWNER
     if (session.role !== 'OWNER') {

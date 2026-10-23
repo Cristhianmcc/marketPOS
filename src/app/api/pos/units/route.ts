@@ -18,15 +18,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { FeatureFlagKey } from '@prisma/client';
 import { isDecimalUnit } from '@/lib/ferreteria';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session?.userId) {
+    const session = await getCurrentStoreUser();
+    if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 

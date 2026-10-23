@@ -381,7 +381,7 @@ export default function ImportPage() {
                   <ul className="mt-3 text-xs text-gray-600 space-y-1">
                     <li>• <strong>name</strong>: Nombre del producto (requerido)</li>
                     <li>• <strong>baseUnitCode</strong>: UNIT, KG, M, L, M2, etc.</li>
-                    <li>• <strong>conversions</strong>: opcional, formato "BOX:12,PACK:6"</li>
+                    <li>• <strong>conversions</strong>: opcional, formato &quot;BOX:12,PACK:6&quot;</li>
                     <li>• Separador: coma (,) o punto y coma (;)</li>
                   </ul>
                 </div>

@@ -2,7 +2,7 @@
 // ✅ MÓDULO 16.2: Exportar Diagnóstico (Solo SUPERADMIN)
 
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog';
 import AdmZip from 'adm-zip';
@@ -12,7 +12,7 @@ const ENVIRONMENT = process.env.NODE_ENV || 'development';
 
 export async function GET(request: Request) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     
     if (!session) {
       return NextResponse.json(

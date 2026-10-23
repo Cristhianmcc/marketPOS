@@ -1,13 +1,13 @@
 // src/app/api/admin/demo/reset/route.ts
 // ✅ MÓDULO 17.4: Demo Mode - Resetear todos los datos demo
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 // ✅ POST /api/admin/demo/reset - Resetear datos demo (SUPERADMIN ONLY)
 export async function POST() {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     
     // ✅ Validar permisos: Solo SUPERADMIN
     if (!user || user.role !== 'OWNER') {

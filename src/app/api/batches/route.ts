@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey } from '@prisma/client';
 import { z } from 'zod';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import {
   requireStoreActive,
   requireFlag,
@@ -45,7 +45,7 @@ function daysToExpiry(expiryDate: Date): number {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_BATCH_EXPIRY);
 
@@ -119,7 +119,7 @@ const CreateBatchSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_BATCH_EXPIRY);
     requireRole(session.role, ['OWNER']);

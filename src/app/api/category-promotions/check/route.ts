@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { computeCategoryPromoDiscount } from '@/lib/categoryPromotions';
 import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Feature Flags
 
@@ -10,8 +10,8 @@ import { isFeatureEnabled } from '@/lib/featureFlags'; // ✅ MÓDULO 15: Featur
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session.userId) {
+    const session = await getCurrentStoreUser();
+    if (!session) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }

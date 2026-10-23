@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { FeatureFlagKey, Prisma } from '@prisma/client';
 
+interface PurchaseOrderItemInput {
+  storeProductId: string;
+  quantityOrdered: number;
+  unitCost: number;
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    if (!user.storeId) return NextResponse.json({ error: 'Sin tienda asignada' }, { status: 403 });
 
     const enabled = await isFeatureEnabled(user.storeId, FeatureFlagKey.ENABLE_SUPPLIERS);
     if (!enabled) return NextResponse.json({ error: 'Módulo no habilitado' }, { status: 403 });
@@ -52,18 +57,20 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-    if (!user.storeId) return NextResponse.json({ error: 'Sin tienda asignada' }, { status: 403 });
 
     const enabled = await isFeatureEnabled(user.storeId, FeatureFlagKey.ENABLE_SUPPLIERS);
     if (!enabled) return NextResponse.json({ error: 'Módulo no habilitado' }, { status: 403 });
 
     const body = await req.json();
-    const { supplierId, notes, expectedDate, items } = body;
+    const { supplierId, notes, expectedDate } = body;
+    const items: unknown = body.items;
 
     if (!supplierId) return NextResponse.json({ error: 'Proveedor requerido' }, { status: 400 });
-    if (!items?.length) return NextResponse.json({ error: 'Debe incluir al menos un producto' }, { status: 400 });
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: 'Debe incluir al menos un producto' }, { status: 400 });
+    }
 
     // Verificar proveedor
     const supplier = await prisma.supplier.findFirst({
@@ -90,11 +97,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Productos inválidos en la orden' }, { status: 400 });
     }
 
-    const requestedProductIds = Array.from(new Set(
-      items
-        .map((item: { storeProductId?: unknown }) => item.storeProductId)
-        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
-    ));
+    const validItems = items as PurchaseOrderItemInput[];
+
+    const requestedProductIds: string[] = Array.from(
+      new Set(validItems.map((item) => item.storeProductId)),
+    );
 
     if (requestedProductIds.length === 0) {
       return NextResponse.json({ error: 'Productos inválidos en la orden' }, { status: 400 });
@@ -126,8 +133,8 @@ export async function POST(req: NextRequest) {
     const orderNumber = (lastOrder?.orderNumber ?? 0) + 1;
 
     // Calcular total
-    const totalAmount = items.reduce(
-      (sum: number, item: { quantityOrdered: number; unitCost: number }) =>
+    const totalAmount = validItems.reduce(
+      (sum: number, item) =>
         sum + item.quantityOrdered * item.unitCost,
       0
     );
@@ -142,7 +149,7 @@ export async function POST(req: NextRequest) {
         expectedDate: expectedDate ? new Date(expectedDate) : null,
         totalAmount,
         items: {
-          create: items.map((item: { storeProductId: string; quantityOrdered: number; unitCost: number }) => ({
+          create: validItems.map((item) => ({
             storeProductId: item.storeProductId,
             quantityOrdered: item.quantityOrdered,
             unitCost: item.unitCost,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { PrismaStoreProductRepository } from '@/infra/db/repositories/PrismaStoreProductRepository';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { FeatureFlagKey } from '@prisma/client';
@@ -9,7 +9,7 @@ const storeProductRepo = new PrismaStoreProductRepository();
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }

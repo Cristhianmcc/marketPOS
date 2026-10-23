@@ -86,8 +86,12 @@ export async function repairLegacyBatchDocument(
   const sourceDocuments = await prisma.electronicDocument.findMany({
     where: { id: { in: stored.ids }, storeId: document.storeId },
   });
-  const byId = new Map(sourceDocuments.map((source: any) => [source.id, source]));
-  const orderedSources = stored.ids.map((id) => byId.get(id)).filter(Boolean);
+  const byId = new Map<string, any>(
+    sourceDocuments.map((source: any): [string, any] => [source.id, source]),
+  );
+  const orderedSources: any[] = stored.ids
+    .map((id) => byId.get(id))
+    .filter((source: any) => Boolean(source));
   if (orderedSources.length !== stored.ids.length) {
     throw new Error(`No se puede reparar ${document.fullNumber}: faltan documentos de origen`);
   }

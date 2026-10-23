@@ -2,12 +2,12 @@
 // ✅ MÓDULO 16.2: Estado Operativo de la Tienda
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     
     if (!session) {
       return NextResponse.json(

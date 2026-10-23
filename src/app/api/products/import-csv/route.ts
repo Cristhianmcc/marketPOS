@@ -24,7 +24,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { Prisma, UnitType } from '@prisma/client';
 
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
   
   try {
     console.log('[CSV Import] 1. Getting session...');
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     console.log('[CSV Import] 2. Session OK, role:', session.role);
 
     if (session.role !== 'OWNER') {

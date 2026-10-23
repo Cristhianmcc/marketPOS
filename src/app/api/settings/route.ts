@@ -3,14 +3,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 
 // GET /api/settings - Obtener configuración (OWNER)
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
 
-    if (!session?.userId || !session.storeId) {
+    if (!session) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
@@ -69,9 +69,9 @@ export async function GET(request: NextRequest) {
 // PATCH /api/settings - Actualizar configuración (OWNER)
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
 
-    if (!session?.userId || !session.storeId) {
+    if (!session) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }

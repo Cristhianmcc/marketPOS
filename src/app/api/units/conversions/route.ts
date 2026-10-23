@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey, Prisma, RoundingMode } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { 
   requireStoreActive, 
   requireFlag, 
@@ -32,7 +32,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
 
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
     requireRole(session.role, ['OWNER']);

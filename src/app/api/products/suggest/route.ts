@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 /**
@@ -11,7 +11,7 @@ import { prisma } from '@/infra/db/prisma';
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 // ✅ MÓDULO F2.2: CRUD de Categorías personalizadas por tienda
@@ -22,7 +22,7 @@ const DEFAULT_CATEGORIES = [
 // GET - Listar categorías de la tienda
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 // POST - Crear categoría
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }

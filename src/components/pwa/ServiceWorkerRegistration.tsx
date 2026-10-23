@@ -12,7 +12,7 @@ export function ServiceWorkerRegistration() {
       // En modo desktop (Electron) no registrar el SW — causa conflictos con la CSP local
       const isElectron =
         navigator.userAgent.toLowerCase().includes('electron') ||
-        typeof (window as Record<string, unknown>).desktopAPI !== 'undefined';
+        typeof (window as unknown as Record<string, unknown>).desktopAPI !== 'undefined';
       if (isElectron) {
         // Desregistrar SWs cacheados de sesiones anteriores
         navigator.serviceWorker.getRegistrations().then(regs => {

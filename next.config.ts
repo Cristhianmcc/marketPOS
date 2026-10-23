@@ -17,14 +17,6 @@ const nextConfig: NextConfig = {
       NEXT_PUBLIC_ENABLE_SUNAT: 'true',
     },
   }),
-  eslint: {
-    // Ignorar ESLint durante builds de producción
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    // Ya validamos tipos localmente
-    ignoreBuildErrors: true,
-  },
   images: {
     remotePatterns: [
       {

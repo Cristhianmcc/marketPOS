@@ -134,7 +134,15 @@ async function main() {
   let productOwnershipLookups = 0;
   const purchaseRoute = loadRoute('src/app/api/purchase-orders/route.ts', {
     'next/server': next,
-    '@/lib/session': { getCurrentUser: async () => ({ userId: 'owner-a', storeId: 'store-a', role: 'OWNER' }) },
+    '@/lib/session': {
+      getCurrentStoreUser: async () => ({
+        userId: 'owner-a',
+        storeId: 'store-a',
+        role: 'OWNER',
+        email: 'owner@example.invalid',
+        isLoggedIn: true,
+      }),
+    },
     '@/lib/featureFlags': { isFeatureEnabled: async () => true },
     '@prisma/client': { FeatureFlagKey: { ENABLE_SUPPLIERS: 'ENABLE_SUPPLIERS' }, Prisma: {} },
     '@/infra/db/prisma': { prisma: {
@@ -149,7 +157,9 @@ async function main() {
   const purchase = await purchaseRoute.POST({ json: async () => ({
     supplierId: 'supplier-a', items: [{ storeProductId: 'product-from-store-b', quantityOrdered: 1, unitCost: 1 }],
   }) });
-  const productDenied = purchase.status >= 400 && !createdOrder;
+  const productDenied = purchase.status === 400
+    && productOwnershipLookups === 1
+    && !createdOrder;
   console.log(`${productDenied ? 'PASS' : 'FAIL'} H09: purchase order must reject a foreign store product. Observed status=${purchase.status}, ownershipLookups=${productOwnershipLookups}`);
   if (!productDenied) failures++;
 
@@ -312,7 +322,16 @@ async function main() {
   const paymentRoute = loadRoute('src/app/api/receivables/[id]/pay/route.ts', {
     'next/server': next,
     '@/infra/db/prisma': { prisma: paymentDb },
-    '@/lib/session': { getSession: async () => ({ userId: 'owner-a', storeId: 'store-a' }) },
+    '@/lib/session': {
+      getCurrentStoreUser: async () => ({
+        userId: 'owner-a',
+        storeId: 'store-a',
+        role: 'OWNER',
+        email: 'owner@example.invalid',
+        isLoggedIn: true,
+      }),
+      getSession: async () => ({ userId: 'owner-a', storeId: 'store-a' }),
+    },
     '@prisma/client': { Prisma: { Decimal } },
     '@/infra/db/repositories/PrismaShiftRepository': {
       PrismaShiftRepository: class { async getCurrentShift() { return { id: 'shift-a' }; } },

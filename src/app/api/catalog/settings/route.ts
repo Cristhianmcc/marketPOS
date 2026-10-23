@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
+import { CatalogStatus } from '@prisma/client';
 
 export async function GET() {
-  const session = await getSession();
+  const session = await getCurrentStoreUser();
+    if (!session) return NextResponse.json({ error: 'No autenticado o sin tienda asignada' }, { status: 403 });
   if (!session?.storeId) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
@@ -97,7 +99,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
+  const session = await getCurrentStoreUser();
+    if (!session) return NextResponse.json({ error: 'No autenticado o sin tienda asignada' }, { status: 403 });
   if (!session?.storeId) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
@@ -162,7 +165,7 @@ export async function POST(req: NextRequest) {
       storeLogoPath: storeLogoPath || null,
       storeBannerPath: storeBannerPath || null,
       catalogUrl: enabled ? computedCatalogUrl : null,
-      catalogStatus: enabled ? 'PUBLISHED' : 'DRAFT',
+      catalogStatus: enabled ? CatalogStatus.PUBLISHED : CatalogStatus.DRAFT,
       facebookUrl: facebookUrl || null,
       instagramUrl: instagramUrl || null,
       tiktokUrl: tiktokUrl || null,

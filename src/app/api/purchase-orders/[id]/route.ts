@@ -89,7 +89,7 @@ function movementId(token: string, index: number) {
 // PATCH: cambiar estado o recepcionar mercadería.
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser();

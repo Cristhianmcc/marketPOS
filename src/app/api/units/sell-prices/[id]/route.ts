@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { isFeatureEnabled } from '@/lib/featureFlags';
 import { FeatureFlagKey } from '@prisma/client';
 
@@ -22,7 +22,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     
     // Solo OWNER
     if (session.role !== 'OWNER') {
@@ -117,7 +117,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     
     // Solo OWNER
     if (session.role !== 'OWNER') {

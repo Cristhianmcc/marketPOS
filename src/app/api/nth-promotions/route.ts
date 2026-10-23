@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { Prisma } from '@prisma/client';
 
@@ -9,7 +9,7 @@ import { Prisma } from '@prisma/client';
  */
 export async function GET(req: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }

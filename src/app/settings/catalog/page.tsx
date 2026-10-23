@@ -699,8 +699,8 @@ export default function CatalogSettingsPage() {
             </h4>
             <p className="text-blue-800 text-xs mt-1">
               Recuerda que para que los productos aparezcan en el catálogo, primero
-              debes marcarlos como "Mostrar en catálogo" en tu inventario y luego
-              pulsar el botón "Publicar" desde la aplicación portable (Desktop).
+              debes marcarlos como &quot;Mostrar en catálogo&quot; en tu inventario y luego
+              pulsar el botón &quot;Publicar&quot; desde la aplicación portable (Desktop).
             </p>
           </div>
         </div>

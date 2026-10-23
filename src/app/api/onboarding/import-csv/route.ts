@@ -2,7 +2,7 @@
 // ✅ MÓDULO 16.2: Onboarding - Preview de import CSV
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 
 interface ProductRow {
   barcode?: string;
@@ -36,7 +36,7 @@ interface ParsedProduct {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     // Solo OWNER
     if (session.role !== 'OWNER') {

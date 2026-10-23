@@ -2,14 +2,14 @@
 // PATCH (toggle active, editar), DELETE cupón específico
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { getCurrentStoreUser } from "@/lib/session";
 import { prisma } from "@/infra/db/prisma";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
+  const session = await getCurrentStoreUser();
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
@@ -52,7 +52,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
+  const session = await getCurrentStoreUser();
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }

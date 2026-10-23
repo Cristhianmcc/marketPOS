@@ -94,7 +94,7 @@ export async function POST(_req: NextRequest) {
 
       const localUrl = `/api/desktop/local-image/${id}`;
 
-      await prisma.product.updateMany({
+      await prisma.productMaster.updateMany({
         where: { imageUrl: localUrl },
         data: { imageUrl: uploadResult.secure_url },
       });

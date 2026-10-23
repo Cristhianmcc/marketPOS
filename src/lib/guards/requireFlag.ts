@@ -207,6 +207,13 @@ export function guardErrorToResponse(error: unknown): Response {
     );
   }
 
+  if (error instanceof Error && error.message === 'STORE_REQUIRED') {
+    return Response.json(
+      { error: 'Selecciona una tienda para continuar', code: 'STORE_REQUIRED' },
+      { status: 400 }
+    );
+  }
+
   // Error desconocido
   console.error('[Guard] Error desconocido:', error);
   return Response.json(

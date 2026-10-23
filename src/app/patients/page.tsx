@@ -355,7 +355,7 @@ export default function PatientsPage() {
             </div>
 
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-4 text-xs text-purple-700">
-              El archivo incluirá dos hojas: <strong>"Pacientes"</strong> (fichas) y <strong>"Dispensaciones"</strong> (historial detallado por producto).
+              El archivo incluirá dos hojas: <strong>&quot;Pacientes&quot;</strong> (fichas) y <strong>&quot;Dispensaciones&quot;</strong> (historial detallado por producto).
             </div>
 
             <div className="flex justify-end gap-3 mt-5">

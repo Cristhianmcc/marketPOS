@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { Prisma, FeatureFlagKey } from '@prisma/client';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
@@ -1256,7 +1256,7 @@ export async function POST(req: NextRequest) {
   let lockAcquired = false;
   
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       const error: ErrorResponse = {
         code: 'UNAUTHORIZED',
@@ -1674,7 +1674,7 @@ export async function POST(req: NextRequest) {
     // ✅ MÓDULO 16.1: Liberar lock en caso de error
     if (lockAcquired) {
       try {
-        const sessionData = await getSession();
+        const sessionData = await getCurrentStoreUser();
         if (sessionData) {
           releaseCheckoutLock(sessionData.storeId, sessionData.userId);
         }
@@ -1686,7 +1686,7 @@ export async function POST(req: NextRequest) {
     // ✅ MÓDULO 15: Auditoría de checkout fallido (fire-and-forget)
     try {
       const { ip, userAgent } = getRequestMetadata(req);
-      const sessionData = await getSession();
+      const sessionData = await getCurrentStoreUser();
       const errorStage = error instanceof CheckoutError ? 'validation' : 
                          error.code === 'P2002' ? 'transaction' : 'unknown';
       

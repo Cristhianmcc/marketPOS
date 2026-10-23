@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 import { Prisma } from '@prisma/client';
 
 // GET - List promotions
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session.userId || session.role !== 'OWNER') {
+    const session = await getCurrentStoreUser();
+    if (!session || session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'Solo el propietario puede ver promociones' },
         { status: 403 }
@@ -44,8 +44,8 @@ export async function GET(request: NextRequest) {
 // POST - Create promotion
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
-    if (!session.userId || session.role !== 'OWNER') {
+    const session = await getCurrentStoreUser();
+    if (!session || session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'Solo el propietario puede crear promociones' },
         { status: 403 }

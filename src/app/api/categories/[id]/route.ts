@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 // ✅ MÓDULO F2.2: CRUD de Categoría individual
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
@@ -47,7 +47,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
@@ -171,7 +171,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }

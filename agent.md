@@ -1,6 +1,6 @@
 # Monterrial POS: mapa técnico y estado verificado
 
-Última revisión: **20/10/2026**, zona America/Lima. Base Git observada:
+Última revisión: **23/10/2026**, zona America/Lima. Base Git observada:
 `2b182cfb` (22/03/2026, rama de trabajo con numerosos cambios sin confirmar).
 Este documento describe el árbol de trabajo, no solamente el último commit.
 
@@ -534,9 +534,9 @@ una base real como comprobación rutinaria.
   recepción concurrente, impedir dos ventas sobre el mismo saldo, preservar un
   ajuste concurrente con una venta, impedir sobreconsumo de lote y no tocar
   productos sin control de stock. Todas pasaron el 19/10/2026.
-- `npx next build` compiló la implementación y generó 206 páginas. Esta evidencia
-  no sustituye TypeScript ni lint: `next.config.ts` aún los omite y H05 sigue
-  pendiente.
+- `npx next build` compiló esta implementación y generó 206 páginas. H05 cerró
+  posteriormente los diagnósticos TypeScript y volvió a activar tipos y lint
+  como controles obligatorios de `build:only`.
 
 ### Resumen de reportes consistente (2026-10-19)
 
@@ -660,6 +660,28 @@ una base real como comprobación rutinaria.
   de distribuir, queda observar la ejecución por intervalo en un paquete y
   restaurar una copia en una instalación desechable.
 
+### Controles de calidad y sesión tipada por tienda (2026-10-23)
+
+- H05 quedó cerrado en `feature/sunat-beta`. `StoreSessionData`,
+  `getCurrentStoreUser` y `getStoreSessionOrThrow` garantizan `storeId: string`
+  dentro de rutas tenant. Los endpoints globales de SUPERADMIN mantienen la
+  sesión nullable porque operan sin una tienda seleccionada.
+- La migración se limitó a endpoints que consultan o modifican datos de tienda.
+  También corrigió firmas `params` de Next 15 y desajustes reales entre rutas y
+  tipos Prisma; no se ejecutaron migraciones, semillas ni escrituras contra una
+  base real.
+- `.eslintrc.json` carga `@typescript-eslint/parser` y el plugin correspondiente.
+  `next.config.ts` ya no contiene `ignoreBuildErrors` ni `ignoreDuringBuilds`, por
+  lo que una distribución vuelve a fallar ante errores de tipos o lint.
+- Evidencia del cierre: TypeScript web y Electron sin diagnósticos;
+  `npm run lint` con 0 errores y 707 advertencias históricas; `build:only` con
+  controles activos y 207 páginas; auditoría aislada H01/H03/H04/H06-H11/H14-H20
+  completa; `git diff --check` sin errores de whitespace.
+- H08 usa en su prueba la misma sesión tipada que la ruta de abonos y confirma
+  saldo 40, dos pagos e idempotencia. H09 exige respuesta 400 después de una
+  consulta de pertenencia y confirma que un producto de otra tienda no crea la
+  orden.
+
 ### Entregas desktop trazables y actualizaciones controladas (2026-10-20)
 
 - La versión de la aplicación y del paquete Electron está sincronizada en
@@ -739,8 +761,11 @@ una base real como comprobación rutinaria.
    Electron limita la navegación al origen exacto del servidor iniciado.
 6. H20 quedó corregido: cada entrega queda identificada por versión, commit y
    manifiestos, sin destinos de actualización de ejemplo.
-7. H03 y H04 quedaron corregidos. El siguiente trabajo es H05: recuperar los
-   controles de tipos y lint antes de generar otra distribución.
+7. H03, H04 y H05 quedaron corregidos y verificados en `feature/sunat-beta`.
+   La línea base H05 fue de 326 errores TypeScript; ahora web y Electron pasan,
+   lint tiene 0 errores y el build ejecuta ambos controles. El siguiente frente
+   es H12/H13: validar la entrada de impresión, el hardware soportado y completar
+   las pruebas de reintentos/idempotencia que aún requieren aceptación integral.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

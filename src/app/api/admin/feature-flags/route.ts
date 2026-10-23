@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     const isSuper = isSuperAdmin(session.email);
 
     // Determinar el storeId a usar
-    let targetStoreId: string;
+    let targetStoreId: string | null;
     
     if (isSuper) {
       // SUPERADMIN puede ver cualquier tienda si pasa storeId, o su propia tienda por defecto

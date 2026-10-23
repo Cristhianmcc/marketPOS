@@ -13,6 +13,10 @@ export interface SessionData {
   isLoggedIn: boolean;
 }
 
+export type StoreSessionData = Omit<SessionData, 'storeId'> & {
+  storeId: string;
+};
+
 /**
  * Get current session (server-side only)
  * MÓDULO S2: Cached per request using React.cache()
@@ -85,5 +89,39 @@ export async function getSessionOrThrow(): Promise<SessionData> {
     name: session.name,
     role: session.role,
     isLoggedIn: session.isLoggedIn,
+  };
+}
+
+/**
+ * Return the authenticated user only when the session is bound to a store.
+ * Tenant routes use this nullable helper so their existing HTTP guards can
+ * reject SUPERADMIN sessions that have not selected a store.
+ */
+export async function getCurrentStoreUser(): Promise<StoreSessionData | null> {
+  const user = await getCurrentUser();
+  if (!user?.storeId) {
+    return null;
+  }
+
+  return {
+    ...user,
+    storeId: user.storeId,
+  };
+}
+
+/**
+ * Get an authenticated session that is bound to a store.
+ * Store-scoped API routes must use this helper so SUPERADMIN sessions without
+ * an active store cannot reach tenant data accidentally.
+ */
+export async function getStoreSessionOrThrow(): Promise<StoreSessionData> {
+  const session = await getSessionOrThrow();
+  if (!session.storeId) {
+    throw new Error('STORE_REQUIRED');
+  }
+
+  return {
+    ...session,
+    storeId: session.storeId,
   };
 }

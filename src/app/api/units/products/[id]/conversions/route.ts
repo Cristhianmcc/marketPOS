@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey, Prisma, RoundingMode } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import { 
   requireStoreActive, 
   requireFlag, 
@@ -64,7 +64,7 @@ async function verifyProductAccess(productMasterId: string, storeId: string) {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: productMasterId } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
 
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: productMasterId } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
     requireRole(session.role, ['OWNER']);
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: productMasterId } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
     requireRole(session.role, ['OWNER']);
@@ -330,7 +330,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: productMasterId } = await params;
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
     await requireStoreActive(session.storeId);
     await requireFlag(session.storeId, FeatureFlagKey.ENABLE_CONVERSIONS);
     requireRole(session.role, ['OWNER']);

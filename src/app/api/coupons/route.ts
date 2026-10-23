@@ -2,12 +2,12 @@
 // CRUD de cupones (GET lista, POST crear)
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/session";
+import { getCurrentStoreUser } from "@/lib/session";
 import { prisma } from "@/infra/db/prisma";
 import { normalizeCouponCode } from "@/lib/coupons";
 
 export async function GET(request: NextRequest) {
-  const session = await getSession();
+  const session = await getCurrentStoreUser();
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getSession();
+  const session = await getCurrentStoreUser();
   if (!session) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }

@@ -698,7 +698,7 @@ export default function AdminBillingPage() {
                       </select>
                     </div>
                     <p className="text-xs text-purple-600 mt-2">
-                      💡 Ejemplo: "2 Horas" para demos rápidos, "14 Días" para evaluación completa
+                      💡 Ejemplo: &quot;2 Horas&quot; para demos rápidos, &quot;14 Días&quot; para evaluación completa
                     </p>
                   </div>
                   

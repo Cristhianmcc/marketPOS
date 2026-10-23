@@ -435,7 +435,7 @@ export default function CloudBackupsTab() {
               <li>Los backups locales se sincronizan automáticamente cuando hay internet</li>
               <li>Se detectan duplicados por SHA-256 para evitar subir el mismo archivo</li>
               <li>Los backups se eliminan automáticamente después de {30} días (configurable)</li>
-              <li>Para restaurar, descarga el backup y usa la opción "Restaurar a Nueva Tienda"</li>
+              <li>Para restaurar, descarga el backup y usa la opción &quot;Restaurar a Nueva Tienda&quot;</li>
             </ul>
           </div>
         </div>

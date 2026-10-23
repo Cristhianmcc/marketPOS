@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 export async function PATCH(
@@ -7,8 +7,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session.userId || session.role !== 'OWNER') {
+    const session = await getCurrentStoreUser();
+    if (!session || session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'Solo el propietario puede modificar promociones' },
         { status: 403 }
@@ -43,8 +43,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session.userId || session.role !== 'OWNER') {
+    const session = await getCurrentStoreUser();
+    if (!session || session.role !== 'OWNER') {
       return NextResponse.json(
         { code: 'FORBIDDEN', message: 'Solo el propietario puede eliminar promociones' },
         { status: 403 }

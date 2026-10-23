@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey } from '@prisma/client';
-import { getSessionOrThrow } from '@/lib/session';
+import { getStoreSessionOrThrow } from '@/lib/session';
 import {
   requireStoreActive,
   requireFlag,
@@ -33,7 +33,7 @@ function batchStatus(days: number): 'VENCIDO' | 'POR_VENCER' | 'OK' {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSessionOrThrow();
+    const session = await getStoreSessionOrThrow();
 
     if (!session.storeId) {
       return NextResponse.json({ error: 'Sin tienda activa' }, { status: 403 });

@@ -1,13 +1,13 @@
 // src/app/api/admin/quick-sell/route.ts
 // ✅ MÓDULO 17.2: Admin API - Configuración de productos rápidos
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
 
 // ✅ GET - Obtener todos los productos con info de quick sell
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user || user.role !== 'OWNER') {
       return NextResponse.json(
         { error: 'No autorizado' },
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
 // ✅ PATCH - Toggle isQuickSell de un producto
 export async function PATCH(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentStoreUser();
     if (!user || user.role !== 'OWNER') {
       return NextResponse.json(
         { error: 'No autorizado' },

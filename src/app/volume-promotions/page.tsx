@@ -232,7 +232,7 @@ export default function VolumePromotionsPage() {
               Promociones por Volumen
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              Ej: "3 unidades por S/ 5.00" - Solo productos UNIT
+              Ej: &quot;3 unidades por S/ 5.00&quot; - Solo productos UNIT
             </p>
           </div>
           <button

@@ -202,7 +202,7 @@ export default function NthPromotionsPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Promociones N-ésimo</h1>
             <p className="text-gray-600 mt-1">
-              Gestiona promociones tipo "2do al 50%", "3ro gratis", etc.
+              Gestiona promociones tipo &quot;2do al 50%&quot;, &quot;3ro gratis&quot;, etc.
             </p>
           </div>
           <button
@@ -224,7 +224,7 @@ export default function NthPromotionsPage() {
               No hay promociones n-ésimo
             </h3>
             <p className="text-gray-500 mb-6">
-              Crea tu primera promoción tipo "2do al 50%" o "3ro gratis"
+              Crea tu primera promoción tipo &quot;2do al 50%&quot; o &quot;3ro gratis&quot;
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
@@ -436,7 +436,7 @@ export default function NthPromotionsPage() {
             <div className="bg-white rounded-lg p-6 w-full max-w-md">
               <h2 className="text-xl font-bold mb-4">Eliminar Promoción</h2>
               <p className="text-gray-600 mb-6">
-                ¿Estás seguro de eliminar la promoción "{promoToDelete.name}"?
+                ¿Estás seguro de eliminar la promoción &quot;{promoToDelete.name}&quot;?
                 Esta acción no se puede deshacer.
               </p>
               <div className="flex gap-3">

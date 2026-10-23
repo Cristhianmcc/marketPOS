@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FeatureFlagKey, WorkOrderStatus, WorkOrderItemType, Prisma } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature, isFeatureEnabled } from '@/lib/featureFlags';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -21,7 +21,7 @@ import { requireFeature, isFeatureEnabled } from '@/lib/featureFlags';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -121,7 +121,7 @@ interface CreateWorkOrderInput {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -277,7 +277,7 @@ interface UpdateWorkOrderInput {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -429,7 +429,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
     if (!session) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }

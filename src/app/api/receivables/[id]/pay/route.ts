@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
-import { getSession } from '@/lib/session';
+import { getCurrentStoreUser, getSession } from '@/lib/session';
 import { Prisma } from '@prisma/client';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 import { logAudit, getRequestMetadata } from '@/lib/auditLog'; // ✅ MÓDULO 15: Auditoría
@@ -18,9 +18,9 @@ export async function POST(
 ) {
   try {
     const { id: receivableId } = await params;
-    const session = await getSession();
+    const session = await getCurrentStoreUser();
 
-    if (!session?.userId || !session.storeId) {
+    if (!session) {
       return NextResponse.json(
         { code: 'UNAUTHORIZED', message: 'No autenticado' },
         { status: 401 }
