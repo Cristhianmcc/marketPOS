@@ -10,6 +10,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { writeReleaseMetadata } = require('./release-metadata');
 const { validateRelease } = require('./validate-release');
+const { writePublicDesktopEnvironment } = require('./public-desktop-env');
 
 const ROOT_DIR = path.join(__dirname, '..', '..');
 const DESKTOP_DIR = path.join(__dirname, '..');
@@ -26,14 +27,8 @@ function readEnvValue(filePath, key) {
 
 function writePublicDesktopEnv() {
   const cloudUrl = process.env.CLOUD_URL || readEnvValue(path.join(ROOT_DIR, '.env'), 'CLOUD_URL');
-  if (!cloudUrl) {
-    throw new Error('CLOUD_URL is required to authenticate a new desktop installation');
-  }
-
-  // CLOUD_URL is a public HTTPS endpoint. Database URLs, API keys and all
-  // other secrets must remain outside the desktop package.
-  fs.writeFileSync(path.join(BUILD_RESOURCES, '.env'), `CLOUD_URL=${cloudUrl}\n`, 'utf8');
-  console.log('Created desktop public environment (CLOUD_URL only)');
+  writePublicDesktopEnvironment({ buildResourcesDir: BUILD_RESOURCES, cloudUrl });
+  console.log('Created sanitized desktop public environment (CLOUD_URL only)');
 }
 
 function buildWindowsLauncher() {

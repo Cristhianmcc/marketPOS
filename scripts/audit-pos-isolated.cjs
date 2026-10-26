@@ -949,6 +949,35 @@ async function main() {
     'utf8'
   );
 
+  const publicDesktopEnv = require(path.resolve(
+    __dirname,
+    '..',
+    'desktop/scripts/public-desktop-env.js'
+  ));
+  const desktopEnvSandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'monterrial-h02-'));
+  let desktopPackageEnvironmentIsPublicOnly = false;
+  try {
+    const nestedServer = path.join(desktopEnvSandbox, 'server');
+    fs.mkdirSync(nestedServer, { recursive: true });
+    fs.writeFileSync(path.join(nestedServer, '.env'), 'DATABASE_URL=private-placeholder\n');
+    fs.writeFileSync(path.join(nestedServer, '.env.production'), 'SESSION_SECRET=private-placeholder\n');
+    publicDesktopEnv.writePublicDesktopEnvironment({
+      buildResourcesDir: desktopEnvSandbox,
+      cloudUrl: 'https://cloud.example.invalid/api/',
+    });
+    const packagedEnvironmentFiles = publicDesktopEnv.findEnvironmentFiles(desktopEnvSandbox)
+      .map(file => path.relative(desktopEnvSandbox, file));
+    desktopPackageEnvironmentIsPublicOnly = packagedEnvironmentFiles.length === 1
+      && packagedEnvironmentFiles[0] === '.env'
+      && fs.readFileSync(path.join(desktopEnvSandbox, '.env'), 'utf8')
+        === 'CLOUD_URL=https://cloud.example.invalid/api\n'
+      && buildPreparationSource.includes('writePublicDesktopEnvironment({ buildResourcesDir: BUILD_RESOURCES, cloudUrl })');
+  } finally {
+    fs.rmSync(desktopEnvSandbox, { recursive: true, force: true });
+  }
+  console.log(`${desktopPackageEnvironmentIsPublicOnly ? 'PASS' : 'FAIL'} H02: desktop packaging removes inherited environment files and keeps only public CLOUD_URL.`);
+  if (!desktopPackageEnvironmentIsPublicOnly) failures++;
+
   const noPublicFallback = missingSecretRejected
     && shortSecretRejected
     && validSecretAccepted

@@ -15,6 +15,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "test:migrations:isolated": "node scripts/test-migrations-isolated.cjs",
     "test:backups:isolated": "node scripts/test-backup-scheduler-isolated.cjs",
+    "test:desktop-env:isolated": "node scripts/test-desktop-package-env-isolated.cjs",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:catalog": "tsx scripts/seedCatalog.ts",

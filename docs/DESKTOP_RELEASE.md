@@ -10,6 +10,9 @@ aplicación de escritorio. La versión vigente de esta rama es **0.2.0**.
   `prisma db push`. La compilación web segura es `npm run build:only`.
 - No guardar certificados privados, contraseñas, archivos `.pfx`, `.p12`,
   `.pem` o `.key` en Git ni dentro del instalador.
+- La preparación elimina cualquier `.env*` heredado del standalone. El paquete
+  contiene un único `.env` público en la raíz de recursos y su única clave
+  permitida es `CLOUD_URL`, validada como HTTPS y sin credenciales embebidas.
 - La URL de actualizaciones no se puede cambiar desde la interfaz ni desde el
   renderer de Electron. Se fija durante la compilación y solo se acepta HTTPS.
 - Sin una URL HTTPS configurada, el autoactualizador permanece deshabilitado.
@@ -33,6 +36,12 @@ Set-Location ..
 El control falla si las versiones no coinciden, existe una clave privada seguida
 por Git, los alias antiguos no delegan al flujo desktop o la URL configurada no
 es HTTPS.
+
+Comprobar también de forma aislada la lista permitida del entorno empaquetado:
+
+```powershell
+npm run test:desktop-env:isolated
+```
 
 ## Configurar el origen de actualizaciones
 

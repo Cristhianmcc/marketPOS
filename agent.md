@@ -706,6 +706,26 @@ una base real como comprobación rutinaria.
   la aceptación integral en una instalación desechable, con impresora térmica
   real y simulación de pérdida de respuesta y reinicio; no hace falta volver a
   migrar rutas tenant ni reabrir H05.
+- Commit funcional H12/H13: `92c2e867` (`fix: secure printing and persist
+  checkout retries`). La rama original `CristhianM` no recibió estos cambios.
+
+### Entorno público del paquete desktop (H02, 2026-10-25)
+
+- El standalone de Next podía heredar una copia anidada `server/.env`, incluso
+  cuando el `.env` principal ya se reducía a `CLOUD_URL`. Ese era el último
+  riesgo de código abierto de H02.
+- `desktop/scripts/public-desktop-env.js` elimina cualquier `.env*` heredado de
+  `build-resources`, valida que `CLOUD_URL` sea HTTPS y crea un único archivo
+  público con esa clave. El build falla si queda otra copia o clave.
+- `npm run test:desktop-env:isolated` y la comprobación H02 de la auditoría
+  reproducen el caso sin leer secretos ni crear una distribución real.
+- Los paquetes históricos permanecen como artefactos antiguos y no deben
+  redistribuirse. Antes de producción deben rotarse las credenciales que alguna
+  vez hayan sido incluidas en esos paquetes.
+- Próximo punto de reanudación: ejecutar todos los controles, guardar el commit
+  H02 y después realizar aceptación operativa en una instalación desechable:
+  impresora térmica real, respuesta perdida/reinicio sin venta duplicada,
+  respaldo/restauración y arranque del worker SUNAT.
 
 - `.eslintrc.json` carga `@typescript-eslint/parser` y el plugin correspondiente.
   `next.config.ts` ya no contiene `ignoreBuildErrors` ni `ignoreDuringBuilds`, por
