@@ -849,3 +849,53 @@ Los detalles, condiciones y límites de evidencia están en el informe de audito
   eso no demuestra que todo el código de la distribución sea idéntico.
 - Fecha identificada dentro de este workspace; no prueba cuándo fue instalado
   en una tienda ni descarta instaladores almacenados en otra ubicación.
+
+### Licenciamiento remoto seguro del desktop (2026-10-26)
+
+- El paquete desktop conserva **solamente `CLOUD_URL`** como configuración
+  pública. No se debe volver a incluir `LICENSE_API_KEY`, la contraseña del
+  SUPERADMIN, `SESSION_SECRET` ni otra credencial global reutilizable.
+- Electron crea un `SESSION_SECRET` aleatorio distinto por instalación, lo
+  guarda dentro del perfil local y lo pasa al servidor Next local. Este secreto
+  protege la sesión local; no autoriza operaciones en la nube.
+- Al iniciar sesión como SUPERADMIN en el desktop, el servidor local envía las
+  credenciales directamente a `CLOUD_URL`. Si son correctas, la nube devuelve
+  una autorización de registro firmada y temporal, con vigencia de cuatro horas.
+  La contraseña no se persiste en el instalador ni se transforma en una clave
+  compartida.
+- Al crear una tienda, o al usar **Registrar licencia/Renovar licencia** en el
+  panel SUPERADMIN, el servidor local registra el `storeId` exacto en
+  `/api/license/register-store`. La nube devuelve una credencial limitada a
+  consultar la licencia de esa misma tienda. Una credencial de una tienda no
+  sirve para consultar otra.
+- Las credenciales por tienda se guardan mediante escritura atómica en
+  `MONTERRIAL_DATA_DIR/config/license-credentials.json`. El listado SUPERADMIN
+  indica qué tiendas ya están vinculadas y permite renovar el vínculo después
+  de volver a iniciar sesión.
+- `/api/license/verify` acepta la credencial limitada de la tienda y mantiene
+  temporalmente `LICENSE_API_KEY` solo como compatibilidad del servidor con
+  instalaciones antiguas. La validación desktop selecciona la tienda activa por
+  su `storeId`; no usa la primera tienda de la base por accidente.
+- Una tienda vinculada conserva siete días de caché válida y tres días de
+  gracia adicional sin Internet. Después exige reconexión con estado
+  `VERIFICATION_REQUIRED`; `SUSPENDED` y `CANCELLED` bloquean la operación. Una
+  instalación anterior que aún no tenga credencial por tienda conserva su
+  comportamiento local hasta que el SUPERADMIN la vincule, para no interrumpir
+  negocios ya instalados.
+- El panel remoto de Billing sigue siendo la fuente de verdad para plan,
+  vencimiento, extensión y suspensión. Registrar de nuevo una tienda existente
+  renueva su credencial limitada y no sobrescribe el estado de pago remoto.
+- Prueba aislada: `npm run test:licenses:isolated` comprueba firma y alteración
+  de autorizaciones, aislamiento entre tiendas, persistencia concurrente y el
+  registro por Bearer sin conectarse a una base real. Antes de distribuir hay
+  que desplegar estas mismas rutas en el servidor de `CLOUD_URL`; un desktop
+  nuevo no puede usar el protocolo hasta que la nube también lo soporte.
+- Cierre verificado en `feature/sunat-beta`: pasan la prueba aislada de
+  licencias, la validación del entorno desktop, TypeScript web y Electron, la
+  auditoría integral H01-H20, lint sin errores y `npm run build:only`. Esta
+  compilación no ejecuta `prisma db push` ni modifica una base real.
+- Punto de reanudación: desplegar primero las rutas de esta rama en el servidor
+  de `CLOUD_URL` y después generar el nuevo paquete desktop. La aceptación debe
+  comprobar inicio SUPERADMIN, registro o renovación de la tienda exacta,
+  suspensión remota, vencimiento y recuperación dentro de la tolerancia sin
+  conexión.

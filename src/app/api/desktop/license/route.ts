@@ -15,6 +15,7 @@ import {
   isStoreAllowedToOperate,
   getDaysUntilExpiration,
 } from '@/lib/subscriptionStatus';
+import { getStoreLicenseCredential } from '@/lib/licenseCredentialStore';
 
 export async function GET(req: NextRequest) {
   if (!hasValidDesktopInternalToken(req)) {
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const requestedStoreId = req.nextUrl.searchParams.get('storeId')?.trim() || null;
     // Obtener TODAS las tiendas locales con su owner
     const stores = await prisma.store.findMany({
       select: {
@@ -47,8 +49,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Info de la tienda más reciente (para licencia / LicenseBanner)
-    const store = stores[0];
+    const store = requestedStoreId
+      ? stores.find(candidate => candidate.id === requestedStoreId)
+      : stores[0];
+    if (!store) {
+      return NextResponse.json({ error: 'Tienda no encontrada' }, { status: 404 });
+    }
     const owner = store.users[0] || null;
+    const cloudLicenseToken = await getStoreLicenseCredential(store.id);
 
     const sub = await prisma.subscription.findUnique({
       where: { storeId: store.id },
@@ -71,6 +79,7 @@ export async function GET(req: NextRequest) {
         canOperate: true,
         status: 'NO_SUBSCRIPTION',
         daysRemaining: 0,
+        cloudLicenseToken,
         allStores,
       });
     }
@@ -91,6 +100,7 @@ export async function GET(req: NextRequest) {
       trialEndsAt: sub.trialEndsAt?.toISOString() || null,
       planCode: sub.planCode,
       daysRemaining,
+      cloudLicenseToken,
       allStores,
     });
   } catch (error) {

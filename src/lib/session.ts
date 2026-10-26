@@ -11,6 +11,8 @@ export interface SessionData {
   name: string;
   role: UserRole;
   isLoggedIn: boolean;
+  /** Credencial efímera emitida por la nube para registrar tiendas nuevas. */
+  cloudAdminToken?: string;
 }
 
 export type StoreSessionData = Omit<SessionData, 'storeId'> & {
@@ -36,6 +38,7 @@ export async function setSession(data: Omit<SessionData, 'isLoggedIn'>): Promise
   session.email = data.email;
   session.name = data.name;
   session.role = data.role;
+  session.cloudAdminToken = data.cloudAdminToken;
   session.isLoggedIn = true;
   await session.save();
 }

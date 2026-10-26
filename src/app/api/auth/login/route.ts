@@ -7,6 +7,8 @@ import { clearSession, setSession } from '@/lib/session';
 import { checkRateLimit, getClientIP, resetRateLimit } from '@/lib/rateLimit';
 import { logAudit } from '@/lib/auditLog';
 import bcrypt from 'bcrypt';
+import { isSuperAdmin } from '@/lib/superadmin';
+import { createCloudAdminLicenseToken } from '@/lib/cloudLicenseTokens';
 
 const userRepo = new PrismaUserRepository();
 
@@ -34,7 +36,10 @@ async function authenticateThroughCloudApi(email: string, password: string) {
   try {
     const response = await fetch(`${cloudBaseUrl}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-marketpos-desktop-auth': '1',
+      },
       body: JSON.stringify({ email, password }),
       signal: controller.signal,
       cache: 'no-store',
@@ -48,6 +53,10 @@ async function authenticateThroughCloudApi(email: string, password: string) {
 
 export async function POST(request: Request) {
   try {
+    const requestsDesktopCloudToken = request.headers.get('x-marketpos-desktop-auth') === '1';
+    const isDesktopRuntime = Boolean(
+      process.env.DESKTOP_INTERNAL_TOKEN || process.env.MONTERRIAL_DATA_DIR
+    );
     // ✅ MÓDULO S8: Rate limit por IP
     const clientIP = getClientIP(request);
     const rateLimitResult = checkRateLimit('login', clientIP);
@@ -137,12 +146,14 @@ export async function POST(request: Request) {
         );
       }
 
-      const localStore = await prisma.store.findUnique({
-        where: { id: localUser.storeId },
-        select: { status: true },
-      });
+      const localStore = localUser.storeId
+        ? await prisma.store.findUnique({
+            where: { id: localUser.storeId },
+            select: { status: true },
+          })
+        : null;
 
-      if (!localStore || localStore.status === 'ARCHIVED') {
+      if (localUser.storeId && (!localStore || localStore.status === 'ARCHIVED')) {
         await clearSession();
         return NextResponse.json(
           {
@@ -156,12 +167,32 @@ export async function POST(request: Request) {
       // ✅ Login LOCAL exitoso
       resetRateLimit('login', clientIP);
 
+      const isAdmin = localUser.role === 'SUPERADMIN' || isSuperAdmin(localUser.email);
+      let cloudAdminToken: string | undefined;
+
+      if (requestsDesktopCloudToken && isAdmin) {
+        cloudAdminToken = createCloudAdminLicenseToken({
+          userId: localUser.id,
+          email: localUser.email,
+        });
+      } else if (isDesktopRuntime && isAdmin) {
+        try {
+          const cloudAuth = await authenticateThroughCloudApi(email, password);
+          if (cloudAuth?.response.ok && typeof cloudAuth.payload?.cloudAdminToken === 'string') {
+            cloudAdminToken = cloudAuth.payload.cloudAdminToken;
+          }
+        } catch (cloudApiError) {
+          console.warn('[Login] No se pudo obtener autorización de licencias de la nube:', cloudApiError);
+        }
+      }
+
       await setSession({
         userId: localUser.id,
         storeId: localUser.storeId,
         email: localUser.email,
         name: localUser.name,
         role: localUser.role,
+        cloudAdminToken,
       });
 
       console.log('[Login] Local auth SUCCESS');
@@ -175,6 +206,7 @@ export async function POST(request: Request) {
           role: localUser.role,
           storeId: localUser.storeId,
         },
+        ...(requestsDesktopCloudToken && cloudAdminToken ? { cloudAdminToken } : {}),
       });
     }
 
@@ -232,6 +264,7 @@ export async function POST(request: Request) {
             email: cloudUser.email,
             name: cloudUser.name,
             role: 'SUPERADMIN',
+            cloudAdminToken: payload.cloudAdminToken,
           });
 
           return NextResponse.json({

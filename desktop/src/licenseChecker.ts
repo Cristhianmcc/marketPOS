@@ -31,8 +31,8 @@ function getCloudUrl(): string {
 function getLicenseApiKey(): string {
   return process.env.LICENSE_API_KEY || '';
 }
-const CACHE_TTL_MS   = 30 * 24 * 60 * 60 * 1000; // 30 días de caché válida
-const GRACE_EXTRA_MS = 60 * 24 * 60 * 60 * 1000; // 60 días de gracia offline adicionales
+const CACHE_TTL_MS   = 7 * 24 * 60 * 60 * 1000; // 7 dias de cache valida
+const GRACE_EXTRA_MS = 3 * 24 * 60 * 60 * 1000; // 3 dias de gracia offline adicionales
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS
@@ -45,7 +45,8 @@ export type LicenseStatus =
   | 'SUSPENDED'
   | 'CANCELLED'
   | 'NO_SUBSCRIPTION'
-  | 'OFFLINE_GRACE';   // sin internet pero dentro de gracia
+  | 'OFFLINE_GRACE'
+  | 'VERIFICATION_REQUIRED';
 
 export interface LicenseState {
   canOperate: boolean;
@@ -118,10 +119,10 @@ function saveCache(storeId: string, state: LicenseState): void {
 // VERIFICACIÓN ONLINE
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function verifyOnline(storeId: string): Promise<LicenseState | null> {
+async function verifyOnline(storeId: string, storeLicenseToken?: string): Promise<LicenseState | null> {
   const cloudUrl = getCloudUrl();
   const apiKey = getLicenseApiKey();
-  if (!cloudUrl || !apiKey) {
+  if (!cloudUrl || (!storeLicenseToken && !apiKey)) {
     console.log('[LicenseChecker] Sin CLOUD_URL o LICENSE_API_KEY en process.env — skip online');
     return null;
   }
@@ -129,7 +130,9 @@ async function verifyOnline(storeId: string): Promise<LicenseState | null> {
   try {
     const url = `${cloudUrl}/api/license/verify?storeId=${encodeURIComponent(storeId)}`;
     const res = await fetch(url, {
-      headers: { 'x-api-key': apiKey },
+      headers: storeLicenseToken
+        ? { Authorization: `Bearer ${storeLicenseToken}` }
+        : { 'x-api-key': apiKey },
       signal: AbortSignal.timeout(8_000),
     });
 
@@ -207,11 +210,15 @@ async function verifyLocal(serverUrl: string): Promise<LicenseState | null> {
  * @param storeId - ID de la tienda local
  * @param serverUrl - URL del servidor Next.js local (ej: http://localhost:43110)
  */
-export async function checkLicense(storeId: string, serverUrl: string): Promise<LicenseState> {
+export async function checkLicense(
+  storeId: string,
+  serverUrl: string,
+  storeLicenseToken?: string,
+): Promise<LicenseState> {
   console.log(`[LicenseChecker] Verificando licencia para storeId: ${storeId}`);
 
   // 1. Si no hay CLOUD_URL configurado → verificar solo en BD local
-  if (!getCloudUrl() || !getLicenseApiKey()) {
+  if (!getCloudUrl() || (!storeLicenseToken && !getLicenseApiKey())) {
     console.log('[LicenseChecker] Sin CLOUD_URL — usando BD local');
     const local = await verifyLocal(serverUrl);
     if (local) return local;
@@ -230,7 +237,7 @@ export async function checkLicense(storeId: string, serverUrl: string): Promise<
   }
 
   // 2. Intentar verificar online
-  const online = await verifyOnline(storeId);
+  const online = await verifyOnline(storeId, storeLicenseToken);
   if (online) {
     console.log(`[LicenseChecker] Online OK — status: ${online.status}, canOperate: ${online.canOperate}`);
     // Guardar en caché y también actualizar BD local vía API
@@ -262,43 +269,16 @@ export async function checkLicense(storeId: string, serverUrl: string): Promise<
     }
   }
 
-  // 4. Sin caché válida y offline → verificar BD local como último recurso
-  const local = await verifyLocal(serverUrl);
-  if (local) {
-    console.log(`[LicenseChecker] BD local — status: ${local.status}`);
-    // Si la nube suspendió explícitamente (y quedó en caché), respetar ese estado
-    // Pero si simplemente no hay internet y la BD local tiene suscripción → permitir operar
-    const suspendedByCloud = cached?.state.status === 'SUSPENDED' || cached?.state.status === 'CANCELLED';
-    if (!suspendedByCloud) {
-      return { ...local, canOperate: true, source: 'cache' };
-    }
-    return local;
-  }
-
-  // 5. Sin nada verificable → si la nube NO suspendió explícitamente, permitir operar
-  // El administrador suspende desde la nube: mientras no haya señal de suspensión, la app funciona
-  const explicitlySuspended = cached?.state.status === 'SUSPENDED' || cached?.state.status === 'CANCELLED';
-  if (!explicitlySuspended) {
-    console.log('[LicenseChecker] Sin verificación disponible — permitiendo operar (no hay suspensión explícita)');
-    return {
-      canOperate: true,
-      status: 'OFFLINE_GRACE',
-      currentPeriodEnd: null,
-      trialEndsAt: null,
-      planCode: cached?.state.planCode ?? null,
-      daysRemaining: 999,
-      source: 'grace',
-      checkedAt: new Date().toISOString(),
-    };
-  }
-
-  // 6. La nube explícitamente suspendió esta tienda → bloquear
+  // Una tienda registrada no puede usar indefinidamente la suscripcion local
+  // si la nube deja de estar disponible. Tras cache + gracia exige reconexion.
   return {
     canOperate: false,
-    status: cached?.state.status ?? 'SUSPENDED',
-    currentPeriodEnd: null,
-    trialEndsAt: null,
-    planCode: null,
+    status: cached?.state.status === 'SUSPENDED' || cached?.state.status === 'CANCELLED'
+      ? cached.state.status
+      : 'VERIFICATION_REQUIRED',
+    currentPeriodEnd: cached?.state.currentPeriodEnd ?? null,
+    trialEndsAt: cached?.state.trialEndsAt ?? null,
+    planCode: cached?.state.planCode ?? null,
     daysRemaining: 0,
     source: 'cache',
     checkedAt: new Date().toISOString(),

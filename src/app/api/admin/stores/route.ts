@@ -11,6 +11,8 @@ import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 import { findRecoverableSubscriptionSource } from '@/lib/restoredSubscription';
+import { registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
+import { getStoreLicenseCredential, saveStoreLicenseCredential } from '@/lib/licenseCredentialStore';
 
 // GET /api/admin/stores - Listar todas las tiendas (SUPERADMIN)
 export async function GET(request: NextRequest) {
@@ -86,10 +88,11 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    const storesWithRecovery = stores.map(store => {
+    const storesWithRecovery = await Promise.all(stores.map(async store => {
       const source = findRecoverableSubscriptionSource(store, archivedSubscriptionSources);
       return {
         ...store,
+        licenseRegistered: Boolean(await getStoreLicenseCredential(store.id)),
         recoverableSubscription: source?.subscription
           ? {
               planCode: source.subscription.planCode,
@@ -97,7 +100,7 @@ export async function GET(request: NextRequest) {
             }
           : null,
       };
-    });
+    }));
 
     return NextResponse.json({ stores: storesWithRecovery });
   } catch (error) {
@@ -299,6 +302,40 @@ export async function POST(request: NextRequest) {
       // No bloqueamos — la tienda ya está creada
     }
 
+    let cloudRegistration: {
+      status: 'registered' | 'reauth_required' | 'failed';
+      already?: boolean;
+      message?: string;
+    };
+
+    if (!session.cloudAdminToken) {
+      cloudRegistration = {
+        status: 'reauth_required',
+        message: 'Vuelve a iniciar sesión como SUPERADMIN para registrar esta tienda en la nube.',
+      };
+    } else {
+      try {
+        const cloudResult = await registerStoreInCloud({
+          storeId: result.store.id,
+          storeName: result.store.name,
+          ownerEmail: result.owner.email,
+          ownerName: result.owner.name,
+          ruc: result.store.ruc,
+          address: result.store.address,
+          phone: result.store.phone,
+          planCode,
+        }, session.cloudAdminToken);
+        await saveStoreLicenseCredential(result.store.id, cloudResult.licenseToken);
+        cloudRegistration = { status: 'registered', already: cloudResult.already };
+      } catch (cloudError) {
+        console.error('[CreateStore] Cloud license registration failed:', cloudError);
+        cloudRegistration = {
+          status: 'failed',
+          message: 'La tienda local fue creada, pero no pudo registrarse en Licencias. Reintenta con conexión.',
+        };
+      }
+    }
+
     return NextResponse.json({
       success: true,
       store: {
@@ -311,6 +348,7 @@ export async function POST(request: NextRequest) {
         name: result.owner.name,
       },
       flagsApplied: result.flagsApplied,
+      cloudRegistration,
     }, { status: 201 });
 
   } catch (error) {

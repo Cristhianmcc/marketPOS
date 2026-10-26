@@ -34,7 +34,15 @@ export function LicenseBanner() {
 
     setChecking(true);
     try {
-      const state = await api.license.check() as LicenseState;
+      const sessionResponse = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (!sessionResponse.ok) return;
+      const sessionPayload = await sessionResponse.json() as { user?: { storeId?: string | null } };
+      const storeId = sessionPayload.user?.storeId;
+      if (!storeId) {
+        setLicense(null);
+        return;
+      }
+      const state = await api.license.check(storeId) as LicenseState;
       setLicense(state);
     } catch {
       // silencioso
@@ -65,6 +73,7 @@ export function LicenseBanner() {
 
   // Licencia vencida — overlay bloqueante de pantalla completa
   if (!license.canOperate) {
+    const verificationRequired = license.status === 'VERIFICATION_REQUIRED';
     return (
       <div className="fixed inset-0 z-[9999] bg-gray-950/95 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full mx-4 text-center flex flex-col items-center gap-6">
@@ -72,10 +81,18 @@ export function LicenseBanner() {
             <XCircle className="w-12 h-12 text-red-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Licencia vencida</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {verificationRequired ? 'Verifica tu licencia' : 'Licencia vencida'}
+            </h2>
             <p className="text-gray-500 text-sm leading-relaxed">
-              Tu suscripción ha expirado o fue suspendida.<br />
-              Contacta a soporte para renovar y continuar operando.
+              {verificationRequired ? (
+                <>Conecta este equipo a Internet y vuelve a verificar para continuar operando.</>
+              ) : (
+                <>
+                  Tu suscripción ha expirado o fue suspendida.<br />
+                  Contacta a soporte para renovar y continuar operando.
+                </>
+              )}
             </p>
           </div>
           {formattedDate && (

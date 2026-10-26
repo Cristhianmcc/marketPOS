@@ -1010,6 +1010,7 @@ async function main() {
     headers: {
       get: name => name === desktopInternalAuth.DESKTOP_INTERNAL_TOKEN_HEADER ? token : null,
     },
+    nextUrl: new URL('http://127.0.0.1/api/desktop/license'),
     json: async () => body,
   });
   const internalTokenIsSafe = desktopInternalAuth.hasValidDesktopInternalToken(
@@ -1026,6 +1027,9 @@ async function main() {
       subscription: { findUnique: async () => null },
     } },
     '@/lib/desktopInternalAuth': desktopInternalAuth,
+    '@/lib/licenseCredentialStore': {
+      getStoreLicenseCredential: async () => null,
+    },
     '@/lib/subscriptionStatus': {
       computeEffectiveStatus: value => value,
       isStoreAllowedToOperate: () => true,

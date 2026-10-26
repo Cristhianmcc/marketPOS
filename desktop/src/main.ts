@@ -568,10 +568,12 @@ export function setLicenseServerUrl(url: string, internalToken?: string) {
 
 function setupLicenseIpcHandlers(): void {
   // Verificar licencia (híbrido: cloud → caché → local BD)
-  ipcMain.handle('license:check', async () => {
+  ipcMain.handle('license:check', async (_event, requestedStoreId?: string) => {
     try {
-      // Obtener storeId desde la BD local
-      const res = await fetch(`${_licenseServerUrl}/api/desktop/license`, {
+      const storeQuery = requestedStoreId
+        ? `?storeId=${encodeURIComponent(requestedStoreId)}`
+        : '';
+      const res = await fetch(`${_licenseServerUrl}/api/desktop/license${storeQuery}`, {
         headers: { 'x-desktop-internal-token': _desktopInternalToken },
         signal: AbortSignal.timeout(5_000),
       }).catch(() => null);
@@ -588,6 +590,7 @@ function setupLicenseIpcHandlers(): void {
         currentPeriodEnd?: string | null;
         trialEndsAt?: string | null;
         daysRemaining?: number;
+        cloudLicenseToken?: string | null;
       };
       const storeId = localInfo?.storeId;
 
@@ -595,22 +598,11 @@ function setupLicenseIpcHandlers(): void {
         return { canOperate: true, status: 'NO_SUBSCRIPTION', source: 'no_config' } as LicenseState;
       }
 
-      const state = await checkLicense(storeId, _licenseServerUrl);
-
-      // Si la nube dice NO_SUBSCRIPTION pero la BD local dice que puede operar,
-      // la tienda fue creada localmente y no está registrada en la nube → usar BD local
-      if (!state.canOperate && state.status === 'NO_SUBSCRIPTION' && localInfo.canOperate) {
-        return {
-          canOperate: true,
-          status: (localInfo.status ?? 'ACTIVE') as LicenseState['status'],
-          planCode: localInfo.planCode ?? null,
-          daysRemaining: localInfo.daysRemaining ?? 0,
-          currentPeriodEnd: localInfo.currentPeriodEnd ?? null,
-          trialEndsAt: localInfo.trialEndsAt ?? null,
-          source: 'cache',
-          checkedAt: new Date().toISOString(),
-        } as LicenseState;
-      }
+      const state = await checkLicense(
+        storeId,
+        _licenseServerUrl,
+        localInfo.cloudLicenseToken || undefined,
+      );
 
       return state;
     } catch (err) {

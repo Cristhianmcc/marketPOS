@@ -136,7 +136,7 @@ interface DesktopAPI {
 
   // License (D9)
   license: {
-    check: () => Promise<unknown>;
+    check: (storeId?: string) => Promise<unknown>;
   };
 
   // PostgreSQL Management (D7.2)
@@ -689,8 +689,8 @@ const desktopAPI: DesktopAPI = {
 
   // License (D9)
   license: {
-    check: () =>
-      ipcRenderer.invoke('license:check'),
+    check: (storeId?: string) =>
+      ipcRenderer.invoke('license:check', storeId),
   },
 
   // PostgreSQL Management (D7.2)

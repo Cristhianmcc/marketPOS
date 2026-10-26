@@ -108,6 +108,7 @@ interface Store {
     planCode: PlanCode;
     status: string;
   } | null;
+  licenseRegistered: boolean;
   recoverableSubscription?: {
     planCode: PlanCode;
     sourceStoreName: string;
@@ -159,6 +160,7 @@ export default function AdminStoresPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [resettingOwnerStoreId, setResettingOwnerStoreId] = useState<string | null>(null);
   const [ownerAccessResult, setOwnerAccessResult] = useState<OwnerAccessResult | null>(null);
+  const [registeringLicenseStoreId, setRegisteringLicenseStoreId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     storeName: '',
@@ -297,6 +299,11 @@ export default function AdminStoresPage() {
       }
 
       toast.success('Tienda creada exitosamente');
+      if (data.cloudRegistration?.status === 'registered') {
+        toast.success('Licencia registrada en la nube');
+      } else if (data.cloudRegistration?.message) {
+        toast.error(data.cloudRegistration.message);
+      }
       
       // ✅ DESKTOP: Cambiar sesión al nuevo store y seedear productos
       if (data.store?.id) {
@@ -426,6 +433,24 @@ export default function AdminStoresPage() {
       toast.error('Error de red al recuperar el plan');
     } finally {
       setActioningStoreId(null);
+    }
+  }
+
+  async function handleRegisterLicense(store: Store) {
+    setRegisteringLicenseStoreId(store.id);
+    try {
+      const res = await fetch(`/api/admin/stores/${store.id}/license`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'No se pudo registrar la licencia');
+        return;
+      }
+      toast.success(data.message || 'Licencia registrada');
+      await loadStores();
+    } catch {
+      toast.error('Error de red al registrar la licencia');
+    } finally {
+      setRegisteringLicenseStoreId(null);
     }
   }
 
@@ -591,6 +616,24 @@ export default function AdminStoresPage() {
         >
           {resettingOwnerStoreId === store.id ? 'Generando...' : 'Acceso OWNER'}
         </button>
+        {store.status === 'ACTIVE' && (
+          <button
+            type="button"
+            onClick={() => handleRegisterLicense(store)}
+            disabled={registeringLicenseStoreId === store.id}
+            className={`rounded px-3 py-2 text-sm disabled:opacity-50 ${
+              store.licenseRegistered
+                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+            }`}
+          >
+            {registeringLicenseStoreId === store.id
+              ? 'Registrando...'
+              : store.licenseRegistered
+                ? 'Renovar licencia'
+                : 'Registrar licencia'}
+          </button>
+        )}
       </div>
     );
   }

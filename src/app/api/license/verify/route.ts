@@ -22,25 +22,24 @@ import {
   isStoreAllowedToOperate,
   getDaysUntilExpiration,
 } from '@/lib/subscriptionStatus';
+import { verifyStoreLicenseToken } from '@/lib/cloudLicenseTokens';
 
 const LICENSE_API_KEY = process.env.LICENSE_API_KEY || '';
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Validar API key
-    if (!LICENSE_API_KEY) {
-      return NextResponse.json({ error: 'Endpoint no configurado' }, { status: 503 });
-    }
-
-    const apiKey = req.headers.get('x-api-key');
-    if (!apiKey || apiKey !== LICENSE_API_KEY) {
-      return NextResponse.json({ error: 'API key inválida' }, { status: 401 });
-    }
-
-    // 2. Obtener storeId
     const storeId = req.nextUrl.searchParams.get('storeId');
     if (!storeId) {
       return NextResponse.json({ error: 'storeId requerido' }, { status: 400 });
+    }
+
+    const authorization = req.headers.get('authorization');
+    const bearer = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+    const apiKey = req.headers.get('x-api-key');
+    const validStoreCredential = Boolean(bearer && verifyStoreLicenseToken(bearer, storeId));
+    const validLegacyKey = Boolean(LICENSE_API_KEY && apiKey === LICENSE_API_KEY);
+    if (!validStoreCredential && !validLegacyKey) {
+      return NextResponse.json({ error: 'Credencial de licencia inválida' }, { status: 401 });
     }
 
     // 3. Buscar suscripción
