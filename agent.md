@@ -719,13 +719,19 @@ una base real como comprobación rutinaria.
   público con esa clave. El build falla si queda otra copia o clave.
 - `npm run test:desktop-env:isolated` y la comprobación H02 de la auditoría
   reproducen el caso sin leer secretos ni crear una distribución real.
+- Commit funcional H02: `c6a9b52f` (`fix: sanitize desktop package
+  environment`). La rama original `CristhianM` no recibió estos cambios.
 - Los paquetes históricos permanecen como artefactos antiguos y no deben
   redistribuirse. Antes de producción deben rotarse las credenciales que alguna
   vez hayan sido incluidas en esos paquetes.
-- Próximo punto de reanudación: ejecutar todos los controles, guardar el commit
-  H02 y después realizar aceptación operativa en una instalación desechable:
-  impresora térmica real, respuesta perdida/reinicio sin venta duplicada,
-  respaldo/restauración y arranque del worker SUNAT.
+- Controles cerrados en este punto: TypeScript web y Electron, prueba aislada
+  H02, auditoría aislada completa, `git diff --check` y `npm run build:only`
+  (207 rutas) correctos. El build conserva advertencias históricas, sin errores.
+- Próximo punto de reanudación: aceptación operativa en una instalación
+  desechable: impresora térmica real, respuesta perdida/reinicio sin venta
+  duplicada, respaldo/restauración y arranque automático del worker SUNAT. No
+  reabrir H02, H05, H12 ni H13 salvo que una prueba operativa aporte evidencia
+  nueva.
 
 - `.eslintrc.json` carga `@typescript-eslint/parser` y el plugin correspondiente.
   `next.config.ts` ya no contiene `ignoreBuildErrors` ni `ignoreDuringBuilds`, por
