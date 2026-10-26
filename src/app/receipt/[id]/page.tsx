@@ -144,6 +144,8 @@ export default function ReceiptPage() {
       try {
         const statusRes = await fetch('http://127.0.0.1:12121/status', { signal: AbortSignal.timeout(1500) });
         if (statusRes.ok) {
+          const { pairingToken } = await statusRes.json();
+          if (!pairingToken) throw new Error('Servicio de impresion sin vinculacion segura');
           const createdAt = new Date(sale.createdAt);
           const printData = {
             store: {
@@ -177,7 +179,10 @@ export default function ReceiptPage() {
           };
           const printRes = await fetch('http://127.0.0.1:12121/print', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-MarketPOS-Token': pairingToken,
+            },
             body: JSON.stringify(printData),
           });
           const result = await printRes.json();

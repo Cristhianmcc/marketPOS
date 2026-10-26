@@ -23,11 +23,16 @@ import {
   LimitExceededError
 } from '@/lib/operationalLimits'; // ✅ MÓDULO 15 - FASE 3: Límites Operativos
 import { checkRateLimit } from '@/lib/rateLimit'; // ✅ MÓDULO 16.1: Rate Limiting
-import { getIdempotentResult, saveIdempotentResult } from '@/lib/idempotency'; // ✅ MÓDULO 16.1: Idempotency
 import { acquireCheckoutLock, releaseCheckoutLock } from '@/lib/checkoutLock'; // ✅ MÓDULO 16.1: Checkout Lock
 import { normalizeToBaseUnit } from '@/lib/units'; // ✅ MÓDULO V2: Conversiones de unidades
 import { PharmacyTraceError, registerPharmacyTrace } from '@/lib/sales/pharmacyTrace';
 import { consumeSaleInventory, InventoryMutationError } from '@/lib/inventory/stockMutations';
+import {
+  createCheckoutSaleId,
+  createCheckoutRequestHash,
+  getCheckoutRequestHash,
+  parseCheckoutIdempotencyKey,
+} from '@/lib/sales/checkoutIdempotency';
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -91,11 +96,40 @@ class CheckoutError extends Error {
   }
 }
 
+async function findPersistedCheckout(storeId: string, userId: string, saleId: string) {
+  return prisma.sale.findFirst({
+    where: { id: saleId, storeId, userId },
+    select: {
+      id: true,
+      saleNumber: true,
+      total: true,
+      paymentDetails: true,
+      _count: { select: { items: true } },
+    },
+  });
+}
+
+function persistedCheckoutPayload(
+  sale: { id: string; saleNumber: number; total: Prisma.Decimal; _count: { items: number } },
+  replay = false
+) {
+  return {
+    success: true,
+    saleId: sale.id,
+    saleNumber: sale.saleNumber,
+    total: sale.total.toNumber(),
+    itemCount: sale._count.items,
+    ...(replay ? { code: 'IDEMPOTENT_REPLAY' } : {}),
+  };
+}
+
 async function executeCheckout(
   session: { storeId: string; userId: string },
   items: CheckoutItem[],
   shiftId: string | null, // ✅ Puede ser null para FIADO
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED',
+  checkoutSaleId: string,
+  checkoutHash: string,
   amountPaid?: number,
   customerId?: string, // ✅ Para FIADO
   discountTotal?: number, // Módulo 14: descuento global
@@ -940,6 +974,7 @@ async function executeCheckout(
 
     // 5. Crear Sale con descuentos y cupón
     const saleData: any = {
+      id: checkoutSaleId,
       storeId: session.storeId,
       userId: session.userId,
       saleNumber: nextSaleNumber,
@@ -956,6 +991,7 @@ async function executeCheckout(
       couponDiscount: new Prisma.Decimal(couponDiscount),
       total: new Prisma.Decimal(total),
       paymentMethod: paymentMethod,
+      paymentDetails: { checkoutRequestHash: checkoutHash },
     };
 
     // Para FIADO: shiftId es null, amountPaid y changeAmount null, agregar customerId
@@ -970,7 +1006,7 @@ async function executeCheckout(
       saleData.shiftId = shiftId;
       saleData.amountPaid = new Prisma.Decimal(splitsTotal);
       saleData.changeAmount = changeAmount !== null ? new Prisma.Decimal(changeAmount) : null;
-      saleData.paymentDetails = { splits: paymentSplits };
+      saleData.paymentDetails = { checkoutRequestHash: checkoutHash, splits: paymentSplits };
     } else {
       // Para otros métodos: shiftId requerido
       saleData.shiftId = shiftId;
@@ -1265,88 +1301,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(error, { status: 401 });
     }
 
-    // ✅ MÓDULO 16.1: Rate Limiting
-    const rateLimitResult = checkRateLimit('checkout', session.userId);
-    if (!rateLimitResult.allowed) {
-      // Auditoría de rate limit
-      const { ip, userAgent } = getRequestMetadata(req);
-      logAudit({
-        storeId: session.storeId,
-        userId: session.userId,
-        action: 'RATE_LIMIT_EXCEEDED',
-        entityType: 'SALE',
-        severity: 'WARN',
-        meta: {
-          endpoint: 'checkout',
-          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
-        },
-        ip,
-        userAgent,
-      }).catch(() => {});
-
-      const error: ErrorResponse = {
-        code: 'RATE_LIMIT_EXCEEDED',
-        message: 'Demasiadas solicitudes. Intenta nuevamente en unos segundos.',
-        details: {
-          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
-        },
-      };
-      return NextResponse.json(error, { status: 429 });
+    let idempotencyKey: string;
+    try {
+      idempotencyKey = parseCheckoutIdempotencyKey(req.headers.get('idempotency-key'));
+    } catch (error) {
+      return NextResponse.json({
+        code: 'INVALID_IDEMPOTENCY_KEY',
+        message: error instanceof Error ? error.message : 'Idempotency-Key invalida',
+      }, { status: 400 });
     }
 
-    // ✅ MÓDULO 16.1: Idempotency - Verificar si es un replay
-    const idempotencyKey = req.headers.get('idempotency-key');
-    if (idempotencyKey) {
-      const cachedResult = getIdempotentResult(idempotencyKey);
-      if (cachedResult) {
-        // Replay detectado - devolver resultado anterior
-        const { ip, userAgent } = getRequestMetadata(req);
-        logAudit({
-          storeId: session.storeId,
-          userId: session.userId,
-          action: 'CHECKOUT_REPLAY',
-          entityType: 'SALE',
-          entityId: cachedResult.saleId,
-          severity: 'INFO',
-          meta: {
-            idempotencyKey,
-            saleNumber: cachedResult.saleNumber,
-          },
-          ip,
-          userAgent,
-        }).catch(() => {});
-
-        return NextResponse.json({
-          ...cachedResult,
-          code: 'IDEMPOTENT_REPLAY',
-        }, { status: 200 });
-      }
-    }
-
-    // ✅ MÓDULO 16.1: Lock de checkout - Evitar checkouts simultáneos
-    lockAcquired = acquireCheckoutLock(session.storeId, session.userId);
-    if (!lockAcquired) {
-      // Auditoría de lock
-      const { ip, userAgent } = getRequestMetadata(req);
-      logAudit({
-        storeId: session.storeId,
-        userId: session.userId,
-        action: 'CHECKOUT_LOCKED',
-        entityType: 'SALE',
-        severity: 'WARN',
-        meta: {
-          reason: 'Checkout already in progress',
-        },
-        ip,
-        userAgent,
-      }).catch(() => {});
-
-      const error: ErrorResponse = {
-        code: 'CHECKOUT_IN_PROGRESS',
-        message: 'Ya tienes una venta en proceso. Espera a que termine.',
-      };
-      return NextResponse.json(error, { status: 409 });
-    }
+    const body: CheckoutBody = await req.json();
+    const requestHash = createCheckoutRequestHash(body);
+    const checkoutSaleId = createCheckoutSaleId(session.storeId, session.userId, idempotencyKey);
 
     // ✅ MÓDULO 16.1: Validaciones defensivas extra
     // Verificar que la tienda está activa
@@ -1387,7 +1354,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(error, { status: 403 });
     }
 
-    const body: CheckoutBody = await req.json();
+    // Una repeticion solo puede consultar la venta despues de revalidar la
+    // tienda, el usuario y su rol actual. Esto evita devolver datos a una
+    // sesion que fue deshabilitada despues del primer intento.
+    const persistedCheckout = await findPersistedCheckout(session.storeId, session.userId, checkoutSaleId);
+    if (persistedCheckout) {
+      if (getCheckoutRequestHash(persistedCheckout.paymentDetails) !== requestHash) {
+        return NextResponse.json({
+          code: 'IDEMPOTENCY_KEY_REUSED',
+          message: 'La misma Idempotency-Key no puede reutilizarse para otra venta',
+        }, { status: 409 });
+      }
+      return NextResponse.json(persistedCheckoutPayload(persistedCheckout, true), { status: 200 });
+    }
+
+    // El replay exitoso no consume cuota; una solicitud nueva si queda sujeta
+    // al limite por usuario.
+    const rateLimitResult = checkRateLimit('checkout', session.userId);
+    if (!rateLimitResult.allowed) {
+      const { ip, userAgent } = getRequestMetadata(req);
+      logAudit({
+        storeId: session.storeId,
+        userId: session.userId,
+        action: 'RATE_LIMIT_EXCEEDED',
+        entityType: 'SALE',
+        severity: 'WARN',
+        meta: {
+          endpoint: 'checkout',
+          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
+        },
+        ip,
+        userAgent,
+      }).catch(() => {});
+
+      const error: ErrorResponse = {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Demasiadas solicitudes. Intenta nuevamente en unos segundos.',
+        details: {
+          resetAt: new Date(rateLimitResult.resetAt).toISOString(),
+        },
+      };
+      return NextResponse.json(error, { status: 429 });
+    }
+
     const { items, paymentMethod, amountPaid, customerId, discountTotal, couponCode, patientId, prescribedBy, cmpNumber, consultReason, paymentSplits } = body;
 
     // Validaciones básicas
@@ -1522,6 +1531,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Evita dos checkouts simultaneos en este proceso. La restriccion unica
+    // persistente protege ademas frente a reinicios y multiples procesos.
+    lockAcquired = acquireCheckoutLock(session.storeId, session.userId);
+    if (!lockAcquired) {
+      return NextResponse.json({
+        code: 'CHECKOUT_IN_PROGRESS',
+        message: 'Ya tienes una venta en proceso. Espera a que termine.',
+      }, { status: 409 });
+    }
+
     // ✅ MÓDULO 16.1: Timeout protection - Verificar si ya pasó demasiado tiempo
     const elapsed = Date.now() - startTime;
     if (elapsed > 3000) {
@@ -1559,6 +1578,8 @@ export async function POST(req: NextRequest) {
           items,
           currentShift?.id || null,
           paymentMethod,
+          checkoutSaleId,
+          requestHash,
           amountPaid,
           customerId,
           discountTotal,
@@ -1572,6 +1593,22 @@ export async function POST(req: NextRequest) {
         break; // Éxito, salir del bucle
       } catch (error: any) {
         lastError = error;
+
+        if (error?.code === 'P2002') {
+          const existing = await findPersistedCheckout(session.storeId, session.userId, checkoutSaleId);
+          if (existing && getCheckoutRequestHash(existing.paymentDetails) === requestHash) {
+            releaseCheckoutLock(session.storeId, session.userId);
+            lockAcquired = false;
+            return NextResponse.json(persistedCheckoutPayload(existing, true), { status: 200 });
+          }
+          if (existing) {
+            throw new CheckoutError(
+              'IDEMPOTENCY_KEY_REUSED',
+              409,
+              'La misma Idempotency-Key no puede reutilizarse para otra venta'
+            );
+          }
+        }
         
         // Detectar colisión de saleNumber (unique constraint)
         // El target viene como array: ['store_id', 'sale_number']
@@ -1595,18 +1632,6 @@ export async function POST(req: NextRequest) {
     // Verificar que result no sea undefined
     if (!result) {
       throw new Error('Checkout failed after retries');
-    }
-
-    // ✅ MÓDULO 16.1: Guardar resultado para idempotency
-    if (idempotencyKey) {
-      const idempotentResult = {
-        success: true,
-        saleId: result.sale.id,
-        saleNumber: result.sale.saleNumber,
-        total: result.sale.total.toNumber(),
-        itemCount: result.saleItems.length,
-      };
-      saveIdempotentResult(idempotencyKey, idempotentResult);
     }
 
     // ✅ MÓDULO 16.1: Liberar lock

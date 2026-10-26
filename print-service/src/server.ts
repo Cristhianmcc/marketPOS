@@ -12,8 +12,16 @@ import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { execSync } from 'child_process';
+import { randomBytes } from 'crypto';
+import { spawnSync } from 'child_process';
 import * as iconv from 'iconv-lite';
+import {
+  createCorsHeaders,
+  isAllowedOrigin,
+  isAuthorizedToken,
+  isSafePrinterPort,
+  validateConfigPatch,
+} from './security';
 
 // ════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -374,6 +382,10 @@ Write-Output $result
 
 function printUsb(portName: string, data: Buffer): Promise<{ success: boolean; error?: string }> {
   return new Promise((resolve) => {
+    if (!isSafePrinterPort(portName)) {
+      resolve({ success: false, error: 'Puerto de impresora no valido' });
+      return;
+    }
     // Escribir buffer a archivo temporal
     const tmpFile = path.join(os.tmpdir(), `marketpos_ticket_${Date.now()}.bin`);
     try {
@@ -398,21 +410,7 @@ function printUsb(portName: string, data: Buffer): Promise<{ success: boolean; e
       console.log(`[USB] Port-file falló (${portPath}): ${err.message}`);
     }
 
-    // Método 2: copy /b al puerto via cmd.exe
-    try {
-      execSync(`copy /b "${tmpFile}" "${portPath}"`, {
-        shell: 'cmd.exe',
-        windowsHide: true,
-        timeout: 10000,
-      });
-      cleanup();
-      resolve({ success: true });
-      return;
-    } catch (err: any) {
-      console.log(`[USB] copy /b falló: ${err.message}`);
-    }
-
-    // Método 3: Windows RAW Printer API via PowerShell
+    // Metodo 2: Windows RAW Printer API via PowerShell
     try {
       const printerName = findPrinterByPort(portName);
       if (printerName) {
@@ -420,13 +418,14 @@ function printUsb(portName: string, data: Buffer): Promise<{ success: boolean; e
         // Generar script PS1 temporal (auto-contenido, no depende de archivo externo)
         const psScript = path.join(os.tmpdir(), `marketpos_rawprint_${Date.now()}.ps1`);
         fs.writeFileSync(psScript, RAWPRINT_PS1);
-        const output = execSync(
-          `powershell -NoProfile -ExecutionPolicy Bypass -File "${psScript}" -PrinterName "${printerName}" -FilePath "${tmpFile}"`,
-          { windowsHide: true, timeout: 15000 }
-        ).toString().trim();
+        const run = spawnSync('powershell.exe', [
+          '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', psScript, '-PrinterName', printerName, '-FilePath', tmpFile,
+        ], { windowsHide: true, timeout: 15000, encoding: 'utf8' });
+        const output = (run.stdout || '').trim();
         try { fs.unlinkSync(psScript); } catch {}
         cleanup();
-        if (output === 'True') {
+        if (run.status === 0 && output === 'True') {
           resolve({ success: true });
           return;
         }
@@ -443,13 +442,18 @@ function printUsb(portName: string, data: Buffer): Promise<{ success: boolean; e
 
 // Buscar nombre de impresora por puerto
 function findPrinterByPort(portName: string): string | null {
-  try {
-    const output = execSync(
-      `powershell -NoProfile -Command "Get-WmiObject Win32_Printer | Where-Object { $_.PortName -eq '${portName.replace(/'/g, "''")}' } | Select-Object -ExpandProperty Name"`,
-      { windowsHide: true, timeout: 5000 }
-    ).toString().trim();
-    return output || null;
-  } catch { return null; }
+  if (!isSafePrinterPort(portName)) return null;
+  const run = spawnSync('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-Command',
+    'Get-CimInstance Win32_Printer | Where-Object { $_.PortName -eq $env:MARKETPOS_PRINTER_PORT } | Select-Object -ExpandProperty Name',
+  ], {
+    windowsHide: true,
+    timeout: 5000,
+    encoding: 'utf8',
+    env: { ...process.env, MARKETPOS_PRINTER_PORT: portName },
+  });
+  const output = (run.stdout || '').trim();
+  return run.status === 0 && output ? output : null;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -499,10 +503,11 @@ interface DetectedPrinter {
 
 function detectPrinters(): DetectedPrinter[] {
   try {
-    const output = execSync(
-      `powershell -NoProfile -Command "Get-WmiObject Win32_Printer | Select-Object Name, PortName, DriverName | ConvertTo-Json"`,
-      { windowsHide: true, timeout: 5000 }
-    ).toString().trim();
+    const run = spawnSync('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      'Get-CimInstance Win32_Printer | Select-Object Name, PortName, DriverName | ConvertTo-Json',
+    ], { windowsHide: true, timeout: 5000, encoding: 'utf8' });
+    const output = (run.stdout || '').trim();
     if (!output) return [];
     const raw = JSON.parse(output);
     const list = Array.isArray(raw) ? raw : [raw];
@@ -540,6 +545,7 @@ function autoDetectThermalPrinter(): DetectedPrinter | null {
 
 const CONFIG_DIR = path.join(os.homedir(), '.marketpos-print');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
+const TOKEN_FILE = path.join(CONFIG_DIR, 'pairing-token');
 
 function loadConfig(): PrintServiceConfig {
   try {
@@ -565,12 +571,24 @@ function saveConfig(config: PrintServiceConfig): void {
   }
 }
 
+function loadOrCreatePairingToken(): string {
+  if (!fs.existsSync(CONFIG_DIR)) fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  if (fs.existsSync(TOKEN_FILE)) {
+    const saved = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+    if (saved.length >= 32) return saved;
+  }
+  const token = randomBytes(32).toString('hex');
+  fs.writeFileSync(TOKEN_FILE, token, { encoding: 'utf8', mode: 0o600 });
+  return token;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // SERVIDOR HTTP
 // ════════════════════════════════════════════════════════════════════════════
 
 const PORT = 12121;
 let config = loadConfig();
+const pairingToken = loadOrCreatePairingToken();
 
 // Auto-detectar impresora al iniciar si el puerto configurado es el default
 if (config.mode === 'USB' && config.usbPort === 'USB001') {
@@ -580,25 +598,6 @@ if (config.mode === 'USB' && config.usbPort === 'USB001') {
     config.usbPort = thermal.port;
     saveConfig(config);
   }
-}
-
-function isLocalOrigin(origin: string | undefined): boolean {
-  if (!origin) return false;
-  try {
-    const url = new URL(origin);
-    return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-  } catch { return false; }
-}
-
-function getCorsHeaders(origin: string | undefined): Record<string, string> {
-  // Permitir cualquier localhost + orígenes configurados
-  const allowed = isLocalOrigin(origin) || config.allowedOrigins.some(o => origin === o);
-  return {
-    'Access-Control-Allow-Origin': allowed && origin ? origin : '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-  };
 }
 
 function readBody(req: http.IncomingMessage): Promise<string> {
@@ -622,9 +621,16 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
-  const headers = getCorsHeaders(origin);
+  const originAllowed = isAllowedOrigin(origin, config.allowedOrigins);
+  const headers = createCorsHeaders(originAllowed ? origin : undefined);
   const url = req.url || '/';
   const method = req.method || 'GET';
+
+  if (!originAllowed) {
+    res.writeHead(403, headers);
+    res.end(JSON.stringify({ error: 'Origen no autorizado' }));
+    return;
+  }
 
   // CORS preflight
   if (method === 'OPTIONS') {
@@ -644,7 +650,14 @@ const server = http.createServer(async (req, res) => {
         mode: config.mode,
         usbPort: config.mode === 'USB' ? config.usbPort : undefined,
         netHost: config.mode === 'NET' ? config.netHost : undefined,
+        pairingToken,
       }));
+      return;
+    }
+
+    if (!isAuthorizedToken(req.headers['x-marketpos-token'], pairingToken)) {
+      res.writeHead(401, headers);
+      res.end(JSON.stringify({ error: 'Token local invalido' }));
       return;
     }
 
@@ -666,17 +679,18 @@ const server = http.createServer(async (req, res) => {
 
     // ── PUT /config ─────────────────────────────────────────
     if (url === '/config' && method === 'PUT') {
-      const body = await readBody(req);
-      const updates = JSON.parse(body);
-      // Solo permitir campos conocidos
-      const allowed = ['mode', 'usbPort', 'netHost', 'netPort', 'netTimeout',
-        'charsPerLine', 'autoCut', 'openCashDrawer', 'encoding',
-        'ticketSlogan', 'ticketWebsite', 'ticketShowQr', 'allowedOrigins'];
-      for (const key of Object.keys(updates)) {
-        if (allowed.includes(key)) {
-          (config as any)[key] = updates[key];
-        }
+      let updates: Record<string, unknown>;
+      try {
+        const body = await readBody(req);
+        updates = validateConfigPatch(JSON.parse(body));
+      } catch (error) {
+        res.writeHead(400, headers);
+        res.end(JSON.stringify({
+          error: error instanceof Error ? error.message : 'Configuracion invalida',
+        }));
+        return;
       }
+      config = { ...config, ...updates } as PrintServiceConfig;
       saveConfig(config);
       res.writeHead(200, headers);
       res.end(JSON.stringify({ ok: true, config }));

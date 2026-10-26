@@ -47,7 +47,7 @@ es `docs/audits/2026-09-26-pos.md`.
 | `prisma` | Esquema, semillas, SQL y migraciones |
 | `desktop/src` | Proceso principal, preload, servidor, PostgreSQL, impresión y backups |
 | `desktop/scripts` | Preparación de recursos y empaquetado |
-| `print-service/src/server.ts` | Servidor de impresión en `127.0.0.1:12121` |
+| `print-service/src/server.ts`, `print-service/src/security.ts` | Servidor de impresión en `127.0.0.1:12121`, emparejamiento local, CORS y validación |
 | `scripts` | Mantenimiento, semillas y pruebas ad hoc; muchos modifican datos |
 | `public` | Assets y service worker PWA |
 | `docs`, `*_TEST_CHECKLIST.md` | Documentación histórica; contrastar afirmaciones con implementación |
@@ -61,7 +61,7 @@ es `docs/audits/2026-09-26-pos.md`.
 | --- | --- |
 | Login, sesión y cambio de tienda | `src/lib/session.ts`, `src/lib/auth.ts`, `src/lib/superadmin.ts`, `src/middleware.ts`, `src/app/api/auth/*`, `src/app/api/setup/*` |
 | Pantalla de venta | `src/app/pos/page.tsx`, `src/components/pos/*`, `src/hooks/usePosShortcuts.ts`, `src/modules/pos/lib/*` |
-| Cobro y validaciones finales | `src/app/api/sales/checkout/route.ts`, `src/lib/checkoutLock.ts`, `src/lib/idempotency.ts` |
+| Cobro y validaciones finales | `src/app/api/sales/checkout/route.ts`, `src/lib/checkoutLock.ts`, `src/lib/sales/checkoutIdempotency.ts` |
 | Anulación | `src/app/api/sales/[id]/cancel/route.ts` |
 | Inventario/productos/precios | `src/app/inventory/page.tsx`, `src/components/inventory/*`, `src/app/api/products/*`, `inventory/*`, `store-products/*`, repositorios Prisma |
 | Unidades y presentaciones | `src/lib/units/*`, `src/app/api/units/*`, `src/app/api/pos/units/*`, modelos Unit/UnitConversion/SellUnitPrice |
@@ -133,10 +133,16 @@ los roles y cruces de tienda que deben seguir rechazándose.
 tienda/usuario, pago y turno, y dentro de una transacción carga productos,
 normaliza unidades, valida stock, calcula promociones/cupones/descuentos, asigna
 lotes FEFO, crea venta/items/movimientos, actualiza stock y registra fiado.
-El lock por cajero y la caché de idempotencia son Map locales al proceso.
-La información de pacientes/libro controlado se registra después y sin esperar;
-no forma parte de la transacción de venta. El cliente también intenta registrar
-medicación y emite el comprobante SUNAT en una petición posterior.
+El lock por cajero evita dos ejecuciones simultáneas dentro del proceso. Además,
+cada intento conserva una clave estable y deriva un `Sale.id` determinista por
+tienda, usuario y clave; el hash canónico del cuerpo queda en `paymentDetails`.
+La restricción primaria de la venta resuelve de forma atómica reintentos entre
+procesos o después de reiniciar: el mismo cuerpo recupera la venta y un cuerpo
+distinto con la misma clave responde conflicto. El replay ocurre solo después de
+revalidar sesión, tienda, usuario y rol.
+La información de pacientes y libro controlado se crea desde los `SaleItem`
+persistidos dentro de la misma transacción. El comprobante SUNAT se solicita en
+una petición posterior a la venta.
 
 ### Fiscal
 
@@ -662,9 +668,9 @@ una base real como comprobación rutinaria.
 
 ### Controles de calidad y sesión tipada por tienda (2026-10-23)
 
-- Punto de reanudación confirmado: commit `7ecfa76c` (`fix: restore enforced
-  quality gates`). El siguiente trabajo comienza en H12/H13; H05 no requiere
-  repetir la migración de sesiones.
+- Punto de reanudación de H05: commit `7ecfa76c` (`fix: restore enforced
+  quality gates`). H12/H13 se implementaron después sobre la misma rama aislada;
+  la migración de sesiones no requiere repetirse.
 - H05 quedó cerrado en `feature/sunat-beta`. `StoreSessionData`,
   `getCurrentStoreUser` y `getStoreSessionOrThrow` garantizan `storeId: string`
   dentro de rutas tenant. Los endpoints globales de SUPERADMIN mantienen la
@@ -673,6 +679,34 @@ una base real como comprobación rutinaria.
   También corrigió firmas `params` de Next 15 y desajustes reales entre rutas y
   tipos Prisma; no se ejecutaron migraciones, semillas ni escrituras contra una
   base real.
+### Impresión local e idempotencia de checkout (cerrado 2026-10-25)
+
+- H12 quedó corregido en la rama aislada. El servicio de impresión rechaza
+  orígenes no autorizados, refleja únicamente el origen permitido, exige un token
+  local para configuración, detección e impresión y valida cada campo del parche
+  de configuración. El token se genera aleatoriamente y se guarda con permisos
+  restringidos en el perfil local; POS y recibo lo obtienen desde `/status`.
+- Los nombres y puertos de impresora ya no se interpolan en `cmd.exe` ni en texto
+  de PowerShell. Se valida el puerto y se invoca PowerShell mediante argumentos
+  separados y una variable de entorno. La aceptación con impresora térmica real
+  sigue siendo una comprobación operativa pendiente.
+- H13 quedó corregido sin cambiar el esquema Prisma. Cada intento usa una clave
+  estable en la interfaz, un ID de venta determinista con ámbito tienda/usuario y
+  un hash canónico persistido en `paymentDetails`. Un reintento igual recupera la
+  venta; reutilizar la clave con otro cuerpo responde 409. La colisión de clave
+  primaria cubre reinicios y procesos concurrentes.
+- `scripts/audit-pos-isolated.cjs` comprueba rechazo de orígenes y puertos
+  maliciosos, token, ausencia de interpolación, orden de autorización/replay,
+  estabilidad del hash y aislamiento entre tiendas y usuarios. TypeScript web y
+  Electron, la compilación del servicio de impresión y la auditoría aislada
+  pasaron. `npm run lint` terminó sin errores y `npm run build:only` compiló la
+  aplicación completa con los controles activos; permanecen únicamente las
+  advertencias históricas ya inventariadas.
+- Punto de reanudación: H12/H13 están cerrados en código. El siguiente trabajo es
+  la aceptación integral en una instalación desechable, con impresora térmica
+  real y simulación de pérdida de respuesta y reinicio; no hace falta volver a
+  migrar rutas tenant ni reabrir H05.
+
 - `.eslintrc.json` carga `@typescript-eslint/parser` y el plugin correspondiente.
   `next.config.ts` ya no contiene `ignoreBuildErrors` ni `ignoreDuringBuilds`, por
   lo que una distribución vuelve a fallar ante errores de tipos o lint.
@@ -758,17 +792,19 @@ una base real como comprobación rutinaria.
    farmacéutica transaccional H11. Mantener esas invariantes al modificar ventas,
    fiados, lotes, compras, ajustes o farmacia.
 4. Recuperar controles de tipos/lint; `next.config.ts` hoy omite ambos en build.
-5. Verificar CORS/entrada de impresión e idempotencia. H15 de reportes, H16 de
-   sesión, H17 de autenticación interna y H18 de turnos quedaron corregidos y
-   cubiertos por pruebas aisladas. H19 también quedó corregido y verificado:
-   Electron limita la navegación al origen exacto del servidor iniciado.
+5. H12/H13 quedaron corregidos y cubiertos por la auditoría aislada: el servicio
+   de impresión valida origen, token, configuración y argumentos; checkout usa
+   identidad persistente por intento y recupera reintentos tras reinicios. Falta
+   aceptación operativa con impresora y pérdida de respuesta en una instalación
+   desechable. H15-H20 también quedaron corregidos y cubiertos por pruebas
+   aisladas.
 6. H20 quedó corregido: cada entrega queda identificada por versión, commit y
    manifiestos, sin destinos de actualización de ejemplo.
-7. H03, H04 y H05 quedaron corregidos y verificados en `feature/sunat-beta`.
-   La línea base H05 fue de 326 errores TypeScript; ahora web y Electron pasan,
-   lint tiene 0 errores y el build ejecuta ambos controles. El siguiente frente
-   es H12/H13: validar la entrada de impresión, el hardware soportado y completar
-   las pruebas de reintentos/idempotencia que aún requieren aceptación integral.
+7. H03, H04, H05, H12 y H13 quedaron corregidos y verificados en
+   `feature/sunat-beta`. La línea base H05 fue de 326 errores TypeScript; ahora
+   web y Electron pasan, lint tiene 0 errores y el build ejecuta ambos controles.
+   El siguiente frente es la aceptación integral y operativa de los cambios ya
+   implementados antes de preparar una distribución.
 
 Los detalles, condiciones y límites de evidencia están en el informe de auditoría.
 

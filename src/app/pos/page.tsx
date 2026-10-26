@@ -182,6 +182,7 @@ export default function POSPage() {
   const addToCartRef = useRef<((sp: StoreProduct) => Promise<void>) | null>(null);
   // ✅ FIX: Dedup para evitar doble agregado por scanner (debounce + Enter race condition)
   const lastScanAddRef = useRef(0);
+  const checkoutAttemptKeyRef = useRef<string | null>(null);
   
   // ✅ OPTIMIZACIÓN: AudioContext reutilizable
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -1667,8 +1668,15 @@ export default function POSPage() {
     setShowPaymentModal(false);
 
     try {
-      // ✅ MÓDULO 16.1: Generar idempotency key único
-      const idempotencyKey = `checkout-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Conservar la misma clave si se pierde la respuesta. Solo una respuesta
+      // definitiva permite iniciar otro intento con una clave nueva.
+      if (!checkoutAttemptKeyRef.current) {
+        const randomPart = typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        checkoutAttemptKeyRef.current = `checkout:${randomPart}`;
+      }
+      const idempotencyKey = checkoutAttemptKeyRef.current;
 
       const checkoutData: any = {
         items: cart.map((item) => {
@@ -1752,6 +1760,7 @@ export default function POSPage() {
 
       // ✅ MÓDULO 16.1: Manejar códigos específicos de hardening
       if (res.status === 429) {
+        checkoutAttemptKeyRef.current = null;
         // Rate limit exceeded
         toast.error('Demasiadas solicitudes', {
           description: 'Espera unos segundos antes de intentar nuevamente',
@@ -1772,6 +1781,7 @@ export default function POSPage() {
       }
 
       if (!res.ok) {
+        if (res.status < 500) checkoutAttemptKeyRef.current = null;
         // Mostrar mensaje de error con detalles si es conflicto de stock
         if (data.code === 'INSUFFICIENT_STOCK' && data.details) {
           const { productName, available, requested } = data.details;
@@ -1790,6 +1800,8 @@ export default function POSPage() {
         setProcessing(false);
         return;
       }
+
+      checkoutAttemptKeyRef.current = null;
 
       // ✅ Manejar respuesta idempotente (replay)
       if (data.code === 'IDEMPOTENT_REPLAY') {
@@ -2936,6 +2948,8 @@ export default function POSPage() {
                   try {
                     const statusRes = await fetch('http://127.0.0.1:12121/status', { signal: AbortSignal.timeout(1500) });
                     if (statusRes.ok) {
+                      const { pairingToken } = await statusRes.json();
+                      if (!pairingToken) throw new Error('Servicio de impresion sin vinculacion segura');
                       // Servicio activo → obtener datos de la venta y enviar
                       toast.info('Enviando a impresora...');
                       const saleRes = await fetch(`/api/sales/${completedSale.id}`);
@@ -2974,7 +2988,10 @@ export default function POSPage() {
                         };
                         const printRes = await fetch('http://127.0.0.1:12121/print', {
                           method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'X-MarketPOS-Token': pairingToken,
+                          },
                           body: JSON.stringify(printData),
                         });
                         const printResult = await printRes.json();

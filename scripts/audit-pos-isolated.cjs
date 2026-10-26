@@ -1279,6 +1279,117 @@ async function main() {
   console.log(`${desktopNavigationIsConstrained ? 'PASS' : 'FAIL'} H19: desktop navigation and ticket windows use the exact running server origin.`);
   if (!desktopNavigationIsConstrained) failures++;
 
+  const printSecurity = loadRoute('print-service/src/security.ts', {
+    crypto: require('crypto'),
+  });
+  const printServerSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'print-service/src/server.ts'),
+    'utf8'
+  );
+  const printPosSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/pos/page.tsx'),
+    'utf8'
+  );
+  const receiptSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/receipt/[id]/page.tsx'),
+    'utf8'
+  );
+  let unsafePrintConfigRejected = false;
+  try {
+    printSecurity.validateConfigPatch({ usbPort: 'USB001; calc.exe' });
+  } catch {
+    unsafePrintConfigRejected = true;
+  }
+  const validPrintConfig = printSecurity.validateConfigPatch({
+    mode: 'USB',
+    usbPort: 'USB001',
+    charsPerLine: 42,
+    allowedOrigins: ['https://pos.example.invalid'],
+  });
+  const allowedCors = printSecurity.createCorsHeaders('https://pos.example.invalid');
+  const printServiceIsRestricted = printSecurity.isAllowedOrigin('http://127.0.0.1:3000', [])
+    && !printSecurity.isAllowedOrigin('http://127.0.0.1.evil.invalid:3000', [])
+    && printSecurity.isAllowedOrigin(
+      'https://pos.example.invalid',
+      ['https://pos.example.invalid']
+    )
+    && !printSecurity.isAllowedOrigin('https://evil.invalid', ['https://pos.example.invalid'])
+    && allowedCors['Access-Control-Allow-Origin'] === 'https://pos.example.invalid'
+    && !Object.values(allowedCors).includes('*')
+    && printSecurity.isAuthorizedToken('paired-token', 'paired-token')
+    && !printSecurity.isAuthorizedToken('other-token', 'paired-token')
+    && printSecurity.isSafePrinterPort('USB001')
+    && !printSecurity.isSafePrinterPort('USB001;calc')
+    && unsafePrintConfigRejected
+    && validPrintConfig.usbPort === 'USB001'
+    && validPrintConfig.charsPerLine === 42
+    && !printServerSource.includes('cmd.exe')
+    && printServerSource.includes("spawnSync('powershell.exe', [")
+    && printServerSource.includes("server.listen(PORT, '127.0.0.1'")
+    && printServerSource.includes("req.headers['x-marketpos-token']")
+    && printPosSource.includes("'X-MarketPOS-Token': pairingToken")
+    && receiptSource.includes("'X-MarketPOS-Token': pairingToken");
+  console.log(`${printServiceIsRestricted ? 'PASS' : 'FAIL'} H12: print service restricts origins, authenticates mutations and avoids shell interpolation.`);
+  if (!printServiceIsRestricted) failures++;
+
+  const checkoutIdempotency = loadRoute('src/lib/sales/checkoutIdempotency.ts', {
+    crypto: require('crypto'),
+  });
+  const checkoutRouteSource = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src/app/api/sales/checkout/route.ts'),
+    'utf8'
+  );
+  let invalidCheckoutKeyRejected = false;
+  try {
+    checkoutIdempotency.parseCheckoutIdempotencyKey('bad key');
+  } catch {
+    invalidCheckoutKeyRejected = true;
+  }
+  const canonicalHash = checkoutIdempotency.createCheckoutRequestHash({
+    paymentMethod: 'CASH',
+    items: [{ quantity: 1, productId: 'product-a' }],
+  });
+  const reorderedHash = checkoutIdempotency.createCheckoutRequestHash({
+    items: [{ productId: 'product-a', quantity: 1 }],
+    paymentMethod: 'CASH',
+  });
+  const changedHash = checkoutIdempotency.createCheckoutRequestHash({
+    items: [{ productId: 'product-a', quantity: 2 }],
+    paymentMethod: 'CASH',
+  });
+  const checkoutKey = checkoutIdempotency.parseCheckoutIdempotencyKey('checkout:stable-attempt');
+  const checkoutId = checkoutIdempotency.createCheckoutSaleId('store-a', 'cashier-a', checkoutKey);
+  const storeCheckIndex = checkoutRouteSource.indexOf('const store = await prisma.store.findUnique');
+  const replayCheckIndex = checkoutRouteSource.indexOf('const persistedCheckout = await findPersistedCheckout');
+  const rateLimitIndex = checkoutRouteSource.indexOf("const rateLimitResult = checkRateLimit('checkout'");
+  const lockIndex = checkoutRouteSource.indexOf('lockAcquired = acquireCheckoutLock');
+  const executeIndex = checkoutRouteSource.indexOf('result = await executeCheckout');
+  const conflictStart = printPosSource.indexOf("data.code === 'CHECKOUT_IN_PROGRESS'");
+  const conflictEnd = printPosSource.indexOf('if (!res.ok)', conflictStart);
+  const conflictBranch = conflictStart >= 0 && conflictEnd > conflictStart
+    ? printPosSource.slice(conflictStart, conflictEnd)
+    : '';
+  const checkoutRetriesAreDurable = invalidCheckoutKeyRejected
+    && canonicalHash === reorderedHash
+    && canonicalHash !== changedHash
+    && checkoutId === checkoutIdempotency.createCheckoutSaleId('store-a', 'cashier-a', checkoutKey)
+    && checkoutId !== checkoutIdempotency.createCheckoutSaleId('store-b', 'cashier-a', checkoutKey)
+    && checkoutId !== checkoutIdempotency.createCheckoutSaleId('store-a', 'cashier-b', checkoutKey)
+    && checkoutRouteSource.includes('id: checkoutSaleId')
+    && checkoutRouteSource.includes('checkoutRequestHash: checkoutHash')
+    && checkoutRouteSource.includes("error?.code === 'P2002'")
+    && !checkoutRouteSource.includes('@/lib/idempotency')
+    && storeCheckIndex >= 0
+    && storeCheckIndex < replayCheckIndex
+    && replayCheckIndex < rateLimitIndex
+    && rateLimitIndex < lockIndex
+    && lockIndex < executeIndex
+    && printPosSource.includes('checkoutAttemptKeyRef')
+    && printPosSource.includes("'Idempotency-Key': idempotencyKey")
+    && !conflictBranch.includes('checkoutAttemptKeyRef.current = null');
+  console.log(`${checkoutRetriesAreDurable ? 'PASS' : 'FAIL'} H13: checkout retries use a persistent tenant-scoped identity and stable client key.`);
+  if (!checkoutRetriesAreDurable) failures++;
+
   const releaseTools = require('../desktop/scripts/release-metadata');
   const rootPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
   const desktopPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'desktop/package.json'), 'utf8'));
