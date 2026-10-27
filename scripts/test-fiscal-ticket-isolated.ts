@@ -138,11 +138,11 @@ for (const [label, cols, fiscal] of [
     const required = [
       fiscal.issuer.businessName.toUpperCase(), `RUC: ${fiscal.issuer.ruc}`, fiscal.title, fiscal.fullNumber,
       '27/10/2026 11:05', 'TICKET 00012', 'CAJERO: cleo', 'OP. GRAVADA:', 'IGV (18%):', 'IMPORTE TOTAL:', 'SON:',
-      'EFECTIVO', 'VUELTO', 'Representacion impresa',
+      'EFECTIVO', 'VUELTO', 'Representacion impresa', 'DESCRIPCION', 'PRECIO',
     ];
     for (const fragment of required) assert.ok(text.includes(fragment), `falta "${fragment}"`);
-    // Diseño compacto: sin hash aparte (va dentro del QR), sin encabezado de columnas.
-    for (const fragment of ['Hash:', 'DESCRIPCION', 'RECIBIDO']) assert.ok(!text.includes(fragment), `sobra "${fragment}"`);
+    // Diseño compacto: sin hash aparte (va dentro del QR) ni línea de puntos.
+    for (const fragment of ['Hash:', 'RECIBIDO', '.........']) assert.ok(!text.includes(fragment), `sobra "${fragment}"`);
     assert.ok(buffer.includes(Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 3])), 'QR de módulo 3');
     assert.ok(buffer.includes(Buffer.from([0x1b, 0x33, 26])), 'interlineado compacto');
     const printedLines = text.split('\n').length;

@@ -222,12 +222,12 @@ export class TicketFormatter {
   // ── Productos ────────────────────────────────────────────────────────────────
 
   private printItems(items: PrintSaleItem[], compact = false): void {
-    if (!compact) {
-      this.push(CMD.BOLD_ON);
-      this.line(this.lr('DESCRIPCION', '  PRECIO'));
-      this.push(CMD.BOLD_OFF);
-      this.line(this.dots());
-    }
+    // El encabezado de columnas orienta al cliente; en el diseño compacto se
+    // omite solo la línea de puntos.
+    this.push(CMD.BOLD_ON);
+    this.line(this.lr('DESCRIPCION', '  PRECIO'));
+    this.push(CMD.BOLD_OFF);
+    if (!compact) this.line(this.dots());
 
     for (const item of items) {
       const price = this.money(item.subtotal);
