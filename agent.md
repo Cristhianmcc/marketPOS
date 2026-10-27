@@ -168,7 +168,9 @@ en letras, QR, hash, leyenda y marca BETA) y `/api/sales/[id]` lo devuelve. Lo
 consumen el formateador ESC/POS de Electron (`desktop/src/printing/escpos`) y
 `/receipt/[id]`. Las notas y los comprobantes rechazados, con error o anulados no
 se imprimen como comprobante. `npm run test:ticket:isolated` valida 80 y 58 mm.
-El formateador del `print-service` web todavía no incluye este bloque.
+El ticket fiscal usa diseño compacto (interlineado 26, QR de módulo 3 y sin hash
+aparte: el QR ya lo contiene). El formateador del `print-service` web todavía no
+incluye este bloque.
 
 Las boletas pueden emitirse a un cliente identificado o a `CLIENTES VARIOS`. En
 el segundo caso se usa el tipo de documento SUNAT `0` y el número `-`; si el

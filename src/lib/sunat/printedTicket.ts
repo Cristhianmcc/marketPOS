@@ -160,7 +160,7 @@ export function buildFiscalTicket(source: FiscalTicketSource): FiscalTicketData 
     issuer: {
       ruc: issuerRuc,
       businessName,
-      tradeName: store.name && store.name !== businessName ? store.name : null,
+      tradeName: store.name && store.name.trim().toUpperCase() !== businessName.trim().toUpperCase() ? store.name : null,
       address: settings.address || store.address,
     },
     customer: {

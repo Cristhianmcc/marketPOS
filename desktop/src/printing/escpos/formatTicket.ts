@@ -18,6 +18,9 @@ const CMD = {
   BOLD_ON:      Buffer.from([ESC, 0x45, 0x01]),
   BOLD_OFF:     Buffer.from([ESC, 0x45, 0x00]),
   FEED_LINE:    Buffer.from([LF]),
+  // Interlineado: 26 puntos es más compacto que el predeterminado (~30)
+  LINE_SPACING_COMPACT: Buffer.from([ESC, 0x33, 26]),
+  LINE_SPACING_DEFAULT: Buffer.from([ESC, 0x32]),
   FEED_LINES:   (n: number) => Buffer.from([ESC, 0x64, n]),
   CUT_PARTIAL:  Buffer.from([GS,  0x56, 0x01]),
   CUT_FULL:     Buffer.from([GS,  0x56, 0x00]),
@@ -115,13 +118,16 @@ export class TicketFormatter {
   formatSale(data: PrintSaleData): Buffer {
     this.buffer = [];
     this.push(CMD.INIT);
+    // El comprobante electrónico usa un diseño compacto para ahorrar papel.
+    if (data.fiscal) this.push(CMD.LINE_SPACING_COMPACT);
     this.printHeader(data);
     this.printSaleInfo(data);
-    this.printItems(data.items);
+    this.printItems(data.items, !!data.fiscal);
     if (data.discounts?.length) this.printDiscounts(data.discounts);
     this.printTotals(data);
     this.printPayment(data);
     this.printFooter(data);
+    if (data.fiscal) this.push(CMD.LINE_SPACING_DEFAULT);
     this.push(CMD.FEED_LINES(4));
     if (this.config.autoCut)        this.push(CMD.CUT_PARTIAL);
     if (this.config.openCashDrawer) this.push(CMD.OPEN_DRAWER);
@@ -158,13 +164,24 @@ export class TicketFormatter {
     this.wrap(fiscal.issuer.businessName.toUpperCase()).forEach(l => this.line(this.center(l.trim())));
     this.push(CMD.BOLD_OFF);
     if (fiscal.issuer.tradeName) this.wrap(fiscal.issuer.tradeName).forEach(l => this.line(this.center(l.trim())));
-    this.line(this.center(`RUC: ${fiscal.issuer.ruc}`));
+    const ruc = `RUC: ${fiscal.issuer.ruc}`;
+    const rucPhone = data.store.phone ? `${ruc}  Tel: ${data.store.phone}` : ruc;
+    if (rucPhone.length <= this.cols) {
+      this.line(this.center(rucPhone));
+    } else {
+      this.line(this.center(ruc));
+      this.line(this.center(`Tel: ${data.store.phone}`));
+    }
     if (fiscal.issuer.address) this.wrap(fiscal.issuer.address).forEach(l => this.line(this.center(l.trim())));
-    if (data.store.phone) this.line(this.center(`Tel: ${data.store.phone}`));
-    this.line(this.dash());
+    // Tipo y número en una sola línea cuando caben (80 mm)
     this.push(CMD.BOLD_ON);
-    this.wrap(fiscal.title).forEach(l => this.line(this.center(l.trim())));
-    this.line(this.center(fiscal.fullNumber));
+    const titleLine = `${fiscal.title} ${fiscal.fullNumber}`;
+    if (titleLine.length <= this.cols) {
+      this.line(this.center(titleLine));
+    } else {
+      this.wrap(fiscal.title).forEach(l => this.line(this.center(l.trim())));
+      this.line(this.center(fiscal.fullNumber));
+    }
     this.push(CMD.BOLD_OFF);
     this.line(this.dash());
   }
@@ -175,13 +192,18 @@ export class TicketFormatter {
     lines.forEach(l => this.line(l));
   }
 
+  /** Texto a la izquierda y a la derecha, sin el límite de ancho de precio. */
+  private spread(left: string, right: string): string {
+    const pad = Math.max(1, this.cols - left.length - right.length);
+    return `${left}${' '.repeat(pad)}${right}`.slice(0, this.cols);
+  }
+
   private printSaleInfo(data: PrintSaleData): void {
     if (data.fiscal) {
       const { fiscal } = data;
-      this.labeled('FECHA EMISION:', `${fiscal.issueDate} ${data.time}`.trim());
+      const hhmm = data.time.slice(0, 5);
+      this.line(this.spread(`${fiscal.issueDate} ${hhmm}`.trim(), `TICKET ${String(data.saleNumber).padStart(5, '0')}`));
       if (data.cashierName) this.labeled('CAJERO:', data.cashierName);
-      this.labeled('TICKET:', String(data.saleNumber).padStart(5, '0'));
-      this.line(this.dash());
       this.labeled(fiscal.title.startsWith('FACTURA') ? 'SENOR(ES):' : 'CLIENTE:', fiscal.customer.name.toUpperCase());
       if (fiscal.customer.documentNumber) this.labeled(`${fiscal.customer.documentLabel}:`, fiscal.customer.documentNumber);
       if (fiscal.customer.address) this.labeled('DIRECCION:', fiscal.customer.address);
@@ -199,11 +221,13 @@ export class TicketFormatter {
 
   // ── Productos ────────────────────────────────────────────────────────────────
 
-  private printItems(items: PrintSaleItem[]): void {
-    this.push(CMD.BOLD_ON);
-    this.line(this.lr('DESCRIPCION', '  PRECIO'));
-    this.push(CMD.BOLD_OFF);
-    this.line(this.dots());
+  private printItems(items: PrintSaleItem[], compact = false): void {
+    if (!compact) {
+      this.push(CMD.BOLD_ON);
+      this.line(this.lr('DESCRIPCION', '  PRECIO'));
+      this.push(CMD.BOLD_OFF);
+      this.line(this.dots());
+    }
 
     for (const item of items) {
       const price = this.money(item.subtotal);
@@ -246,7 +270,7 @@ export class TicketFormatter {
   // ── Totales ──────────────────────────────────────────────────────────────────
 
   private printTotals(data: PrintSaleData): void {
-    this.line(this.equals());
+    this.line(data.fiscal ? this.dash() : this.equals());
     if (data.totalDiscount > 0) {
       this.line(this.lr('SUBTOTAL:', this.money(data.subtotal)));
       this.line(this.lr('DESCUENTO:', `-S/${data.totalDiscount.toFixed(2)}`));
@@ -258,7 +282,10 @@ export class TicketFormatter {
     this.push(CMD.BOLD_ON);
     this.line(this.lr(data.fiscal ? 'IMPORTE TOTAL:' : 'TOTAL:', this.money(data.fiscal?.total ?? data.total)));
     this.push(CMD.BOLD_OFF);
-    if (data.fiscal) this.wrap(data.fiscal.amountInWords).forEach(l => this.line(l));
+    if (data.fiscal) {
+      this.wrap(data.fiscal.amountInWords).forEach(l => this.line(l));
+      return;
+    }
     this.line(this.equals());
   }
 
@@ -275,6 +302,15 @@ export class TicketFormatter {
       FIADO:    'CREDITO',
       MIXED:    'MIXTO',
     };
+    // Comprobante: medio de pago e importe en una línea; vuelto solo si hay.
+    if (data.fiscal && payment.method !== 'FIADO') {
+      const paid = payment.method === 'CASH' && payment.amountPaid !== undefined ? payment.amountPaid : data.fiscal.total;
+      this.line(this.lr(METHOD[payment.method] ?? payment.method, this.money(paid)));
+      if (payment.method === 'CASH' && payment.change !== undefined && payment.change > 0) {
+        this.line(this.lr('VUELTO', this.money(payment.change)));
+      }
+      return;
+    }
     this.line(`PAGO: ${METHOD[payment.method] ?? payment.method}`);
     if (payment.method === 'CASH' && payment.amountPaid !== undefined) {
       this.line(this.lr('RECIBIDO:', this.money(payment.amountPaid)));
@@ -295,31 +331,30 @@ export class TicketFormatter {
   // ── Pie de ticket ────────────────────────────────────────────────────────────
 
   /**
-   * Bloque legal de la representación impresa: QR SUNAT, hash, leyenda y,
-   * en BETA, la marca de documento sin valor tributario.
+   * Bloque legal de la representación impresa: QR SUNAT (incluye el hash),
+   * leyenda y, en BETA, la marca de documento sin valor tributario.
    */
   private printFiscalFooter(data: PrintSaleData): void {
     const fiscal = data.fiscal!;
-    this.line(this.equals());
+    this.line(this.dash());
     this.push(CMD.ALIGN_CENTER);
-    this.qrCode(fiscal.qrText, this.cols <= 32 ? 4 : 5);
+    // Módulo de 3 puntos: ~2 cm, legible con la cámara de un celular.
+    this.qrCode(fiscal.qrText, 3);
     this.push(CMD.FEED_LINE, CMD.ALIGN_LEFT);
-    if (fiscal.hash) this.wrap(`Hash: ${fiscal.hash}`).forEach(l => this.line(this.center(l.trim())));
     this.wrap(fiscal.legend).forEach(l => this.line(this.center(l.trim())));
     if (fiscal.isBeta) {
       this.push(CMD.BOLD_ON);
-      this.line(this.center('*** DOCUMENTO DE PRUEBA BETA ***'));
-      this.line(this.center('SIN VALOR TRIBUTARIO'));
+      this.wrap('PRUEBA BETA - SIN VALOR TRIBUTARIO').forEach(l => this.line(this.center(l.trim())));
       this.push(CMD.BOLD_OFF);
     } else {
-      this.wrap('Consulte su comprobante en www.sunat.gob.pe').forEach(l => this.line(this.center(l.trim())));
+      this.wrap('Consulte en www.sunat.gob.pe').forEach(l => this.line(this.center(l.trim())));
     }
   }
 
   private printFooter(data: PrintSaleData): void {
     const { store } = data;
     if (data.fiscal) this.printFiscalFooter(data);
-    this.line(this.equals());
+    else this.line(this.equals());
     const slogan = store.slogan || data.footer || 'Gracias por su compra!';
     this.push(CMD.BOLD_ON);
     // Centrado por software: agrega espacios manualmente → funciona en cualquier impresora

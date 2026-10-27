@@ -616,15 +616,15 @@ export default function ReceiptPage() {
           {fiscal && (
             <>
               <div style={{ textAlign: 'center', fontSize: '10px', margin: '8px 0' }}>
+                {/* El QR ya contiene el hash del comprobante */}
                 {fiscalQr && (
-                  <img src={fiscalQr} alt="Código QR SUNAT" style={{ width: '120px', height: '120px', margin: '0 auto 6px', display: 'block' }} />
+                  <img src={fiscalQr} alt="Código QR SUNAT" style={{ width: '90px', height: '90px', margin: '0 auto 4px', display: 'block' }} />
                 )}
-                {fiscal.hash && <div style={{ wordBreak: 'break-all' }}>Hash: {fiscal.hash}</div>}
-                <div style={{ marginTop: '4px' }}>{fiscal.legend}</div>
+                <div>{fiscal.legend}</div>
                 {fiscal.isBeta ? (
-                  <div style={{ fontWeight: 'bold', marginTop: '4px' }}>*** DOCUMENTO DE PRUEBA BETA — SIN VALOR TRIBUTARIO ***</div>
+                  <div style={{ fontWeight: 'bold', marginTop: '2px' }}>PRUEBA BETA - SIN VALOR TRIBUTARIO</div>
                 ) : (
-                  <div style={{ marginTop: '4px' }}>Consulte su comprobante en www.sunat.gob.pe</div>
+                  <div style={{ marginTop: '2px' }}>Consulte en www.sunat.gob.pe</div>
                 )}
               </div>
               <div className="separator">================================</div>

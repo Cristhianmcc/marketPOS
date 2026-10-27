@@ -73,6 +73,8 @@ check('boleta a consumidor final', () => {
   assert.equal(boleta.customer.name, 'CLIENTES VARIOS');
   assert.equal(boleta.issuer.businessName, 'COMERCIAL MONTERRIAL S.A.C.');
   assert.equal(boleta.issuer.tradeName, 'Bodega Los Alamos', 'nombre comercial cuando difiere');
+  const sameName = buildFiscalTicket({ ...baseSource, store: { ...baseSource.store, name: 'comercial monterrial s.a.c.' } })!;
+  assert.equal(sameName.issuer.tradeName, null, 'no repite el nombre si solo cambia mayúsculas');
   assert.equal(boleta.amountInWords, 'SON: SIETE CON 00/100 SOLES');
   assert.equal(boleta.isBeta, true);
   assert.match(boleta.qrText, /^20123456789\|03\|B001\|12\|1\.07\|7\.00\|2026-10-27\|0\|/, 'QR reconstruido cuando falta');
@@ -135,17 +137,23 @@ for (const [label, cols, fiscal] of [
     const text = printable(buffer, fiscal.qrText);
     const required = [
       fiscal.issuer.businessName.toUpperCase(), `RUC: ${fiscal.issuer.ruc}`, fiscal.title, fiscal.fullNumber,
-      'FECHA EMISION:', 'CAJERO: cleo', 'OP. GRAVADA:', 'IGV (18%):', 'IMPORTE TOTAL:', 'SON:', 'Hash:',
-      'Representacion impresa',
+      '27/10/2026 11:05', 'TICKET 00012', 'CAJERO: cleo', 'OP. GRAVADA:', 'IGV (18%):', 'IMPORTE TOTAL:', 'SON:',
+      'EFECTIVO', 'VUELTO', 'Representacion impresa',
     ];
     for (const fragment of required) assert.ok(text.includes(fragment), `falta "${fragment}"`);
+    // Diseño compacto: sin hash aparte (va dentro del QR), sin encabezado de columnas.
+    for (const fragment of ['Hash:', 'DESCRIPCION', 'RECIBIDO']) assert.ok(!text.includes(fragment), `sobra "${fragment}"`);
+    assert.ok(buffer.includes(Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 3])), 'QR de módulo 3');
+    assert.ok(buffer.includes(Buffer.from([0x1b, 0x33, 26])), 'interlineado compacto');
+    const printedLines = text.split('\n').length;
+    assert.ok(printedLines <= (cols === 48 ? 30 : 34), `ticket demasiado largo: ${printedLines} líneas`);
     if (fiscal.docType === 'FACTURA') {
       assert.ok(text.includes('RUC: 20987654321'), 'RUC del cliente');
       assert.ok(text.includes('DIRECCION:'), 'dirección del cliente');
       assert.ok(text.includes('www.sunat.gob.pe'), 'consulta en producción');
     } else {
       assert.ok(text.includes('CLIENTES VARIOS'), 'consumidor final');
-      assert.ok(text.includes('DOCUMENTO DE PRUEBA BETA'), 'marca BETA');
+      assert.ok(text.includes('PRUEBA BETA') && text.includes('SIN VALOR'), 'marca BETA');
       assert.ok(!text.includes('www.sunat.gob.pe'), 'BETA no invita a consultar en SUNAT');
     }
     assert.ok(buffer.includes(Buffer.from([0x1d, 0x28, 0x6b])), 'comando QR presente');
