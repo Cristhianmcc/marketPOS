@@ -13,7 +13,23 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { execSync } from 'child_process';
+import { app } from 'electron';
 import { UsbDevice, getVendorName, KNOWN_PRINTER_VENDORS } from './types';
+
+/**
+ * Carpeta para los archivos temporales de impresión. Se usa el perfil de la
+ * app porque un proceso de integridad baja (variante portable aislada) no
+ * puede escribir en %TEMP%; si no está disponible, se recurre a %TEMP%.
+ */
+function getPrintTempDir(): string {
+  try {
+    const dir = path.join(app.getPath('userData'), 'print-tmp');
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  } catch {
+    return os.tmpdir();
+  }
+}
 
 // ============== USB Device Discovery ==============
 
@@ -242,8 +258,8 @@ async function printWindowsNative(
   vendorId: number,
   productId: number,
   data: Buffer
-): Promise<boolean> {
-  if (process.platform !== 'win32') return false;
+): Promise<PrintResult> {
+  if (process.platform !== 'win32') return { ok: false, detail: 'No es Windows' };
 
   // 1. Discover USB printers installed in Windows
   const usbPrinters = listWindowsUsbPrinters();
@@ -252,12 +268,12 @@ async function printWindowsNative(
   const printerName = pickBestPrinter(usbPrinters, vendorId);
   if (!printerName) {
     console.warn('[USB-WIN] No USB printer found in Windows. Is the Epson driver installed?');
-    return false;
+    return { ok: false, detail: 'No hay una impresora Epson instalada en Windows' };
   }
   console.log(`[USB-WIN] Selected printer: "${printerName}"`);
 
   // 2. Write ESC/POS bytes and PS1 script to temp files
-  const tmpDir  = os.tmpdir();
+  const tmpDir  = getPrintTempDir();
   const binFile = path.join(tmpDir, `escpos_${Date.now()}.bin`);
   const ps1File = path.join(tmpDir, `escpos_print_${Date.now()}.ps1`);
 
@@ -266,22 +282,30 @@ async function printWindowsNative(
     fs.writeFileSync(ps1File, WIN_RAW_PRINT_PS1, 'utf8');
   } catch (e) {
     console.error('[USB-WIN] Failed to write temp files:', e);
-    return false;
+    return { ok: false, detail: `No se pudo escribir el archivo temporal en ${tmpDir}: ${(e as Error).message}` };
   }
 
   try {
     // 3. Execute the PowerShell script (uses winspool.drv via P/Invoke)
     const cmd = `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${ps1File}" -PrinterName "${printerName}" -FilePath "${binFile}"`;
     console.log(`[USB-WIN] Running: ${cmd}`);
-    const result = execSync(cmd, { timeout: 20000, encoding: 'utf8' }).trim();
+    // Add-Type compila C# en %TEMP%: se dirige a la misma carpeta escribible.
+    const result = execSync(cmd, {
+      timeout: 20000,
+      encoding: 'utf8',
+      env: { ...process.env, TEMP: tmpDir, TMP: tmpDir },
+    }).trim();
     console.log(`[USB-WIN] Result: ${result}`);
     if (result.startsWith('OK:')) {
       console.log(`[USB-WIN] ✓ Print OK via WinSpool → "${printerName}"`);
-      return true;
+      return { ok: true, detail: `OK via WinSpool → ${printerName}` };
     }
-    return false;
+    return { ok: false, detail: `WinSpool respondió sin confirmar: ${result || '(vacío)'}` };
   } catch (e) {
     console.error('[USB-WIN] WinSpool print failed:', (e as Error).message);
+    // El primer renglón útil de stderr de PowerShell explica la causa real.
+    const stderr = String((e as { stderr?: unknown }).stderr || (e as Error).message || '');
+    const reason = stderr.split(/\r?\n/).map(l => l.trim()).find(l => l && !l.startsWith('+') && !l.startsWith('En l')) || stderr.slice(0, 200);
 
     // 4. Last-resort fallback: copy /b to port file USB001..USB009
     console.log('[USB-WIN] Trying copy /b fallback...');
@@ -290,10 +314,10 @@ async function printWindowsNative(
       try {
         execSync(`cmd /c copy /b "${binFile}" "${port}"`, { timeout: 8000, encoding: 'utf8' });
         console.log(`[USB-WIN] copy /b OK via ${port}`);
-        return true;
+        return { ok: true, detail: `OK via ${port}` };
       } catch { /* try next */ }
     }
-    return false;
+    return { ok: false, detail: `WinSpool falló en "${printerName}": ${reason}` };
   } finally {
     try { fs.unlinkSync(binFile); } catch { /* ignore */ }
     try { fs.unlinkSync(ps1File); } catch { /* ignore */ }
@@ -413,9 +437,7 @@ export async function printAndClose(
   // ── 1. Windows native path ──────────────────────────────────────────────
   if (process.platform === 'win32') {
     try {
-      const ok = await printWindowsNative(vendorId, productId, data);
-      if (ok) return { ok: true, detail: 'OK via WinSpool' };
-      return { ok: false, detail: 'WinSpool: todos los métodos fallaron (ver log del proceso principal)' };
+      return await printWindowsNative(vendorId, productId, data);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[USB] Windows native error:', msg);
