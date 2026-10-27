@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
-import { registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
+import { isCloudLicenseRegistrationAvailable, registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
 import { saveStoreLicenseCredential } from '@/lib/licenseCredentialStore';
 
 export async function POST(
@@ -15,6 +15,12 @@ export async function POST(
   }
   if (session.role !== 'SUPERADMIN' && !isSuperAdmin(session.email)) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
+  }
+  if (!isCloudLicenseRegistrationAvailable()) {
+    return NextResponse.json(
+      { error: 'Las tiendas creadas en la nube no necesitan registrar licencia; se registra desde la aplicacion de escritorio.' },
+      { status: 400 },
+    );
   }
   if (!session.cloudAdminToken) {
     return NextResponse.json(

@@ -143,6 +143,7 @@ interface RestoreResult {
 export default function AdminStoresPage() {
   const router = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
+  const [licenseRegistrationAvailable, setLicenseRegistrationAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -218,6 +219,7 @@ export default function AdminStoresPage() {
       if (!res.ok) throw new Error('Error al cargar tiendas');
       const data = await res.json();
       setStores(data.stores);
+      setLicenseRegistrationAvailable(data.licenseRegistrationAvailable === true);
     } catch (err) {
       setError('Error al cargar tiendas');
     } finally {
@@ -616,7 +618,7 @@ export default function AdminStoresPage() {
         >
           {resettingOwnerStoreId === store.id ? 'Generando...' : 'Acceso OWNER'}
         </button>
-        {store.status === 'ACTIVE' && (
+        {licenseRegistrationAvailable && store.status === 'ACTIVE' && (
           <button
             type="button"
             onClick={() => handleRegisterLicense(store)}

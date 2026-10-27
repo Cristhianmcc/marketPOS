@@ -11,7 +11,7 @@ import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 import { findRecoverableSubscriptionSource } from '@/lib/restoredSubscription';
-import { registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
+import { isCloudLicenseRegistrationAvailable, registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
 import { getStoreLicenseCredential, saveStoreLicenseCredential } from '@/lib/licenseCredentialStore';
 
 // GET /api/admin/stores - Listar todas las tiendas (SUPERADMIN)
@@ -102,7 +102,10 @@ export async function GET(request: NextRequest) {
       };
     }));
 
-    return NextResponse.json({ stores: storesWithRecovery });
+    return NextResponse.json({
+      stores: storesWithRecovery,
+      licenseRegistrationAvailable: isCloudLicenseRegistrationAvailable(),
+    });
   } catch (error) {
     console.error('Error fetching stores:', error);
     return NextResponse.json(
@@ -303,12 +306,14 @@ export async function POST(request: NextRequest) {
     }
 
     let cloudRegistration: {
-      status: 'registered' | 'reauth_required' | 'failed';
+      status: 'registered' | 'not_required' | 'reauth_required' | 'failed';
       already?: boolean;
       message?: string;
     };
 
-    if (!session.cloudAdminToken) {
+    if (!isCloudLicenseRegistrationAvailable()) {
+      cloudRegistration = { status: 'not_required' };
+    } else if (!session.cloudAdminToken) {
       cloudRegistration = {
         status: 'reauth_required',
         message: 'Vuelve a iniciar sesión como SUPERADMIN para registrar esta tienda en la nube.',

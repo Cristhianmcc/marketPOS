@@ -868,6 +868,10 @@ Los detalles, condiciones y límites de evidencia están en el informe de audito
   `/api/license/register-store`. La nube devuelve una credencial limitada a
   consultar la licencia de esa misma tienda. Una credencial de una tienda no
   sirve para consultar otra.
+- El registro solo existe en el servidor local del desktop
+  (`isCloudLicenseRegistrationAvailable`, por `DESKTOP_INTERNAL_TOKEN` o
+  `MONTERRIAL_DATA_DIR`). En la web cloud, crear una tienda devuelve
+  `not_required`, el botón de licencia no se muestra y la ruta responde 400.
 - Las credenciales por tienda se guardan mediante escritura atómica en
   `MONTERRIAL_DATA_DIR/config/license-credentials.json`. El listado SUPERADMIN
   indica qué tiendas ya están vinculadas y permite renovar el vínculo después

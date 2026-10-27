@@ -15,6 +15,14 @@ interface CloudRegistrationResult {
   licenseToken: string;
 }
 
+/**
+ * Solo el servidor local del escritorio registra tiendas en la nube. En la web
+ * la tienda ya vive en la base cloud y no necesita credencial de licencia.
+ */
+export function isCloudLicenseRegistrationAvailable(): boolean {
+  return Boolean(process.env.DESKTOP_INTERNAL_TOKEN || process.env.MONTERRIAL_DATA_DIR);
+}
+
 function getCloudBaseUrl(): string {
   const value = process.env.CLOUD_URL?.trim().replace(/\/+$/, '') || '';
   if (!value) throw new Error('CLOUD_URL_NOT_CONFIGURED');
