@@ -149,10 +149,40 @@ fallando en los mismos 25 modelos, como corresponde antes de la Fase 2.
 Regresión: TypeScript web y Electron, lint de las rutas, `test:backups:isolated`,
 auditoría aislada (40/40) y `git diff --check` correctos.
 
+## Resultado de las Fases 2 y 3 (27/10/2026)
+
+`restore/new-store` recrea todas las secciones `1.1` dentro de la misma
+transacción, en orden de dependencias. Las unidades se traducen por código y se
+crean solo las que faltan. La categoría padre se enlaza en un segundo paso. El
+catálogo público vuelve deshabilitado y sin slug. Se conservan además
+`Movement.batchId`, `SaleItem.serviceId`, `ProductMaster.baseUnitId` (al crear
+un maestro nuevo) y `Shift.createdAt`. Si el respaldo contiene una sección, toda
+referencia a ella debe resolverse o la restauración entera se revierte; en un
+respaldo `1.0` esas referencias se omiten como antes. Los conteos de las
+secciones nuevas se validan contra `metadata.counts`, y el panel SUPERADMIN
+muestra lotes, proveedores, compras, servicios, órdenes, pacientes y registros
+de controlados restaurados.
+
+Validación en `npm run test:backups:roundtrip`:
+
+- Roundtrip: 34/34 modelos conservados campo por campo en otra base.
+- Exportación: 45/45 comprobaciones.
+- Casos adicionales 5/5: unidad faltante creada, unidad existente intacta,
+  stock igual a la suma de lotes, fixture `1.0` restaurado, y referencia rota
+  revertida sin dejar tiendas, usuarios, productos, ventas ni categorías.
+- Prueba de mutación: anular `Movement.batchId` en la restauración hizo fallar
+  exactamente `Movement`; se revirtió la mutación.
+- El banco reconoce `saleId` de `ControlledBookEntry` y `DrugInteractionLog`
+  como referencias a la venta, aunque Prisma no declare esas relaciones.
+
+Regresión (Fase 3): TypeScript web y Electron, lint de las rutas y del panel,
+`test:backups:isolated`, auditoría aislada 40/40, `test:migrations:isolated`,
+`git diff --check` y `npm run build:only` correctos.
+
 ## Estado
 
 - [x] Fase 0
 - [x] Fase 1
-- [ ] Fase 2
-- [ ] Fase 3
+- [x] Fase 2
+- [x] Fase 3
 - [ ] Fase 4

@@ -290,7 +290,31 @@ export async function POST(request: NextRequest) {
         (sum: number, receivable: any) => sum + (Array.isArray(receivable.payments) ? receivable.payments.length : 0),
         0
       ),
-    };
+    } as Record<string, number>;
+    // Secciones 1.1: se validan solo si el respaldo las contiene.
+    const sectionArrays = [
+      'units', 'categories', 'unitConversions', 'sellUnitPrices', 'productBatches', 'services',
+      'suppliers', 'purchaseOrders', 'workOrders', 'patients', 'patientMedications',
+      'controlledBookEntries', 'drugInteractionLogs', 'promotions', 'coupons',
+      'categoryPromotions', 'volumePromotions', 'nthPromotions',
+    ];
+    for (const key of sectionArrays) {
+      if (backupData[key] === undefined) continue;
+      if (!Array.isArray(backupData[key])) {
+        return NextResponse.json(
+          { code: 'INVALID_BACKUP_DATA', message: 'El respaldo no contiene la estructura requerida' },
+          { status: 400 }
+        );
+      }
+      actualCounts[key] = backupData[key].length;
+    }
+    const nestedCount = (key: string) => (Array.isArray(backupData[key])
+      ? backupData[key].reduce((sum: number, row: any) => sum + (Array.isArray(row.items) ? row.items.length : 0), 0)
+      : undefined);
+    const purchaseOrderItemsCount = nestedCount('purchaseOrders');
+    const workOrderItemsCount = nestedCount('workOrders');
+    if (purchaseOrderItemsCount !== undefined) actualCounts.purchaseOrderItems = purchaseOrderItemsCount;
+    if (workOrderItemsCount !== undefined) actualCounts.workOrderItems = workOrderItemsCount;
     const mismatchedCount = Object.entries(actualCounts).find(([key, value]) =>
       typeof metadata.counts?.[key] === 'number' && metadata.counts[key] !== value
     );
@@ -407,6 +431,123 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Los respaldos 1.0 no traen las secciones por rubro. Si una sección
+      // existe, toda referencia a ella debe resolverse; si no existe, la
+      // referencia se omite como hasta ahora.
+      const hasSection = (key: string) => Array.isArray(backupData[key]);
+      const mapReference = (
+        map: Map<string, string>,
+        sourceId: string | null | undefined,
+        section: string,
+        label: string,
+      ): string | null => {
+        if (!sourceId) return null;
+        const mapped = map.get(sourceId);
+        if (mapped) return mapped;
+        if (hasSection(section)) throw new Error(`El respaldo contiene ${label} con una referencia inexistente`);
+        return null;
+      };
+      const optionalDate = (value: string | null | undefined) => (value ? new Date(value) : null);
+
+      // 2.2 Unidades: son globales y cada instalación tiene sus propios IDs.
+      // Se traducen por código y solo se crean las que faltan; una unidad
+      // existente nunca se modifica.
+      const unitIdMap = new Map<string, string>();
+      if (hasSection('units')) {
+        restorePhase = 'RESTORE_UNITS';
+        for (const unit of backupData.units) {
+          if (!unit?.code) throw new Error('El respaldo contiene una unidad sin código');
+          const existing = await tx.unit.findUnique({ where: { code: unit.code } });
+          if (existing) {
+            unitIdMap.set(unit.id, existing.id);
+            continue;
+          }
+          const sunatCodeTaken = unit.sunatCode
+            ? await tx.unit.findUnique({ where: { sunatCode: unit.sunatCode } })
+            : null;
+          const created = await tx.unit.create({
+            data: {
+              code: unit.code,
+              sunatCode: sunatCodeTaken ? null : unit.sunatCode,
+              name: unit.name,
+              displayName: unit.displayName,
+              symbol: unit.symbol,
+              kind: unit.kind,
+              allowDecimals: unit.allowDecimals,
+              precision: unit.precision,
+              isBase: unit.isBase,
+              active: unit.active,
+              sortOrder: unit.sortOrder,
+            },
+          });
+          unitIdMap.set(unit.id, created.id);
+        }
+      }
+
+      // 2.3 Categorías en dos pasos para conservar la jerarquía.
+      const categoryIdMap = new Map<string, string>();
+      if (hasSection('categories')) {
+        restorePhase = 'RESTORE_CATEGORIES';
+        for (const category of backupData.categories) {
+          const created = await tx.category.create({
+            data: {
+              storeId: newStore.id,
+              name: category.name,
+              slug: category.slug,
+              color: category.color,
+              icon: category.icon,
+              sortOrder: category.sortOrder,
+              active: category.active,
+            },
+          });
+          categoryIdMap.set(category.id, created.id);
+        }
+        for (const category of backupData.categories) {
+          if (!category.parentId) continue;
+          await tx.category.update({
+            where: { id: categoryIdMap.get(category.id)! },
+            data: { parentId: mapReference(categoryIdMap, category.parentId, 'categories', 'una categoría') },
+          });
+        }
+      }
+
+      // 2.4 Límites operativos y catálogo público. El catálogo queda
+      // deshabilitado y sin slug para no publicar dos tiendas con la misma URL.
+      if (backupData.operationalLimit) {
+        restorePhase = 'RESTORE_OPERATIONAL_LIMITS';
+        const limit = backupData.operationalLimit;
+        await tx.operationalLimit.create({
+          data: {
+            storeId: newStore.id,
+            maxDiscountPercent: limit.maxDiscountPercent,
+            maxManualDiscountAmount: limit.maxManualDiscountAmount,
+            maxSaleTotal: limit.maxSaleTotal,
+            maxItemsPerSale: limit.maxItemsPerSale,
+            maxReceivableBalance: limit.maxReceivableBalance,
+          },
+        });
+      }
+      if (backupData.catalogSettings) {
+        restorePhase = 'RESTORE_CATALOG_SETTINGS';
+        const catalog = backupData.catalogSettings;
+        await tx.catalogSettings.create({
+          data: {
+            storeId: newStore.id,
+            enabled: false,
+            storeName: catalog.storeName,
+            storeSlug: null,
+            storeLogoPath: catalog.storeLogoPath,
+            storeBannerPath: catalog.storeBannerPath,
+            whatsappNumber: catalog.whatsappNumber,
+            facebookUrl: catalog.facebookUrl,
+            instagramUrl: catalog.instagramUrl,
+            tiktokUrl: catalog.tiktokUrl,
+            catalogStatus: 'DISABLED',
+            syncMode: catalog.syncMode,
+          },
+        });
+      }
+
       // 3. Upsert ProductMasters
       const productIdMap = new Map<string, string>();
       restorePhase = 'RESTORE_PRODUCT_MASTERS';
@@ -456,6 +597,7 @@ export async function POST(request: NextRequest) {
               requiresPrescription: pm.requiresPrescription,
               medicineCategory: pm.medicineCategory,
               barcodeSecondary: pm.barcodeSecondary,
+              baseUnitId: mapReference(unitIdMap, pm.baseUnitId, 'units', 'un producto con unidad base'),
             },
           });
           productIdMap.set(pm.id, newProduct.id);
@@ -540,6 +682,115 @@ export async function POST(request: NextRequest) {
         storeProductIdMap.set(sp.id, newSP.id);
       }
 
+      const requireProductMaster = (sourceId: string, label: string) => {
+        const mapped = productIdMap.get(sourceId);
+        if (!mapped) throw new Error(`El respaldo contiene ${label} con un producto inexistente`);
+        return mapped;
+      };
+      const requireStoreProduct = (sourceId: string, label: string) => {
+        const mapped = storeProductIdMap.get(sourceId);
+        if (!mapped) throw new Error(`El respaldo contiene ${label} con un producto de tienda inexistente`);
+        return mapped;
+      };
+
+      // 5.1 Conversiones y precios por presentación.
+      if (hasSection('unitConversions')) {
+        restorePhase = 'RESTORE_UNIT_CONVERSIONS';
+        for (const conversion of backupData.unitConversions) {
+          await tx.unitConversion.create({
+            data: {
+              storeId: newStore.id,
+              productMasterId: requireProductMaster(conversion.productMasterId, 'una conversión de unidades'),
+              fromUnitId: mapReference(unitIdMap, conversion.fromUnitId, 'units', 'una conversión de unidades')!,
+              toUnitId: mapReference(unitIdMap, conversion.toUnitId, 'units', 'una conversión de unidades')!,
+              factorToBase: conversion.factorToBase,
+              roundingMode: conversion.roundingMode,
+              active: conversion.active,
+            },
+          });
+        }
+      }
+      if (hasSection('sellUnitPrices')) {
+        restorePhase = 'RESTORE_SELL_UNIT_PRICES';
+        for (const sellPrice of backupData.sellUnitPrices) {
+          await tx.sellUnitPrice.create({
+            data: {
+              storeId: newStore.id,
+              productMasterId: requireProductMaster(sellPrice.productMasterId, 'un precio por presentación'),
+              sellUnitId: mapReference(unitIdMap, sellPrice.sellUnitId, 'units', 'un precio por presentación')!,
+              price: sellPrice.price,
+              active: sellPrice.active,
+              notes: sellPrice.notes,
+            },
+          });
+        }
+      }
+
+      // 5.2 Lotes antes de movimientos, para conservar su trazabilidad.
+      const batchIdMap = new Map<string, string>();
+      if (hasSection('productBatches')) {
+        restorePhase = 'RESTORE_PRODUCT_BATCHES';
+        for (const batch of backupData.productBatches) {
+          const created = await tx.productBatch.create({
+            data: {
+              storeId: newStore.id,
+              storeProductId: requireStoreProduct(batch.storeProductId, 'un lote'),
+              batchNumber: batch.batchNumber,
+              expiryDate: new Date(batch.expiryDate),
+              purchaseDate: optionalDate(batch.purchaseDate),
+              quantityInitial: batch.quantityInitial,
+              quantityAvailable: batch.quantityAvailable,
+              unitCost: batch.unitCost,
+              active: batch.active,
+              notes: batch.notes,
+              createdAt: optionalDate(batch.createdAt) ?? undefined,
+            },
+          });
+          batchIdMap.set(batch.id, created.id);
+        }
+      }
+
+      // 5.3 Servicios antes de las ventas que los referencian.
+      const serviceIdMap = new Map<string, string>();
+      if (hasSection('services')) {
+        restorePhase = 'RESTORE_SERVICES';
+        for (const service of backupData.services) {
+          const created = await tx.service.create({
+            data: {
+              storeId: newStore.id,
+              name: service.name,
+              price: service.price,
+              taxable: service.taxable,
+              active: service.active,
+              baseUnitId: mapReference(unitIdMap, service.baseUnitId, 'units', 'un servicio'),
+            },
+          });
+          serviceIdMap.set(service.id, created.id);
+        }
+      }
+
+      // 5.4 Proveedores.
+      const supplierIdMap = new Map<string, string>();
+      if (hasSection('suppliers')) {
+        restorePhase = 'RESTORE_SUPPLIERS';
+        for (const supplier of backupData.suppliers) {
+          const created = await tx.supplier.create({
+            data: {
+              storeId: newStore.id,
+              name: supplier.name,
+              ruc: supplier.ruc,
+              contactName: supplier.contactName,
+              phone: supplier.phone,
+              email: supplier.email,
+              address: supplier.address,
+              notes: supplier.notes,
+              active: supplier.active,
+            },
+          });
+          supplierIdMap.set(supplier.id, created.id);
+        }
+      }
+
       // 6. Crear Customers
       const customerIdMap = new Map<string, string>();
       restorePhase = 'RESTORE_CUSTOMERS';
@@ -578,6 +829,7 @@ export async function POST(request: NextRequest) {
             difference: shift.difference,
             notes: shift.notes,
             isDemo: shift.isDemo ?? false,
+            createdAt: optionalDate(shift.createdAt) ?? undefined,
           },
         });
         shiftIdMap.set(shift.id, newShift.id);
@@ -661,6 +913,7 @@ export async function POST(request: NextRequest) {
               nthPromoPercent: item.nthPromoPercent,
               nthPromoDiscount: item.nthPromoDiscount,
               isService: item.isService ?? false,
+              serviceId: mapReference(serviceIdMap, item.serviceId, 'services', 'una venta de servicio'),
               unitCodeUsed: item.unitCodeUsed,
               quantityOriginal: item.quantityOriginal,
               quantityBase: item.quantityBase,
@@ -696,6 +949,7 @@ export async function POST(request: NextRequest) {
             total: movement.total,
             notes: movement.notes,
             createdById: movement.createdById ? (userIdMap.get(movement.createdById) || newOwner.id) : null,
+            batchId: mapReference(batchIdMap, movement.batchId, 'productBatches', 'un movimiento de lote'),
             isDemo: movement.isDemo ?? false,
             createdAt: new Date(movement.createdAt),
           },
@@ -751,6 +1005,268 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      const requireSale = (sourceId: string, label: string) => {
+        const mapped = saleIdMap.get(sourceId);
+        if (!mapped) throw new Error(`El respaldo contiene ${label} con una venta inexistente`);
+        return mapped;
+      };
+
+      // 10.1 Órdenes de compra con sus ítems.
+      let purchaseOrderItemsRestored = 0;
+      if (hasSection('purchaseOrders')) {
+        restorePhase = 'RESTORE_PURCHASE_ORDERS';
+        for (const order of backupData.purchaseOrders) {
+          const supplierId = supplierIdMap.get(order.supplierId);
+          if (!supplierId) throw new Error('El respaldo contiene una orden de compra con proveedor inexistente');
+          await tx.purchaseOrder.create({
+            data: {
+              storeId: newStore.id,
+              supplierId,
+              createdById: userIdMap.get(order.createdById) || newOwner.id,
+              orderNumber: order.orderNumber,
+              status: order.status,
+              notes: order.notes,
+              totalAmount: order.totalAmount,
+              expectedDate: optionalDate(order.expectedDate),
+              receivedAt: optionalDate(order.receivedAt),
+              createdAt: new Date(order.createdAt),
+              items: {
+                create: (order.items || []).map((item: any) => ({
+                  storeProductId: requireStoreProduct(item.storeProductId, 'un ítem de compra'),
+                  quantityOrdered: item.quantityOrdered,
+                  quantityReceived: item.quantityReceived,
+                  unitCost: item.unitCost,
+                  batchNumber: item.batchNumber,
+                  expiryDate: optionalDate(item.expiryDate),
+                })),
+              },
+            },
+          });
+          purchaseOrderItemsRestored += (order.items || []).length;
+        }
+      }
+
+      // 10.2 Órdenes de trabajo, enlazadas a la venta en que se cobraron.
+      let workOrderItemsRestored = 0;
+      if (hasSection('workOrders')) {
+        restorePhase = 'RESTORE_WORK_ORDERS';
+        for (const order of backupData.workOrders) {
+          await tx.workOrder.create({
+            data: {
+              storeId: newStore.id,
+              orderNumber: order.orderNumber,
+              customerId: mapReference(customerIdMap, order.customerId, 'customers', 'una orden de trabajo'),
+              status: order.status,
+              notes: order.notes,
+              subtotal: order.subtotal,
+              discount: order.discount,
+              total: order.total,
+              saleId: order.saleId ? requireSale(order.saleId, 'una orden de trabajo') : null,
+              createdAt: new Date(order.createdAt),
+              items: {
+                create: (order.items || []).map((item: any) => ({
+                  type: item.type,
+                  storeProductId: item.storeProductId ? requireStoreProduct(item.storeProductId, 'un ítem de orden de trabajo') : null,
+                  serviceId: mapReference(serviceIdMap, item.serviceId, 'services', 'un ítem de orden de trabajo'),
+                  itemName: item.itemName,
+                  itemContent: item.itemContent,
+                  unitIdUsed: mapReference(unitIdMap, item.unitIdUsed, 'units', 'un ítem de orden de trabajo'),
+                  quantityOriginal: item.quantityOriginal,
+                  quantityBase: item.quantityBase,
+                  conversionFactor: item.conversionFactor,
+                  unitPrice: item.unitPrice,
+                  subtotal: item.subtotal,
+                  notes: item.notes,
+                })),
+              },
+            },
+          });
+          workOrderItemsRestored += (order.items || []).length;
+        }
+      }
+
+      // 10.3 Farmacia: pacientes, medicación dispensada, libro de controlados
+      // e interacciones. Son registros sanitarios: se conservan sus fechas.
+      const patientIdMap = new Map<string, string>();
+      if (hasSection('patients')) {
+        restorePhase = 'RESTORE_PATIENTS';
+        for (const patient of backupData.patients) {
+          const created = await tx.patient.create({
+            data: {
+              storeId: newStore.id,
+              dni: patient.dni,
+              name: patient.name,
+              phone: patient.phone,
+              birthDate: optionalDate(patient.birthDate),
+              gender: patient.gender,
+              address: patient.address,
+              allergies: patient.allergies,
+              conditions: patient.conditions,
+              notes: patient.notes,
+              active: patient.active,
+            },
+          });
+          patientIdMap.set(patient.id, created.id);
+        }
+      }
+      if (hasSection('patientMedications')) {
+        restorePhase = 'RESTORE_PATIENT_MEDICATIONS';
+        for (const medication of backupData.patientMedications) {
+          const patientId = patientIdMap.get(medication.patientId);
+          if (!patientId) throw new Error('El respaldo contiene medicación de un paciente inexistente');
+          await tx.patientMedication.create({
+            data: {
+              patientId,
+              saleId: requireSale(medication.saleId, 'una medicación dispensada'),
+              productName: medication.productName,
+              genericName: medication.genericName,
+              concentration: medication.concentration,
+              quantity: medication.quantity,
+              prescribedBy: medication.prescribedBy,
+              dosage: medication.dosage,
+              consultReason: medication.consultReason,
+              notes: medication.notes,
+              dispensedAt: new Date(medication.dispensedAt),
+            },
+          });
+        }
+      }
+      if (hasSection('controlledBookEntries')) {
+        restorePhase = 'RESTORE_CONTROLLED_BOOK';
+        for (const entry of backupData.controlledBookEntries) {
+          await tx.controlledBookEntry.create({
+            data: {
+              storeId: newStore.id,
+              saleId: requireSale(entry.saleId, 'un registro del libro de controlados'),
+              saleNumber: entry.saleNumber,
+              saleDate: new Date(entry.saleDate),
+              productName: entry.productName,
+              genericName: entry.genericName,
+              concentration: entry.concentration,
+              laboratory: entry.laboratory,
+              batchNumber: entry.batchNumber,
+              quantity: entry.quantity,
+              prescriptionNumber: entry.prescriptionNumber,
+              prescribedBy: entry.prescribedBy,
+              cmpNumber: entry.cmpNumber,
+              patientId: mapReference(patientIdMap, entry.patientId, 'patients', 'un registro del libro de controlados'),
+              patientName: entry.patientName,
+              patientDni: entry.patientDni,
+              dispensedById: userIdMap.get(entry.dispensedById) || newOwner.id,
+              dispensedByName: entry.dispensedByName,
+              notes: entry.notes,
+              createdAt: new Date(entry.createdAt),
+            },
+          });
+        }
+      }
+      if (hasSection('drugInteractionLogs')) {
+        restorePhase = 'RESTORE_DRUG_INTERACTION_LOGS';
+        for (const log of backupData.drugInteractionLogs) {
+          await tx.drugInteractionLog.create({
+            data: {
+              storeId: newStore.id,
+              saleId: log.saleId ? requireSale(log.saleId, 'un registro de interacción') : null,
+              patientId: mapReference(patientIdMap, log.patientId, 'patients', 'un registro de interacción'),
+              drugA: log.drugA,
+              drugB: log.drugB,
+              severity: log.severity,
+              description: log.description,
+              action: log.action,
+              acknowledgedBy: log.acknowledgedBy,
+              createdAt: new Date(log.createdAt),
+            },
+          });
+        }
+      }
+
+      // 10.4 Promociones y cupones. Los cupones conservan sus usos.
+      restorePhase = 'RESTORE_PROMOTIONS';
+      for (const promotion of hasSection('promotions') ? backupData.promotions : []) {
+        await tx.promotion.create({
+          data: {
+            storeId: newStore.id,
+            type: promotion.type,
+            name: promotion.name,
+            active: promotion.active,
+            productId: promotion.productId ? requireProductMaster(promotion.productId, 'una promoción') : null,
+            minQty: promotion.minQty,
+            packPrice: promotion.packPrice,
+            happyStart: optionalDate(promotion.happyStart),
+            happyEnd: optionalDate(promotion.happyEnd),
+            happyPrice: promotion.happyPrice,
+            startsAt: optionalDate(promotion.startsAt),
+            endsAt: optionalDate(promotion.endsAt),
+            isDemo: promotion.isDemo ?? false,
+          },
+        });
+      }
+      for (const coupon of hasSection('coupons') ? backupData.coupons : []) {
+        await tx.coupon.create({
+          data: {
+            storeId: newStore.id,
+            code: coupon.code,
+            type: coupon.type,
+            value: coupon.value,
+            minTotal: coupon.minTotal,
+            startsAt: optionalDate(coupon.startsAt),
+            endsAt: optionalDate(coupon.endsAt),
+            maxUses: coupon.maxUses,
+            usesCount: coupon.usesCount,
+            active: coupon.active,
+            isDemo: coupon.isDemo ?? false,
+          },
+        });
+      }
+      for (const promotion of hasSection('categoryPromotions') ? backupData.categoryPromotions : []) {
+        await tx.categoryPromotion.create({
+          data: {
+            storeId: newStore.id,
+            name: promotion.name,
+            category: promotion.category,
+            type: promotion.type,
+            value: promotion.value,
+            startsAt: optionalDate(promotion.startsAt),
+            endsAt: optionalDate(promotion.endsAt),
+            active: promotion.active,
+            isDemo: promotion.isDemo ?? false,
+            maxDiscountPerItem: promotion.maxDiscountPerItem,
+          },
+        });
+      }
+      for (const promotion of hasSection('volumePromotions') ? backupData.volumePromotions : []) {
+        await tx.volumePromotion.create({
+          data: {
+            storeId: newStore.id,
+            name: promotion.name,
+            productId: requireProductMaster(promotion.productId, 'una promoción por volumen'),
+            type: promotion.type,
+            requiredQty: promotion.requiredQty,
+            packPrice: promotion.packPrice,
+            startsAt: optionalDate(promotion.startsAt),
+            endsAt: optionalDate(promotion.endsAt),
+            active: promotion.active,
+            isDemo: promotion.isDemo ?? false,
+          },
+        });
+      }
+      for (const promotion of hasSection('nthPromotions') ? backupData.nthPromotions : []) {
+        await tx.nthPromotion.create({
+          data: {
+            storeId: newStore.id,
+            name: promotion.name,
+            productId: requireProductMaster(promotion.productId, 'una promoción n-ésima'),
+            type: promotion.type,
+            nthQty: promotion.nthQty,
+            percentOff: promotion.percentOff,
+            startsAt: optionalDate(promotion.startsAt),
+            endsAt: optionalDate(promotion.endsAt),
+            active: promotion.active,
+            isDemo: promotion.isDemo ?? false,
+          },
+        });
+      }
+
       // 11. Restaurar archivo fiscal portable después de recrear las ventas.
       // No recupera credenciales SOL, certificado privado ni jobs pendientes.
       // SUNAT queda desactivado hasta que el OWNER vuelva a configurarlo.
@@ -790,6 +1306,16 @@ export async function POST(request: NextRequest) {
           customers: customerIdMap.size,
           receivables: receivablesRestored,
           receivablePayments: receivablePaymentsRestored,
+          categories: categoryIdMap.size,
+          productBatches: batchIdMap.size,
+          services: serviceIdMap.size,
+          suppliers: supplierIdMap.size,
+          purchaseOrders: hasSection('purchaseOrders') ? backupData.purchaseOrders.length : 0,
+          purchaseOrderItems: purchaseOrderItemsRestored,
+          workOrders: hasSection('workOrders') ? backupData.workOrders.length : 0,
+          workOrderItems: workOrderItemsRestored,
+          patients: patientIdMap.size,
+          controlledBookEntries: hasSection('controlledBookEntries') ? backupData.controlledBookEntries.length : 0,
           fiscalDocuments: backupData.fiscalArchive?.data?.documents?.length || 0,
         },
       };

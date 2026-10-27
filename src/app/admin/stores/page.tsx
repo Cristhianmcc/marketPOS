@@ -137,6 +137,13 @@ interface RestoreResult {
     customers: number;
     receivables: number;
     fiscalDocuments: number;
+    productBatches?: number;
+    services?: number;
+    suppliers?: number;
+    purchaseOrders?: number;
+    workOrders?: number;
+    patients?: number;
+    controlledBookEntries?: number;
   };
 }
 
@@ -744,6 +751,22 @@ export default function AdminStoresPage() {
                     <p className="text-sm mt-1">
                       {restoreResult.restoredCounts.storeProducts} productos, {restoreResult.restoredCounts.sales} ventas y{' '}
                       {restoreResult.restoredCounts.fiscalDocuments} comprobantes fiscales.
+                    </p>
+                  )}
+                  {restoreResult.restoredCounts && (
+                    <p className="text-sm mt-1">
+                      {[
+                        ['lotes', restoreResult.restoredCounts.productBatches],
+                        ['proveedores', restoreResult.restoredCounts.suppliers],
+                        ['órdenes de compra', restoreResult.restoredCounts.purchaseOrders],
+                        ['servicios', restoreResult.restoredCounts.services],
+                        ['órdenes de trabajo', restoreResult.restoredCounts.workOrders],
+                        ['pacientes', restoreResult.restoredCounts.patients],
+                        ['registros de controlados', restoreResult.restoredCounts.controlledBookEntries],
+                      ]
+                        .filter(([, count]) => typeof count === 'number' && count > 0)
+                        .map(([label, count]) => `${count} ${label}`)
+                        .join(', ')}
                     </p>
                   )}
                 </div>

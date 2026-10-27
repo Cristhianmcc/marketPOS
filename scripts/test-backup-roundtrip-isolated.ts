@@ -148,9 +148,19 @@ const UNITS = [
   { code: 'ZZ', sunatCode: 'ZZ', name: 'Servicio', kind: 'SERVICES', allowDecimals: false },
 ] as const;
 
-async function seedUnits(db: PrismaClient, reverse = false) {
-  const list = reverse ? [...UNITS].reverse() : [...UNITS];
-  for (const unit of list) await db.unit.create({ data: { ...unit } });
+async function seedUnits(db: PrismaClient) {
+  for (const unit of UNITS) await db.unit.create({ data: { ...unit } });
+}
+
+/**
+ * Destino con IDs distintos (orden inverso), sin la unidad BX y con NIU
+ * renombrada localmente: la restauración debe crear BX y no tocar NIU.
+ */
+async function seedTargetUnits(db: PrismaClient) {
+  for (const unit of [...UNITS].reverse()) {
+    if (unit.code === 'BX') continue;
+    await db.unit.create({ data: { ...unit, name: unit.code === 'NIU' ? 'Unidad (local)' : unit.name } });
+  }
 }
 
 async function seedStore(db: PrismaClient) {
@@ -394,6 +404,12 @@ const EXPECTED_DIFFERENCES: Record<string, string[]> = {
   ProductMaster: ['createdByStoreId', 'approvedById', 'approvedAt', 'mergedIntoId'],
 };
 
+/** Referencias guardadas como texto, sin relación declarada en Prisma. */
+const IMPLICIT_REFERENCES: Record<string, Record<string, string>> = {
+  ControlledBookEntry: { saleId: 'Sale' },
+  DrugInteractionLog: { saleId: 'Sale' },
+};
+
 /** Clave natural de cada modelo referenciado, estable entre dos bases. */
 const NATURAL_KEYS: Record<string, { include?: Row; key: (row: Row) => string }> = {
   Unit: { key: (r) => String(r.code) },
@@ -442,6 +458,7 @@ function signature(model: string, row: Row, maps: KeyMaps): string {
       for (const fk of field.relationFromFields) foreignKeys.set(fk, field.type);
     }
   }
+  for (const [fk, type] of Object.entries(IMPLICIT_REFERENCES[model] || {})) foreignKeys.set(fk, type);
   const ignored = new Set(['id', 'storeId', 'updatedAt', ...(EXPECTED_DIFFERENCES[model] || [])]);
   if (!HISTORICAL.has(model)) ignored.add('createdAt');
 
@@ -592,7 +609,7 @@ async function main() {
     run(executable('pg_ctl'), ['start', '-D', dataDir, '-l', path.join(tempRoot, 'postgres.log'), '-o', `-p ${port} -h 127.0.0.1`, '-w', '-t', '60'], { stdio: 'ignore', timeout: 90_000 });
     started = true;
 
-    for (const db of ['origen', 'destino']) {
+    for (const db of ['origen', 'destino', 'legado', 'roto']) {
       run(executable('createdb'), [db], { env: pgEnv });
       run(process.execPath, [prismaCli, 'migrate', 'deploy', '--schema', schemaPath], {
         env: { ...process.env, DATABASE_URL: url(db), DIRECT_URL: url(db) },
@@ -605,7 +622,7 @@ async function main() {
 
     console.log('Roundtrip: sembrando tienda con todos los módulos...');
     await seedUnits(source);
-    await seedUnits(target, true); // IDs distintos en destino: obliga a mapear por código.
+    await seedTargetUnits(target);
     const sourceStoreId = await seedStore(source);
 
     console.log('Roundtrip: exportando con el handler real...');
@@ -641,6 +658,73 @@ async function main() {
       }
     }
 
+    // ── Comprobaciones de la restauración (Fase 2) ──
+    console.log('\nRestauración (casos adicionales):');
+    const restoreChecks: Array<{ name: string; ok: boolean; detail: string }> = [];
+    const check = (name: string, ok: boolean, detail: string) => {
+      restoreChecks.push({ name, ok, detail });
+      console.log(`${ok ? 'PASS' : 'FAIL'} ${name.padEnd(38)} ${detail}`);
+    };
+
+    const bx = await target.unit.findUnique({ where: { code: 'BX' } });
+    check('unidad faltante creada', !!bx && bx.sunatCode === 'BX', bx ? `BX id=${bx.id}` : 'BX no existe');
+    const niu = await target.unit.findUnique({ where: { code: 'NIU' } });
+    check('unidad existente intacta', niu?.name === 'Unidad (local)', `NIU name=${niu?.name}`);
+
+    const restoredPara = await target.storeProduct.findFirst({
+      where: { storeId: targetStoreId, product: { internalSku: 'RT-PARA-500' } },
+      include: { batches: true },
+    });
+    const batchTotal = (restoredPara?.batches || []).reduce((sum, b) => sum + Number(b.quantityAvailable), 0);
+    check('stock = suma de lotes', Number(restoredPara?.stock) === 170 && batchTotal === 170, `stock=${restoredPara?.stock} lotes=${batchTotal}`);
+
+    // Respaldo 1.0 de producción anterior: debe restaurarse sin secciones nuevas.
+    const legacy = new PrismaClient({ datasources: { db: { url: url('legado') } } });
+    clients.push(legacy);
+    await seedUnits(legacy);
+    const legacyResult = runWorker('restore', url('legado'), [`--zip=${legacyFixture}`]);
+    const legacyCounts = legacyResult.payload?.restoredCounts || {};
+    check(
+      'respaldo 1.0 compatible',
+      legacyResult.status === 200 && legacyCounts.sales === 3 && legacyCounts.saleItems === 4 && legacyCounts.movements === 3 && legacyCounts.productBatches === 0,
+      `status=${legacyResult.status} ventas=${legacyCounts.sales} ítems=${legacyCounts.saleItems} lotes=${legacyCounts.productBatches}`,
+    );
+
+    // Respaldo con una referencia rota y checksum válido: nada debe quedar.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const AdmZip = require('adm-zip');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const crypto = require('node:crypto');
+    const brokenZip = new AdmZip(zipPath);
+    const brokenData = JSON.parse(brokenZip.readAsText('data.json'));
+    brokenData.productBatches[0].storeProductId = 'producto-inexistente';
+    const brokenText = JSON.stringify(brokenData, null, 2);
+    const brokenMetadata = JSON.parse(brokenZip.readAsText('metadata.json'));
+    brokenMetadata.checksum = `sha256:${crypto.createHash('sha256').update(brokenText, 'utf8').digest('hex')}`;
+    const rebuilt = new AdmZip();
+    rebuilt.addFile('metadata.json', Buffer.from(JSON.stringify(brokenMetadata, null, 2)));
+    rebuilt.addFile('data.json', Buffer.from(brokenText));
+    const brokenPath = path.join(tempRoot, 'respaldo-roto.zip');
+    rebuilt.writeZip(brokenPath);
+
+    const broken = new PrismaClient({ datasources: { db: { url: url('roto') } } });
+    clients.push(broken);
+    await seedUnits(broken);
+    const brokenResult = runWorker('restore', url('roto'), [`--zip=${brokenPath}`]);
+    const leftovers = {
+      stores: await broken.store.count(),
+      users: await broken.user.count(),
+      productMasters: await broken.productMaster.count(),
+      sales: await broken.sale.count(),
+      categories: await broken.category.count(),
+    };
+    check(
+      'referencia rota revierte todo',
+      brokenResult.status !== 200 && Object.values(leftovers).every((n) => n === 0),
+      `status=${brokenResult.status} restos=${JSON.stringify(leftovers)}`,
+    );
+    const restoreFailures = restoreChecks.filter((c) => !c.ok).length;
+
     console.log(exportFailures > 0
       ? `\nExportación FAIL: ${exportFailures} de ${exportChecks.length} comprobaciones.`
       : `\nExportación PASS: ${exportChecks.length} comprobaciones.`);
@@ -649,7 +733,10 @@ async function main() {
     } else {
       console.log(`Roundtrip PASS: ${report.length} modelos conservados entre origen y restauración.`);
     }
-    if (exportFailures > 0 || failures > 0) process.exitCode = 1;
+    console.log(restoreFailures > 0
+      ? `Restauración FAIL: ${restoreFailures} de ${restoreChecks.length} casos adicionales.`
+      : `Restauración PASS: ${restoreChecks.length} casos adicionales.`);
+    if (exportFailures > 0 || failures > 0 || restoreFailures > 0) process.exitCode = 1;
   } finally {
     await Promise.all(clients.map((client) => client.$disconnect().catch(() => undefined)));
     if (started) {

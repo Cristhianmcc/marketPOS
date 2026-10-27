@@ -196,6 +196,29 @@ recupere en otra instalación. La restauración conserva el mayor correlativo en
 el destino y el respaldo y deja SUNAT desactivado. Se mantiene lectura compatible
 del sidecar `.sunat-fiscal` cifrado usado por builds Beta anteriores.
 
+### Respaldo completo por tienda (formato 1.1, 2026-10-27)
+
+- `/api/backups/export` genera `metadata.version = '1.1'` y agrega a `data.json`
+  `units`, `categories`, `unitConversions`, `sellUnitPrices`, `productBatches`,
+  `services`, `suppliers`, `purchaseOrders` e `items`, `workOrders` e `items`,
+  `patients`, `patientMedications`, `controlledBookEntries`,
+  `drugInteractionLogs`, `promotions`, `coupons`, `categoryPromotions`,
+  `volumePromotions`, `nthPromotions`, `operationalLimit` y `catalogSettings`.
+  El respaldo programado de Electron rotula sus ZIP con la misma versión.
+- `restore/new-store` acepta `1.0` y `1.1`. Traduce unidades por `code` y crea
+  solo las ausentes, sin modificar las existentes. Toda referencia a una sección
+  presente debe resolverse o se revierte la transacción completa. El catálogo
+  público vuelve deshabilitado y sin `storeSlug`.
+- Al agregar un modelo con `storeId`, incluirlo en exportación, restauración y
+  `scripts/test-backup-roundtrip-isolated.ts`. `npm run test:backups:roundtrip`
+  usa PostgreSQL desechable con dos bases y compara 34 modelos campo por campo;
+  `scripts/fixtures/backup-v1.0-sintetico.zip` cubre la compatibilidad `1.0`.
+- El ZIP contiene datos sanitarios de pacientes y no está cifrado; tratarlo
+  como información sensible. Exclusiones deliberadas: auditoría, jobs SUNAT,
+  colas de catálogo, pagos de suscripción e interacciones globales.
+- `.gitignore` contiene `backups`, que también coincide con
+  `src/app/api/backups`. Esos archivos están versionados: usar `git add -f`.
+
 El panel `/admin/stores` permite a SUPERADMIN seleccionar un ZIP y restaurarlo
 mediante `/api/backups/restore/new-store`. El endpoint valida extensión/tamaño,
 estructura, versión, checksum general y conteos antes de abrir una transacción.
@@ -810,9 +833,9 @@ una base real como comprobación rutinaria.
 
 1. Retirar secretos de distribuciones. El cambio de identidad/tienda H01 quedó
    corregido y cubierto por pruebas aisladas el 18/10/2026.
-2. Ampliar el formato de backup si deben cubrirse módulos ajenos al núcleo actual
-   (por ejemplo compras, promociones, lotes, servicios y farmacia) y definir una
-   estrategia de migraciones sin aceptación automática de pérdida de datos.
+2. Cerrado el 27/10/2026: el formato de backup `1.1` cubre todos los módulos por
+   rubro (ver «Respaldo completo por tienda»). Las migraciones sin pérdida de
+   datos quedaron resueltas en H04.
 3. H14 quedó corregido junto con las anulaciones H06/H07, los abonos concurrentes
    H08, el aislamiento H09, la recepción atómica/idempotente H10 y la trazabilidad
    farmacéutica transaccional H11. Mantener esas invariantes al modificar ventas,
