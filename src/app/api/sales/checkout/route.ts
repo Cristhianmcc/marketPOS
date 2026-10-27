@@ -25,6 +25,7 @@ import {
 import { checkRateLimit } from '@/lib/rateLimit'; // ✅ MÓDULO 16.1: Rate Limiting
 import { acquireCheckoutLock, releaseCheckoutLock } from '@/lib/checkoutLock'; // ✅ MÓDULO 16.1: Checkout Lock
 import { normalizeToBaseUnit } from '@/lib/units'; // ✅ MÓDULO V2: Conversiones de unidades
+import { computeLineTaxes } from '@/lib/sales/lineTaxes';
 import { PharmacyTraceError, registerPharmacyTrace } from '@/lib/sales/pharmacyTrace';
 import { consumeSaleInventory, InventoryMutationError } from '@/lib/inventory/stockMutations';
 import {
@@ -570,10 +571,20 @@ async function executeCheckout(
       // PASO 6: Calcular totalLine = subtotal - promo producto - promo categoría - promo volumen - nth promo - descuento manual
       const totalLine = subtotalItem - promotionDiscount - categoryPromoDiscount - volumePromoDiscount - nthPromoDiscount - discountAmount;
 
+      // PASO 7: Tributos de la línea (afectación IGV del producto e ICBPER por bolsa)
+      const lineTaxes = computeLineTaxes({
+        lineTotal: totalLine,
+        igvAffectation: sp.igvAffectation,
+        icbper: sp.icbper,
+        quantity: quantityBase,
+        saleDate: new Date(),
+      });
+
       return {
         ...item,
         productId: sp.product.id,
         subtotalItem,
+        lineTaxes,
         promotionType: appliedPromo?.promotionType ?? null,
         promotionName: appliedPromo?.promotionName ?? null,
         promotionDiscount,
@@ -861,8 +872,13 @@ async function executeCheckout(
     // Total de descuentos (ítems + global) para guardar en discountTotal
     const totalDiscounts = itemDiscountsTotal + globalDiscount;
 
-    // Total FINAL (después de cupón y descuento global)
-    const total = totalAfterCoupon - globalDiscount;
+    // ICBPER de bolsas: tributo fijo por unidad, no descontable, se suma aparte.
+    const icbperTotal = Math.round(
+      itemsWithDiscounts.reduce((sum, item) => sum + item.lineTaxes.icbperAmount, 0) * 100
+    ) / 100;
+
+    // Total FINAL (después de cupón y descuento global) más ICBPER
+    const total = totalAfterCoupon - globalDiscount + icbperTotal;
 
     // ✅ MÓDULO 15 - FASE 3: VALIDAR LÍMITES OPERATIVOS
     // Las validaciones se hacen ANTES de ejecutar la transacción
@@ -1015,6 +1031,7 @@ async function executeCheckout(
       couponValue: couponSnapshot?.couponValue ? new Prisma.Decimal(couponSnapshot.couponValue) : null,
       couponDiscount: new Prisma.Decimal(couponDiscount),
       total: new Prisma.Decimal(total),
+      icbperTotal: new Prisma.Decimal(icbperTotal),
       paymentMethod: paymentMethod,
       paymentDetails: { checkoutRequestHash: checkoutHash },
     };
@@ -1090,6 +1107,12 @@ async function executeCheckout(
             discountValue: item.discountValue !== undefined ? new Prisma.Decimal(item.discountValue) : null,
             discountAmount: new Prisma.Decimal(item.discountAmount),
             totalLine: new Prisma.Decimal(item.totalLine),
+            // Tributos de la línea (snapshot)
+            igvAffectation: item.lineTaxes.igvAffectation,
+            taxableAmount: new Prisma.Decimal(item.lineTaxes.taxableAmount),
+            igvAmount: new Prisma.Decimal(item.lineTaxes.igvAmount),
+            icbperQuantity: item.lineTaxes.icbperQuantity !== null ? new Prisma.Decimal(item.lineTaxes.icbperQuantity) : null,
+            icbperAmount: new Prisma.Decimal(item.lineTaxes.icbperAmount),
             // ✅ F3: No es servicio
             isService: false,
             // ✅ MÓDULO PH8: Snapshot farmacéutico

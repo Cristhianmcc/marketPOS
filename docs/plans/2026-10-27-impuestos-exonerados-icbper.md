@@ -136,11 +136,35 @@ prueba de impuestos sigue en 20/50 hasta la Fase 3.
 Nota de despliegue: el servicio web en Render necesita aplicar el esquema en su
 próximo despliegue (`prisma db push` temporal, como la vez anterior).
 
+## Resultado de la Fase 2 (27/10/2026)
+
+- `src/lib/sales/lineTaxes.ts`: `computeLineTaxes` calcula por línea la base y
+  el IGV desde el importe final (gravado: ÷ 1.18; exonerado e inafecto: sin IGV)
+  y el ICBPER = cantidad base × tarifa del año (`icbperRateFor`, S/ 0.50 desde
+  2023).
+- Checkout guarda el snapshot por línea y `Sale.icbperTotal`, y suma el ICBPER
+  al total después del cupón y del descuento global: el ICBPER no es
+  descontable. Efectivo, pago mixto, vuelto y fiado usan ese total.
+- Servicios y ventas libres conservan el comportamiento anterior (gravados).
+
+Validación: `npm run test:checkout:taxes` cobra 7 casos contra PostgreSQL real
+(venta mixta en efectivo con vuelto, efectivo y pago mixto insuficientes por el
+ICBPER, venta solo gravada sin cambios, descuento global que no reduce el
+ICBPER, fiado con la deuda incluyendo el ICBPER, pago mixto suficiente): 7/7.
+Mutación: no sumar el ICBPER al total hizo fallar 6 de 7 casos.
+Regresión: ferretería 13/13, respaldo 34/34, auditoría 40/40, SUNAT local,
+TypeScript y lint correctos. La prueba XML sigue en 20/50 hasta la Fase 3.
+
+Restricción hasta la Fase 4: el POS todavía calcula el total sin ICBPER y no
+hay pantalla para marcar productos exonerados o bolsas, de modo que estos
+casos no son alcanzables desde la interfaz. Las Fases 3 y 4 deben salir juntas
+antes de habilitarlos para un cliente.
+
 ## Estado
 
 - [x] Fase 0
 - [x] Fase 1
-- [ ] Fase 2
+- [x] Fase 2
 - [ ] Fase 3
 - [ ] Fase 4
 - [ ] Fase 5

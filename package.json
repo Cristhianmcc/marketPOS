@@ -19,6 +19,7 @@
     "test:ticket:isolated": "tsx scripts/test-fiscal-ticket-isolated.ts",
     "test:ferreteria:isolated": "tsx scripts/test-ferreteria-units-isolated.ts",
     "test:sunat:taxes": "tsx scripts/test-sunat-taxes-isolated.ts",
+    "test:checkout:taxes": "tsx scripts/test-checkout-taxes-isolated.ts",
     "test:desktop-env:isolated": "node scripts/test-desktop-package-env-isolated.cjs",
     "test:licenses:isolated": "tsx scripts/test-license-capabilities-isolated.ts",
     "db:studio": "prisma studio",
