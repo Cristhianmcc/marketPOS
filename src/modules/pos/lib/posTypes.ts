@@ -8,6 +8,8 @@ export interface StoreProduct {
   price: number;
   stock: number | null;
   active: boolean;
+  /** Bolsa plástica: suma ICBPER por unidad al total. */
+  icbper?: boolean;
   product: {
     id: string;
     name: string;

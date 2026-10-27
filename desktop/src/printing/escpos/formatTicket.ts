@@ -276,8 +276,16 @@ export class TicketFormatter {
       this.line(this.lr('DESCUENTO:', `-S/${data.totalDiscount.toFixed(2)}`));
     }
     if (data.fiscal) {
-      this.line(this.lr('OP. GRAVADA:', this.money(data.fiscal.taxable)));
-      this.line(this.lr('IGV (18%):', this.money(data.fiscal.igv)));
+      const { fiscal } = data;
+      if (fiscal.taxable > 0 || (!fiscal.exempt && !fiscal.unaffected)) {
+        this.line(this.lr('OP. GRAVADA:', this.money(fiscal.taxable)));
+      }
+      if (fiscal.exempt) this.line(this.lr('OP. EXONERADA:', this.money(fiscal.exempt)));
+      if (fiscal.unaffected) this.line(this.lr('OP. INAFECTA:', this.money(fiscal.unaffected)));
+      this.line(this.lr('IGV (18%):', this.money(fiscal.igv)));
+      if (fiscal.icbper) this.line(this.lr('ICBPER:', this.money(fiscal.icbper)));
+    } else if (data.icbperTotal) {
+      this.line(this.lr('ICBPER BOLSAS:', this.money(data.icbperTotal)));
     }
     this.push(CMD.BOLD_ON);
     this.line(this.lr(data.fiscal ? 'IMPORTE TOTAL:' : 'TOTAL:', this.money(data.fiscal?.total ?? data.total)));

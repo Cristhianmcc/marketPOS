@@ -25,7 +25,7 @@ export async function PUT(
     const body = await req.json();
     const { 
       name, brand, content, barcode, category, price, costPrice, minStock, imageUrl, baseUnitId,
-      publishInCatalog,
+      publishInCatalog, igvAffectation, icbper,
       // ✅ MÓDULO PH1: Campos farmacéuticos
       commercialName, genericName, concentration, pharmaceuticalForm,
       presentation, laboratory, sanitaryRegistry, requiresPrescription,
@@ -49,6 +49,12 @@ export async function PUT(
     // Validaciones básicas
     if (price !== undefined && (isNaN(Number(price)) || Number(price) <= 0)) {
       return NextResponse.json({ error: 'El precio debe ser mayor a 0' }, { status: 400 });
+    }
+    if (igvAffectation !== undefined && !['GRAVADO', 'EXONERADO', 'INAFECTO'].includes(igvAffectation)) {
+      return NextResponse.json({ error: 'Tipo de IGV inválido' }, { status: 400 });
+    }
+    if (icbper !== undefined && typeof icbper !== 'boolean') {
+      return NextResponse.json({ error: 'Valor de bolsa plástica inválido' }, { status: 400 });
     }
 
     // Actualizar campos del producto maestro (solo si no es global)
@@ -99,7 +105,10 @@ export async function PUT(
     if (price !== undefined)     spUpdates.price     = Number(price);
     if (costPrice !== undefined) spUpdates.costPrice = costPrice !== null && costPrice !== '' ? Number(costPrice) : null;
     if (minStock !== undefined)  spUpdates.minStock  = minStock !== '' && minStock !== null ? Number(minStock) : null;
-    
+    // Tributos: rigen para ventas nuevas; las anteriores conservan su snapshot.
+    if (igvAffectation !== undefined) spUpdates.igvAffectation = igvAffectation;
+    if (icbper !== undefined)         spUpdates.icbper         = icbper;
+
     if (publishInCatalog !== undefined) {
       const isPublished = Boolean(publishInCatalog);
       spUpdates.publishInCatalog = isPublished;

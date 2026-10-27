@@ -37,6 +37,7 @@ export async function GET(
         couponValue: true,
         couponDiscount: true,
         total: true,
+        icbperTotal: true,
         paymentMethod: true,
         amountPaid: true,
         changeAmount: true,
@@ -169,7 +170,7 @@ export async function GET(
       select: {
         docType: true, series: true, number: true, fullNumber: true, issueDate: true,
         customerDocType: true, customerDocNumber: true, customerName: true, customerAddress: true,
-        taxable: true, igv: true, total: true, status: true, hash: true, qrText: true,
+        taxable: true, igv: true, exempt: true, unaffected: true, icbper: true, total: true, status: true, hash: true, qrText: true,
         sunatSettings: { select: { env: true, ruc: true, razonSocial: true, address: true } },
         store: { select: { name: true, ruc: true, address: true } },
       },

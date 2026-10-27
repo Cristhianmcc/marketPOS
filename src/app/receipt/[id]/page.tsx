@@ -67,6 +67,7 @@ interface Sale {
   couponValue: number | null;
   couponDiscount: number;
   total: number;
+  icbperTotal?: number;
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED';
   amountPaid: number | null;
   changeAmount: number | null;
@@ -525,20 +526,50 @@ export default function ReceiptPage() {
                 )}
                 {fiscal ? (
                   <>
-                    <div className="total-row">
-                      <span>Op. gravada:</span>
-                      <span>{formatMoney(fiscal.taxable)}</span>
-                    </div>
+                    {(fiscal.taxable > 0 || (!fiscal.exempt && !fiscal.unaffected)) && (
+                      <div className="total-row">
+                        <span>Op. gravada:</span>
+                        <span>{formatMoney(fiscal.taxable)}</span>
+                      </div>
+                    )}
+                    {fiscal.exempt > 0 && (
+                      <div className="total-row">
+                        <span>Op. exonerada:</span>
+                        <span>{formatMoney(fiscal.exempt)}</span>
+                      </div>
+                    )}
+                    {fiscal.unaffected > 0 && (
+                      <div className="total-row">
+                        <span>Op. inafecta:</span>
+                        <span>{formatMoney(fiscal.unaffected)}</span>
+                      </div>
+                    )}
                     <div className="total-row">
                       <span>IGV (18%):</span>
                       <span>{formatMoney(fiscal.igv)}</span>
                     </div>
+                    {fiscal.icbper > 0 && (
+                      <div className="total-row">
+                        <span>ICBPER:</span>
+                        <span>{formatMoney(fiscal.icbper)}</span>
+                      </div>
+                    )}
                   </>
-                ) : sale.tax > 0 && (
-                  <div className="total-row">
-                    <span>IGV (18%):</span>
-                    <span>{formatMoney(sale.tax)}</span>
-                  </div>
+                ) : (
+                  <>
+                    {sale.tax > 0 && (
+                      <div className="total-row">
+                        <span>IGV (18%):</span>
+                        <span>{formatMoney(sale.tax)}</span>
+                      </div>
+                    )}
+                    {Number(sale.icbperTotal) > 0 && (
+                      <div className="total-row">
+                        <span>ICBPER bolsas:</span>
+                        <span>{formatMoney(Number(sale.icbperTotal))}</span>
+                      </div>
+                    )}
+                  </>
                 )}
                 <div className="total-row total-final">
                   <span>{fiscal ? 'IMPORTE TOTAL:' : 'TOTAL:'}</span>

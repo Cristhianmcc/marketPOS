@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { ShoppingCart, Trash2, Plus, Minus, Tag, X, CreditCard, Banknote, Scale, ChevronDown } from 'lucide-react';
 import { formatMoney } from '@/lib/money';
+import { getCartIcbper } from '@/modules/pos/lib/posMath';
 import Image from 'next/image';
 
 // ✅ F2.2: Tipos para unidades
@@ -272,9 +273,12 @@ function CartPanelComponent({
   // Descuento de cupón
   const couponDiscount = appliedCoupon?.discount || 0;
 
+  // ICBPER de bolsas: se suma aparte y no se descuenta
+  const icbper = getCartIcbper(cart as unknown as Parameters<typeof getCartIcbper>[0]);
+
   // Total final
-  const total = Math.max(0, subtotal - totalDiscounts - couponDiscount);
-  
+  const total = Math.max(0, subtotal - totalDiscounts - couponDiscount) + icbper;
+
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -546,6 +550,12 @@ function CartPanelComponent({
                 <span className="font-semibold text-red-600 dark:text-red-400">
                   -{formatMoney(totalDiscounts + couponDiscount)}
                 </span>
+              </div>
+            )}
+            {icbper > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-text-secondary dark:text-gray-400">ICBPER bolsas</span>
+                <span className="font-semibold text-text-main dark:text-white">{formatMoney(icbper)}</span>
               </div>
             )}
             <div className="h-px bg-border-light dark:bg-border-dark" />

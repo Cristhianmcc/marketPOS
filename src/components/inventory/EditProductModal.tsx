@@ -25,6 +25,8 @@ interface EditProductModalProps {
     costPrice: number | null;
     minStock: number | null;
     publishInCatalog?: boolean;
+    igvAffectation?: 'GRAVADO' | 'EXONERADO' | 'INAFECTO';
+    icbper?: boolean;
     product: {
       id: string;
       name: string;
@@ -87,6 +89,8 @@ export function EditProductModal({
     imageUrl: storeProduct.product.imageUrl ?? '',
     baseUnitId: storeProduct.product.baseUnitId ?? '',
     publishInCatalog: !!storeProduct.publishInCatalog,
+    igvAffectation: storeProduct.igvAffectation ?? 'GRAVADO',
+    icbper: !!storeProduct.icbper,
     // ✅ MÓDULO PH1: Campos farmacéuticos
     commercialName: storeProduct.product.commercialName ?? '',
     genericName: storeProduct.product.genericName ?? '',
@@ -118,6 +122,8 @@ export function EditProductModal({
       imageUrl: storeProduct.product.imageUrl ?? '',
       baseUnitId: storeProduct.product.baseUnitId ?? '',
       publishInCatalog: !!storeProduct.publishInCatalog,
+      igvAffectation: storeProduct.igvAffectation ?? 'GRAVADO',
+      icbper: !!storeProduct.icbper,
       // ✅ MÓDULO PH1
       commercialName: storeProduct.product.commercialName ?? '',
       genericName: storeProduct.product.genericName ?? '',
@@ -255,6 +261,8 @@ export function EditProductModal({
         costPrice: form.costPrice !== '' ? parseFloat(form.costPrice) : null,
         minStock: form.minStock !== '' ? Number(form.minStock) : null,
         publishInCatalog: form.publishInCatalog,
+        igvAffectation: form.igvAffectation,
+        icbper: form.icbper,
       };
 
       // Solo enviar campos del producto si no es global
@@ -747,6 +755,35 @@ export function EditProductModal({
                   placeholder="Para alertas de stock bajo"
                 />
               </div>
+
+              {/* Tributos: definen el comprobante SUNAT y el total del cobro */}
+              <div>
+                <label className="block text-sm font-medium text-[#1F2A37] mb-2">Tipo de IGV</label>
+                <select
+                  className={inputClass}
+                  value={form.igvAffectation}
+                  onChange={e => setForm(prev => ({ ...prev, igvAffectation: e.target.value as typeof prev.igvAffectation }))}
+                >
+                  <option value="GRAVADO">Gravado (precio incluye IGV 18 %)</option>
+                  <option value="EXONERADO">Exonerado (sin IGV)</option>
+                  <option value="INAFECTO">Inafecto (sin IGV)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  El precio de venta es el que paga el cliente. Aplica a las ventas nuevas.
+                </p>
+              </div>
+              <label className="flex items-start gap-3 p-3 bg-amber-50/60 border border-amber-100 rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  checked={form.icbper}
+                  onChange={e => setForm(prev => ({ ...prev, icbper: e.target.checked }))}
+                />
+                <span className="text-sm text-[#1F2A37]">
+                  Bolsa plástica (ICBPER)
+                  <span className="block text-xs text-gray-500">Suma S/ 0.50 por bolsa al total, aparte del precio.</span>
+                </span>
+              </label>
 
               {/* Mostrar en Catálogo */}
               <div className="pt-2">

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { amountToWordsPEN, buildFiscalTicket, type FiscalTicketSource } from '../src/lib/sunat/printedTicket';
 import { TicketFormatter } from '../desktop/src/printing/escpos/formatTicket';
 import { DEFAULT_ESCPOS_CONFIG, type PrintSaleData } from '../desktop/src/printing/escpos/types';
+import { getCartIcbper, getCartTotal } from '../src/modules/pos/lib/posMath';
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -169,6 +170,58 @@ check('ticket sin comprobante no cambia', () => {
   for (const fragment of ['OP. GRAVADA', 'IMPORTE TOTAL', 'SON:', 'Representacion impresa']) {
     assert.ok(!text.includes(fragment), `no debe incluir "${fragment}"`);
   }
+});
+
+// ── Operaciones sin IGV e ICBPER ───────────────────────────────────────────
+const mixed = buildFiscalTicket({
+  ...baseSource,
+  document: { ...baseSource.document, taxable: '8.64', igv: '1.56', exempt: '5.00', unaffected: '20.00', icbper: '1.00', total: '36.20' },
+})!;
+
+for (const cols of [42, 32] as const) {
+  check(`ticket mixto ${cols} col: exonerado, inafecto e ICBPER`, () => {
+    const text = printable(new TicketFormatter({ ...DEFAULT_ESCPOS_CONFIG, charsPerLine: cols }).formatSale({ ...sale(mixed), total: 36.2, icbperTotal: 1 }), mixed.qrText);
+    // El importe en letras puede ocupar varias líneas en 58 mm.
+    const joined = text.replace(/\s+/g, ' ');
+    for (const fragment of ['OP. GRAVADA:', 'OP. EXONERADA:', 'OP. INAFECTA:', 'IGV (18%):', 'ICBPER:', 'IMPORTE TOTAL:', 'SON: TREINTA Y SEIS CON 20/100 SOLES']) {
+      assert.ok(joined.includes(fragment), `falta "${fragment}"`);
+    }
+    assert.match(text, /OP\. EXONERADA:\s+S\/5\.00/);
+    assert.match(text, /OP\. INAFECTA:\s+S\/20\.00/);
+    assert.match(text, /ICBPER:\s+S\/1\.00/);
+    assert.deepEqual(text.split('\n').filter((line) => line.length > cols), [], `líneas más anchas que ${cols} columnas`);
+  });
+}
+
+check('ticket exonerado puro no muestra op. gravada en cero', () => {
+  const exemptOnly = buildFiscalTicket({
+    ...baseSource,
+    document: { ...baseSource.document, taxable: '0', igv: '0', exempt: '5.00', unaffected: '0', icbper: '0', total: '5.00' },
+  })!;
+  const text = printable(new TicketFormatter({ ...DEFAULT_ESCPOS_CONFIG, charsPerLine: 42 }).formatSale(sale(exemptOnly)), exemptOnly.qrText);
+  assert.ok(text.includes('OP. EXONERADA:'), 'op. exonerada');
+  assert.ok(!text.includes('OP. GRAVADA:'), 'sin op. gravada en cero');
+});
+
+check('ticket sin comprobante muestra el ICBPER de bolsas', () => {
+  const text = printable(new TicketFormatter({ ...DEFAULT_ESCPOS_CONFIG, charsPerLine: 42 }).formatSale({ ...sale(undefined), icbperTotal: 0.5, total: 7.5 }));
+  assert.match(text, /ICBPER BOLSAS:\s+S\/0\.50/);
+});
+
+// ── Total del POS (debe coincidir con el cobro del servidor) ────────────────
+check('POS: total con ICBPER igual al servidor', () => {
+  const product = (price: number, icbper = false) => ({ id: `p${price}`, price, stock: null, active: true, icbper, product: { id: 'x', name: 'x', brand: null, content: null, category: 'x', unitType: 'UNIT', barcode: null } });
+  const cart = [
+    { storeProduct: product(10), quantity: 1 },
+    { storeProduct: product(0.1, true), quantity: 1 },
+  ] as unknown as Parameters<typeof getCartTotal>[0];
+  const saleDate = new Date('2026-10-27T15:00:00Z');
+  assert.equal(getCartIcbper(cart, saleDate), 0.5);
+  // Mismo caso que T4 del banco de cobro: arroz + bolsa − S/1 de descuento = 9.60
+  assert.equal(Math.round(getCartTotal(cart, 1, null) * 100) / 100, 9.6);
+  const twoBags = [{ storeProduct: product(0.1, true), quantity: 2 }] as unknown as Parameters<typeof getCartTotal>[0];
+  assert.equal(getCartIcbper(twoBags, saleDate), 1);
+  assert.equal(getCartIcbper(twoBags, new Date('2022-06-01T15:00:00Z')), 0.8, 'tarifa 2022: S/0.40');
 });
 
 console.log(`\nTicket fiscal PASS: ${passed} comprobaciones.`);

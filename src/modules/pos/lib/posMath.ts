@@ -4,6 +4,7 @@
  */
 
 import type { CartItem, AppliedCoupon } from './posTypes';
+import { icbperRateFor } from '@/lib/sales/lineTaxes';
 
 /**
  * Calcula el subtotal de un item (cantidad * precio)
@@ -110,17 +111,30 @@ export function getTotalItemDiscounts(cart: CartItem[]): number {
 }
 
 /**
- * Total del carrito incluyendo cupón y descuento global
+ * ICBPER de las bolsas del carrito: tarifa por unidad, igual que el servidor.
+ * No se descuenta con cupones ni descuento global.
+ */
+export function getCartIcbper(cart: CartItem[], saleDate: Date = new Date()): number {
+  const rate = icbperRateFor(saleDate);
+  const total = cart.reduce(
+    (sum, item) => sum + (item.storeProduct.icbper ? Math.round(item.quantity * rate * 100) / 100 : 0),
+    0,
+  );
+  return Math.round(total * 100) / 100;
+}
+
+/**
+ * Total del carrito incluyendo cupón, descuento global e ICBPER de bolsas
  */
 export function getCartTotal(
-  cart: CartItem[], 
-  globalDiscount: number, 
+  cart: CartItem[],
+  globalDiscount: number,
   appliedCoupon: AppliedCoupon | null
 ): number {
   const subtotalAfterItemDiscounts = cart.reduce((sum, item) => sum + calculateItemTotal(item), 0);
   const totalBeforeCoupon = subtotalAfterItemDiscounts - globalDiscount;
   const couponDiscount = appliedCoupon?.discount ?? 0;
-  return totalBeforeCoupon - couponDiscount;
+  return totalBeforeCoupon - couponDiscount + getCartIcbper(cart);
 }
 
 /**

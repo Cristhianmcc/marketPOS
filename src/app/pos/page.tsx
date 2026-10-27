@@ -31,6 +31,7 @@ import {
   getTotalNthPromotions,
   getTotalItemDiscounts,
   getCartTotal,
+  getCartIcbper,
   getTotalBeforeCoupon
 } from '@/modules/pos';
 
@@ -40,6 +41,8 @@ interface StoreProduct {
   costPrice: number | null;
   stock: number | null;
   active: boolean;
+  /** Bolsa plástica: suma ICBPER por unidad al total. */
+  icbper?: boolean;
   // ✅ MÓDULO PH3: Info de lotes/vencimiento
   batchInfo?: { nearestExpiry: string; hasExpired: boolean } | null;
   product: {
@@ -2409,6 +2412,11 @@ export default function POSPage() {
                 <div className="text-2xl font-bold text-green-800">
                   {formatMoney(getCartTotal(cart, globalDiscount, appliedCoupon))}
                 </div>
+                {getCartIcbper(cart) > 0 && (
+                  <div className="text-xs text-green-700 mt-0.5">
+                    Incluye ICBPER bolsas {formatMoney(getCartIcbper(cart))}
+                  </div>
+                )}
               </div>
 
               {/* Selector de método - más compacto */}

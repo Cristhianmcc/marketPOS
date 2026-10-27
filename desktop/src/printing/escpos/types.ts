@@ -126,6 +126,9 @@ export interface PrintFiscalData {
   customer: { documentLabel: string; documentNumber: string | null; name: string; address: string | null };
   taxable: number;
   igv: number;
+  exempt?: number;
+  unaffected?: number;
+  icbper?: number;
   total: number;
   amountInWords: string;
   qrText: string;
@@ -143,6 +146,8 @@ export interface PrintSaleData {
   items: PrintSaleItem[];
   subtotal: number;
   totalDiscount: number;
+  /** ICBPER de bolsas, incluido en total (0 si no hay) */
+  icbperTotal?: number;
   total: number;
   discounts?: PrintDiscount[];
   payment: PrintPayment;

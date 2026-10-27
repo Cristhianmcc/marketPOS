@@ -25,6 +25,10 @@ export interface FiscalTicketData {
   };
   taxable: number;
   igv: number;
+  /** Operación exonerada, inafecta e ICBPER (0 si no hay) */
+  exempt: number;
+  unaffected: number;
+  icbper: number;
   total: number;
   amountInWords: string;
   qrText: string;
@@ -47,6 +51,9 @@ export interface FiscalTicketSource {
     customerAddress: string | null;
     taxable: unknown;
     igv: unknown;
+    exempt?: unknown;
+    unaffected?: unknown;
+    icbper?: unknown;
     total: unknown;
     status: SunatStatus;
     hash: string | null;
@@ -171,6 +178,9 @@ export function buildFiscalTicket(source: FiscalTicketSource): FiscalTicketData 
     },
     taxable: toNumber(document.taxable),
     igv,
+    exempt: toNumber(document.exempt),
+    unaffected: toNumber(document.unaffected),
+    icbper: toNumber(document.icbper),
     total,
     amountInWords: amountToWordsPEN(total),
     qrText: document.qrText || buildSunatQrText({

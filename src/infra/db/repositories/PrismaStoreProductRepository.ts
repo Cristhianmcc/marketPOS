@@ -65,6 +65,8 @@ const STORE_PRODUCT_SELECT = {
   stock: true,
   minStock: true,
   active: true,
+  igvAffectation: true,
+  icbper: true,
   product: { select: PRODUCT_SELECT },
 } as const;
 
@@ -87,6 +89,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
       publishInCatalog: (sp as any).publishInCatalog ?? false,
+      igvAffectation: (sp as any).igvAffectation ?? 'GRAVADO',
+      icbper: (sp as any).icbper ?? false,
       product: mapProduct(sp.product),
     };
   }
@@ -145,6 +149,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
       publishInCatalog: (sp as any).publishInCatalog ?? false,
+      igvAffectation: (sp as any).igvAffectation ?? 'GRAVADO',
+      icbper: (sp as any).icbper ?? false,
       product: mapProduct(sp.product),
     }));
 
@@ -180,6 +186,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: sp.minStock !== null ? sp.minStock.toNumber() : null,
       active: sp.active,
       publishInCatalog: (sp as any).publishInCatalog ?? false,
+      igvAffectation: (sp as any).igvAffectation ?? 'GRAVADO',
+      icbper: (sp as any).icbper ?? false,
       product: mapProduct(sp.product),
     };
   }
@@ -239,6 +247,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: created.minStock?.toNumber() || null,
       active: created.active,
       publishInCatalog: (created as any).publishInCatalog ?? false,
+      igvAffectation: (created as any).igvAffectation ?? 'GRAVADO',
+      icbper: (created as any).icbper ?? false,
       product: mapProduct(created.product),
     };
   }
@@ -260,6 +270,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
       publishInCatalog: (updated as any).publishInCatalog ?? false,
+      igvAffectation: (updated as any).igvAffectation ?? 'GRAVADO',
+      icbper: (updated as any).icbper ?? false,
       product: mapProduct(updated.product),
     };
   }
@@ -281,6 +293,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
       publishInCatalog: (updated as any).publishInCatalog ?? false,
+      igvAffectation: (updated as any).igvAffectation ?? 'GRAVADO',
+      icbper: (updated as any).icbper ?? false,
       product: mapProduct(updated.product),
     };
   }
@@ -302,6 +316,8 @@ export class PrismaStoreProductRepository implements IStoreProductRepository {
       minStock: updated.minStock?.toNumber() || null,
       active: updated.active,
       publishInCatalog: (updated as any).publishInCatalog ?? false,
+      igvAffectation: (updated as any).igvAffectation ?? 'GRAVADO',
+      icbper: (updated as any).icbper ?? false,
       product: mapProduct(updated.product),
     };
   }

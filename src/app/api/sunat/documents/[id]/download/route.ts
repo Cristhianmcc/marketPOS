@@ -212,6 +212,9 @@ export async function GET(
         items: printedItems,
         totals: {
           taxable: Number(doc.taxable),
+          exempt: Number(doc.exempt),
+          unaffected: Number(doc.unaffected),
+          icbper: Number(doc.icbper),
           igv: Number(doc.igv),
           total: Number(doc.total),
         },

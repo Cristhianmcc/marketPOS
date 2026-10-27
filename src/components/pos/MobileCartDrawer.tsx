@@ -4,6 +4,7 @@
 
 import { X, ShoppingCart, Trash2, Plus, Minus, Tag, Scale } from 'lucide-react';
 import { formatMoney } from '@/lib/money';
+import { getCartIcbper } from '@/modules/pos/lib/posMath';
 
 interface StoreProduct {
   id: string;
@@ -125,8 +126,11 @@ export default function MobileCartDrawer({
   // Descuento de cupón
   const couponDiscount = appliedCoupon?.discount || 0;
 
+  // ICBPER de bolsas: se suma aparte y no se descuenta
+  const icbper = getCartIcbper(cart as unknown as Parameters<typeof getCartIcbper>[0]);
+
   // Total final
-  const total = Math.max(0, subtotal - totalDiscounts - couponDiscount);
+  const total = Math.max(0, subtotal - totalDiscounts - couponDiscount) + icbper;
 
 
 
@@ -387,6 +391,12 @@ export default function MobileCartDrawer({
                   <span className="font-medium">
                     -{formatMoney(totalDiscounts + couponDiscount)}
                   </span>
+                </div>
+              )}
+              {icbper > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">ICBPER bolsas:</span>
+                  <span className="font-medium">{formatMoney(icbper)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t">

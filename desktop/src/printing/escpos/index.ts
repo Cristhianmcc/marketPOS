@@ -533,6 +533,7 @@ class EscposPrintManager {
       cashierName: sale.user?.name || undefined,
       footer: undefined,
       fiscal: sale.fiscalTicket || undefined,
+      icbperTotal: Number(sale.icbperTotal || 0),
     };
   }
 

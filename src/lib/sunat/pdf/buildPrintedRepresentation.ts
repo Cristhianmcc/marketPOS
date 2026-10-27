@@ -38,6 +38,9 @@ export interface PrintedRepresentationData {
   totals: {
     taxable: number;
     igv: number;
+    exempt?: number;
+    unaffected?: number;
+    icbper?: number;
     total: number;
   };
   qrText: string;
@@ -195,14 +198,31 @@ export async function buildPrintedRepresentationPdf(
     y -= rowHeight;
   }
 
-  ensureSpace(245);
+  ensureSpace(290);
   line();
   text('Op. gravada:', 388, 9);
   text(money(data.totals.taxable), 493, 9);
   y -= 15;
+  // Operaciones sin IGV e ICBPER solo cuando existen
+  const extraRows: Array<[string, number | undefined]> = [
+    ['Op. exonerada:', data.totals.exempt],
+    ['Op. inafecta:', data.totals.unaffected],
+  ];
+  for (const [label, value] of extraRows) {
+    if (!value || value <= 0) continue;
+    text(label, 388, 9);
+    text(money(value), 493, 9);
+    y -= 15;
+  }
   text('IGV (18%):', 388, 9);
   text(money(data.totals.igv), 493, 9);
-  y -= 18;
+  y -= 15;
+  if (data.totals.icbper && data.totals.icbper > 0) {
+    text('ICBPER:', 388, 9);
+    text(money(data.totals.icbper), 493, 9);
+    y -= 15;
+  }
+  y -= 3;
   text('TOTAL:', 388, 11, bold);
   text(money(data.totals.total), 483, 11, bold);
   y -= 25;

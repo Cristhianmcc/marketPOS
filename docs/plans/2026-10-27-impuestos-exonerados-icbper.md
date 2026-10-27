@@ -194,11 +194,32 @@ Pendiente de la fase: envío controlado a SUNAT BETA de una boleta, una factura,
 una nota y un resumen mixtos. Requiere las pantallas de la Fase 4 para crear los
 productos.
 
+## Resultado de la Fase 4 (27/10/2026)
+
+- Inventario: el modal de edición permite elegir el tipo de IGV y marcar
+  "Bolsa plástica (ICBPER)"; `PUT /api/store-products/[id]` valida ambos y el
+  repositorio de productos los devuelve al inventario y al POS. Los productos
+  nuevos se crean gravados y sin ICBPER; se ajustan editándolos.
+- POS: `getCartIcbper` usa la misma tarifa que el servidor y `getCartTotal`
+  suma el ICBPER, así el total mostrado, el efectivo recibido y el vuelto
+  coinciden con el cobro. Panel, carrito móvil y modal de pago muestran la
+  línea "ICBPER bolsas".
+- Ticket térmico, recibo y PDF: OP. GRAVADA (se omite si es cero y hay otra
+  operación), OP. EXONERADA, OP. INAFECTA, IGV e ICBPER. El ticket sin
+  comprobante muestra "ICBPER BOLSAS".
+
+Validación: `test:ticket:isolated` 12/12 (ticket mixto en 80 y 58 mm, ticket
+solo exonerado, ticket sin comprobante con ICBPER y total del POS igual al del
+servidor para el mismo caso, S/ 9.60; tarifa 2022 de S/ 0.40). Mutación: quitar
+el ICBPER del total del POS fue detectada (9.10 ≠ 9.60). Regresión completa y
+`build:only` correctos. Las pantallas no se probaron en navegador (el servidor
+de desarrollo usaría la base configurada); se revisan en el portable.
+
 ## Estado
 
 - [x] Fase 0
 - [x] Fase 1
 - [x] Fase 2
 - [x] Fase 3 (salvo envío a SUNAT BETA)
-- [ ] Fase 4
+- [x] Fase 4 (salvo revisión visual en el portable)
 - [ ] Fase 5

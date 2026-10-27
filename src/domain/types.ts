@@ -41,6 +41,10 @@ export interface StoreProduct {
   minStock: number | null;
   active: boolean;
   publishInCatalog?: boolean;
+  /** Afectación al IGV; el precio es el final al cliente. */
+  igvAffectation?: 'GRAVADO' | 'EXONERADO' | 'INAFECTO';
+  /** Bolsa plástica: suma ICBPER por unidad al total. */
+  icbper?: boolean;
   product?: Product;
 }
 
