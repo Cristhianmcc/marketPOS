@@ -899,3 +899,15 @@ Los detalles, condiciones y límites de evidencia están en el informe de audito
   comprobar inicio SUPERADMIN, registro o renovación de la tienda exacta,
   suspensión remota, vencimiento y recuperación dentro de la tolerancia sin
   conexión.
+
+### Compilación limpia en Render (2026-10-26)
+
+- El `tsconfig.json` raíz incluye `print-service/src/server.ts` en la
+  comprobación de tipos de `next build`. Por eso las dependencias usadas por
+  ese módulo también deben estar declaradas en el `package.json` raíz, aunque
+  `print-service/package.json` las declare para su ejecución independiente.
+- `iconv-lite` quedó declarado como dependencia directa de la raíz para que una
+  instalación limpia con `npm install && npm run build:only`, como la de
+  Render, pueda resolver el módulo y sus tipos.
+- El aviso de reglas ESLint de Next.js no fue la causa del fallo observado; el
+  error bloqueante era la resolución de `iconv-lite` durante TypeScript.
