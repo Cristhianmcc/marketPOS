@@ -131,7 +131,11 @@ export class TicketFormatter {
   // ── Cabecera (Nombre tienda, RUC, dirección, teléfono) ──────────────────────
 
   private printHeader(data: PrintSaleData): void {
-    const { store } = data;
+    const { store, fiscal } = data;
+    if (fiscal) {
+      this.printFiscalHeader(data);
+      return;
+    }
     this.push(CMD.ALIGN_CENTER, CMD.BOLD_ON);
     this.line(store.name.toUpperCase());
     this.push(CMD.BOLD_OFF);
@@ -144,7 +148,46 @@ export class TicketFormatter {
 
   // ── Info de la venta (número ticket, fecha, cajero) ─────────────────────────
 
+  /**
+   * Cabecera de boleta/factura electrónica: emisor (razón social, nombre
+   * comercial, RUC, dirección), tipo de comprobante y serie-número.
+   */
+  private printFiscalHeader(data: PrintSaleData): void {
+    const fiscal = data.fiscal!;
+    this.push(CMD.BOLD_ON);
+    this.wrap(fiscal.issuer.businessName.toUpperCase()).forEach(l => this.line(this.center(l.trim())));
+    this.push(CMD.BOLD_OFF);
+    if (fiscal.issuer.tradeName) this.wrap(fiscal.issuer.tradeName).forEach(l => this.line(this.center(l.trim())));
+    this.line(this.center(`RUC: ${fiscal.issuer.ruc}`));
+    if (fiscal.issuer.address) this.wrap(fiscal.issuer.address).forEach(l => this.line(this.center(l.trim())));
+    if (data.store.phone) this.line(this.center(`Tel: ${data.store.phone}`));
+    this.line(this.dash());
+    this.push(CMD.BOLD_ON);
+    this.wrap(fiscal.title).forEach(l => this.line(this.center(l.trim())));
+    this.line(this.center(fiscal.fullNumber));
+    this.push(CMD.BOLD_OFF);
+    this.line(this.dash());
+  }
+
+  /** Línea "ETIQUETA: valor" con ajuste de texto bajo la etiqueta. */
+  private labeled(label: string, value: string): void {
+    const lines = this.wrap(`${label} ${value}`);
+    lines.forEach(l => this.line(l));
+  }
+
   private printSaleInfo(data: PrintSaleData): void {
+    if (data.fiscal) {
+      const { fiscal } = data;
+      this.labeled('FECHA EMISION:', `${fiscal.issueDate} ${data.time}`.trim());
+      if (data.cashierName) this.labeled('CAJERO:', data.cashierName);
+      this.labeled('TICKET:', String(data.saleNumber).padStart(5, '0'));
+      this.line(this.dash());
+      this.labeled(fiscal.title.startsWith('FACTURA') ? 'SENOR(ES):' : 'CLIENTE:', fiscal.customer.name.toUpperCase());
+      if (fiscal.customer.documentNumber) this.labeled(`${fiscal.customer.documentLabel}:`, fiscal.customer.documentNumber);
+      if (fiscal.customer.address) this.labeled('DIRECCION:', fiscal.customer.address);
+      this.line(this.dash());
+      return;
+    }
     const num      = String(data.saleNumber).padStart(5, '0');
     const datetime = `${data.date} ${data.time}`.trim();
     this.line(this.lr(`N° ${num}`, datetime.slice(-PRICE_W)));
@@ -208,9 +251,14 @@ export class TicketFormatter {
       this.line(this.lr('SUBTOTAL:', this.money(data.subtotal)));
       this.line(this.lr('DESCUENTO:', `-S/${data.totalDiscount.toFixed(2)}`));
     }
+    if (data.fiscal) {
+      this.line(this.lr('OP. GRAVADA:', this.money(data.fiscal.taxable)));
+      this.line(this.lr('IGV (18%):', this.money(data.fiscal.igv)));
+    }
     this.push(CMD.BOLD_ON);
-    this.line(this.lr('TOTAL:', this.money(data.total)));
+    this.line(this.lr(data.fiscal ? 'IMPORTE TOTAL:' : 'TOTAL:', this.money(data.fiscal?.total ?? data.total)));
     this.push(CMD.BOLD_OFF);
+    if (data.fiscal) this.wrap(data.fiscal.amountInWords).forEach(l => this.line(l));
     this.line(this.equals());
   }
 
@@ -246,8 +294,31 @@ export class TicketFormatter {
 
   // ── Pie de ticket ────────────────────────────────────────────────────────────
 
+  /**
+   * Bloque legal de la representación impresa: QR SUNAT, hash, leyenda y,
+   * en BETA, la marca de documento sin valor tributario.
+   */
+  private printFiscalFooter(data: PrintSaleData): void {
+    const fiscal = data.fiscal!;
+    this.line(this.equals());
+    this.push(CMD.ALIGN_CENTER);
+    this.qrCode(fiscal.qrText, this.cols <= 32 ? 4 : 5);
+    this.push(CMD.FEED_LINE, CMD.ALIGN_LEFT);
+    if (fiscal.hash) this.wrap(`Hash: ${fiscal.hash}`).forEach(l => this.line(this.center(l.trim())));
+    this.wrap(fiscal.legend).forEach(l => this.line(this.center(l.trim())));
+    if (fiscal.isBeta) {
+      this.push(CMD.BOLD_ON);
+      this.line(this.center('*** DOCUMENTO DE PRUEBA BETA ***'));
+      this.line(this.center('SIN VALOR TRIBUTARIO'));
+      this.push(CMD.BOLD_OFF);
+    } else {
+      this.wrap('Consulte su comprobante en www.sunat.gob.pe').forEach(l => this.line(this.center(l.trim())));
+    }
+  }
+
   private printFooter(data: PrintSaleData): void {
     const { store } = data;
+    if (data.fiscal) this.printFiscalFooter(data);
     this.line(this.equals());
     const slogan = store.slogan || data.footer || 'Gracias por su compra!';
     this.push(CMD.BOLD_ON);

@@ -525,6 +525,7 @@ class EscposPrintManager {
       payment,
       cashierName: sale.user?.name || undefined,
       footer: undefined,
+      fiscal: sale.fiscalTicket || undefined,
     };
   }
 

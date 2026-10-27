@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/infra/db/prisma';
+import { buildFiscalTicket } from '@/lib/sunat/printedTicket';
 
 export async function GET(
   request: NextRequest,
@@ -160,7 +161,28 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ sale });
+    // Representación impresa: la boleta o factura vigente de la venta. Las
+    // notas no reemplazan el comprobante original en el ticket.
+    const fiscalDocument = await prisma.electronicDocument.findFirst({
+      where: { saleId: sale.id, storeId: session.storeId, docType: { in: ['FACTURA', 'BOLETA'] } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        docType: true, series: true, number: true, fullNumber: true, issueDate: true,
+        customerDocType: true, customerDocNumber: true, customerName: true, customerAddress: true,
+        taxable: true, igv: true, total: true, status: true, hash: true, qrText: true,
+        sunatSettings: { select: { env: true, ruc: true, razonSocial: true, address: true } },
+        store: { select: { name: true, ruc: true, address: true } },
+      },
+    });
+    const fiscalTicket = fiscalDocument
+      ? buildFiscalTicket({
+          document: fiscalDocument,
+          settings: fiscalDocument.sunatSettings,
+          store: fiscalDocument.store,
+        })
+      : null;
+
+    return NextResponse.json({ sale: { ...sale, fiscalTicket } });
   } catch (error) {
     console.error('Error fetching sale:', error);
     return NextResponse.json(

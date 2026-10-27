@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Printer, Download, ArrowLeft } from 'lucide-react';
+import QRCode from 'qrcode';
 import { formatMoney } from '@/lib/money';
+import type { FiscalTicketData } from '@/lib/sunat/printedTicket';
 
 interface SaleItem {
   id: string;
@@ -104,6 +106,8 @@ interface Sale {
     customerName: string | null;
     createdAt: string;
   }>;
+  // Representación impresa completa de la boleta o factura vigente.
+  fiscalTicket?: FiscalTicketData | null;
 }
 
 export default function ReceiptPage() {
@@ -112,6 +116,16 @@ export default function ReceiptPage() {
   const searchParams = useSearchParams();
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fiscalQr, setFiscalQr] = useState<string | null>(null);
+
+  useEffect(() => {
+    const qrText = sale?.fiscalTicket?.qrText;
+    if (!qrText) {
+      setFiscalQr(null);
+      return;
+    }
+    QRCode.toDataURL(qrText, { margin: 1, width: 150 }).then(setFiscalQr).catch(() => setFiscalQr(null));
+  }, [sale?.fiscalTicket?.qrText]);
   
   // D6.2: Print mode for Playwright screenshot
   const isPrintMode = searchParams.get('print') === '1';
@@ -229,6 +243,7 @@ export default function ReceiptPage() {
   }
 
   const isAnulada = Number(sale.total) === 0 && Number(sale.subtotal) === 0;
+  const fiscal = isAnulada ? null : sale.fiscalTicket ?? null;
 
   return (
     <div data-receipt-ready="true">
@@ -273,14 +288,34 @@ export default function ReceiptPage() {
                 style={{ maxWidth: '80%', maxHeight: '60px', margin: '0 auto 6px', display: 'block', objectFit: 'contain' }}
               />
             )}
-            <div className="store-name">{sale.store.name}</div>
-            {sale.store.ruc && <div className="store-info">RUC: {sale.store.ruc}</div>}
-            {sale.store.address && <div className="store-info">{sale.store.address}</div>}
+            <div className="store-name">{fiscal ? fiscal.issuer.businessName : sale.store.name}</div>
+            {fiscal?.issuer.tradeName && <div className="store-info">{fiscal.issuer.tradeName}</div>}
+            {(fiscal?.issuer.ruc || sale.store.ruc) && <div className="store-info">RUC: {fiscal?.issuer.ruc || sale.store.ruc}</div>}
+            {(fiscal?.issuer.address || sale.store.address) && <div className="store-info">{fiscal?.issuer.address || sale.store.address}</div>}
             {sale.store.phone && <div className="store-info">Tel: {sale.store.phone}</div>}
           </div>
 
-          {/* ✅ MÓDULO 18.8: Mostrar comprobante electrónico */}
-          {sale.electronicDocuments && sale.electronicDocuments.length > 0 && (
+          {/* Representación impresa de boleta o factura electrónica */}
+          {fiscal && (
+            <>
+              <div className="separator">================================</div>
+              <div className="comprobante-electronico">
+                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>{fiscal.title}</div>
+                <div style={{ textAlign: 'center', fontSize: '16px', fontWeight: 'bold', margin: '4px 0' }}>{fiscal.fullNumber}</div>
+                <div style={{ fontSize: '11px', marginTop: '6px' }}>
+                  <div>Fecha de emisión: {fiscal.issueDate}</div>
+                  <div>{fiscal.docType === 'FACTURA' ? 'Señor(es)' : 'Cliente'}: {fiscal.customer.name}</div>
+                  {fiscal.customer.documentNumber && (
+                    <div>{fiscal.customer.documentLabel}: {fiscal.customer.documentNumber}</div>
+                  )}
+                  {fiscal.customer.address && <div>Dirección: {fiscal.customer.address}</div>}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ✅ MÓDULO 18.8: Comprobante sin representación válida (p. ej. rechazado) */}
+          {!fiscal && sale.electronicDocuments && sale.electronicDocuments.length > 0 && (
             <>
               <div className="separator">================================</div>
               <div className="comprobante-electronico">
@@ -486,16 +521,30 @@ export default function ReceiptPage() {
                     <span>-{formatMoney(sale.couponDiscount)}</span>
                   </div>
                 )}
-                {sale.tax > 0 && (
+                {fiscal ? (
+                  <>
+                    <div className="total-row">
+                      <span>Op. gravada:</span>
+                      <span>{formatMoney(fiscal.taxable)}</span>
+                    </div>
+                    <div className="total-row">
+                      <span>IGV (18%):</span>
+                      <span>{formatMoney(fiscal.igv)}</span>
+                    </div>
+                  </>
+                ) : sale.tax > 0 && (
                   <div className="total-row">
                     <span>IGV (18%):</span>
                     <span>{formatMoney(sale.tax)}</span>
                   </div>
                 )}
                 <div className="total-row total-final">
-                  <span>TOTAL:</span>
-                  <span>{formatMoney(sale.total)}</span>
+                  <span>{fiscal ? 'IMPORTE TOTAL:' : 'TOTAL:'}</span>
+                  <span>{formatMoney(fiscal ? fiscal.total : sale.total)}</span>
                 </div>
+                {fiscal && (
+                  <div style={{ fontSize: '11px', marginTop: '4px' }}>{fiscal.amountInWords}</div>
+                )}
               </div>
 
               <div className="separator">================================</div>
@@ -562,6 +611,25 @@ export default function ReceiptPage() {
           )}
 
           <div className="separator">================================</div>
+
+          {/* Bloque legal de la representación impresa */}
+          {fiscal && (
+            <>
+              <div style={{ textAlign: 'center', fontSize: '10px', margin: '8px 0' }}>
+                {fiscalQr && (
+                  <img src={fiscalQr} alt="Código QR SUNAT" style={{ width: '120px', height: '120px', margin: '0 auto 6px', display: 'block' }} />
+                )}
+                {fiscal.hash && <div style={{ wordBreak: 'break-all' }}>Hash: {fiscal.hash}</div>}
+                <div style={{ marginTop: '4px' }}>{fiscal.legend}</div>
+                {fiscal.isBeta ? (
+                  <div style={{ fontWeight: 'bold', marginTop: '4px' }}>*** DOCUMENTO DE PRUEBA BETA — SIN VALOR TRIBUTARIO ***</div>
+                ) : (
+                  <div style={{ marginTop: '4px' }}>Consulte su comprobante en www.sunat.gob.pe</div>
+                )}
+              </div>
+              <div className="separator">================================</div>
+            </>
+          )}
 
           {/* Footer */}
           <div className="receipt-footer">

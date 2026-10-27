@@ -161,6 +161,15 @@ ambiente es BETA. El texto QR se persiste al firmar nuevas emisiones; para los
 documentos anteriores se reconstruye al descargar sin reservar otro correlativo.
 El listado de ventas expone PDF junto a XML y CDR.
 
+El ticket de la venta también es la representación impresa cuando existe boleta o
+factura vigente. `src/lib/sunat/printedTicket.ts` arma `fiscalTicket` (emisor
+desde `SunatSettings`, comprobante, cliente, operación gravada, IGV, total, importe
+en letras, QR, hash, leyenda y marca BETA) y `/api/sales/[id]` lo devuelve. Lo
+consumen el formateador ESC/POS de Electron (`desktop/src/printing/escpos`) y
+`/receipt/[id]`. Las notas y los comprobantes rechazados, con error o anulados no
+se imprimen como comprobante. `npm run test:ticket:isolated` valida 80 y 58 mm.
+El formateador del `print-service` web todavía no incluye este bloque.
+
 Las boletas pueden emitirse a un cliente identificado o a `CLIENTES VARIOS`. En
 el segundo caso se usa el tipo de documento SUNAT `0` y el número `-`; si el
 importe supera S/ 700, el servidor exige identificar al cliente. El selector de

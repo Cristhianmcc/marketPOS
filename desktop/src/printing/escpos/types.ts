@@ -114,8 +114,29 @@ export interface PrintPayment {
   customerBalance?: number; // For FIADO
 }
 
+/**
+ * Representación impresa de boleta/factura electrónica. La arma el servidor
+ * (src/lib/sunat/printedTicket.ts) y llega en /api/sales/[id] como fiscalTicket.
+ */
+export interface PrintFiscalData {
+  title: string;
+  fullNumber: string;
+  issueDate: string;
+  issuer: { ruc: string; businessName: string; tradeName: string | null; address: string | null };
+  customer: { documentLabel: string; documentNumber: string | null; name: string; address: string | null };
+  taxable: number;
+  igv: number;
+  total: number;
+  amountInWords: string;
+  qrText: string;
+  hash: string | null;
+  legend: string;
+  isBeta: boolean;
+}
+
 export interface PrintSaleData {
   store: PrintStoreInfo;
+  fiscal?: PrintFiscalData;
   saleNumber: string;
   date: string;
   time: string;
