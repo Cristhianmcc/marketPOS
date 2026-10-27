@@ -38,14 +38,11 @@ function getDefaultRubroFlags(profile: BusinessProfile): RubroFlagKey[] {
 const PLAN_INFO = {
   DEMO: {
     label: '🎉 Demo — Prueba gratuita 30 días',
-    description: 'Acceso completo a TODO. Ideal para que el cliente conozca el sistema antes de pagar.',
+    description: 'Todas las funciones del plan (fiado, promociones y SUNAT) con los módulos del rubro elegido. Ideal para que el cliente conozca el sistema antes de pagar.',
     color: 'text-green-700',
-    // DEMO activa todo para que el cliente pueda probar cada módulo
-    extraFlags: ['ENABLE_ADVANCED_UNITS', 'ENABLE_CONVERSIONS', 'ENABLE_SELLUNIT_PRICING',
-                 'ENABLE_SERVICES', 'ENABLE_WORK_ORDERS', 'ENABLE_RESERVATIONS',
-                 'ENABLE_BATCH_EXPIRY', 'ENABLE_FEFO_SALES', 'ENABLE_PHARMA_FIELDS',
-                 'ENABLE_MEDICINE_SEARCH', 'ENABLE_RESTRICTED_PRODUCTS',
-                 'ENABLE_SUPPLIERS', 'ENABLE_PATIENTS', 'ENABLE_CONTROLLED_BOOK'] as RubroFlagKey[],
+    // DEMO no suma módulos de otros rubros: una bodega no necesita pacientes.
+    // Los módulos adicionales se marcan a mano en las casillas.
+    extraFlags: [] as RubroFlagKey[],
   },
   STARTER: {
     label: '📦 Básico — Solo ventas esenciales',
@@ -72,10 +69,6 @@ type PlanCode = keyof typeof PLAN_INFO;
 function getRecommendedRubroFlags(plan: PlanCode, profile: BusinessProfile): RubroFlagKey[] {
   const profileFlags = getDefaultRubroFlags(profile);
   const planExtras = PLAN_INFO[plan].extraFlags;
-  if (plan === 'DEMO') {
-    // DEMO: activa todo — los del rubro + todos los extras del plan
-    return [...new Set([...profileFlags, ...planExtras])] as RubroFlagKey[];
-  }
   return [...new Set([...profileFlags, ...planExtras])] as RubroFlagKey[];
 }
 
@@ -180,7 +173,7 @@ export default function AdminStoresPage() {
     ownerPassword: '',
     businessProfile: 'BODEGA' as BusinessProfile, // ✅ MÓDULO V1
     planCode: 'DEMO' as PlanCode,
-    selectedRubroFlags: PLAN_INFO['DEMO'].extraFlags, // DEMO activa todos los módulos
+    selectedRubroFlags: getRecommendedRubroFlags('DEMO', 'BODEGA' as BusinessProfile),
   });
 
   useEffect(() => {
@@ -362,7 +355,7 @@ export default function AdminStoresPage() {
         ownerPassword: '',
         businessProfile: 'BODEGA',
         planCode: 'DEMO',
-        selectedRubroFlags: PLAN_INFO['DEMO'].extraFlags,
+        selectedRubroFlags: getRecommendedRubroFlags('DEMO', 'BODEGA' as BusinessProfile),
       });
       setShowForm(false);
     } catch (err) {
