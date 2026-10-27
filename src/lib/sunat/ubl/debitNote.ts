@@ -12,9 +12,8 @@ import {
   getCustomizationId,
   getCurrencyCode,
   mapUnitTypeToUBL,
-  getDefaultIGVAffectation,
-  getIGVPercentage,
 } from './common';
+import { appendHeaderTaxTotal, appendLineTaxTotal, lineAmounts, totalsByOperation } from './taxes';
 
 interface DebitNoteMetadata {
   referencedDocType: string; // FACTURA o BOLETA
@@ -173,19 +172,15 @@ export function generateDebitNoteXML(
 
   custParty.ele('cac:PartyLegalEntity').ele('cbc:RegistrationName').txt(customer.name);
 
-  // TaxTotal
-  const taxTotal = doc.ele('cac:TaxTotal');
-  taxTotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(totals.tax));
-  const taxSubtotal = taxTotal.ele('cac:TaxSubtotal');
-  taxSubtotal.ele('cbc:TaxableAmount', { currencyID: currency }).txt(formatUBLAmount(totals.subtotal));
-  taxSubtotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(totals.tax));
-  const taxScheme = taxSubtotal.ele('cac:TaxCategory').ele('cac:TaxScheme');
-  taxScheme.ele('cbc:ID').txt(SUNAT_CATALOGS.TAX_TYPE.IGV);
-  taxScheme.ele('cbc:Name').txt('IGV');
-  taxScheme.ele('cbc:TaxTypeCode').txt('VAT');
+  // TaxTotal: IGV, exonerado, inafecto e ICBPER
+  appendHeaderTaxTotal(doc, totals, currency);
 
-  // RequestedMonetaryTotal
+  // RequestedMonetaryTotal: valor de venta, importe con impuestos e importe total
   const requestedMonetaryTotal = doc.ele('cac:RequestedMonetaryTotal');
+  requestedMonetaryTotal.ele('cbc:LineExtensionAmount', { currencyID: currency })
+    .txt(formatUBLAmount(totalsByOperation(totals).lineExtension));
+  requestedMonetaryTotal.ele('cbc:TaxInclusiveAmount', { currencyID: currency })
+    .txt(formatUBLAmount(totals.total));
   requestedMonetaryTotal.ele('cbc:PayableAmount', { currencyID: currency })
     .txt(formatUBLAmount(totals.total));
 
@@ -194,9 +189,7 @@ export function generateDebitNoteXML(
     const debitNoteLine = doc.ele('cac:DebitNoteLine');
     debitNoteLine.ele('cbc:ID').txt(item.lineNumber.toString());
     const unitCode = item.unitSunatCode || mapUnitTypeToUBL(item.unitType);
-    const lineTaxable = item.taxableAmount ?? item.lineSubtotal / 1.18;
-    const lineTax = item.taxAmount ?? item.lineSubtotal - lineTaxable;
-    const unitValue = item.unitValue ?? (item.quantity > 0 ? lineTaxable / item.quantity : 0);
+    const { taxable: lineTaxable, unitValue } = lineAmounts(item);
     debitNoteLine.ele('cbc:DebitedQuantity', { unitCode })
       .txt(formatUBLQuantity(item.quantity));
     debitNoteLine.ele('cbc:LineExtensionAmount', { currencyID: currency })
@@ -207,18 +200,7 @@ export function generateDebitNoteXML(
     alternativePrice.ele('cbc:PriceAmount', { currencyID: currency }).txt(formatUBLAmount(item.unitPrice));
     alternativePrice.ele('cbc:PriceTypeCode').txt('01');
 
-    const lineTaxTotal = debitNoteLine.ele('cac:TaxTotal');
-    lineTaxTotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(lineTax));
-    const lineTaxSubtotal = lineTaxTotal.ele('cac:TaxSubtotal');
-    lineTaxSubtotal.ele('cbc:TaxableAmount', { currencyID: currency }).txt(formatUBLAmount(lineTaxable));
-    lineTaxSubtotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(lineTax));
-    const lineTaxCategory = lineTaxSubtotal.ele('cac:TaxCategory');
-    lineTaxCategory.ele('cbc:Percent').txt(getIGVPercentage().toString());
-    lineTaxCategory.ele('cbc:TaxExemptionReasonCode').txt(getDefaultIGVAffectation());
-    const lineTaxScheme = lineTaxCategory.ele('cac:TaxScheme');
-    lineTaxScheme.ele('cbc:ID').txt(SUNAT_CATALOGS.TAX_TYPE.IGV);
-    lineTaxScheme.ele('cbc:Name').txt('IGV');
-    lineTaxScheme.ele('cbc:TaxTypeCode').txt('VAT');
+    appendLineTaxTotal(debitNoteLine, item, currency);
 
     // Item
     const itemElement = debitNoteLine.ele('cac:Item');

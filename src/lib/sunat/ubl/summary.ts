@@ -34,6 +34,10 @@ export interface SummaryDocumentLine {
   taxable: number;
   /** IGV */
   igv: number;
+  /** Exonerado (02), inafecto (03) e ICBPER (7152) */
+  exempt?: number;
+  unaffected?: number;
+  icbper?: number;
   /** Total */
   total: number;
   /** Moneda (default PEN) */
@@ -200,8 +204,14 @@ export function generateSummaryXML(payload: SummaryPayload, docId: string): stri
       gravadoPayment.ele('cbc:InstructionID').txt('01'); // Gravado
     }
 
-    // Total exonerado (si aplica) - por ahora asumimos todo gravado
-    // Total inafecto (si aplica)
+    // Total exonerado (02) e inafecto (03)
+    const operations: Array<[number | undefined, string]> = [[line.exempt, '02'], [line.unaffected, '03']];
+    for (const [amount, instructionId] of operations) {
+      if (!amount || amount <= 0) continue;
+      const payment = summaryLine.ele('sac:BillingPayment');
+      payment.ele('cbc:PaidAmount', { currencyID: currency }).txt(formatUBLAmount(amount));
+      payment.ele('cbc:InstructionID').txt(instructionId);
+    }
 
     // SUNAT define este nodo como la sumatoria de otros cargos del item.
     // En el Resumen Diario exige ChargeIndicator=true incluso cuando el monto
@@ -224,6 +234,18 @@ export function generateSummaryXML(payload: SummaryPayload, docId: string): stri
     taxScheme.ele('cbc:ID').txt('1000'); // IGV
     taxScheme.ele('cbc:Name').txt('IGV');
     taxScheme.ele('cbc:TaxTypeCode').txt('VAT');
+
+    // TaxTotal (ICBPER): cada tributo del resumen va en su propio bloque
+    if (line.icbper && line.icbper > 0) {
+      const icbperTotal = summaryLine.ele('cac:TaxTotal');
+      icbperTotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(line.icbper));
+      const icbperSubtotal = icbperTotal.ele('cac:TaxSubtotal');
+      icbperSubtotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(line.icbper));
+      const icbperScheme = icbperSubtotal.ele('cac:TaxCategory').ele('cac:TaxScheme');
+      icbperScheme.ele('cbc:ID').txt('7152');
+      icbperScheme.ele('cbc:Name').txt('ICBPER');
+      icbperScheme.ele('cbc:TaxTypeCode').txt('OTH');
+    }
   });
 
   return doc.end({ prettyPrint: true });

@@ -3,7 +3,7 @@
 // Usado por GET /api/sunat/documents/:id/payload
 
 import { PrismaClient } from '@prisma/client';
-import { sunatLineQuantity } from './saleLineQuantity';
+import { buildSaleTaxLines, SALE_ITEM_TAX_SELECT } from './saleTaxLines';
 import {
   SunatDocumentPayload,
   SunatIssuer,
@@ -30,26 +30,7 @@ export async function buildPayloadFromDocument(
       sale: {
         include: {
           items: {
-            select: {
-              id: true,
-              productName: true,
-              productContent: true,
-              unitType: true,
-              quantity: true,
-              unitPrice: true,
-              subtotal: true,
-              discountAmount: true,
-              unitSunatCode: true,
-              unitSunatCodeUsed: true,
-              pricingMode: true,
-              quantityOriginal: true,
-              sellUnitPriceApplied: true,
-              // PH8: pharma snapshot
-              commercialName: true,
-              genericName: true,
-              concentration: true,
-              pharmaceuticalForm: true,
-            },
+            select: { id: true, genericName: true, ...SALE_ITEM_TAX_SELECT },
           },
         },
       },
@@ -92,54 +73,49 @@ export async function buildPayloadFromDocument(
     address: doc.customerAddress,
   };
 
-  // 4. Construir items
+  // 4-5. Líneas y totales. Si el documento cubre la venta completa se usan
+  // las mismas líneas que la emisión (descuentos repartidos, afectaciones e
+  // ICBPER); así una nota de crédito total cuadra con la boleta o factura.
   let items: SunatLineItem[];
+  let totals: SunatTotals;
 
-  if (doc.sale && doc.sale.items.length > 0) {
-    // Usar datos del Sale si están disponibles
-    items = doc.sale.items.map((item, index) => {
-      // ✅ PH8: Descripción enriquecida para farmacia
-      let description: string;
-      if (item.commercialName) {
-        description = item.commercialName;
-        if (item.concentration) description += ` ${item.concentration}`;
-        if (item.pharmaceuticalForm) description += ` ${item.pharmaceuticalForm}`;
-      } else {
-        description = item.productName;
-        if (item.productContent) description += ` ${item.productContent}`;
-      }
+  const coversWholeSale = !!doc.sale
+    && doc.sale.items.length > 0
+    && Math.abs(Number(doc.total) - Number(doc.sale.total)) < 0.01;
 
-      const line = sunatLineQuantity(item);
-      return {
-        lineNumber: index + 1,
-        description,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        lineSubtotal: Number(item.subtotal),
-        discountsApplied: Number(item.discountAmount || 0),
-        unitSunatCode: line.unitSunatCode,
-        unitType: item.unitType,
-      };
-    });
+  if (coversWholeSale) {
+    ({ items, totals } = buildSaleTaxLines(doc.sale!));
   } else {
-    // Fallback: crear un ítem genérico
+    // Documento parcial o sin venta: una línea con los importes del documento.
+    // Si no hay operación gravada, la línea toma la afectación del documento.
+    const exempt = Number(doc.exempt);
+    const unaffected = Number(doc.unaffected);
+    const icbper = Number(doc.icbper);
+    const taxable = Number(doc.taxable);
+    const igvAffectation = taxable > 0 ? 'GRAVADO' : exempt > 0 ? 'EXONERADO' : unaffected > 0 ? 'INAFECTO' : 'GRAVADO';
+    const lineValue = taxable + exempt + unaffected;
     items = [{
       lineNumber: 1,
       description: 'Venta',
       quantity: 1,
-      unitPrice: Number(doc.taxable) + Number(doc.igv),
-      lineSubtotal: Number(doc.total),
+      unitPrice: Number(doc.total) - icbper,
+      lineSubtotal: Number(doc.total) - icbper,
+      taxableAmount: lineValue,
+      taxAmount: Number(doc.igv),
+      unitValue: lineValue,
       discountsApplied: 0,
+      igvAffectation,
     }];
+    totals = {
+      subtotal: taxable,
+      tax: Number(doc.igv),
+      ...(exempt > 0 ? { exempt } : {}),
+      ...(unaffected > 0 ? { unaffected } : {}),
+      ...(icbper > 0 ? { icbper } : {}),
+      total: Number(doc.total),
+      currency: doc.currency as 'PEN',
+    };
   }
-
-  // 5. Construir totals desde snapshot del documento
-  const totals: SunatTotals = {
-    subtotal: Number(doc.taxable),
-    tax: Number(doc.igv),
-    total: Number(doc.total),
-    currency: doc.currency as 'PEN',
-  };
 
   // 6. Construir payload completo
   const payload: SunatDocumentPayload = {

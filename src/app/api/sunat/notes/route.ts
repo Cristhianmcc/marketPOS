@@ -94,27 +94,39 @@ export async function POST(req: NextRequest) {
 
     const basePayload = await buildPayloadFromDocument(prisma, reference.id);
     const isFullCredit = noteType === 'NOTA_CREDITO' && Math.abs(amount - Number(reference.total)) < 0.001;
-    const taxable = isFullCredit
-      ? Number(reference.taxable)
-      : Number((amount / 1.18).toFixed(2));
-    const igv = isFullCredit
-      ? Number(reference.igv)
-      : Number((amount - taxable).toFixed(2));
-    const payload = {
+    // Nota total: mismas líneas y totales que el comprobante (afectaciones e
+    // ICBPER incluidos). Nota parcial: una línea; si el comprobante no tiene
+    // operación gravada, la línea toma su afectación (exonerada o inafecta).
+    const partialAffectation = Number(reference.taxable) > 0
+      ? 'GRAVADO'
+      : Number(reference.exempt) > 0 ? 'EXONERADO' : Number(reference.unaffected) > 0 ? 'INAFECTO' : 'GRAVADO';
+    const partialTaxable = partialAffectation === 'GRAVADO' ? Number((amount / 1.18).toFixed(2)) : amount;
+    const partialIgv = partialAffectation === 'GRAVADO' ? Number((amount - partialTaxable).toFixed(2)) : 0;
+    const payload = isFullCredit ? basePayload : {
       ...basePayload,
-      items: isFullCredit ? basePayload.items : [{
+      items: [{
         lineNumber: 1,
         description: reason,
         quantity: 1,
         unitPrice: amount,
         lineSubtotal: amount,
-        taxableAmount: taxable,
-        taxAmount: igv,
-        unitValue: taxable,
+        taxableAmount: partialTaxable,
+        taxAmount: partialIgv,
+        unitValue: partialTaxable,
         unitSunatCode: 'NIU',
+        igvAffectation: partialAffectation as 'GRAVADO' | 'EXONERADO' | 'INAFECTO',
       }],
-      totals: { subtotal: taxable, tax: igv, total: amount, currency: 'PEN' as const },
+      totals: {
+        subtotal: partialAffectation === 'GRAVADO' ? partialTaxable : 0,
+        tax: partialIgv,
+        ...(partialAffectation === 'EXONERADO' ? { exempt: amount } : {}),
+        ...(partialAffectation === 'INAFECTO' ? { unaffected: amount } : {}),
+        total: amount,
+        currency: 'PEN' as const,
+      },
     };
+    const taxable = payload.totals.subtotal;
+    const igv = payload.totals.tax;
 
     const fiscalType = noteType as SunatDocType;
     const issueDate = new Date();
@@ -140,6 +152,9 @@ export async function POST(req: NextRequest) {
           customerAddress: reference.customerAddress,
           taxable,
           igv,
+          exempt: payload.totals.exempt ?? 0,
+          unaffected: payload.totals.unaffected ?? 0,
+          icbper: payload.totals.icbper ?? 0,
           total: amount,
           status: 'DRAFT',
           referenceDocId: reference.id,

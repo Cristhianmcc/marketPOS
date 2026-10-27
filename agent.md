@@ -50,6 +50,7 @@ es `docs/audits/2026-09-26-pos.md`.
 | `print-service/src/server.ts`, `print-service/src/security.ts` | Servidor de impresión en `127.0.0.1:12121`, emparejamiento local, CORS y validación |
 | `scripts` | Mantenimiento, semillas y pruebas ad hoc; muchos modifican datos |
 | `public` | Assets y service worker PWA |
+| `landing` | Página de venta estática (Three.js + Lenis, sin build); independiente de la app, ver `landing/README.md` |
 | `docs`, `*_TEST_CHECKLIST.md` | Documentación histórica; contrastar afirmaciones con implementación |
 | `.next`, `desktop/dist`, `desktop/build-resources`, `desktop/dist-electron*` | Artefactos generados; no editar como fuente |
 | `pgsql`, `desktop/vendor`, `node_modules` | Runtime/dependencias, fuera de cambios funcionales ordinarios |
@@ -415,11 +416,14 @@ tienda en PRODUCCIÓN deben completarse y comprobarse todos estos puntos:
    correlativos sin incluir certificado privado, claves SOL ni contraseñas.
 
 Los documentos aceptados en BETA demuestran el flujo técnico, pero no tienen valor
-fiscal de PRODUCCIÓN. El soporte tributario actual cubre únicamente operaciones
-gravadas al 18 % con precios finales que incluyen IGV. Una tienda que necesite
-operaciones exoneradas, inafectas o gratuitas, ISC o bolsas sujetas a ICBPER no
-está lista: primero hay que modelar esos afectos, generar el UBL correspondiente y
-probarlo. Si la tienda trabaja exclusivamente con productos gravados al 18 %, la
+fiscal de PRODUCCIÓN. Desde el 27/10/2026 (plan
+`docs/plans/2026-10-27-impuestos-exonerados-icbper.md`) el modelo cubre operaciones
+gravadas al 18 %, exoneradas (20/9997), inafectas (30/9998) e ICBPER por bolsa
+(7152) en checkout, factura, boleta, notas y Resumen Diario; el cálculo de líneas
+vive en `src/lib/sunat/saleTaxLines.ts` y los tributos UBL en
+`src/lib/sunat/ubl/taxes.ts`. Siguen fuera de alcance operaciones gratuitas, ISC
+y exportación. Las afectaciones nuevas requieren todavía su envío controlado a
+SUNAT BETA. Si la tienda trabaja exclusivamente con productos gravados al 18 %, la
 validación XSD ya está cubierta; la salida puede considerarse lista después de
 superar la prueba controlada real descrita arriba.
 
@@ -454,9 +458,9 @@ La variante empaquetada genera un `.env` público dentro de `resources` con una
 sola clave: `CLOUD_URL`. No copia URLs de base de datos, claves API, certificados
 ni credenciales. `ENABLE_SUNAT=true` se fija en el servidor desktop BETA.
 
-Límites comprobados: el cálculo actual solo representa operaciones gravadas al
-18 % y precios finales con IGV. No hay clasificación persistida para exoneradas,
-inafectas, gratuitas, ISC o bolsas. La prueba local cubre UBL, firma, ZIP y CDR,
+Límites comprobados: los precios son finales; gravado incluye IGV, exonerado e
+inafecto no, y el ICBPER se suma aparte. No hay soporte para operaciones
+gratuitas ni ISC. La prueba local cubre UBL, firma, ZIP y CDR,
 y ya se verificaron emisiones controladas contra SUNAT BETA de facturas, boletas,
 notas y resúmenes. Los seis formatos se validan además con XSD antes de salir a la
 red. Antes de producción todavía se requiere una prueba controlada con certificado
@@ -530,8 +534,9 @@ una base real como comprobación rutinaria.
   `SUNAT_SOL_USER` y `SUNAT_SOL_PASS` en el entorno. Si alguna credencial válida
   estuvo versionada antes de esta corrección, debe rotarse aunque ya no aparezca
   en los archivos actuales.
-- La validación estructural no amplía el modelo tributario. Siguen fuera de
-  alcance operaciones exoneradas, inafectas o gratuitas, ISC e ICBPER.
+- La validación estructural no comprueba importes: un XML con impuestos mal
+  calculados pasa el XSD. `npm run test:sunat:taxes` y `test:checkout:taxes`
+  verifican el contenido. Siguen fuera de alcance operaciones gratuitas e ISC.
 - Para cerrar la salida a PRODUCCIÓN falta la emisión controlada con RUC, SOL y
   certificado reales: factura, boleta y nota asociada aceptadas, con CDR y PDF.
 

@@ -132,6 +132,9 @@ export async function POST(req: NextRequest) {
       customerDocNumber: boleta.customerDocNumber,
       taxable: Number(boleta.taxable),
       igv: Number(boleta.igv),
+      exempt: Number(boleta.exempt),
+      unaffected: Number(boleta.unaffected),
+      icbper: Number(boleta.icbper),
       total: Number(boleta.total),
       currency: boleta.currency,
       status: '1', // Adicionar
@@ -194,9 +197,12 @@ export async function POST(req: NextRequest) {
       (acc, line) => ({
         taxable: acc.taxable + line.taxable,
         igv: acc.igv + line.igv,
+        exempt: acc.exempt + (line.exempt ?? 0),
+        unaffected: acc.unaffected + (line.unaffected ?? 0),
+        icbper: acc.icbper + (line.icbper ?? 0),
         total: acc.total + line.total,
       }),
-      { taxable: 0, igv: 0, total: 0 }
+      { taxable: 0, igv: 0, exempt: 0, unaffected: 0, icbper: 0, total: 0 }
     );
 
     const fullNumber = getSummaryFilename(settings.ruc!, series, nextNumber, refDate);
@@ -216,6 +222,9 @@ export async function POST(req: NextRequest) {
         customerName: 'VARIOS',
         taxable: totals.taxable,
         igv: totals.igv,
+        exempt: totals.exempt,
+        unaffected: totals.unaffected,
+        icbper: totals.icbper,
         total: totals.total,
         status: 'SIGNED',
         xmlSigned: signResult.signedXml,

@@ -79,6 +79,9 @@ export async function repairLegacyCpeDocument(
     totals: {
       subtotal: Number(document.taxable),
       tax: Number(document.igv),
+      ...(Number(document.exempt) > 0 ? { exempt: Number(document.exempt) } : {}),
+      ...(Number(document.unaffected) > 0 ? { unaffected: Number(document.unaffected) } : {}),
+      ...(Number(document.icbper) > 0 ? { icbper: Number(document.icbper) } : {}),
       total: Number(document.total),
       currency: document.currency,
     },

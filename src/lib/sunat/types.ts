@@ -65,6 +65,14 @@ export interface SunatLineItem {
   /** Código SUNAT de unidad (NIU, KGM, LTR, MLT, ZZ) — snapshot directo */
   unitSunatCode?: string;
 
+  /** Afectación al IGV de la línea (por defecto GRAVADO) */
+  igvAffectation?: 'GRAVADO' | 'EXONERADO' | 'INAFECTO';
+
+  /** ICBPER: bolsas gravadas, tarifa por bolsa e impuesto (aparte de lineSubtotal) */
+  icbperQuantity?: number | null;
+  icbperUnitAmount?: number;
+  icbperAmount?: number;
+
   /** SKU interno del producto (opcional) */
   internalSku?: string | null;
   
@@ -85,8 +93,17 @@ export interface SunatTotals {
 
   /** Total de descuentos sin IGV representados en las líneas */
   allowanceTotal?: number;
-  
-  /** Total del comprobante (subtotal + tax) */
+
+  /** Operación exonerada (código 20) */
+  exempt?: number;
+
+  /** Operación inafecta (código 30) */
+  unaffected?: number;
+
+  /** Impuesto a las bolsas plásticas (tributo 7152) */
+  icbper?: number;
+
+  /** Total del comprobante (gravada + IGV + exonerada + inafecta + ICBPER) */
   total: number;
   
   /** Moneda (siempre PEN para MVP) */

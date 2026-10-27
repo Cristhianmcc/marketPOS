@@ -13,7 +13,7 @@ import {
   SunatErrorCodes,
 } from './types';
 import { isFeatureEnabled } from '@/lib/featureFlags';
-import { sunatLineQuantity } from './saleLineQuantity';
+import { buildSaleTaxLines } from './saleTaxLines';
 
 interface BuildPayloadInput {
   saleId: string;
@@ -84,6 +84,9 @@ export async function buildPayloadFromSale(
           pricingMode: true,
           quantityOriginal: true,
           sellUnitPriceApplied: true,
+          igvAffectation: true,
+          icbperQuantity: true,
+          icbperAmount: true,
           // PH8: pharma snapshot para descripción enriquecida
           commercialName: true,
           genericName: true,
@@ -254,83 +257,9 @@ export async function buildPayloadFromSale(
     }
   }
 
-  // 9. Construir ítems desde el snapshot. SaleItem.totalLine ya contiene
-  // promociones y descuento manual. El cupón y descuento global viven en Sale,
-  // por lo que se distribuyen proporcionalmente para que las líneas cuadren con
-  // el total final efectivamente cobrado.
-  const grossTotal = Number(sale.total);
-  const taxableTotal = Math.round((grossTotal / 1.18) * 100) / 100;
-  const igvTotal = Math.round((grossTotal - taxableTotal) * 100) / 100;
-  let allocatedTaxable = 0;
-
-  const directManualDiscount = sale.items.reduce(
-    (sum, item) => sum + Number(item.discountAmount || 0),
-    0
-  );
-  const globalDiscount = Math.max(0, Number(sale.discountTotal || 0) - directManualDiscount);
-  const headerDiscount = globalDiscount + Number(sale.couponDiscount || 0);
-  const lineTotalsBeforeHeaderDiscount = sale.items.reduce(
-    (sum, item) => sum + Number(item.totalLine),
-    0
-  );
-  let allocatedHeaderDiscount = 0;
-
-  const items: SunatLineItem[] = sale.items.map((item, index) => {
-    // ✅ PH8: Descripción enriquecida para farmacia
-    let description: string;
-    if (item.commercialName) {
-      // Farmacia: nombre comercial + concentración + forma farmacéutica
-      description = item.commercialName;
-      if (item.concentration) description += ` ${item.concentration}`;
-      if (item.pharmaceuticalForm) description += ` ${item.pharmaceuticalForm}`;
-    } else {
-      // Bodega/general: nombre del producto + contenido
-      description = item.productName;
-      if (item.productContent) description += ` ${item.productContent}`;
-    }
-
-    const grossBeforeHeaderDiscount = Number(item.totalLine);
-    const isLastLine = index === sale.items.length - 1;
-    const proportionalHeaderDiscount = isLastLine
-      ? headerDiscount - allocatedHeaderDiscount
-      : lineTotalsBeforeHeaderDiscount > 0
-        ? Math.round((headerDiscount * grossBeforeHeaderDiscount / lineTotalsBeforeHeaderDiscount) * 100) / 100
-        : 0;
-    allocatedHeaderDiscount += proportionalHeaderDiscount;
-
-    const finalGross = Math.max(0, grossBeforeHeaderDiscount - proportionalHeaderDiscount);
-    const taxableAmount = isLastLine
-      ? Math.max(0, taxableTotal - allocatedTaxable)
-      : Math.round((finalGross / 1.18) * 100) / 100;
-    allocatedTaxable += taxableAmount;
-    const taxAmount = Math.round((finalGross - taxableAmount) * 100) / 100;
-    const automaticDiscounts =
-      Number(item.promotionDiscount || 0) +
-      Number(item.categoryPromoDiscount || 0) +
-      Number(item.volumePromoDiscount || 0) +
-      Number(item.nthPromoDiscount || 0);
-    const totalDiscount = automaticDiscounts + Number(item.discountAmount || 0) + proportionalHeaderDiscount;
-    // Unidad vendida (rollo, caja) cuando la línea usó precio por presentación.
-    const line = sunatLineQuantity(item);
-
-    return {
-      lineNumber: index + 1,
-      description,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      lineSubtotal: Math.round(finalGross * 100) / 100,
-      taxableAmount,
-      taxAmount,
-      unitValue: line.quantity > 0
-        ? taxableAmount / line.quantity
-        : 0,
-      discountsApplied: Math.round(totalDiscount * 100) / 100,
-      // ✅ PH8: Usar código SUNAT del snapshot (ya validado en checkout)
-      unitSunatCode: line.unitSunatCode,
-      internalSku: item.storeProduct?.product?.internalSku,
-      barcode: item.storeProduct?.product?.barcode,
-    };
-  });
+  // 9-10. Líneas y totales: descuentos de cabecera repartidos, afectación al
+  // IGV por línea e ICBPER aparte (src/lib/sunat/saleTaxLines.ts).
+  const { items, totals } = buildSaleTaxLines(sale);
 
   if (items.length === 0) {
     throw new SunatError(
@@ -339,18 +268,6 @@ export async function buildPayloadFromSale(
       400
     );
   }
-
-  // 10. En checkout los precios son finales e incluyen IGV. Separar base e
-  // impuesto aquí mantiene consistente cabecera, líneas y monto cobrado.
-  const totals: SunatTotals = {
-    subtotal: taxableTotal,
-    tax: igvTotal,
-    allowanceTotal: Math.round(
-      items.reduce((sum, item) => sum + Number(item.discountsApplied || 0), 0) / 1.18 * 100
-    ) / 100,
-    total: grossTotal,
-    currency: 'PEN',
-  };
 
   // 11. Determinar series y número (NO asignar correlativo aquí)
   // Esto es responsabilidad del servicio que crea el ElectronicDocument

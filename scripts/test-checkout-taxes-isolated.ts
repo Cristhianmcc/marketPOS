@@ -138,7 +138,10 @@ async function seed(db: PrismaClient) {
   const niu = (await db.unit.findUniqueOrThrow({ where: { code: 'NIU' } })).id;
   const store = await db.store.create({ data: { name: 'Bodega Tributos', ruc: '20123456789', businessProfile: 'BOTICA' } });
   const storeId = store.id;
-  await db.featureFlag.createMany({ data: (['ALLOW_FIADO'] as const).map((key) => ({ storeId, key, enabled: true })) });
+  await db.featureFlag.createMany({ data: (['ALLOW_FIADO', 'ENABLE_SUNAT'] as const).map((key) => ({ storeId, key, enabled: true })) });
+  await db.sunatSettings.create({
+    data: { storeId, enabled: true, env: 'BETA', ruc: '20123456789', razonSocial: 'BODEGA TRIBUTOS S.A.C.', address: 'Av. Prueba 1', ubigeo: '150101' },
+  });
   const owner = await db.user.create({ data: { storeId, email: 'owner@tributos.test', name: 'Dueña', password: 'x', role: 'OWNER' } });
   await db.shift.create({ data: { storeId, openedById: owner.id, openingCash: 50 } });
   const customer = await db.customer.create({ data: { storeId, name: 'Cliente Fiado', dni: '45678912' } });
@@ -208,9 +211,72 @@ async function salesWorker(contextPath: string) {
         })),
       };
     }
+    if (response.ok) result.saleId = payload.saleId;
     results[testCase.id] = result;
   }
-  console.log(`RESULT:${JSON.stringify(results)}`);
+
+  // Comprobantes reales de las ventas mixtas: boleta y nota de crédito total.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { buildPayloadFromSale } = require('../src/lib/sunat/buildPayloadFromSale');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { buildPayloadFromDocument } = require('../src/lib/sunat/buildPayloadFromDocument');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { generateInvoiceXML } = require('../src/lib/sunat/ubl/invoice');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { generateCreditNoteXML } = require('../src/lib/sunat/ubl/creditNote');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { generateBetaCertificate } = require('../src/lib/sunat/cert/generateBetaCertificate');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { parsePfxCertificate } = require('../src/lib/sunat/cert/loadCertificate');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { signXml } = require('../src/lib/sunat/sign/signXmlCrypto');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { validateSunatXml } = require('../src/lib/sunat/validation/xsdValidation');
+  const generated = generateBetaCertificate('20123456789');
+  const certificate = parsePfxCertificate(generated.pfxBase64, generated.password);
+  const xsd = async (docType: string, xml: string, id: string) => {
+    const result = await validateSunatXml(docType, signXml(xml, certificate, id).signedXml);
+    return result.valid ? 'ok' : (result.message || result.errors.join(' | ')).slice(0, 160);
+  };
+  const totalsOf = (t: Record<string, number | undefined>) => ({
+    subtotal: t.subtotal ?? 0, tax: t.tax ?? 0, exempt: t.exempt ?? 0, unaffected: t.unaffected ?? 0, icbper: t.icbper ?? 0, total: t.total ?? 0,
+  });
+
+  const documents: Record<string, unknown> = {};
+  for (const [index, id] of ['T1', 'T4'].entries()) {
+    const saleId = (results[id] as { saleId?: string })?.saleId;
+    if (!saleId) continue;
+    const boleta = await buildPayloadFromSale(prisma, { saleId, docType: 'BOLETA' });
+    boleta.metadata = { ...boleta.metadata, series: 'B001', number: index + 1, fullNumber: `B001-0000000${index + 1}` };
+    const boletaXml = generateInvoiceXML(boleta, `boleta-${id}`);
+
+    // Igual que /api/sunat/emit: el documento guarda los importes del payload.
+    const stored = await prisma.electronicDocument.create({
+      data: {
+        storeId: context.storeId, saleId, docType: 'BOLETA', series: 'B001', number: index + 1, fullNumber: `B001-0000000${index + 1}`,
+        issueDate: new Date(), currency: 'PEN', customerDocType: 'OTHER', customerDocNumber: '-', customerName: 'CLIENTES VARIOS',
+        taxable: boleta.totals.subtotal, igv: boleta.totals.tax, exempt: boleta.totals.exempt ?? 0,
+        unaffected: boleta.totals.unaffected ?? 0, icbper: boleta.totals.icbper ?? 0, total: boleta.totals.total, status: 'ACCEPTED',
+      },
+    });
+    // Nota de crédito total: mismo camino que /api/sunat/notes.
+    const note = await buildPayloadFromDocument(prisma, stored.id);
+    note.metadata = { ...note.metadata, docType: 'NOTA_CREDITO', series: 'BC01', number: index + 1, fullNumber: `BC01-0000000${index + 1}` };
+    const noteXml = generateCreditNoteXML(note, `nota-${id}`, {
+      referencedDocType: 'BOLETA', referencedDocNumber: stored.fullNumber, creditNoteTypeCode: '01', creditNoteReason: 'ANULACION DE LA OPERACION',
+    });
+
+    const linesSum = boleta.items.reduce((sum: number, l: { taxableAmount: number; taxAmount: number; icbperAmount?: number }) => sum + l.taxableAmount + l.taxAmount + (l.icbperAmount ?? 0), 0);
+    documents[id] = {
+      boletaTotals: totalsOf(boleta.totals),
+      linesSum: Math.round(linesSum * 100) / 100,
+      boletaXsd: await xsd('BOLETA', boletaXml, `boleta-${id}`),
+      noteTotals: totalsOf(note.totals),
+      noteLines: note.items.length,
+      noteXsd: await xsd('NOTA_CREDITO', noteXml, `nota-${id}`),
+    };
+  }
+  console.log(`RESULT:${JSON.stringify({ results, documents })}`);
 }
 
 async function main() {
@@ -240,7 +306,12 @@ async function main() {
     });
     const line = String(worker.stdout || '').split(/\r?\n/).find((l) => l.startsWith('RESULT:'));
     if (worker.status !== 0 || !line) throw new Error(`Worker falló (${worker.status})\n${worker.stdout}${worker.stderr}`);
-    const results = JSON.parse(line.slice('RESULT:'.length)) as Record<string, { status: number; code?: string; message?: string; sale?: any }>;
+    const parsed = JSON.parse(line.slice('RESULT:'.length));
+    const results = parsed.results as Record<string, { status: number; code?: string; message?: string; sale?: any }>;
+    const documents = parsed.documents as Record<string, {
+      boletaTotals: Record<string, number>; linesSum: number; boletaXsd: string;
+      noteTotals: Record<string, number>; noteLines: number; noteXsd: string;
+    }>;
 
     let failed = 0;
     for (const testCase of CASES) {
@@ -273,7 +344,34 @@ async function main() {
       problems.forEach((p) => console.log(`       · ${p}`));
     }
     console.log(`\nTributos en el cobro: ${CASES.length - failed}/${CASES.length} casos correctos.`);
-    if (failed > 0) process.exitCode = 1;
+
+    // Del cobro al comprobante: importes por operación, XSD y nota total.
+    console.log('\nDel cobro al comprobante SUNAT:');
+    const expectedDocs: Record<string, Record<string, number>> = {
+      // 8.64 + 1.56 + 5 + 20 + 1 = 36.20
+      T1: { subtotal: 8.64, tax: 1.56, exempt: 5, unaffected: 20, icbper: 1, total: 36.2 },
+      // (10 + 0.10 − 1) = 9.10 gravado → 7.71 + 1.39; + ICBPER 0.50 = 9.60
+      T4: { subtotal: 7.71, tax: 1.39, exempt: 0, unaffected: 0, icbper: 0.5, total: 9.6 },
+    };
+    let docFailures = 0;
+    for (const [id, expected] of Object.entries(expectedDocs)) {
+      const doc = documents[id];
+      const problems: string[] = [];
+      if (!doc) problems.push('no se generó el comprobante');
+      else {
+        for (const [key, value] of Object.entries(expected)) {
+          if (Math.abs((doc.boletaTotals[key] ?? 0) - value) > 0.0005) problems.push(`boleta ${key} ${doc.boletaTotals[key]} ≠ ${value}`);
+          if (Math.abs((doc.noteTotals[key] ?? 0) - value) > 0.0005) problems.push(`nota ${key} ${doc.noteTotals[key]} ≠ ${value}`);
+        }
+        if (Math.abs(doc.linesSum - expected.total) > 0.0005) problems.push(`líneas suman ${doc.linesSum} ≠ ${expected.total}`);
+        if (doc.boletaXsd !== 'ok') problems.push(`XSD boleta: ${doc.boletaXsd}`);
+        if (doc.noteXsd !== 'ok') problems.push(`XSD nota: ${doc.noteXsd}`);
+      }
+      if (problems.length) docFailures++;
+      console.log(`${problems.length ? 'FAIL' : 'PASS'} ${id}: boleta y nota de crédito total cuadran con lo cobrado (S/ ${expected.total.toFixed(2)})`);
+      problems.forEach((p) => console.log(`       · ${p}`));
+    }
+    if (failed > 0 || docFailures > 0) process.exitCode = 1;
   } finally {
     await db?.$disconnect().catch(() => undefined);
     if (started) {

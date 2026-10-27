@@ -12,9 +12,8 @@ import {
   getCustomizationId,
   getCurrencyCode,
   mapUnitTypeToUBL,
-  getDefaultIGVAffectation,
-  getIGVPercentage,
 } from './common';
+import { appendHeaderTaxTotal, appendLineTaxTotal, lineAmounts, netOf, totalsByOperation } from './taxes';
 
 /**
  * Genera el XML UBL 2.1 para una FACTURA o BOLETA
@@ -172,27 +171,13 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
   paymentTerms.ele('cbc:ID').txt('FormaPago');
   paymentTerms.ele('cbc:PaymentMeansID').txt('Contado');
 
-  // TaxTotal (IGV)
-  const taxTotal = doc.ele('cac:TaxTotal');
-  taxTotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(totals.tax));
-  
-  const taxSubtotal = taxTotal.ele('cac:TaxSubtotal');
-  taxSubtotal.ele('cbc:TaxableAmount', { currencyID: currency }).txt(formatUBLAmount(totals.subtotal));
-  taxSubtotal.ele('cbc:TaxAmount', { currencyID: currency }).txt(formatUBLAmount(totals.tax));
-  
-  const taxCategory = taxSubtotal.ele('cac:TaxCategory');
-  const taxScheme = taxCategory.ele('cac:TaxScheme');
-  taxScheme.ele('cbc:ID', {
-    schemeID: 'UN/ECE 5153',
-    schemeAgencyID: '6'
-  }).txt(SUNAT_CATALOGS.TAX_TYPE.IGV);
-  taxScheme.ele('cbc:Name').txt('IGV');
-  taxScheme.ele('cbc:TaxTypeCode').txt('VAT');
+  // TaxTotal: IGV, exonerado, inafecto e ICBPER
+  appendHeaderTaxTotal(doc, totals, currency);
 
-  // LegalMonetaryTotal (Totales)
+  // LegalMonetaryTotal (Totales). Valor de venta = gravada + exonerada + inafecta
   const legalMonetaryTotal = doc.ele('cac:LegalMonetaryTotal');
   legalMonetaryTotal.ele('cbc:LineExtensionAmount', { currencyID: currency })
-    .txt(formatUBLAmount(totals.subtotal));
+    .txt(formatUBLAmount(totalsByOperation(totals).lineExtension));
   legalMonetaryTotal.ele('cbc:TaxInclusiveAmount', { currencyID: currency })
     .txt(formatUBLAmount(totals.total));
   if (totals.allowanceTotal && totals.allowanceTotal > 0) {
@@ -212,9 +197,7 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
     const unitCode = item.unitSunatCode || mapUnitTypeToUBL(item.unitType);
     invoiceLine.ele('cbc:InvoicedQuantity', { unitCode }).txt(quantity);
     
-    const lineTaxable = item.taxableAmount ?? item.lineSubtotal / 1.18;
-    const lineTax = item.taxAmount ?? item.lineSubtotal - lineTaxable;
-    const unitValue = item.unitValue ?? (item.quantity > 0 ? lineTaxable / item.quantity : 0);
+    const { affectation, taxable: lineTaxable, unitValue } = lineAmounts(item);
 
     invoiceLine.ele('cbc:LineExtensionAmount', { currencyID: currency })
       .txt(formatUBLAmount(lineTaxable));
@@ -232,7 +215,7 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
 
     if (item.discountsApplied && item.discountsApplied > 0) {
       const discountGross = item.discountsApplied;
-      const discountNet = discountGross / 1.18;
+      const discountNet = netOf(discountGross, affectation);
       const baseNet = lineTaxable + discountNet;
       const allowance = invoiceLine.ele('cac:AllowanceCharge');
       allowance.ele('cbc:ChargeIndicator').txt('false');
@@ -243,28 +226,8 @@ export function generateInvoiceXML(payload: SunatDocumentPayload, docId: string)
       allowance.ele('cbc:BaseAmount', { currencyID: currency }).txt(formatUBLAmount(baseNet));
     }
 
-    // TaxTotal del item
-    const itemTaxTotal = invoiceLine.ele('cac:TaxTotal');
-    itemTaxTotal.ele('cbc:TaxAmount', { currencyID: currency })
-      .txt(formatUBLAmount(lineTax));
-
-    const itemTaxSubtotal = itemTaxTotal.ele('cac:TaxSubtotal');
-    itemTaxSubtotal.ele('cbc:TaxableAmount', { currencyID: currency })
-      .txt(formatUBLAmount(lineTaxable));
-    itemTaxSubtotal.ele('cbc:TaxAmount', { currencyID: currency })
-      .txt(formatUBLAmount(lineTax));
-
-    const itemTaxCategory = itemTaxSubtotal.ele('cac:TaxCategory');
-    itemTaxCategory.ele('cbc:Percent').txt(getIGVPercentage().toString());
-    itemTaxCategory.ele('cbc:TaxExemptionReasonCode').txt(getDefaultIGVAffectation());
-    
-    const itemTaxScheme = itemTaxCategory.ele('cac:TaxScheme');
-    itemTaxScheme.ele('cbc:ID', {
-      schemeID: 'UN/ECE 5153',
-      schemeAgencyID: '6'
-    }).txt(SUNAT_CATALOGS.TAX_TYPE.IGV);
-    itemTaxScheme.ele('cbc:Name').txt('IGV');
-    itemTaxScheme.ele('cbc:TaxTypeCode').txt('VAT');
+    // TaxTotal del item: IGV/EXO/INA según afectación e ICBPER de bolsas
+    appendLineTaxTotal(invoiceLine, item, currency);
 
     // Item (Descripción del producto)
     const itemElement = invoiceLine.ele('cac:Item');

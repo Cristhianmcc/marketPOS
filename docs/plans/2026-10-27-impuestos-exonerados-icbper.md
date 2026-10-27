@@ -160,11 +160,45 @@ hay pantalla para marcar productos exonerados o bolsas, de modo que estos
 casos no son alcanzables desde la interfaz. Las Fases 3 y 4 deben salir juntas
 antes de habilitarlos para un cliente.
 
+## Resultado de la Fase 3 (27/10/2026)
+
+- `src/lib/sunat/ubl/taxes.ts`: tributos de línea (S/10/1000, E/20/9997,
+  O/30/9998 e ICBPER 7152 con `BaseUnitMeasure` y `PerUnitAmount`) y de cabecera
+  (un subtotal por tributo presente). Factura, boleta y notas lo comparten; el
+  valor de venta es gravada + exonerada + inafecta y el total incluye ICBPER.
+  Las notas de crédito y débito ahora informan también valor de venta e importe
+  con impuestos en la cabecera.
+- Resumen Diario: importes 02 (exonerado) y 03 (inafecto) y un `TaxTotal` 7152.
+- `src/lib/sunat/saleTaxLines.ts`: único cálculo de líneas (descuentos de
+  cabecera repartidos, afectación por línea, ICBPER) usado por la emisión, la
+  re-firma y la nota de crédito total. Antes, `buildPayloadFromDocument` armaba
+  las líneas con el subtotal previo a descuentos, de modo que una nota total de
+  una venta con descuento podía no cuadrar con el comprobante original.
+- La nota parcial toma la afectación del comprobante si este no tiene operación
+  gravada. Limitación: en un comprobante mixto, una nota parcial se informa como
+  gravada.
+- Emisión, notas y resumen guardan `exempt`, `unaffected` e `icbper`.
+
+Corrección del informe de la Fase 0: la nota de crédito no calculaba mal el
+valor de venta; no lo incluía en la cabecera y la prueba leyó el de la primera
+línea. Ahora se incluye.
+
+Validación: `test:sunat:taxes` 50/50 (XSD de boleta, factura, nota y resumen);
+`test:checkout:taxes` 7/7 cobros más dos ventas mixtas convertidas en boleta y
+nota de crédito total con XSD válido e importes exactos (36.20 y 9.60, con
+descuento global); mutación "todo gravado" detectada (IGV 5.37 en vez de 1.56).
+Regresión: SUNAT local, ferretería 13/13, ticket 7/7, respaldo 34/34,
+auditoría 40/40, TypeScript y lint correctos.
+
+Pendiente de la fase: envío controlado a SUNAT BETA de una boleta, una factura,
+una nota y un resumen mixtos. Requiere las pantallas de la Fase 4 para crear los
+productos.
+
 ## Estado
 
 - [x] Fase 0
 - [x] Fase 1
 - [x] Fase 2
-- [ ] Fase 3
+- [x] Fase 3 (salvo envío a SUNAT BETA)
 - [ ] Fase 4
 - [ ] Fase 5
