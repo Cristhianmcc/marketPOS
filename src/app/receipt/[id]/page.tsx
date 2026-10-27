@@ -377,22 +377,24 @@ export default function ReceiptPage() {
           <div className="items">
             {sale.items.map((item) => {
               // ✅ MÓDULO F2.2: Determinar si hay conversión de unidad
-              const hasConversion = item.quantityOriginal !== null && 
-                                    item.conversionFactorUsed !== null && 
+              const hasConversion = item.quantityOriginal !== null &&
+                                    item.conversionFactorUsed !== null &&
                                     item.conversionFactorUsed !== 1;
-              
-              // Formatear cantidad según si hay conversión o unitType
+              // Precio por presentación: 1 rollo × S/200 (no 100 m × precio base).
+              const bySellUnit = item.pricingMode === 'SELL_UNIT_OVERRIDE'
+                && Number(item.quantityOriginal) > 0
+                && item.sellUnitPriceApplied != null;
+              const displayUnitPrice = bySellUnit ? Number(item.sellUnitPriceApplied) : item.unitPrice;
+
+              // La cantidad mostrada siempre multiplica al precio mostrado.
               const getQuantityDisplay = () => {
-                if (hasConversion && item.quantityOriginal) {
-                  // Mostrar: "2 CAJA" (cantidad en unidad de venta)
-                  const unitSymbol = item.unitSymbol || item.unitCodeUsed || 'UN';
-                  return `${Number(item.quantityOriginal)} ${unitSymbol}`;
-                }
-                // Fallback a comportamiento original
+                if (bySellUnit) return `${Number(item.quantityOriginal)}`;
+                const unitSymbol = item.unitSymbol || (item.unitType === 'KG' ? 'kg' : 'und');
+                if (hasConversion) return `${Number(item.quantityBase ?? item.quantity)} ${unitSymbol}`;
                 if (item.unitType === 'KG') {
                   return `${Number(item.quantity).toFixed(3)} kg`;
                 }
-                return `${item.quantity} und`;
+                return `${item.quantity} ${unitSymbol}`;
               };
 
               return (
@@ -420,14 +422,14 @@ export default function ReceiptPage() {
                   )}
                   <div className="item-line">
                     <span>
-                      {getQuantityDisplay()} x {formatMoney(item.unitPrice)}
+                      {getQuantityDisplay()} x {formatMoney(displayUnitPrice)}
                     </span>
                     <span>{formatMoney(item.subtotal)}</span>
                   </div>
-                  {/* ✅ MÓDULO F2.2: Mostrar equivalencia en unidad base */}
-                  {hasConversion && (
+                  {/* ✅ MÓDULO F2.2: Equivalencia de la presentación en unidad base */}
+                  {bySellUnit && (
                     <div className="item-conversion" style={{ fontSize: '10px', color: '#6b7280' }}>
-                      = {Number(item.quantityBase ?? item.quantity)} unid. base
+                      = {Number(item.quantityBase ?? item.quantity)} {item.unitSymbol || 'unid. base'}
                     </div>
                   )}
                   {/* ✅ MÓDULO F2.3: Mostrar si se usó precio por presentación */}

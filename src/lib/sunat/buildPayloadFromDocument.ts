@@ -3,6 +3,7 @@
 // Usado por GET /api/sunat/documents/:id/payload
 
 import { PrismaClient } from '@prisma/client';
+import { sunatLineQuantity } from './saleLineQuantity';
 import {
   SunatDocumentPayload,
   SunatIssuer,
@@ -40,6 +41,9 @@ export async function buildPayloadFromDocument(
               discountAmount: true,
               unitSunatCode: true,
               unitSunatCodeUsed: true,
+              pricingMode: true,
+              quantityOriginal: true,
+              sellUnitPriceApplied: true,
               // PH8: pharma snapshot
               commercialName: true,
               genericName: true,
@@ -105,14 +109,15 @@ export async function buildPayloadFromDocument(
         if (item.productContent) description += ` ${item.productContent}`;
       }
 
+      const line = sunatLineQuantity(item);
       return {
         lineNumber: index + 1,
         description,
-        quantity: Number(item.quantity),
-        unitPrice: Number(item.unitPrice),
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
         lineSubtotal: Number(item.subtotal),
         discountsApplied: Number(item.discountAmount || 0),
-        unitSunatCode: item.unitSunatCodeUsed || item.unitSunatCode || undefined,
+        unitSunatCode: line.unitSunatCode,
         unitType: item.unitType,
       };
     });

@@ -13,6 +13,7 @@ import {
   SunatErrorCodes,
 } from './types';
 import { isFeatureEnabled } from '@/lib/featureFlags';
+import { sunatLineQuantity } from './saleLineQuantity';
 
 interface BuildPayloadInput {
   saleId: string;
@@ -80,6 +81,9 @@ export async function buildPayloadFromSale(
           isService: true,
           unitSunatCode: true,
           unitSunatCodeUsed: true,
+          pricingMode: true,
+          quantityOriginal: true,
+          sellUnitPriceApplied: true,
           // PH8: pharma snapshot para descripción enriquecida
           commercialName: true,
           genericName: true,
@@ -306,21 +310,23 @@ export async function buildPayloadFromSale(
       Number(item.volumePromoDiscount || 0) +
       Number(item.nthPromoDiscount || 0);
     const totalDiscount = automaticDiscounts + Number(item.discountAmount || 0) + proportionalHeaderDiscount;
+    // Unidad vendida (rollo, caja) cuando la línea usó precio por presentación.
+    const line = sunatLineQuantity(item);
 
     return {
       lineNumber: index + 1,
       description,
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice),
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
       lineSubtotal: Math.round(finalGross * 100) / 100,
       taxableAmount,
       taxAmount,
-      unitValue: Number(item.quantity) > 0
-        ? taxableAmount / Number(item.quantity)
+      unitValue: line.quantity > 0
+        ? taxableAmount / line.quantity
         : 0,
       discountsApplied: Math.round(totalDiscount * 100) / 100,
       // ✅ PH8: Usar código SUNAT del snapshot (ya validado en checkout)
-      unitSunatCode: item.unitSunatCodeUsed || item.unitSunatCode || undefined,
+      unitSunatCode: line.unitSunatCode,
       internalSku: item.storeProduct?.product?.internalSku,
       barcode: item.storeProduct?.product?.barcode,
     };

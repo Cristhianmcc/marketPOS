@@ -140,6 +140,14 @@ La restricción primaria de la venta resuelve de forma atómica reintentos entre
 procesos o después de reiniciar: el mismo cuerpo recupera la venta y un cuerpo
 distinto con la misma clave responde conflicto. El replay ocurre solo después de
 revalidar sesión, tienda, usuario y rol.
+Con unidad de venta distinta de la base (caja, rollo, centímetro), el POS envía
+la cantidad en esa unidad y el precio base. Checkout valida decimales con la
+unidad elegida (una caja no se fracciona aunque el metro admita decimales) y
+deja el control de existencias al descuento ya convertido. Con precio por
+presentación, `unitSunatCodeUsed` guarda la unidad vendida y
+`src/lib/sunat/saleLineQuantity.ts` informa a SUNAT `1 rollo × S/200` en vez de
+`100 m × precio base`; ticket y recibo muestran lo mismo. Ver
+`npm run test:ferreteria:isolated`, que cobra 13 casos contra PostgreSQL real.
 La información de pacientes y libro controlado se crea desde los `SaleItem`
 persistidos dentro de la misma transacción. El comprobante SUNAT se solicita en
 una petición posterior a la venta.

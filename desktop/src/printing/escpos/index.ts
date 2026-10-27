@@ -470,14 +470,21 @@ class EscposPrintManager {
       second: '2-digit',
     });
 
-    const items = (sale.items || []).map((item: any) => ({
-      name: item.productName || 'Producto',
-      quantity: Number(item.quantity || 0),
-      unitPrice: Number(item.unitPrice || 0),
-      subtotal: Number(item.subtotal || 0),
-      discount: Number(item.discountAmount || 0),
-      unit: item.unitSymbol || item.unitCodeUsed || undefined,
-    }));
+    const items = (sale.items || []).map((item: any) => {
+      // Precio por presentación (1 rollo a S/200): mostrar la cantidad vendida
+      // y su precio, no los 100 m × precio base que no suman el importe.
+      const bySellUnit = item.pricingMode === 'SELL_UNIT_OVERRIDE'
+        && Number(item.quantityOriginal) > 0
+        && item.sellUnitPriceApplied != null;
+      return {
+        name: item.productName || 'Producto',
+        quantity: bySellUnit ? Number(item.quantityOriginal) : Number(item.quantity || 0),
+        unitPrice: bySellUnit ? Number(item.sellUnitPriceApplied) : Number(item.unitPrice || 0),
+        subtotal: Number(item.subtotal || 0),
+        discount: Number(item.discountAmount || 0),
+        unit: bySellUnit ? undefined : (item.unitSymbol || item.unitCodeUsed || undefined),
+      };
+    });
 
     const discounts: Array<{ type: 'item' | 'order' | 'coupon' | 'promo'; description: string; amount: number }> = [];
     const itemDiscounts = items.reduce((sum: number, i: { discount?: number }) => sum + (i.discount || 0), 0);

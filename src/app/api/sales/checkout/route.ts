@@ -199,6 +199,12 @@ async function executeCheckout(
       );
     }
 
+    // Unidades de venta distintas de la base (caja, rollo, centímetro...).
+    const saleUnitIds = [...new Set(productItems.flatMap((i) => (i.saleUnitId ? [i.saleUnitId] : [])))];
+    const saleUnits = saleUnitIds.length > 0
+      ? await tx.unit.findMany({ where: { id: { in: saleUnitIds } }, select: { id: true, allowDecimals: true, sunatCode: true } })
+      : [];
+
     // Validar stock y cantidades (solo productos)
     for (const item of productItems) {
       const sp = storeProducts.find((p) => p.id === item.storeProductId);
@@ -210,9 +216,22 @@ async function executeCheckout(
         );
       }
 
-      // Validar cantidad según tipo: solo rechazar decimales si la unidad base no los permite
-      const baseUnitAllowsDecimals = sp.product.baseUnit?.allowDecimals ?? false;
-      if (!baseUnitAllowsDecimals && !Number.isInteger(item.quantity)) {
+      // La cantidad viene en la unidad elegida: se valida contra esa unidad.
+      // Así una caja o un rollo no se fraccionan aunque el metro admita decimales.
+      const usesSaleUnit = !!item.saleUnitId && item.saleUnitId !== sp.product.baseUnitId;
+      const saleUnit = usesSaleUnit ? saleUnits.find((u) => u.id === item.saleUnitId) : null;
+      if (usesSaleUnit && !saleUnit) {
+        throw new CheckoutError(
+          'INVALID_SALE_UNIT',
+          400,
+          `${sp.product.name}: la unidad de venta no existe`,
+          { productId: sp.id, productName: sp.product.name }
+        );
+      }
+      const unitAllowsDecimals = saleUnit
+        ? saleUnit.allowDecimals
+        : (sp.product.baseUnit?.allowDecimals ?? false);
+      if (!unitAllowsDecimals && !Number.isInteger(item.quantity)) {
         throw new CheckoutError(
           'INVALID_QUANTITY',
           400,
@@ -249,8 +268,10 @@ async function executeCheckout(
           );
         }
         
-        // Validar que hay suficiente stock para la cantidad solicitada
-        if (currentStock < item.quantity) {
+        // Validar que hay suficiente stock para la cantidad solicitada. Con
+        // otra unidad de venta la cantidad aún no está en unidad base; esa
+        // venta se valida al descontar inventario, ya convertida.
+        if (!usesSaleUnit && currentStock < item.quantity) {
           throw new CheckoutError(
             'INSUFFICIENT_STOCK',
             409,
@@ -373,6 +394,8 @@ async function executeCheckout(
       // ✅ MÓDULO F2.3: Verificar si hay precio especial por unidad de venta
       let pricingMode: 'BASE_UNIT' | 'SELL_UNIT_OVERRIDE' = 'BASE_UNIT';
       let sellUnitPriceApplied: number | null = null;
+      // Con precio por presentación, SUNAT recibe la línea en la unidad vendida.
+      let sellUnitSunatCode: string | null = null;
       let subtotalItem: number;
       
       // Si hay conversión y el flag de precios por sellUnit está activo, buscar override
@@ -390,6 +413,7 @@ async function executeCheckout(
         if (sellUnitPrice) {
           // Usar precio especial de la unidad de venta
           pricingMode = 'SELL_UNIT_OVERRIDE';
+          sellUnitSunatCode = saleUnits.find((u) => u.id === item.saleUnitId)?.sunatCode ?? null;
           sellUnitPriceApplied = Number(sellUnitPrice.price);
           // Subtotal = cantidad original (en sellUnit) × precio sellUnit
           subtotalItem = quantityOriginal * sellUnitPriceApplied;
@@ -573,6 +597,7 @@ async function executeCheckout(
         // ✅ MÓDULO F2.3: Campos de precio por unidad de venta
         pricingMode,
         sellUnitPriceApplied,
+        sellUnitSunatCode,
       };
     }));
 
@@ -1072,7 +1097,10 @@ async function executeCheckout(
             genericName: sp.product.genericName || null,
             concentration: sp.product.concentration || null,
             pharmaceuticalForm: sp.product.pharmaceuticalForm || null,
-            unitSunatCodeUsed: sp.product.baseUnit?.sunatCode ?? (sp.product.unitType === 'KG' ? 'KGM' : 'NIU'),
+            // Con precio por presentación se informa la unidad vendida (rollo, caja).
+            unitSunatCodeUsed: item.sellUnitSunatCode
+              ?? sp.product.baseUnit?.sunatCode
+              ?? (sp.product.unitType === 'KG' ? 'KGM' : 'NIU'),
             // ✅ MÓDULO PH3: snapshot de lotes consumidos (FEFO)
             batchBreakdown: (() => {
               const alloc = fefoAllocation.get(item.storeProductId!);
