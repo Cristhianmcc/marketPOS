@@ -676,6 +676,13 @@ una base real como comprobación rutinaria.
   después de que `prisma migrate diff --exit-code` confirme que su esquema
   coincide exactamente. Si existe cualquier diferencia, no se marca la
   migración y se exige respaldo y una migración de compatibilidad explícita.
+- La comparación usa `prisma/baseline/schema.prisma`, copia fija del datamodel
+  de la línea base; luego `migrate deploy` aplica las migraciones posteriores.
+  No editar esa copia. Todo cambio de esquema va en `prisma/schema.prisma` con
+  una migración nueva generada con `prisma migrate diff`, solo aditiva
+  (auditoría H04 rechaza `DROP`, `RENAME`, cambios de tipo y borrados). Primera
+  migración posterior: `20261027000000_tax_affectations` (afectación IGV e
+  ICBPER).
 - `npm run build` ahora delega a `build:only`; compilar no despliega ni cambia el
   esquema de la base configurada.
 - `npm run test:migrations:isolated` inicia el PostgreSQL incluido en una carpeta

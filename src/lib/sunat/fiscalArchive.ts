@@ -117,6 +117,10 @@ export async function restoreFiscalArchive(
       customerAddress: text(doc.customerAddress),
       taxable: String(doc.taxable || '0'),
       igv: String(doc.igv || '0'),
+      // Respaldos anteriores no traen estos importes: eran ventas solo gravadas.
+      exempt: String(doc.exempt || '0'),
+      unaffected: String(doc.unaffected || '0'),
+      icbper: String(doc.icbper || '0'),
       total: String(doc.total || '0'),
       status: archivedStatus as any,
       hash: text(doc.hash),

@@ -107,10 +107,39 @@ primera línea (8.47).
 Los casos de cobro se escriben en la Fase 2, cuando existan los campos del
 modelo; antes no se puede sembrar un producto exonerado.
 
+## Resultado de la Fase 1 (27/10/2026)
+
+- Esquema: enum `IgvAffectation` (GRAVADO, EXONERADO, INAFECTO);
+  `StoreProduct.igvAffectation` e `icbper`; `Sale.icbperTotal`;
+  `SaleItem.igvAffectation`, `taxableAmount`, `igvAmount`, `icbperQuantity`,
+  `icbperAmount`; `ElectronicDocument.exempt`, `unaffected`, `icbper`.
+- Migración `20261027000000_tax_affectations`: solo `CREATE TYPE` y
+  `ADD COLUMN` con valores por defecto; los datos existentes quedan gravados.
+- Hallazgo corregido: la adopción de bases antiguas comparaba contra el esquema
+  actual, por lo que cualquier migración nueva habría impedido arrancar a una
+  instalación anterior. Ahora compara contra `prisma/baseline/schema.prisma`
+  (copia exacta del datamodel de la línea base) y después aplica las
+  migraciones pendientes.
+- Respaldo: exportación sin cambios (exporta todas las columnas); la
+  restauración y el archivo fiscal conservan los campos nuevos y usan
+  gravado/0 para respaldos anteriores.
+
+Validación: `test:migrations:isolated` (instalación limpia con 2 migraciones,
+adopción de una base antigua con un producto que conserva precio y stock y
+queda gravado, rechazo de deriva); roundtrip del respaldo 34/34 con productos
+exonerado/inafecto/ICBPER y una mutación detectada; auditoría 40/40 con H04
+actualizado (primera migración = línea base, posteriores solo aditivas; una
+migración de prueba con `DROP COLUMN` fue rechazada); ferretería 13/13,
+SUNAT local, ticket 7/7, respaldo programado y TypeScript/lint correctos. La
+prueba de impuestos sigue en 20/50 hasta la Fase 3.
+
+Nota de despliegue: el servicio web en Render necesita aplicar el esquema en su
+próximo despliegue (`prisma db push` temporal, como la vez anterior).
+
 ## Estado
 
 - [x] Fase 0
-- [ ] Fase 1
+- [x] Fase 1
 - [ ] Fase 2
 - [ ] Fase 3
 - [ ] Fase 4

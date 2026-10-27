@@ -8,7 +8,12 @@ const root = path.resolve(__dirname, '..');
 const pgBin = path.join(root, 'desktop', 'vendor', 'postgres', 'bin');
 const prismaCli = path.join(root, 'node_modules', 'prisma', 'build', 'index.js');
 const schema = path.join(root, 'prisma', 'schema.prisma');
-const baseline = path.join(root, 'prisma', 'migrations', '20261020000000_baseline', 'migration.sql');
+const baselineSchema = path.join(root, 'prisma', 'baseline', 'schema.prisma');
+const migrationsDir = path.join(root, 'prisma', 'migrations');
+const baseline = path.join(migrationsDir, '20261020000000_baseline', 'migration.sql');
+const migrationCount = fs.readdirSync(migrationsDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(migrationsDir, entry.name, 'migration.sql')))
+  .length;
 
 function executable(name) {
   return path.join(pgBin, process.platform === 'win32' ? `${name}.exe` : name);
@@ -105,26 +110,38 @@ async function main() {
     prisma(url('h04_clean'), ['migrate', 'deploy']);
     const cleanTables = Number(psql('h04_clean', ['-Atc', "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'"]));
     const cleanMigrations = Number(psql('h04_clean', ['-Atc', 'SELECT count(*) FROM "_prisma_migrations"']));
-    if (cleanTables !== expectedTables || cleanMigrations !== 1) {
-      throw new Error(`Clean install verification failed: ${cleanTables} tables, ${cleanMigrations} migrations`);
+    if (cleanTables !== expectedTables || cleanMigrations !== migrationCount) {
+      throw new Error(`Clean install verification failed: ${cleanTables} tables, ${cleanMigrations}/${migrationCount} migrations`);
     }
+    prisma(url('h04_clean'), ['migrate', 'diff', '--from-schema-datasource', schema, '--to-schema-datamodel', schema, '--exit-code']);
 
+    // Una base de una versión anterior coincide con la línea base, no con el
+    // esquema actual: se adopta contra prisma/baseline y luego recibe las
+    // migraciones posteriores, igual que hace el escritorio.
     console.log('H04: testing exact legacy adoption...');
     psql('h04_legacy', ['-f', baseline]);
-    prisma(url('h04_legacy'), ['migrate', 'diff', '--from-schema-datasource', schema, '--to-schema-datamodel', schema, '--exit-code']);
+    psql('h04_legacy', ['-c', [
+      "INSERT INTO stores (id, name, updated_at) VALUES ('legacy-store', 'Bodega antigua', now());",
+      "INSERT INTO products_master (id, internal_sku, name, unit_type, updated_at) VALUES ('legacy-pm', 'LEG-001', 'Arroz', 'UNIT', now());",
+      "INSERT INTO store_products (id, store_id, product_id, price, stock, updated_at) VALUES ('legacy-sp', 'legacy-store', 'legacy-pm', 4.50, 12, now());",
+    ].join(' ')]);
+    prisma(url('h04_legacy'), ['migrate', 'diff', '--from-schema-datasource', schema, '--to-schema-datamodel', baselineSchema, '--exit-code']);
     prisma(url('h04_legacy'), ['migrate', 'resolve', '--applied', '20261020000000_baseline']);
     prisma(url('h04_legacy'), ['migrate', 'deploy']);
     const legacyMigrations = Number(psql('h04_legacy', ['-Atc', 'SELECT count(*) FROM "_prisma_migrations"']));
-    if (legacyMigrations !== 1) throw new Error(`Legacy adoption recorded ${legacyMigrations} migrations`);
+    if (legacyMigrations !== migrationCount) throw new Error(`Legacy adoption recorded ${legacyMigrations}/${migrationCount} migrations`);
+    const legacyProduct = psql('h04_legacy', ['-Atc', "SELECT price || '|' || stock || '|' || igv_affectation || '|' || icbper FROM store_products WHERE id = 'legacy-sp'"]);
+    if (legacyProduct !== '4.50|12.000|GRAVADO|false') throw new Error(`Legacy product changed after upgrade: ${legacyProduct}`);
+    prisma(url('h04_legacy'), ['migrate', 'diff', '--from-schema-datasource', schema, '--to-schema-datamodel', schema, '--exit-code']);
 
     console.log('H04: testing incompatible schema rejection...');
     psql('h04_drift', ['-f', baseline]);
     psql('h04_drift', ['-c', 'CREATE TABLE h04_unmanaged_drift (id integer PRIMARY KEY)']);
-    prisma(url('h04_drift'), ['migrate', 'diff', '--from-schema-datasource', schema, '--to-schema-datamodel', schema, '--exit-code'], 2);
+    prisma(url('h04_drift'), ['migrate', 'diff', '--from-schema-datasource', schema, '--to-schema-datamodel', baselineSchema, '--exit-code'], 2);
     const driftHistory = psql('h04_drift', ['-Atc', "SELECT to_regclass('public._prisma_migrations') IS NOT NULL"]);
     if (driftHistory !== 'f') throw new Error('Drifted database was incorrectly baselined');
 
-    console.log(`H04 PASS: clean install (${cleanTables} tables), exact legacy adoption, drift rejection.`);
+    console.log(`H04 PASS: clean install (${cleanTables} tables, ${migrationCount} migrations), exact legacy adoption and upgrade, drift rejection.`);
   } finally {
     if (started) {
       try {

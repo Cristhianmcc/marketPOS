@@ -1005,19 +1005,22 @@ export class MigrationRunner {
   /**
    * A database created by an older desktop release has no migration history.
    * It can adopt the baseline only when its live schema exactly matches the
-   * current datamodel. Prisma exits with 0 for no difference and 2 when a
-   * difference exists.
+   * baseline datamodel (prisma/baseline/schema.prisma); the later migrations
+   * are applied afterwards by migrate deploy. Prisma exits with 0 for no
+   * difference and 2 when a difference exists.
    */
   private async assertLegacySchemaMatches(schemaPath: string, databaseUrl: string): Promise<void> {
     const prismaCliJs = this.getPrismaCliJsPath();
     const prismaBin = prismaCliJs ? process.execPath : this.getPrismaBinary();
     const isNpx = !prismaCliJs && prismaBin.includes('npx');
+    const baselineSchemaPath = path.join(path.dirname(schemaPath), 'baseline', 'schema.prisma');
+    const targetSchemaPath = fs.existsSync(baselineSchemaPath) ? baselineSchemaPath : schemaPath;
 
     const args = isNpx
       ? [`prisma@${this.prismaVersion}`, 'migrate', 'diff', '--from-schema-datasource', schemaPath,
-          '--to-schema-datamodel', schemaPath, '--exit-code']
+          '--to-schema-datamodel', targetSchemaPath, '--exit-code']
       : ['migrate', 'diff', '--from-schema-datasource', schemaPath,
-          '--to-schema-datamodel', schemaPath, '--exit-code'];
+          '--to-schema-datamodel', targetSchemaPath, '--exit-code'];
     const fullArgs = prismaCliJs ? [prismaCliJs, ...args] : args;
 
     const cmd = isNpx

@@ -212,9 +212,9 @@ async function seedStore(db: PrismaClient) {
     data: { internalSku: 'RT-CEM-KG', name: 'Cemento a granel', category: 'Construcción', unitType: 'KG', baseUnitId: await unit('KGM') },
   });
 
-  const spPara = await db.storeProduct.create({ data: { storeId, productId: paracetamol.id, price: 1.5, costPrice: 0.6, stock: 170, minStock: 20 } });
-  const spCable = await db.storeProduct.create({ data: { storeId, productId: cable.id, price: 2.2, costPrice: 1.1, stock: 480.5 } });
-  const spCem = await db.storeProduct.create({ data: { storeId, productId: cemento.id, price: 0.9, costPrice: 0.5, stock: 95.25 } });
+  const spPara = await db.storeProduct.create({ data: { storeId, productId: paracetamol.id, price: 1.5, costPrice: 0.6, stock: 170, minStock: 20, igvAffectation: 'EXONERADO' } });
+  const spCable = await db.storeProduct.create({ data: { storeId, productId: cable.id, price: 2.2, costPrice: 1.1, stock: 480.5, icbper: true } });
+  const spCem = await db.storeProduct.create({ data: { storeId, productId: cemento.id, price: 0.9, costPrice: 0.5, stock: 95.25, igvAffectation: 'INAFECTO' } });
 
   await db.unitConversion.create({
     data: { storeId, productMasterId: cable.id, fromUnitId: await unit('BX'), toUnitId: await unit('MTR'), factorToBase: 100, roundingMode: 'NONE' },
@@ -263,13 +263,14 @@ async function seedStore(db: PrismaClient) {
     data: {
       saleId: salePharma.id, storeProductId: spPara.id, productName: 'Paracetamol 500mg', unitType: 'UNIT', quantity: 30, unitPrice: 1.5, costPrice: 0.6,
       subtotal: 45, totalLine: 45, unitSunatCode: 'NIU', batchBreakdown: [{ batchNumber: 'L-001', quantity: 30 }], genericName: 'Paracetamol', concentration: '500 mg',
+      igvAffectation: 'EXONERADO', taxableAmount: 45, igvAmount: 0,
     },
   });
 
   const saleService = await db.sale.create({
     data: {
-      storeId, userId: owner.id, shiftId: shift.id, saleNumber: 2, subtotal: 66.1, tax: 11.9, total: 78, totalBeforeDiscount: 78,
-      paymentMethod: 'CASH', amountPaid: 78, changeAmount: 0, createdAt: d('2026-10-20T18:00:00Z'),
+      storeId, userId: owner.id, shiftId: shift.id, saleNumber: 2, subtotal: 66.1, tax: 11.9, total: 79, totalBeforeDiscount: 78,
+      paymentMethod: 'CASH', amountPaid: 79, changeAmount: 0, icbperTotal: 1, createdAt: d('2026-10-20T18:00:00Z'),
     },
   });
   await db.saleItem.createMany({
@@ -278,6 +279,7 @@ async function seedStore(db: PrismaClient) {
       {
         saleId: saleService.id, storeProductId: spCable.id, productName: 'Cable THW 14', unitType: 'UNIT', quantity: 19.5, unitPrice: 2.2, subtotal: 43, totalLine: 43,
         unitCodeUsed: 'MTR', quantityOriginal: 19.5, quantityBase: 19.5, conversionFactorUsed: 1, pricingMode: 'BASE_UNIT',
+        taxableAmount: 36.44, igvAmount: 6.56, icbperQuantity: 2, icbperAmount: 1,
       },
     ],
   });

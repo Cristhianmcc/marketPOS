@@ -677,6 +677,9 @@ export async function POST(request: NextRequest) {
             catalogCategory: sp.catalogCategory,
             catalogVisible: sp.catalogVisible,
             catalogUpdatedAt: sp.catalogUpdatedAt ? new Date(sp.catalogUpdatedAt) : null,
+            // Respaldos anteriores no traen tributos: productos gravados sin ICBPER.
+            igvAffectation: sp.igvAffectation ?? 'GRAVADO',
+            icbper: sp.icbper === true,
           },
         });
         storeProductIdMap.set(sp.id, newSP.id);
@@ -864,6 +867,7 @@ export async function POST(request: NextRequest) {
             amountPaid: sale.amountPaid,
             changeAmount: sale.changeAmount,
             paymentDetails: sale.paymentDetails,
+            icbperTotal: sale.icbperTotal ?? 0,
             shiftId: newShiftId,
             customerId: newCustomerId,
             userId: newUserId,
@@ -926,6 +930,11 @@ export async function POST(request: NextRequest) {
               concentration: item.concentration,
               pharmaceuticalForm: item.pharmaceuticalForm,
               unitSunatCodeUsed: item.unitSunatCodeUsed,
+              igvAffectation: item.igvAffectation ?? 'GRAVADO',
+              taxableAmount: item.taxableAmount ?? null,
+              igvAmount: item.igvAmount ?? null,
+              icbperQuantity: item.icbperQuantity ?? null,
+              icbperAmount: item.icbperAmount ?? 0,
             },
           });
           saleItemsRestored++;

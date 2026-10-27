@@ -1432,16 +1432,27 @@ async function main() {
   );
   const migrationsDir = path.resolve(__dirname, '..', 'prisma/migrations');
   const timestampedMigrations = fs.readdirSync(migrationsDir)
-    .filter(name => /^\d{14}_/.test(name) && fs.statSync(path.join(migrationsDir, name)).isDirectory());
-  const baselineSql = timestampedMigrations.length === 1
+    .filter(name => /^\d{14}_/.test(name) && fs.statSync(path.join(migrationsDir, name)).isDirectory())
+    .sort();
+  const baselineSql = timestampedMigrations[0] === '20261020000000_baseline'
     ? fs.readFileSync(path.join(migrationsDir, timestampedMigrations[0], 'migration.sql'), 'utf8')
     : '';
+  // Las migraciones posteriores a la línea base solo pueden agregar estructura.
+  const laterMigrationsAdditive = timestampedMigrations.slice(1).every((name) => {
+    const sql = fs.readFileSync(path.join(migrationsDir, name, 'migration.sql'), 'utf8')
+      .split('\n').filter((line) => !line.trim().startsWith('--')).join('\n');
+    return !/\bDROP\b|\bRENAME\b|ALTER\s+COLUMN[^;]*\bTYPE\b|\bTRUNCATE\b|\bDELETE\s+FROM\b/i.test(sql);
+  });
+  const baselineSnapshotExists = fs.existsSync(path.resolve(__dirname, '..', 'prisma/baseline/schema.prisma'));
   const migrationProbe = fs.readFileSync(
     path.resolve(__dirname, '..', 'scripts/test-migrations-isolated.cjs'),
     'utf8'
   );
   const migrationPolicySafe = rootPackage.scripts.build === 'npm run build:only'
-    && timestampedMigrations.length === 1
+    && timestampedMigrations.length >= 1
+    && laterMigrationsAdditive
+    && baselineSnapshotExists
+    && migrationRunnerSource.includes("'baseline', 'schema.prisma'")
     && baselineSql.length > 10000
     && baselineSql.includes('CREATE TABLE "stores"')
     && baselineSql.includes('CREATE TABLE "sales"')

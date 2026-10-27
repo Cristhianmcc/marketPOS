@@ -107,6 +107,13 @@ enum PricingMode {
   SELL_UNIT_OVERRIDE
 }
 
+// Afectación al IGV (catálogo SUNAT 07): 10 gravado, 20 exonerado, 30 inafecto
+enum IgvAffectation {
+  GRAVADO
+  EXONERADO
+  INAFECTO
+}
+
 enum WorkOrderStatus {
   DRAFT
   APPROVED
@@ -344,6 +351,11 @@ model StoreProduct {
   catalogVisible      Boolean   @default(true)   @map("catalog_visible")
   catalogUpdatedAt    DateTime?                  @map("catalog_updated_at")
 
+  // Tributos: el precio es el final al cliente. Gravado incluye IGV; exonerado
+  // e inafecto no llevan IGV. ICBPER se suma aparte por unidad vendida (bolsas).
+  igvAffectation      IgvAffectation @default(GRAVADO) @map("igv_affectation")
+  icbper              Boolean        @default(false)   @map("icbper")
+
   store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
   product ProductMaster @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -425,6 +437,9 @@ model Sale {
   changeAmount   Decimal?      @map("change_amount") @db.Decimal(10, 2) // vuelto
   paymentDetails Json?         @map("payment_details") // Desglose de pago mixto: { splits: [{ method, amount }] }
 
+  // Impuesto a las bolsas plásticas, incluido en total (aparte del IGV)
+  icbperTotal Decimal @default(0) @map("icbper_total") @db.Decimal(10, 2)
+
   printedAt DateTime? @map("printed_at")
 
   isDemo Boolean @default(false) @map("is_demo") // ✅ MÓDULO 17.4: Demo Mode isolation
@@ -475,6 +490,15 @@ model SaleItem {
   discountValue  Decimal?      @map("discount_value") @db.Decimal(10, 2)
   discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
   totalLine      Decimal       @default(0) @map("total_line") @db.Decimal(10, 2)
+
+  // Tributos de la línea (snapshot). taxableAmount/igvAmount se calculan sobre
+  // totalLine; null en ventas anteriores (se derivan como gravadas). ICBPER va
+  // aparte de totalLine y se suma al total de la venta.
+  igvAffectation IgvAffectation @default(GRAVADO) @map("igv_affectation")
+  taxableAmount  Decimal?       @map("taxable_amount") @db.Decimal(10, 2)
+  igvAmount      Decimal?       @map("igv_amount") @db.Decimal(10, 2)
+  icbperQuantity Decimal?       @map("icbper_quantity") @db.Decimal(10, 3)
+  icbperAmount   Decimal        @default(0) @map("icbper_amount") @db.Decimal(10, 2)
 
   // Promociones (Módulo 14.1) - Snapshot
   promotionType     PromotionType? @map("promotion_type")
@@ -1150,10 +1174,13 @@ model ElectronicDocument {
   customerName      String          @map("customer_name")
   customerAddress   String?         @map("customer_address")
 
-  // Totales
-  taxable Decimal @db.Decimal(10, 2)
-  igv     Decimal @db.Decimal(10, 2)
-  total   Decimal @db.Decimal(10, 2)
+  // Totales. taxable = operación gravada; total incluye exonerado, inafecto e ICBPER
+  taxable    Decimal @db.Decimal(10, 2)
+  igv        Decimal @db.Decimal(10, 2)
+  exempt     Decimal @default(0) @db.Decimal(10, 2)
+  unaffected Decimal @default(0) @db.Decimal(10, 2)
+  icbper     Decimal @default(0) @db.Decimal(10, 2)
+  total      Decimal @db.Decimal(10, 2)
 
   // Estado y respuesta SUNAT
   status          SunatStatus @default(DRAFT)
