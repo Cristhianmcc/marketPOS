@@ -297,7 +297,8 @@ export class BackupScheduler {
 
       // Metadata
       const metadata: BackupMetadata = {
-        version: '1.0',
+        // Debe coincidir con la versión que genera /api/backups/export.
+        version: '1.1',
         exportedAt: now.toISOString(),
         appVersion: app.getVersion(),
         store: {

@@ -264,8 +264,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Validar versión
-    if (metadata.version !== '1.0') {
+    // Validar versión. 1.1 agrega los módulos por rubro; 1.0 sigue siendo
+    // compatible y sus secciones nuevas se consideran vacías.
+    if (!['1.0', '1.1'].includes(metadata.version)) {
       return NextResponse.json(
         { code: 'UNSUPPORTED_VERSION', message: `Versión de backup no soportada: ${metadata.version}` },
         { status: 400 }

@@ -128,10 +128,31 @@ lugar de detener la restauración, el respaldo incluirá la definición de las
 unidades usadas y la restauración creará por `code` solo las que falten; nunca
 modifica una unidad existente.
 
+## Resultado de la Fase 1 (27/10/2026)
+
+`/api/backups/export` genera el formato `1.1` con las secciones `units`,
+`categories`, `unitConversions`, `sellUnitPrices`, `productBatches`, `services`,
+`suppliers`, `purchaseOrders` (con `items`), `workOrders` (con `items`),
+`patients`, `patientMedications`, `controlledBookEntries`, `drugInteractionLogs`,
+`promotions`, `coupons`, `categoryPromotions`, `volumePromotions`,
+`nthPromotions`, `operationalLimit` y `catalogSettings`, más sus conteos en
+`metadata.counts`. Los maestros incluyen también los referenciados por
+conversiones, precios por presentación y promociones. El respaldo programado de
+Electron rotula sus ZIP como `1.1`, y la restauración acepta `1.0` y `1.1`; las
+secciones nuevas se ignoran hasta la Fase 2.
+
+Validación: 45/45 comprobaciones del ZIP en `npm run test:backups:roundtrip`
+(secciones, conteos, ítems anidados, unidades usadas, `batchId`, `serviceId`,
+`baseUnitId`, checksum y ausencia de contraseñas, SOL y certificados; el
+detector de secretos se comprobó con muestras positivas). El roundtrip sigue
+fallando en los mismos 25 modelos, como corresponde antes de la Fase 2.
+Regresión: TypeScript web y Electron, lint de las rutas, `test:backups:isolated`,
+auditoría aislada (40/40) y `git diff --check` correctos.
+
 ## Estado
 
 - [x] Fase 0
-- [ ] Fase 1
+- [x] Fase 1
 - [ ] Fase 2
 - [ ] Fase 3
 - [ ] Fase 4

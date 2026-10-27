@@ -193,11 +193,81 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    // Extraer ProductMasters únicos
-    const productMasterIds = new Set(storeProducts.map(sp => sp.productId));
+    // Módulos por rubro: catálogo, unidades, lotes, compras, farmacia,
+    // servicios, promociones y límites. Todo se limita a la tienda exportada.
+    const [
+      categories,
+      unitConversions,
+      sellUnitPrices,
+      productBatches,
+      services,
+      suppliers,
+      purchaseOrders,
+      workOrders,
+      patients,
+      patientMedications,
+      controlledBookEntries,
+      drugInteractionLogs,
+      promotions,
+      coupons,
+      categoryPromotions,
+      volumePromotions,
+      nthPromotions,
+      operationalLimit,
+      catalogSettings,
+    ] = await Promise.all([
+      prisma.category.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.unitConversion.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.sellUnitPrice.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.productBatch.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.service.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.supplier.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.purchaseOrder.findMany({ where: { storeId: storeIdToExport }, include: { items: true } }),
+      prisma.workOrder.findMany({ where: { storeId: storeIdToExport }, include: { items: true } }),
+      prisma.patient.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.patientMedication.findMany({ where: { patient: { storeId: storeIdToExport } } }),
+      prisma.controlledBookEntry.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.drugInteractionLog.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.promotion.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.coupon.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.categoryPromotion.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.volumePromotion.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.nthPromotion.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.operationalLimit.findUnique({ where: { storeId: storeIdToExport } }),
+      prisma.catalogSettings.findUnique({ where: { storeId: storeIdToExport } }),
+    ]);
+
+    // Extraer ProductMasters únicos: los de la tienda y los referenciados por
+    // conversiones, precios por presentación y promociones.
+    const productMasterIds = new Set([
+      ...storeProducts.map(sp => sp.productId),
+      ...unitConversions.map(c => c.productMasterId),
+      ...sellUnitPrices.map(p => p.productMasterId),
+      ...promotions.flatMap(p => (p.productId ? [p.productId] : [])),
+      ...volumePromotions.map(p => p.productId),
+      ...nthPromotions.map(p => p.productId),
+    ]);
     const productMasters = await prisma.productMaster.findMany({
       where: {
         id: { in: Array.from(productMasterIds) },
+      },
+    });
+
+    // Las unidades son globales y cada instalación siembra las suyas con IDs
+    // propios. Se exporta la definición de las usadas para traducirlas por
+    // código al restaurar y crear solamente las que falten.
+    const unitIds = new Set<string>([
+      ...productMasters.flatMap(pm => (pm.baseUnitId ? [pm.baseUnitId] : [])),
+      ...unitConversions.flatMap(c => [c.fromUnitId, c.toUnitId]),
+      ...sellUnitPrices.map(p => p.sellUnitId),
+      ...services.flatMap(s => (s.baseUnitId ? [s.baseUnitId] : [])),
+      ...workOrders.flatMap(wo => wo.items.flatMap(item => (item.unitIdUsed ? [item.unitIdUsed] : []))),
+    ]);
+    const units = await prisma.unit.findMany({
+      where: { id: { in: Array.from(unitIds) } },
+      select: {
+        id: true, code: true, sunatCode: true, name: true, displayName: true, symbol: true,
+        kind: true, allowDecimals: true, precision: true, isBase: true, active: true, sortOrder: true,
       },
     });
 
@@ -247,6 +317,27 @@ export async function GET(request: NextRequest) {
       fiscalArchive,
       subscription,
       featureFlags,
+      // Formato 1.1
+      units,
+      categories,
+      unitConversions,
+      sellUnitPrices,
+      productBatches,
+      services,
+      suppliers,
+      purchaseOrders,
+      workOrders,
+      patients,
+      patientMedications,
+      controlledBookEntries,
+      drugInteractionLogs,
+      promotions,
+      coupons,
+      categoryPromotions,
+      volumePromotions,
+      nthPromotions,
+      operationalLimit,
+      catalogSettings,
     };
 
     // Calcular checksum SHA-256 del contenido de data.json
@@ -255,7 +346,7 @@ export async function GET(request: NextRequest) {
 
     // Metadata
     const metadata = {
-      version: '1.0',
+      version: '1.1',
       exportedAt: new Date().toISOString(),
       appVersion: '1.0.0',
       store: {
@@ -277,6 +368,28 @@ export async function GET(request: NextRequest) {
         customers: customers.length,
         receivables: receivables.length,
         receivablePayments: receivables.reduce((sum, r) => sum + r.payments.length, 0),
+        units: units.length,
+        categories: categories.length,
+        unitConversions: unitConversions.length,
+        sellUnitPrices: sellUnitPrices.length,
+        productBatches: productBatches.length,
+        services: services.length,
+        suppliers: suppliers.length,
+        purchaseOrders: purchaseOrders.length,
+        purchaseOrderItems: purchaseOrders.reduce((sum, po) => sum + po.items.length, 0),
+        workOrders: workOrders.length,
+        workOrderItems: workOrders.reduce((sum, wo) => sum + wo.items.length, 0),
+        patients: patients.length,
+        patientMedications: patientMedications.length,
+        controlledBookEntries: controlledBookEntries.length,
+        drugInteractionLogs: drugInteractionLogs.length,
+        promotions: promotions.length,
+        coupons: coupons.length,
+        categoryPromotions: categoryPromotions.length,
+        volumePromotions: volumePromotions.length,
+        nthPromotions: nthPromotions.length,
+        operationalLimits: operationalLimit ? 1 : 0,
+        catalogSettings: catalogSettings ? 1 : 0,
       },
     };
 

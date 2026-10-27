@@ -482,6 +482,86 @@ async function compareStores(source: PrismaClient, sourceStoreId: string, target
   return report;
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Contenido del ZIP exportado (Fase 1).
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Secciones de data.json y el modelo de origen con el que se cuentan. */
+const EXPORT_SECTIONS: Array<{ section: string; model: string; where: (storeId: string) => Row }> = [
+  { section: 'categories', model: 'Category', where: (s) => ({ storeId: s }) },
+  { section: 'unitConversions', model: 'UnitConversion', where: (s) => ({ storeId: s }) },
+  { section: 'sellUnitPrices', model: 'SellUnitPrice', where: (s) => ({ storeId: s }) },
+  { section: 'productBatches', model: 'ProductBatch', where: (s) => ({ storeId: s }) },
+  { section: 'services', model: 'Service', where: (s) => ({ storeId: s }) },
+  { section: 'suppliers', model: 'Supplier', where: (s) => ({ storeId: s }) },
+  { section: 'purchaseOrders', model: 'PurchaseOrder', where: (s) => ({ storeId: s }) },
+  { section: 'workOrders', model: 'WorkOrder', where: (s) => ({ storeId: s }) },
+  { section: 'patients', model: 'Patient', where: (s) => ({ storeId: s }) },
+  { section: 'patientMedications', model: 'PatientMedication', where: (s) => ({ patient: { storeId: s } }) },
+  { section: 'controlledBookEntries', model: 'ControlledBookEntry', where: (s) => ({ storeId: s }) },
+  { section: 'drugInteractionLogs', model: 'DrugInteractionLog', where: (s) => ({ storeId: s }) },
+  { section: 'promotions', model: 'Promotion', where: (s) => ({ storeId: s }) },
+  { section: 'coupons', model: 'Coupon', where: (s) => ({ storeId: s }) },
+  { section: 'categoryPromotions', model: 'CategoryPromotion', where: (s) => ({ storeId: s }) },
+  { section: 'volumePromotions', model: 'VolumePromotion', where: (s) => ({ storeId: s }) },
+  { section: 'nthPromotions', model: 'NthPromotion', where: (s) => ({ storeId: s }) },
+];
+
+/** Claves o valores que nunca deben aparecer en un respaldo. */
+const FORBIDDEN_CONTENT = [
+  /"password"\s*:/i,
+  /hash-no-exportable/,
+  /"sol(User|Pass|Password)"\s*:/i,
+  /"cert(ificate)?(Pfx|Password|Pem|Base64)?"\s*:/i,
+  /"privateKey"\s*:/i,
+];
+
+async function inspectExport(zipPath: string, source: PrismaClient, storeId: string) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const AdmZip = require('adm-zip');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const crypto = require('node:crypto');
+  const zip = new AdmZip(zipPath);
+  const metadata = JSON.parse(zip.readAsText('metadata.json')) as { version: string; checksum: string; counts: Record<string, number> };
+  const dataText = zip.readAsText('data.json') as string;
+  const data = JSON.parse(dataText) as Record<string, unknown>;
+  const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
+  const check = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
+
+  check('versión 1.1', metadata.version === '1.1', `metadata.version=${metadata.version}`);
+  const digest = crypto.createHash('sha256').update(dataText, 'utf8').digest('hex');
+  check('checksum', metadata.checksum === `sha256:${digest}`, 'sha256 de data.json');
+
+  for (const { section, model, where } of EXPORT_SECTIONS) {
+    const expected = (await delegate(source, model).findMany({ where: where(storeId) })).length;
+    const value = data[section];
+    const actual = Array.isArray(value) ? value.length : -1;
+    check(`sección ${section}`, expected > 0 && actual === expected, `origen=${expected} zip=${actual} metadata=${metadata.counts?.[section]}`);
+    check(`conteo ${section}`, metadata.counts?.[section] === actual, `metadata=${metadata.counts?.[section]} zip=${actual}`);
+  }
+
+  const nested = (section: string, child: string) =>
+    ((data[section] as Row[] | undefined) || []).reduce((sum, row) => sum + ((row[child] as unknown[]) || []).length, 0);
+  check('ítems de compras', nested('purchaseOrders', 'items') === 2 && metadata.counts?.purchaseOrderItems === 2, `zip=${nested('purchaseOrders', 'items')}`);
+  check('ítems de órdenes de trabajo', nested('workOrders', 'items') === 2 && metadata.counts?.workOrderItems === 2, `zip=${nested('workOrders', 'items')}`);
+  check('límites operativos', !!data.operationalLimit && metadata.counts?.operationalLimits === 1, 'objeto único');
+  check('catálogo público', !!data.catalogSettings && metadata.counts?.catalogSettings === 1, 'objeto único');
+
+  const unitCodes = ((data.units as Row[] | undefined) || []).map((u) => String(u.code)).sort();
+  check('unidades usadas', JSON.stringify(unitCodes) === JSON.stringify(UNITS.map((u) => u.code).sort()), `zip=${unitCodes.join(',')}`);
+
+  const movements = (data.movements as Row[]) || [];
+  check('Movement.batchId exportado', movements.filter((m) => m.batchId).length === 2, 'dos movimientos con lote');
+  const saleItems = ((data.sales as Row[]) || []).flatMap((s) => (s.items as Row[]) || []);
+  check('SaleItem.serviceId exportado', saleItems.some((i) => i.serviceId), 'venta de servicio');
+  const masters = (data.productMasters as Row[]) || [];
+  check('ProductMaster.baseUnitId exportado', masters.length === 3 && masters.every((m) => m.baseUnitId), 'tres productos con unidad base');
+
+  const leaked = FORBIDDEN_CONTENT.filter((pattern) => pattern.test(dataText));
+  check('sin contraseñas, SOL ni certificados', leaked.length === 0, leaked.map(String).join(', ') || 'ninguno');
+  return checks;
+}
+
 function describeDifference(missing: string, extra: string | undefined) {
   if (!extra) return 'fila ausente en la restauración';
   const a = JSON.parse(missing) as Row;
@@ -537,7 +617,12 @@ async function main() {
       console.log(`Roundtrip: fixture de compatibilidad guardado en ${path.relative(root, legacyFixture)}`);
     }
 
-    console.log('Roundtrip: restaurando en otra base con el handler real...');
+    console.log('\nExportación (contenido del ZIP):');
+    const exportChecks = await inspectExport(zipPath, source, sourceStoreId);
+    for (const { name, ok, detail } of exportChecks) console.log(`${ok ? 'PASS' : 'FAIL'} ${name.padEnd(38)} ${detail}`);
+    const exportFailures = exportChecks.filter((c) => !c.ok).length;
+
+    console.log('\nRoundtrip: restaurando en otra base con el handler real...');
     const restored = runWorker('restore', url('destino'), [`--zip=${zipPath}`]);
     if (restored.status !== 200) {
       throw new Error(`La restauración respondió ${restored.status}: ${JSON.stringify(restored.payload)}`);
@@ -556,12 +641,15 @@ async function main() {
       }
     }
 
+    console.log(exportFailures > 0
+      ? `\nExportación FAIL: ${exportFailures} de ${exportChecks.length} comprobaciones.`
+      : `\nExportación PASS: ${exportChecks.length} comprobaciones.`);
     if (failures > 0) {
-      console.log(`\nRoundtrip FAIL: ${failures} de ${report.length} modelos no se conservan.`);
-      process.exitCode = 1;
+      console.log(`Roundtrip FAIL: ${failures} de ${report.length} modelos no se conservan.`);
     } else {
-      console.log(`\nRoundtrip PASS: ${report.length} modelos conservados entre origen y restauración.`);
+      console.log(`Roundtrip PASS: ${report.length} modelos conservados entre origen y restauración.`);
     }
+    if (exportFailures > 0 || failures > 0) process.exitCode = 1;
   } finally {
     await Promise.all(clients.map((client) => client.$disconnect().catch(() => undefined)));
     if (started) {
