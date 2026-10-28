@@ -99,6 +99,7 @@ async function flowWorker(contextPath: string) {
   const { getRubroFlagChanges } = require('../src/lib/businessProfiles');
   const laundryPrice = require('../src/app/api/store/laundry-price/route');
   const storeRoute = require('../src/app/api/store/route');
+  const { whatsappNumber, readyWhatsappLink } = require('../src/app/work-orders/shared');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
   const json = (url: string, method: string, body?: unknown) =>
@@ -310,6 +311,26 @@ async function flowWorker(contextPath: string) {
     ruc: storeView.body?.store?.ruc ?? null,
   };
 
+  // L20 Prendas recibidas: se juntan repetidas, se validan y se pueden borrar
+  const withGarments = await create([kiloItem(2)], {
+    garments: [{ name: 'Camisa', qty: 3 }, { name: 'camisa', qty: 2 }, { name: 'Pantalón', qty: 1 }, { name: ' ', qty: 4 }],
+  });
+  const garmentsId = withGarments.body?.data?.id;
+  const savedGarments = (await prisma.workOrder.findUnique({ where: { id: garmentsId } }))?.garments;
+  const badGarments = await create([kiloItem(1)], { garments: [{ name: 'Polo', qty: 1.5 }] });
+  const cleared = await read(await workOrders.PATCH(json('/api/work-orders', 'PATCH', { id: garmentsId, garments: null })));
+  const afterClear = (await prisma.workOrder.findUnique({ where: { id: garmentsId } }))?.garments ?? null;
+  steps.L20 = { created: withGarments.status, saved: savedGarments, bad: badGarments.status, cleared: cleared.status, afterClear };
+
+  // L21 Aviso por WhatsApp: número peruano y mensaje con orden y saldo
+  const readyOrder = { orderNumber: 7, total: 40, advancePaid: 10, customer: { name: 'Rosa Quispe', phone: '977 555 333' } };
+  const link = readyWhatsappLink(readyOrder, 'Lavandería Prueba', true);
+  steps.L21 = {
+    numbers: [whatsappNumber('977 555 333'), whatsappNumber('+51 977555333'), whatsappNumber('01 555 1234'), whatsappNumber(null)],
+    link: link ? decodeURIComponent(link) : null,
+    noPhone: readyWhatsappLink({ ...readyOrder, customer: { name: 'Sin celular', phone: null } }, 'X', true),
+  };
+
   // L8 Express: 2 kg (10) + 1 terno (15) = 25 con recargo 50 % = 37,50 y fecha prometida
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
   const yesterday = new Date(Date.now() - 2 * 86_400_000).toISOString();
@@ -460,6 +481,17 @@ const EXPECTATIONS: Expectation[] = [
     ...eq('dueño', s.L19?.ok, [200, 5.5]),
     ...eq('visible en la recepción', s.L19?.seen, 5.5),
     ...eq('RUC intacto', s.L19?.ruc, '20123456789'),
+  ] },
+  { id: 'L20', title: 'Prendas: se juntan repetidas, se validan y se pueden borrar', check: (s) => [
+    ...eq('creada', s.L20?.created, 201),
+    ...eq('guardadas', (s.L20?.saved ?? []).map((g: any) => `${g.name}:${g.qty}`), ['Camisa:5', 'Pantalón:1']),
+    ...eq('cantidad con decimales', s.L20?.bad, 400),
+    ...eq('borrar', [s.L20?.cleared, s.L20?.afterClear], [200, null]),
+  ] },
+  { id: 'L21', title: 'Aviso por WhatsApp con número peruano, orden y saldo', check: (s) => [
+    ...eq('números', s.L21?.numbers, ['51977555333', '51977555333', null, null]),
+    ...eq('enlace', s.L21?.link, 'https://wa.me/51977555333?text=Hola Rosa, tu ropa de la orden #7 ya está lista para recoger en Lavandería Prueba. Saldo a pagar: S/ 30.00. ¡Te esperamos!'),
+    ...eq('sin celular', s.L21?.noPhone, null),
   ] },
   { id: 'L14', title: 'Producto de la orden descuenta stock con movimiento', check: (s) => [
     ...(ok(s.L14) ? [] : [`respondió ${s.L14?.result?.status}: ${s.L14?.result?.error}`]),

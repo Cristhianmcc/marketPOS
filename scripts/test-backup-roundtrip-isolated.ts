@@ -309,7 +309,7 @@ async function seedStore(db: PrismaClient) {
   });
 
   const workOrder = await db.workOrder.create({
-    data: { storeId, orderNumber: 1, customerId: customer.id, status: 'CLOSED', notes: 'Cableado cocina', subtotal: 78, total: 78, express: true, expressSurcharge: 0, promisedAt: d('2026-10-21T17:00:00Z'), advancePaid: 20, saleId: saleService.id, createdAt: d('2026-10-19T14:00:00Z') },
+    data: { storeId, orderNumber: 1, customerId: customer.id, status: 'CLOSED', notes: 'Cableado cocina', subtotal: 78, total: 78, express: true, expressSurcharge: 0, promisedAt: d('2026-10-21T17:00:00Z'), garments: [{ name: 'Camisa', qty: 3 }], advancePaid: 20, saleId: saleService.id, createdAt: d('2026-10-19T14:00:00Z') },
   });
   // Adelanto cobrado al recibir y aplicado en la venta de entrega
   await db.workOrderPayment.create({

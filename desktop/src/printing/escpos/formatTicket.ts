@@ -180,6 +180,13 @@ export class TicketFormatter {
     this.push(CMD.BOLD_ON);
     this.line(this.lr('SALDO A PAGAR:', this.money(balance)));
     this.push(CMD.BOLD_OFF);
+    if (data.garments && data.garments.length > 0) {
+      this.line(this.dash());
+      this.push(CMD.BOLD_ON);
+      this.line(`PRENDAS (${data.garments.reduce((t, g) => t + g.qty, 0)})`);
+      this.push(CMD.BOLD_OFF);
+      data.garments.forEach(g => this.line(this.lr(g.name, String(g.qty))));
+    }
     if (data.notes) {
       this.line(this.dash());
       this.wrap(`Obs.: ${data.notes}`).forEach(l => this.line(l));

@@ -18,6 +18,7 @@ export interface ApiWorkOrder {
   expressSurcharge: string | number;
   advancePaid: string | number;
   promisedAt: string | null;
+  garments?: { name: string; qty: number }[] | null;
   saleId: string | null;
   createdAt: string;
   customer: { id: string; name: string; phone: string | null } | null;
@@ -25,6 +26,7 @@ export interface ApiWorkOrder {
     id: string;
     type: 'PRODUCT' | 'SERVICE';
     itemName: string;
+    itemContent?: string | null;
     quantityBase: string | number;
     unitPrice: string | number;
     subtotal: string | number;
@@ -33,6 +35,28 @@ export interface ApiWorkOrder {
   }[];
   payments?: { id: string; kind: 'ADVANCE' | 'REFUND'; amount: string | number; method: string; createdAt: string }[];
   sale?: { id: string; saleNumber: number } | null;
+}
+
+/** Celular peruano a formato internacional para WhatsApp (51 + 9 dígitos). */
+export function whatsappNumber(phone: string | null | undefined): string | null {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  if (/^9\d{8}$/.test(digits)) return `51${digits}`;
+  if (/^519\d{8}$/.test(digits)) return digits;
+  return null;
+}
+
+/** Enlace de WhatsApp con el aviso de que la orden está lista para recoger. */
+export function readyWhatsappLink(order: ApiWorkOrder, storeName: string, isLaundry: boolean): string | null {
+  const number = whatsappNumber(order.customer?.phone);
+  if (!number) return null;
+  const firstName = (order.customer?.name ?? '').split(' ')[0];
+  const balance = balanceOf(order);
+  const text = [
+    `Hola${firstName ? ` ${firstName}` : ''}, ${isLaundry ? 'tu ropa' : 'tu pedido'} de la orden #${order.orderNumber} ya está ${isLaundry ? 'lista' : 'listo'} para recoger en ${storeName}.`,
+    balance > 0 ? `Saldo a pagar: ${money(balance)}.` : 'Ya está pagado.',
+    '¡Te esperamos!',
+  ].join(' ');
+  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
 export const OPEN_STATUSES: WorkOrderStatusName[] = ['DRAFT', 'APPROVED', 'IN_PROGRESS', 'READY'];
@@ -125,6 +149,7 @@ export async function printReceptionTicket(order: ApiWorkOrder, ctx: WorkOrderCo
     customer: order.customer,
     items: order.items.map((item) => ({
       name: item.itemName,
+      detail: item.itemContent && item.itemContent !== '(Servicio)' ? item.itemContent : null,
       quantity: num(item.quantityBase),
       unit: item.unitUsed?.symbol ?? null,
       subtotal: num(item.subtotal),
@@ -133,6 +158,7 @@ export async function printReceptionTicket(order: ApiWorkOrder, ctx: WorkOrderCo
     total: num(order.total),
     advancePaid: num(order.advancePaid),
     promisedAt: order.promisedAt,
+    garments: order.garments ?? null,
     notes: order.notes,
     footer,
   });

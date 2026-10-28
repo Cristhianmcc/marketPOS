@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Search, User, Package, Zap, CalendarClock, Wallet, Save, Printer, UserPlus, Scale } from 'lucide-react';
+import { Plus, Minus, Trash2, Search, User, Package, Zap, CalendarClock, Wallet, Save, Printer, UserPlus, Scale, Shirt } from 'lucide-react';
 import { toast } from 'sonner';
 import { METHOD_LABEL, money, printReceptionTicket, useWorkOrderContext, type ApiWorkOrder } from './shared';
 
@@ -26,6 +26,7 @@ interface Line {
 }
 
 const ADVANCE_METHODS = ['CASH', 'YAPE', 'PLIN', 'CARD'] as const;
+const COMMON_GARMENTS = ['Camisa', 'Polo', 'Pantalón', 'Casaca', 'Chompa', 'Vestido', 'Falda', 'Sábana', 'Frazada', 'Toalla', 'Cortina', 'Medias (pares)'];
 const WORK_SUGGESTIONS = ['Lavado de ropa', 'Lavado al seco', 'Lavado y planchado', 'Planchado', 'Lavado de edredón'];
 
 /** Fecha local para un input datetime-local (YYYY-MM-DDTHH:mm). */
@@ -65,6 +66,9 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
   const [editingKgPrice, setEditingKgPrice] = useState(false);
   const [kgPriceDraft, setKgPriceDraft] = useState('');
   const [totalTouched, setTotalTouched] = useState(false);
+  // Prendas recibidas (se imprimen en el ticket para evitar reclamos)
+  const [garments, setGarments] = useState<Record<string, number>>({});
+  const [customGarment, setCustomGarment] = useState('');
   const [express, setExpress] = useState(false);
   const [promisedAt, setPromisedAt] = useState('');
   const [notes, setNotes] = useState('');
@@ -153,6 +157,15 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
     freeNameRef.current?.focus();
   };
 
+  const changeGarment = (name: string, delta: number) =>
+    setGarments((prev) => {
+      const next = { ...prev, [name]: Math.max(0, (prev[name] ?? 0) + delta) };
+      if (next[name] === 0) delete next[name];
+      return next;
+    });
+  const garmentCount = Object.values(garments).reduce((sum, qty) => sum + qty, 0);
+  const garmentNames = [...COMMON_GARMENTS, ...Object.keys(garments).filter((name) => !COMMON_GARMENTS.includes(name))];
+
   const subtotal = Math.round(lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0) * 100) / 100;
   const surcharge = express ? Math.round(subtotal * ctx.expressPercent + 1e-6) / 100 : 0;
   const total = Math.round((subtotal + surcharge) * 100) / 100;
@@ -160,7 +173,7 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
   const invalidQuantity = lines.some((l) => !(l.quantity > 0) || (!l.allowDecimals && !Number.isInteger(l.quantity)));
 
   const reset = () => {
-    setLines([]); setCustomerId(''); setCustomerQuery(''); setNewCustomer(null); setExpress(false);
+    setLines([]); setGarments({}); setCustomGarment(''); setCustomerId(''); setCustomerQuery(''); setNewCustomer(null); setExpress(false);
     setPromisedAt(''); setNotes(''); setAdvance(''); setAdvanceMethod('CASH');
   };
 
@@ -194,6 +207,7 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
           notes: notes.trim() || null,
           express,
           promisedAt: promisedAt ? new Date(promisedAt).toISOString() : null,
+          garments: Object.entries(garments).map(([name, qty]) => ({ name, qty })),
           items: lines.map((l) => (l.type === 'FREE'
             ? { type: 'SERVICE', itemName: l.name, itemContent: l.detail || undefined, quantityBase: 1, unitPrice: l.unitPrice, notes: l.notes.trim() || undefined }
             : {
@@ -376,6 +390,35 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
             </div>
           )}
         </section>
+
+        {ctx.isLaundry && (
+          <section className="bg-white dark:bg-surface-dark rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <h2 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+              <Shirt className="w-5 h-5 text-primary" />Prendas{garmentCount > 0 && <span className="text-sm font-normal text-gray-500">· {garmentCount} en total</span>}
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {garmentNames.map((name) => {
+                const qty = garments[name] ?? 0;
+                return (
+                  <div key={name} className={`flex items-center justify-between rounded-lg border px-2 py-1.5 ${qty > 0 ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-gray-700'}`}>
+                    <button type="button" onClick={() => changeGarment(name, 1)} className="flex-1 text-left text-sm truncate" title={`Sumar 1 a ${name}`}>{name}</button>
+                    <div className="flex items-center gap-1">
+                      {qty > 0 && (
+                        <button type="button" onClick={() => changeGarment(name, -1)} className="w-7 h-7 rounded-md border border-gray-300 flex items-center justify-center" aria-label={`Restar 1 a ${name}`}><Minus className="w-3 h-3" /></button>
+                      )}
+                      <span className="w-6 text-center text-sm font-semibold">{qty || ''}</span>
+                      <button type="button" onClick={() => changeGarment(name, 1)} className="w-7 h-7 rounded-md bg-primary text-white flex items-center justify-center" aria-label={`Sumar 1 a ${name}`}><Plus className="w-3 h-3" /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); const name = customGarment.trim(); if (name) { changeGarment(name.slice(0, 40), 1); setCustomGarment(''); } }} className="mt-2 flex gap-2">
+              <input value={customGarment} onChange={(e) => setCustomGarment(e.target.value)} placeholder="Otra prenda (terno, mantel, peluche...)" className={inputClass} />
+              <button type="submit" className="px-3 rounded-lg border border-primary text-primary text-sm">Agregar</button>
+            </form>
+          </section>
+        )}
 
         <section className="bg-white dark:bg-surface-dark rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 space-y-3">
           <h2 className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2"><User className="w-5 h-5 text-primary" />Cliente</h2>

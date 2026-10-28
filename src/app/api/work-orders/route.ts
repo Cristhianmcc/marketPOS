@@ -14,7 +14,7 @@ import { FeatureFlagKey, WorkOrderStatus, WorkOrderItemType, Prisma } from '@pri
 import { prisma } from '@/infra/db/prisma';
 import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature, isFeatureEnabled } from '@/lib/featureFlags';
-import { canEditTransition, expressSurchargeFor, freeWorkLine, parsePromisedAt, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
+import { canEditTransition, expressSurchargeFor, freeWorkLine, parseGarments, parsePromisedAt, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
 import { lockWorkOrder, refundAdvances } from '@/lib/workOrders/payments';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 
@@ -127,6 +127,7 @@ interface CreateWorkOrderInput {
   items: CreateItemInput[];
   express?: boolean;
   promisedAt?: string | null;
+  garments?: { name: string; qty: number }[] | null;
 }
 
 /** Porcentaje express configurado por la tienda (por defecto 50 %). */
@@ -148,8 +149,10 @@ export async function POST(request: NextRequest) {
     const { customerId, notes, items } = body;
     const express = body.express === true;
     let promisedAt: Date | null | undefined;
+    let garments: ReturnType<typeof parseGarments>;
     try {
       promisedAt = parsePromisedAt(body.promisedAt);
+      garments = parseGarments(body.garments);
     } catch (error) {
       if (error instanceof WorkOrderRuleError) return NextResponse.json({ error: error.message }, { status: error.status });
       throw error;
@@ -280,6 +283,7 @@ export async function POST(request: NextRequest) {
           express,
           expressSurcharge: new Prisma.Decimal(expressSurcharge),
           promisedAt: promisedAt ?? null,
+          ...(garments && { garments: garments as unknown as Prisma.InputJsonValue }),
           total: new Prisma.Decimal(Math.round((subtotal + expressSurcharge) * 100) / 100),
         },
       });
@@ -331,6 +335,7 @@ interface UpdateWorkOrderInput {
   items?: CreateItemInput[]; // Reemplaza todos los items si se proporciona
   express?: boolean;
   promisedAt?: string | null;
+  garments?: { name: string; qty: number }[] | null;
 }
 
 export async function PATCH(request: NextRequest) {
@@ -345,8 +350,10 @@ export async function PATCH(request: NextRequest) {
     const body: UpdateWorkOrderInput = await request.json();
     const { id, status, customerId, notes, items } = body;
     let promisedAt: Date | null | undefined;
+    let garments: ReturnType<typeof parseGarments>;
     try {
       promisedAt = parsePromisedAt(body.promisedAt);
+      garments = parseGarments(body.garments);
     } catch (error) {
       if (error instanceof WorkOrderRuleError) return NextResponse.json({ error: error.message }, { status: error.status });
       throw error;
@@ -490,6 +497,7 @@ export async function PATCH(request: NextRequest) {
         expressSurcharge: new Prisma.Decimal(expressSurcharge),
         total: new Prisma.Decimal(newTotal), // subtotal + recargo express (sin descuentos)
         ...(promisedAt !== undefined && { promisedAt }),
+        ...(garments !== undefined && { garments: garments ? (garments as unknown as Prisma.InputJsonValue) : Prisma.DbNull }),
       };
 
       if (status !== undefined) {

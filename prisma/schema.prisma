@@ -1420,6 +1420,8 @@ model WorkOrder {
   express          Boolean   @default(false)
   expressSurcharge Decimal   @default(0) @map("express_surcharge") @db.Decimal(12, 2)
   promisedAt       DateTime? @map("promised_at")
+  // Prendas recibidas (lavandería): [{ name, qty }], se imprimen en el ticket
+  garments         Json?     @map("garments")
 
   // Suma neta de adelantos (ADVANCE − REFUND); se actualiza con la orden bloqueada
   advancePaid Decimal @default(0) @map("advance_paid") @db.Decimal(12, 2)

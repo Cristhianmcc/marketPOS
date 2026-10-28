@@ -3,11 +3,11 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
-import { ArrowLeft, Printer, Zap, CalendarClock, Wallet, Receipt, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Printer, Zap, CalendarClock, Wallet, Receipt, XCircle, AlertTriangle, Shirt, MessageCircle } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import {
   METHOD_LABEL, OPEN_STATUSES, STATUS_STYLE, balanceOf, formatDateTime, isOverdue, money, num,
-  printReceptionTicket, useWorkOrderContext, type ApiWorkOrder, type WorkOrderStatusName,
+  printReceptionTicket, readyWhatsappLink, useWorkOrderContext, type ApiWorkOrder, type WorkOrderStatusName,
 } from '../shared';
 
 const PAY_METHODS = ['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO'] as const;
@@ -72,6 +72,8 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
   const open = OPEN_STATUSES.includes(order.status);
   const overdue = isOverdue(order);
   const label = ctx.labels;
+  // Aviso de "lista para recoger" (solo cuando la orden está lista y hay celular)
+  const whatsapp = order.status === 'READY' ? readyWhatsappLink(order, ctx.store.name, ctx.isLaundry) : null;
 
   const setStatus = (status: WorkOrderStatusName) =>
     call('/api/work-orders', 'PATCH', { id: order.id, status }, `Estado: ${label[status]}`);
@@ -144,13 +146,23 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
             {order.notes && <div className="sm:col-span-3"><div className="text-gray-500">Observaciones</div><div>{order.notes}</div></div>}
           </section>
 
+          {(order.garments?.length ?? 0) > 0 && (
+            <section className="bg-white rounded-lg border border-gray-200 p-4">
+              <h2 className="font-medium text-gray-900 mb-2"><Shirt className="inline w-4 h-4 mr-1 text-primary" />Prendas recibidas · {order.garments!.reduce((sum, g) => sum + g.qty, 0)}</h2>
+              <div className="flex flex-wrap gap-2 text-sm">
+                {order.garments!.map((g) => <span key={g.name} className="px-2 py-1 rounded-lg bg-gray-100">{g.qty} × {g.name}</span>)}
+              </div>
+              {order.status === 'READY' && <p className="text-xs text-gray-500 mt-2">Revisa las prendas con el cliente antes de entregar.</p>}
+            </section>
+          )}
+
           <section className="bg-white rounded-lg border border-gray-200 p-4">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-gray-500 border-b"><th className="py-2">Detalle</th><th className="py-2 text-right">Cant.</th><th className="py-2 text-right">Precio</th><th className="py-2 text-right">Importe</th></tr></thead>
               <tbody>
                 {order.items.map((item) => (
                   <tr key={item.id} className="border-b last:border-0">
-                    <td className="py-2">{item.itemName}{item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}</td>
+                    <td className="py-2">{item.itemName}{item.itemContent && item.itemContent !== '(Servicio)' && <span className="text-gray-500"> · {item.itemContent}</span>}{item.notes && <div className="text-xs text-gray-500">{item.notes}</div>}</td>
                     <td className="py-2 text-right">{num(item.quantityBase)}{item.unitUsed?.symbol ? ` ${item.unitUsed.symbol}` : ''}</td>
                     <td className="py-2 text-right">{money(num(item.unitPrice))}</td>
                     <td className="py-2 text-right">{money(num(item.subtotal))}</td>
@@ -193,6 +205,11 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
                 <button disabled={busy} onClick={() => { setAmountPaid(balance.toFixed(2)); setShowCharge(true); }} className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50">
                   <Receipt className="inline w-4 h-4 mr-1" />{ctx.isLaundry ? 'Entregar y cobrar' : 'Cobrar'} {money(balance)}
                 </button>
+              )}
+              {whatsapp && (
+                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="px-4 py-2 border border-green-500 text-green-700 rounded-lg hover:bg-green-50">
+                  <MessageCircle className="inline w-4 h-4 mr-1" />Avisar por WhatsApp
+                </a>
               )}
               {balance > 0 && <button disabled={busy} onClick={() => setShowAdvance(true)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"><Wallet className="inline w-4 h-4 mr-1" />Adelanto</button>}
               <button disabled={busy} onClick={toggleExpress} className="px-4 py-2 border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50"><Zap className="inline w-4 h-4 mr-1" />{order.express ? 'Quitar express' : 'Hacer express'}</button>

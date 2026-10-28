@@ -160,6 +160,10 @@ es `docs/audits/2026-09-26-pos.md`.
   (`catalogCloudHeaders`); la nube lo valida con `isCatalogStoreAuthorized`
   (una tienda solo publica su catálogo) y sube imágenes a Cloudinary en
   `/api/catalog/cloud-image`. Banco: `scripts/test-catalog-publish-isolated.ts`.
+- Lavandería: `WorkOrder.garments` (JSON `[{ name, qty }]`, `parseGarments`)
+  guarda las prendas recibidas; salen en ambos tickets y en el detalle. El aviso
+  de orden lista abre `wa.me` con el mensaje (`readyWhatsappLink`, celular
+  peruano a +51); en el escritorio el enlace se abre fuera de la app.
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

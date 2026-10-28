@@ -150,6 +150,7 @@ export interface PrintWorkOrderData {
   total: number;
   advancePaid: number;
   promisedAt?: string;
+  garments?: { name: string; qty: number }[];
   notes?: string;
   footer: string;
 }

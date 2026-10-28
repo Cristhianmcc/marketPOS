@@ -226,6 +226,7 @@ check('ticket de recepción de lavandería por ESC/POS', () => {
     customer: { name: 'Rosa Quispe', phone: '977555333' },
     items: [{ name: 'Lavado de ropa', detail: '5 kg', quantity: 1, subtotal: 25 }, { name: 'Terno al seco', quantity: 2, unit: 'und', subtotal: 30 }],
     expressSurcharge: 27.5, total: 82.5, advancePaid: 20, promisedAt: '29/10/2026 18:00', notes: 'Camisa con mancha',
+    garments: [{ name: 'Camisa', qty: 5 }, { name: 'Pantalon', qty: 1 }],
     footer: 'Presente este ticket para recoger sus prendas',
   }));
   assert.ok(text.includes('000002'), 'número de orden');
@@ -236,6 +237,8 @@ check('ticket de recepción de lavandería por ESC/POS', () => {
   assert.match(text, /ADELANTO:\s+S\/20\.00/);
   assert.match(text, /SALDO A PAGAR:\s+S\/62\.50/);
   assert.ok(text.includes('ENTREGA: 29/10/2026 18:00'), 'fecha de entrega');
+  assert.ok(text.includes('PRENDAS (6)'), 'total de prendas');
+  assert.match(text, /Camisa\s+5/);
 });
 
 // ── Total del POS (debe coincidir con el cobro del servidor) ────────────────

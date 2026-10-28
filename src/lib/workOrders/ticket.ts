@@ -10,11 +10,12 @@ export interface WorkOrderTicketData {
   orderNumber: number;
   createdAt: string | Date;
   customer?: { name: string; phone?: string | null } | null;
-  items: { name: string; quantity: number; unit?: string | null; subtotal: number }[];
+  items: { name: string; detail?: string | null; quantity: number; unit?: string | null; subtotal: number }[];
   expressSurcharge: number;
   total: number;
   advancePaid: number;
   promisedAt?: string | Date | null;
+  garments?: { name: string; qty: number }[] | null;
   notes?: string | null;
   footer: string;
 }
@@ -34,7 +35,7 @@ export function buildWorkOrderTicketHtml(data: WorkOrderTicketData): string {
   const row = (left: string, right: string, strong = false) =>
     `<tr${strong ? ' class="strong"' : ''}><td>${left}</td><td class="r">${right}</td></tr>`;
   const items = data.items.map((item) =>
-    row(`${escapeHtml(qty(item.quantity))}${item.unit ? ` ${escapeHtml(item.unit)}` : ''} ${escapeHtml(item.name)}`, money(item.subtotal))
+    row(`${escapeHtml(qty(item.quantity))}${item.unit ? ` ${escapeHtml(item.unit)}` : ''} ${escapeHtml(item.name)}${item.detail ? ` ${escapeHtml(item.detail)}` : ''}`, money(item.subtotal))
   ).join('');
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>OT ${data.orderNumber}</title><style>
@@ -63,6 +64,7 @@ export function buildWorkOrderTicketHtml(data: WorkOrderTicketData): string {
     ${data.advancePaid > 0 ? row('Adelanto', money(data.advancePaid)) : ''}
     ${row('SALDO A PAGAR', money(balance), true)}
     </table>
+    ${data.garments && data.garments.length > 0 ? `<hr><div><strong>PRENDAS (${data.garments.reduce((t, g) => t + g.qty, 0)})</strong></div><table>${data.garments.map((g) => row(escapeHtml(g.name), String(g.qty))).join('')}</table>` : ''}
     ${data.notes ? `<hr><div>Obs.: ${escapeHtml(data.notes)}</div>` : ''}
     <hr><div class="c">${escapeHtml(data.footer)}</div>
   </body></html>`;

@@ -112,3 +112,30 @@ export function freeWorkLine(input: { itemName?: unknown; itemContent?: unknown;
   const content = typeof input.itemContent === 'string' ? input.itemContent.trim().slice(0, 60) : '';
   return { itemName, itemContent: content || null };
 }
+
+export interface GarmentCount { name: string; qty: number }
+
+/**
+ * Prendas recibidas: lista de { name, qty }. Junta nombres repetidos y quita
+ * los vacíos. `undefined` no cambia nada; `null` o lista vacía las borra.
+ */
+export function parseGarments(value: unknown): GarmentCount[] | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (!Array.isArray(value) || value.length > 40) throw new WorkOrderRuleError('Lista de prendas inválida');
+  const merged = new Map<string, GarmentCount>();
+  for (const entry of value) {
+    const name = typeof entry?.name === 'string' ? entry.name.trim().slice(0, 40) : '';
+    const qty = Number(entry?.qty);
+    if (!name || qty === 0) continue;
+    if (!Number.isInteger(qty) || qty < 0 || qty > 999) throw new WorkOrderRuleError(`${name}: la cantidad de prendas debe ser un número entero`);
+    const key = name.toLowerCase();
+    const current = merged.get(key);
+    merged.set(key, { name: current?.name ?? name, qty: (current?.qty ?? 0) + qty });
+  }
+  const list = [...merged.values()];
+  return list.length > 0 ? list : null;
+}
+
+export const garmentTotal = (garments: GarmentCount[] | null | undefined) =>
+  (garments ?? []).reduce((sum, g) => sum + g.qty, 0);

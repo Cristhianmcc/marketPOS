@@ -1082,6 +1082,7 @@ export async function POST(request: NextRequest) {
               express: order.express ?? false,
               expressSurcharge: order.expressSurcharge ?? 0,
               promisedAt: order.promisedAt ? new Date(order.promisedAt) : null,
+              ...(order.garments ? { garments: order.garments } : {}),
               saleId: order.saleId ? requireSale(order.saleId, 'una orden de trabajo') : null,
               createdAt: new Date(order.createdAt),
               items: {

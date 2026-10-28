@@ -300,6 +300,7 @@ class EscposPrintManager {
       total: Number(order.total),
       advancePaid: Number(order.advancePaid || 0),
       promisedAt: order.promisedAt ? when(order.promisedAt) : undefined,
+      garments: Array.isArray(order.garments) ? order.garments.map((g: any) => ({ name: String(g.name), qty: Number(g.qty) })) : undefined,
       notes: order.notes || undefined,
       footer: labels.footer,
     };
