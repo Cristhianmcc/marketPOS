@@ -21,6 +21,25 @@ export function ServiceWorkerRegistration() {
         return;
       }
 
+      // En desarrollo no usar SW: cachea /_next/static con nombres fijos y mezcla
+      // chunks viejos con nuevos ("Cannot read properties of undefined (reading 'call')").
+      if (process.env.NODE_ENV !== 'production') {
+        const wasControlled = !!navigator.serviceWorker.controller;
+        Promise.all([
+          navigator.serviceWorker.getRegistrations().then(regs => Promise.all(regs.map(r => r.unregister()))),
+          'caches' in window
+            ? caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('bodegapos-')).map(k => caches.delete(k))))
+            : Promise.resolve(),
+        ]).then(() => {
+          // Una sola recarga para salir del control del SW antiguo
+          if (wasControlled && !sessionStorage.getItem('sw-dev-cleared')) {
+            sessionStorage.setItem('sw-dev-cleared', '1');
+            window.location.reload();
+          }
+        });
+        return;
+      }
+
       // Registrar SW después de que la página cargue
       window.addEventListener('load', () => {
         navigator.serviceWorker
