@@ -380,6 +380,7 @@ export async function POST(request: NextRequest) {
             expiredBatchPolicy: backupData.storeSettings.expiredBatchPolicy,
             fefoEnabled: backupData.storeSettings.fefoEnabled,
             expiryAlertDays: backupData.storeSettings.expiryAlertDays,
+            expressSurchargePercent: backupData.storeSettings.expressSurchargePercent ?? 50,
             showExpiredWarnings: backupData.storeSettings.showExpiredWarnings,
           },
         });
@@ -1077,6 +1078,9 @@ export async function POST(request: NextRequest) {
               discount: order.discount,
               total: order.total,
               advancePaid: order.advancePaid ?? 0,
+              express: order.express ?? false,
+              expressSurcharge: order.expressSurcharge ?? 0,
+              promisedAt: order.promisedAt ? new Date(order.promisedAt) : null,
               saleId: order.saleId ? requireSale(order.saleId, 'una orden de trabajo') : null,
               createdAt: new Date(order.createdAt),
               items: {

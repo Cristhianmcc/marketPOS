@@ -165,8 +165,9 @@ export async function POST(
       });
       const nextSaleNumber = (lastSale?.saleNumber ?? 0) + 1;
 
-      // 2. Calcular totales
-      const subtotal = workOrder.subtotal.toNumber();
+      // 2. Calcular totales (el recargo express va como línea propia)
+      const expressSurcharge = workOrder.expressSurcharge.toNumber();
+      const subtotal = round2(workOrder.subtotal.toNumber() + expressSurcharge);
       const discount = workOrder.discount.toNumber();
       const saleTotal = workOrder.total.toNumber();
       const changeAmount = paymentMethod === 'CASH' && amountPaid !== undefined ? round2(amountPaid - balance) : null;
@@ -246,6 +247,31 @@ export async function POST(
             nthPromoDiscount: new Prisma.Decimal(0),
             discountAmount: new Prisma.Decimal(0),
             totalLine: woItem.subtotal,
+          },
+        });
+      }
+
+      if (expressSurcharge > 0) {
+        const expressLine = new Prisma.Decimal(expressSurcharge);
+        await tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            isService: true,
+            productName: 'Recargo express',
+            productContent: '(Servicio)',
+            unitType: 'UNIT',
+            unitSunatCode: 'ZZ',
+            unitSymbol: 'serv',
+            quantity: new Prisma.Decimal(1),
+            unitPrice: expressLine,
+            subtotal: expressLine,
+            quantityBase: new Prisma.Decimal(1),
+            promotionDiscount: new Prisma.Decimal(0),
+            categoryPromoDiscount: new Prisma.Decimal(0),
+            volumePromoDiscount: new Prisma.Decimal(0),
+            nthPromoDiscount: new Prisma.Decimal(0),
+            discountAmount: new Prisma.Decimal(0),
+            totalLine: expressLine,
           },
         });
       }

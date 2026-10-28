@@ -182,8 +182,6 @@ async function flowWorker(contextPath: string) {
     paymentsOfPair: await prisma.workOrderPayment.count({ where: { workOrderId: pairId } }),
   };
 
-  // L8 Recargo express en la orden
-  steps.L8 = { expressField: 'express' in (prisma.workOrder.fields ?? {}) };
 
   // L9 Entrega: saldo de S/ 27,50 (47,50 - adelanto 20) pagado con S/ 30
   const short = await charge(mainId, { paymentMethod: 'CASH', amountPaid: 25 });
@@ -258,6 +256,46 @@ async function flowWorker(contextPath: string) {
     shift: await cashOfShift(),
   };
 
+  // L8 Express: 2 kg (10) + 1 terno (15) = 25 con recargo 50 % = 37,50 y fecha prometida
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
+  const yesterday = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const fast = await create([kiloItem(2), ternoItem(1)], { express: true, promisedAt: tomorrow });
+  const fastId = fast.body?.data?.id;
+  const pastDate = await create([kiloItem(1)], { promisedAt: yesterday });
+  const order0 = await orderState(fastId);
+  const fastRow = await prisma.workOrder.findUnique({ where: { id: fastId } });
+  const toggleOff = await read(await workOrders.PATCH(json('/api/work-orders', 'PATCH', { id: fastId, express: false })));
+  const offTotal = (await orderState(fastId))?.total;
+  await read(await workOrders.PATCH(json('/api/work-orders', 'PATCH', { id: fastId, express: true })));
+  const onTotal = (await orderState(fastId))?.total;
+  await setStatus(fastId, 'APPROVED');
+  await advance(fastId, 30);
+  const blockedOff = await read(await workOrders.PATCH(json('/api/work-orders', 'PATCH', { id: fastId, express: false })));
+  await setStatus(fastId, 'READY');
+  const fastPaid = await charge(fastId, { paymentMethod: 'CASH', amountPaid: 7.5 });
+  const fastSale = fastPaid.body?.data?.saleId
+    ? await prisma.sale.findUnique({ where: { id: fastPaid.body.data.saleId }, include: { items: true } })
+    : null;
+  const fastBoleta = fastSale ? await buildPayloadFromSale(prisma, { saleId: fastSale.id, docType: 'BOLETA' }) : null;
+  // Porcentaje configurado por la tienda: 40 %
+  await prisma.storeSettings.upsert({ where: { storeId: ctx.storeId }, update: { expressSurchargePercent: 40 }, create: { storeId: ctx.storeId, expressSurchargePercent: 40 } });
+  const forty = await create([kiloItem(2)], { express: true });
+  steps.L8 = {
+    created: { status: fast.status, total: order0?.total, surcharge: Number(fastRow?.expressSurcharge), promised: !!fastRow?.promisedAt },
+    pastDate: pastDate.status,
+    toggle: { off: [toggleOff.status, offTotal], on: onTotal },
+    blockedOff: blockedOff.status,
+    sale: fastSale && {
+      status: fastPaid.status,
+      total: Number(fastSale.total),
+      lines: fastSale.items.map((i: any) => `${i.productName}:${Number(i.totalLine)}`).sort(),
+      linesSum: Math.round(fastSale.items.reduce((t: number, i: any) => t + Number(i.totalLine), 0) * 100) / 100,
+      change: Number(fastSale.changeAmount),
+    },
+    boleta: fastBoleta ? { total: fastBoleta.totals.total, tax: fastBoleta.totals.tax, lines: fastBoleta.items.length } : null,
+    forty: forty.body?.data ? Number(forty.body.data.total) : null,
+  };
+
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
 
@@ -301,8 +339,15 @@ const EXPECTATIONS: Expectation[] = [
     ...eq('adelantos simultáneos', s.L7?.racing, [201, 409]),
     ...eq('orden de 30', [s.L7?.pair?.advancePaid, s.L7?.paymentsOfPair], [20, 1]),
   ] },
-  { id: 'L8', title: 'Recargo express', kind: 'missing', check: (s) =>
-    s.L8?.expressField ? [] : ['la orden no tiene recargo express'] },
+  { id: 'L8', title: 'Express: recargo 50 % (o el configurado), fecha prometida y línea en la boleta', check: (s) => [
+    ...eq('orden express', s.L8?.created, { status: 201, total: 37.5, surcharge: 12.5, promised: true }),
+    ...eq('fecha pasada', s.L8?.pastDate, 400),
+    ...eq('quitar y volver a poner express', s.L8?.toggle, { off: [200, 25], on: 37.5 }),
+    ...eq('quitar express con adelanto 30 (> 25)', s.L8?.blockedOff, 409),
+    ...eq('venta', s.L8?.sale, { status: 200, total: 37.5, lines: ['Lavado por kilo:10', 'Recargo express:12.5', 'Terno al seco:15'], linesSum: 37.5, change: 0 }),
+    ...eq('boleta', s.L8?.boleta, { total: 37.5, tax: 5.72, lines: 3 }),
+    ...eq('express al 40 % de 10', s.L8?.forty, 14),
+  ] },
   { id: 'L9', title: 'Entrega cobra el saldo 27,50 (vuelto 2,50) y la venta queda por 47,50', check: (s) => [
     ...eq('pago menor al saldo', s.L9?.short, 400),
     ...eq('adelanto aplicado', s.L9?.advanceApplied, 20),

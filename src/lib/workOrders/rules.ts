@@ -72,3 +72,25 @@ export function resolveItemPrice(input: {
   }
   return input.requestedPrice;
 }
+
+/** Recargo express redondeado a céntimos sobre el subtotal de la orden. */
+export function expressSurchargeFor(subtotal: number, percent: number, express: boolean): number {
+  if (!express) return 0;
+  const safePercent = Math.min(Math.max(Number.isFinite(percent) ? percent : 0, 0), 200);
+  return Math.round(subtotal * safePercent + 1e-6) / 100;
+}
+
+/**
+ * Fecha prometida de entrega: opcional; `null` la borra. No admite fechas
+ * anteriores a hoy (margen de 12 h por zona horaria).
+ */
+export function parsePromisedAt(value: unknown): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) throw new WorkOrderRuleError('Fecha prometida inválida');
+  if (date.getTime() < Date.now() - 12 * 3_600_000) {
+    throw new WorkOrderRuleError('La fecha prometida no puede ser anterior a hoy');
+  }
+  return date;
+}

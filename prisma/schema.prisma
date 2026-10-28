@@ -653,6 +653,9 @@ model StoreSettings {
   expiryAlertDays     Int     @default(60)   @map("expiry_alert_days")
   showExpiredWarnings Boolean @default(true) @map("show_expired_warnings")
 
+  // Lavandería: recargo de las órdenes express (% sobre el subtotal)
+  expressSurchargePercent Int @default(50) @map("express_surcharge_percent")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -1410,6 +1413,11 @@ model WorkOrder {
   subtotal Decimal @default(0) @db.Decimal(12, 2)
   discount Decimal @default(0) @db.Decimal(12, 2)
   total    Decimal @default(0) @db.Decimal(12, 2)
+
+  // Servicio express: recargo calculado sobre el subtotal; total = subtotal + recargo
+  express          Boolean   @default(false)
+  expressSurcharge Decimal   @default(0) @map("express_surcharge") @db.Decimal(12, 2)
+  promisedAt       DateTime? @map("promised_at")
 
   // Suma neta de adelantos (ADVANCE − REFUND); se actualiza con la orden bloqueada
   advancePaid Decimal @default(0) @map("advance_paid") @db.Decimal(12, 2)

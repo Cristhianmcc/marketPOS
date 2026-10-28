@@ -90,7 +90,7 @@ export async function PATCH(request: NextRequest) {
       storeName, storeRuc, storeAddress, storePhone,
       ticketFooter, ticketLogo, taxRate,
       // Configuración farmacéutica
-      expiryAlertDays, fefoEnabled, expiredBatchPolicy, showExpiredWarnings,
+      expiryAlertDays, fefoEnabled, expiredBatchPolicy, showExpiredWarnings, expressSurchargePercent,
     } = body;
 
     // Actualizar Store y Settings en transacción
@@ -114,6 +114,7 @@ export async function PATCH(request: NextRequest) {
       let updatedSettings;
       const pharmaData = {
         ...(expiryAlertDays !== undefined && { expiryAlertDays: Math.max(1, parseInt(expiryAlertDays) || 60) }),
+        ...(expressSurchargePercent !== undefined && { expressSurchargePercent: Math.min(200, Math.max(0, parseInt(expressSurchargePercent) || 0)) }),
         ...(fefoEnabled !== undefined && { fefoEnabled: Boolean(fefoEnabled) }),
         ...(expiredBatchPolicy !== undefined && { expiredBatchPolicy }),
         ...(showExpiredWarnings !== undefined && { showExpiredWarnings: Boolean(showExpiredWarnings) }),

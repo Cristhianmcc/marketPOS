@@ -14,7 +14,7 @@ import { FeatureFlagKey, WorkOrderStatus, WorkOrderItemType, Prisma } from '@pri
 import { prisma } from '@/infra/db/prisma';
 import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature, isFeatureEnabled } from '@/lib/featureFlags';
-import { canEditTransition, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
+import { canEditTransition, expressSurchargeFor, parsePromisedAt, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
 import { lockWorkOrder, refundAdvances } from '@/lib/workOrders/payments';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 
@@ -122,6 +122,14 @@ interface CreateWorkOrderInput {
   customerId?: string;
   notes?: string;
   items: CreateItemInput[];
+  express?: boolean;
+  promisedAt?: string | null;
+}
+
+/** Porcentaje express configurado por la tienda (por defecto 50 %). */
+async function expressPercentFor(storeId: string): Promise<number> {
+  const settings = await prisma.storeSettings.findUnique({ where: { storeId }, select: { expressSurchargePercent: true } });
+  return settings?.expressSurchargePercent ?? 50;
 }
 
 export async function POST(request: NextRequest) {
@@ -135,6 +143,14 @@ export async function POST(request: NextRequest) {
 
     const body: CreateWorkOrderInput = await request.json();
     const { customerId, notes, items } = body;
+    const express = body.express === true;
+    let promisedAt: Date | null | undefined;
+    try {
+      promisedAt = parsePromisedAt(body.promisedAt);
+    } catch (error) {
+      if (error instanceof WorkOrderRuleError) return NextResponse.json({ error: error.message }, { status: error.status });
+      throw error;
+    }
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Debe agregar al menos un item' }, { status: 400 });
@@ -235,6 +251,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const expressSurcharge = expressSurchargeFor(subtotal, await expressPercentFor(session.storeId), express);
+
     // Crear orden con items en transacción
     const workOrder = await prisma.$transaction(async (tx) => {
       const order = await tx.workOrder.create({
@@ -246,7 +264,10 @@ export async function POST(request: NextRequest) {
           notes: notes || null,
           subtotal: new Prisma.Decimal(subtotal),
           discount: new Prisma.Decimal(0),
-          total: new Prisma.Decimal(subtotal),
+          express,
+          expressSurcharge: new Prisma.Decimal(expressSurcharge),
+          promisedAt: promisedAt ?? null,
+          total: new Prisma.Decimal(Math.round((subtotal + expressSurcharge) * 100) / 100),
         },
       });
 
@@ -295,6 +316,8 @@ interface UpdateWorkOrderInput {
   customerId?: string | null;
   notes?: string;
   items?: CreateItemInput[]; // Reemplaza todos los items si se proporciona
+  express?: boolean;
+  promisedAt?: string | null;
 }
 
 export async function PATCH(request: NextRequest) {
@@ -308,6 +331,13 @@ export async function PATCH(request: NextRequest) {
 
     const body: UpdateWorkOrderInput = await request.json();
     const { id, status, customerId, notes, items } = body;
+    let promisedAt: Date | null | undefined;
+    try {
+      promisedAt = parsePromisedAt(body.promisedAt);
+    } catch (error) {
+      if (error instanceof WorkOrderRuleError) return NextResponse.json({ error: error.message }, { status: error.status });
+      throw error;
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'ID de orden requerido' }, { status: 400 });
@@ -427,14 +457,21 @@ export async function PATCH(request: NextRequest) {
         await tx.workOrderItem.createMany({ data: itemsToCreate });
       }
 
-      if (newSubtotal + 0.005 < locked.advancePaid.toNumber()) {
+      const express = body.express !== undefined ? body.express === true : locked.express;
+      const expressSurcharge = expressSurchargeFor(newSubtotal, await expressPercentFor(session.storeId), express);
+      const newTotal = Math.round((newSubtotal + expressSurcharge) * 100) / 100;
+
+      if (newTotal + 0.005 < locked.advancePaid.toNumber()) {
         throw new WorkOrderRuleError(`El total no puede quedar por debajo del adelanto ya cobrado (S/ ${locked.advancePaid.toFixed(2)})`, 409);
       }
 
       // Actualizar orden
       const updateData: Prisma.WorkOrderUpdateInput = {
         subtotal: new Prisma.Decimal(newSubtotal),
-        total: new Prisma.Decimal(newSubtotal), // Por ahora sin descuentos
+        express,
+        expressSurcharge: new Prisma.Decimal(expressSurcharge),
+        total: new Prisma.Decimal(newTotal), // subtotal + recargo express (sin descuentos)
+        ...(promisedAt !== undefined && { promisedAt }),
       };
 
       if (status !== undefined) {

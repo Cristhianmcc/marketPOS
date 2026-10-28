@@ -131,6 +131,11 @@ es `docs/audits/2026-09-26-pos.md`.
   el adelanto; `getCashSalesTotal` y `getSalesByMethod` restan `advanceApplied`
   y suman los adelantos netos del turno. Cancelar una orden con adelanto lo
   devuelve por método (REFUND). El respaldo 1.1 incluye `workOrders[].payments`.
+- Express: `WorkOrder.express`, `expressSurcharge`, `promisedAt` y
+  `StoreSettings.expressSurchargePercent` (50 por defecto). El recargo se
+  calcula en el servidor sobre el subtotal (`expressSurchargeFor`) al crear y
+  editar; total = subtotal + recargo. Al cobrar sale como línea "Recargo
+  express" (ZZ, gravada) para que las líneas sumen el total del comprobante.
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

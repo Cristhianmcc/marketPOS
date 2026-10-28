@@ -115,6 +115,25 @@ dos veces (L12, L15), cobro que ignora el adelanto (L9), cancelar sin devolver
 Pendiente de pantalla (Fase 4): botón de adelanto en la orden, saldo visible y
 el adelanto en ticket y cierre de turno.
 
+## Resultado de la Fase 3 (2026-10-27)
+
+Banco 16/16.
+
+- Migración aditiva `20261028010000_work_order_express`.
+- L8: orden express de 25 con recargo 50 % = 37,50; fecha prometida opcional
+  (no anterior a hoy). Quitar o poner el express recalcula el total; no se
+  puede quitar si el adelanto supera el nuevo total. La venta lleva la línea
+  "Recargo express" y la boleta da 37,50 con IGV 5,72. El porcentaje se
+  configura en los ajustes de la tienda (`expressSurchargePercent`, 0 a 200).
+- El respaldo conserva express, recargo, fecha prometida y el porcentaje.
+
+Mutaciones detectadas: sin línea express en la venta, edición que ignora el
+express, edición sin control del adelanto, porcentaje ignorado, restauración
+sin fecha prometida.
+
+Pendiente de pantalla (Fase 4): casilla express y fecha prometida al recibir,
+porcentaje en Ajustes y órdenes atrasadas en la lista.
+
 ## Fases
 
 0. Banco `scripts/test-lavanderia-flow-isolated.ts` (PostgreSQL desechable)
