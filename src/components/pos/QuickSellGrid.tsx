@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, Plus } from 'lucide-react';
-import { categoryImage } from './categoryImage';
+import { CategoryIcon } from './categoryIcon';
 
 interface QuickSellProduct {
   id: string;
@@ -114,8 +114,7 @@ function QuickSellGridComponent({ onAddProduct, disabled = false }: QuickSellGri
             >
               {/* ✅ Imagen o Inicial - Tamaño táctil */}
               <div className="relative w-full h-28 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark flex items-center justify-center overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={categoryImage(product.category)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                <CategoryIcon name={product.category} className="w-10 h-10 text-primary/60" />
                 {product.imageUrl && (
                   <img
                     src={product.imageUrl}

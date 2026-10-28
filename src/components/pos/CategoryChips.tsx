@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, Squares2X2Icon } from '@heroicons/react/24/outline';
-import { categoryImage } from './categoryImage';
+import { CategoryIcon } from './categoryIcon';
 
 interface Category {
   id: string;
@@ -105,15 +105,15 @@ export function CategoryChips({ selected, onSelect }: CategoryChipsProps) {
             <button
               key={cat.id}
               onClick={() => onSelect(selected === cat.name ? null : cat.name)}
-              className={tile(selected === cat.name)}
+              className={`${tile(selected === cat.name)} flex flex-col items-center justify-center gap-2 px-1.5 ${
+                selected === cat.name ? 'bg-primary text-white' : 'bg-surface-light dark:bg-surface-dark text-text-main dark:text-text-light'
+              }`}
               title={cat.name}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={categoryImage(cat.name)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
-              <span className={`absolute inset-0 ${selected === cat.name ? 'bg-primary/35' : ''} bg-gradient-to-t from-black/75 via-black/20 to-transparent`} />
-              <span className="absolute inset-x-1.5 bottom-1.5 text-left text-[11px] font-bold leading-tight text-white line-clamp-2 drop-shadow">
-                {cat.name}
+              <span className={`w-11 h-11 rounded-xl flex items-center justify-center ${selected === cat.name ? 'bg-white/20' : 'bg-monterrial-lavender/70 dark:bg-background-dark text-primary'}`}>
+                <CategoryIcon name={cat.name} className="w-6 h-6" />
               </span>
+              <span className="text-[11px] font-bold leading-tight text-center line-clamp-2">{cat.name}</span>
             </button>
           ))}
         </div>

@@ -10,7 +10,7 @@ import { PosHeader } from '@/components/pos/PosHeader';
 import { CategoryChips } from '@/components/pos/CategoryChips';
 import { PosBanner } from '@/components/pos/PosBanner';
 import { ShiftCard } from '@/components/pos/ShiftCard';
-import { categoryImage } from '@/components/pos/categoryImage';
+import { CategoryIcon } from '@/components/pos/categoryIcon';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
 import AdvancedUnitSelector from '@/components/pos/AdvancedUnitSelector'; // ✅ MÓDULO F1
@@ -1990,10 +1990,9 @@ export default function POSPage() {
         key={sp.id}
         className="group flex flex-col rounded-2xl bg-surface-light dark:bg-surface-dark p-3 shadow-soft hover:shadow-medium transition-shadow"
       >
-        {/* Imagen del producto (o emoji de su categoría) */}
+        {/* Foto del producto, o el ícono de su categoría si aún no tiene foto */}
         <div className="relative h-28 mb-3 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark overflow-hidden flex items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={categoryImage(sp.product.category)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+          <CategoryIcon name={sp.product.category} className="w-10 h-10 text-primary/60" />
           {sp.product.imageUrl && (
             <img
               src={sp.product.imageUrl}
