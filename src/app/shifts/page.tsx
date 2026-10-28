@@ -217,7 +217,7 @@ export default function ShiftsPage() {
                 <p className="text-gray-600 mb-6">No hay turno abierto</p>
                 <button
                   onClick={() => setShowOpenModal(true)}
-                  className="px-6 py-2.5 bg-[#2bee79] text-[#0d1b13] rounded-lg hover:bg-[#25c765] font-medium transition-colors"
+                  className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-hover font-medium transition-colors"
                 >
                   Abrir Turno
                 </button>
@@ -370,7 +370,7 @@ export default function ShiftsPage() {
 
               <button
                 onClick={() => setShowCloseModal(true)}
-                className="w-full px-5 py-2.5 bg-white text-gray-700 border-2 border-[#2bee79] rounded-lg hover:bg-[#2bee79] hover:text-[#0d1b13] font-medium transition-colors"
+                className="w-full px-5 py-2.5 bg-white text-gray-700 border-2 border-primary rounded-lg hover:bg-primary hover:text-white font-medium transition-colors"
               >
                 Cerrar Turno
               </button>
@@ -576,7 +576,7 @@ export default function ShiftsPage() {
                   step="0.01"
                   value={openingCash}
                   onChange={(e) => setOpeningCash(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2bee79] focus:border-[#2bee79] transition-colors"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
                   placeholder="0.00"
                   autoFocus
                 />
@@ -591,7 +591,7 @@ export default function ShiftsPage() {
                 </button>
                 <button
                   onClick={handleOpenShift}
-                  className="flex-1 px-4 py-2.5 bg-[#2bee79] text-[#0d1b13] rounded-lg hover:bg-[#25c765] font-medium transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-hover font-medium transition-colors"
                 >
                   Abrir Turno
                 </button>
@@ -622,7 +622,7 @@ export default function ShiftsPage() {
                   step="0.01"
                   value={closingCash}
                   onChange={(e) => setClosingCash(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2bee79] focus:border-[#2bee79] transition-colors"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
                   placeholder="0.00"
                   autoFocus
                 />
@@ -635,7 +635,7 @@ export default function ShiftsPage() {
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2bee79] focus:border-[#2bee79] transition-colors"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary transition-colors"
                   rows={3}
                   placeholder="Ej: Faltaron S/ 5 por error en cambio"
                 />

@@ -277,7 +277,7 @@ export default function InventoryPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-semibold text-[#1F2A37]">Gestión de Inventario</h1>
+              <h1 className="text-2xl font-semibold text-text-main">Gestión de Inventario</h1>
               <p className="text-sm text-gray-500 mt-1">{totalProducts} productos en tu tienda</p>
             </div>
             {isOwner && (
@@ -343,7 +343,7 @@ export default function InventoryPage() {
                 </a>
                 <button
                   onClick={() => setCreateModalOpen(true)}
-                  className="h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] transition-colors flex items-center gap-2"
+                  className="h-10 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Nuevo Producto
@@ -362,14 +362,14 @@ export default function InventoryPage() {
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                   placeholder="Buscar por nombre, código..."
-                  className="w-full h-10 pl-10 pr-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                  className="w-full h-10 pl-10 pr-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
               <select
                 value={categoryFilter}
                 onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
-                className="h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                className="h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               >
                 <option value="">Todas las categorías</option>
                 {categories.map((cat) => (
@@ -385,9 +385,9 @@ export default function InventoryPage() {
                   id="lowStock"
                   checked={lowStockFilter}
                   onChange={(e) => { setLowStockFilter(e.target.checked); setCurrentPage(1); }}
-                  className="w-4 h-4 text-[#16A34A] border-gray-300 rounded focus:ring-[#16A34A]"
+                  className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary/40"
                 />
-                <label htmlFor="lowStock" className="text-sm text-[#1F2A37]">
+                <label htmlFor="lowStock" className="text-sm text-text-main">
                   Stock bajo
                 </label>
               </div>
@@ -398,7 +398,7 @@ export default function InventoryPage() {
                   setActiveFilter(e.target.value === '' ? null : e.target.value === 'true');
                   setCurrentPage(1);
                 }}
-                className="h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                className="h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               >
                 <option value="true">Activos</option>
                 <option value="false">Inactivos</option>
@@ -458,7 +458,7 @@ export default function InventoryPage() {
               {isOwner && (
                 <button
                   onClick={() => setCreateModalOpen(true)}
-                  className="h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] transition-colors"
+                  className="h-10 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-hover transition-colors"
                 >
                   Crear primer producto
                 </button>
@@ -473,10 +473,10 @@ export default function InventoryPage() {
                       <th className="px-4 py-3 text-center w-8">
                         <button 
                           onClick={handleSelectAll}
-                          className="text-gray-400 hover:text-[#16A34A] transition-colors"
+                          className="text-gray-400 hover:text-primary transition-colors"
                         >
                           {selectedIds.length === products.length ? (
-                            <CheckSquare className="w-5 h-5 text-[#16A34A]" />
+                            <CheckSquare className="w-5 h-5 text-primary" />
                           ) : (
                             <Square className="w-5 h-5" />
                           )}
@@ -523,10 +523,10 @@ export default function InventoryPage() {
                           <td className="px-4 py-3 text-center">
                             <button 
                               onClick={() => handleSelectProduct(sp.id)}
-                              className="text-gray-400 hover:text-[#16A34A] transition-colors"
+                              className="text-gray-400 hover:text-primary transition-colors"
                             >
                               {selectedIds.includes(sp.id) ? (
-                                <CheckSquare className="w-5 h-5 text-[#16A34A]" />
+                                <CheckSquare className="w-5 h-5 text-primary" />
                               ) : (
                                 <Square className="w-5 h-5" />
                               )}
@@ -548,13 +548,13 @@ export default function InventoryPage() {
                                   </div>
                                 )}
                                 {sp.publishInCatalog && (
-                                  <div className="absolute -top-1 -right-1 bg-[#16A34A] text-white rounded-full p-0.5 border-2 border-white shadow-sm" title="Visible en catálogo">
+                                  <div className="absolute -top-1 -right-1 bg-primary text-white rounded-full p-0.5 border-2 border-white shadow-sm" title="Visible en catálogo">
                                     <Globe className="w-2.5 h-2.5" />
                                   </div>
                                 )}
                               </div>
                               <div>
-                                <div className="text-sm font-medium text-[#1F2A37]">
+                                <div className="text-sm font-medium text-text-main">
                                   {sp.product.name}
                                 </div>
                                 {sp.product.brand && (
@@ -577,14 +577,14 @@ export default function InventoryPage() {
                               {(sp.product as any).baseUnitDisplay || (sp.product.unitType === 'UNIT' ? 'Unidad' : 'KG')}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-right text-sm font-medium text-[#1F2A37]">
+                          <td className="px-4 py-3 text-right text-sm font-medium text-text-main">
                             S/ {sp.price.toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-right">
                             {sp.stock !== null ? (
                               <span
                                 className={`text-sm font-medium ${
-                                  isLowStock ? 'text-red-600' : 'text-[#1F2A37]'
+                                  isLowStock ? 'text-red-600' : 'text-text-main'
                                 }`}
                               >
                                 {sp.stock}

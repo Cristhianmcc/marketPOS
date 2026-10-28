@@ -572,7 +572,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-[#1F2A37]">Nuevo Producto</h2>
+          <h2 className="text-lg font-semibold text-text-main">Nuevo Producto</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded-md transition-colors"
@@ -586,7 +586,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
             onClick={() => setTab('with-code')}
             className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
               tab === 'with-code'
-                ? 'text-[#16A34A] border-b-2 border-[#16A34A]'
+                ? 'text-primary border-b-2 border-primary'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -596,7 +596,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
             onClick={() => setTab('without-code')}
             className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
               tab === 'without-code'
-                ? 'text-[#16A34A] border-b-2 border-[#16A34A]'
+                ? 'text-primary border-b-2 border-primary'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -606,7 +606,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Nombre *
             </label>
             <input
@@ -614,7 +614,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               placeholder="Ej: Arroz Extra"
             />
           </div>
@@ -676,7 +676,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
           {tab === 'with-code' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Código de barras *
                   <span className="text-xs text-gray-500 ml-2">(Puedes usar pistola escáner)</span>
                 </label>
@@ -687,7 +687,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                   onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                   required={tab === 'with-code'}
                   pattern="[0-9]{8,14}"
-                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="Escanea o escribe el código"
                   autoComplete="off"
                 />
@@ -726,7 +726,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
 
           {/* Campo de imagen del producto */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Imagen del producto
             </label>
             <div className="flex items-center gap-3">
@@ -779,7 +779,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
 
           {/* ✅ MÓDULO F2.1: Dropdown de unidades SUNAT dinámico */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Unidad de medida *
             </label>
             <select
@@ -794,7 +794,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                 });
               }}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               {availableUnits.length === 0 ? (
                 <>
@@ -814,14 +814,14 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Categoría *
             </label>
             <select
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
@@ -832,27 +832,27 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Marca
             </label>
             <input
               type="text"
               value={formData.brand}
               onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               placeholder="Opcional"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Contenido
             </label>
             <input
               type="text"
               value={formData.content}
               onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               placeholder="Ej: 1kg, 500ml"
             />
           </div>
@@ -996,12 +996,12 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
           )}
 
           <div className="border-t border-gray-200 pt-4 mt-4">
-            <p className="text-sm font-medium text-[#1F2A37] mb-3">Configuración para tu tienda</p>
+            <p className="text-sm font-medium text-text-main mb-3">Configuración para tu tienda</p>
             
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Precio de compra (S/)
                     <span className="text-xs text-gray-400 ml-1">Opcional</span>
                   </label>
@@ -1011,12 +1011,12 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     min="0.01"
                     value={formData.costPrice}
                     onChange={(e) => handleCostOrMarginChange('costPrice', e.target.value)}
-                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                     placeholder="Ej: 1.80"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     % Ganancia
                     <span className="text-xs text-gray-400 ml-1">Opcional</span>
                   </label>
@@ -1026,14 +1026,14 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     min="0"
                     value={formData.margin}
                     onChange={(e) => handleCostOrMarginChange('margin', e.target.value)}
-                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                     placeholder="Ej: 40"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Precio de venta (S/) *
                 </label>
                 <input
@@ -1043,7 +1043,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                   value={formData.price}
                   onChange={(e) => handlePriceChange(e.target.value)}
                   required
-                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="Ej: 2.50"
                 />
                 {profitInfo && (
@@ -1112,7 +1112,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Stock inicial {formData.unitType === 'KG' ? '(Opcional)' : ''}
                   </label>
                   <input
@@ -1121,14 +1121,14 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     min="0"
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                    className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                     placeholder={formData.unitType === 'UNIT' ? 'Ej: 100' : 'Ej: 25.5'}
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Stock mínimo (Opcional)
                 </label>
                 <input
@@ -1137,7 +1137,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                   min="0"
                   value={formData.minStock}
                   onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
-                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="Para alertas de stock bajo"
                 />
               </div>
@@ -1161,7 +1161,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 h-10 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creando...' : 'Crear Producto'}
             </button>

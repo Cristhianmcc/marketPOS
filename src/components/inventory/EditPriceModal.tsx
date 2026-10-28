@@ -62,7 +62,7 @@ export function EditPriceModal({
       <div className="bg-white rounded-lg max-w-md w-full">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
-            <h2 className="text-lg font-semibold text-[#1F2A37]">Editar Precio</h2>
+            <h2 className="text-lg font-semibold text-text-main">Editar Precio</h2>
             <p className="text-sm text-gray-500 mt-1">
               {storeProduct.product?.name || 'Producto'}
             </p>
@@ -77,16 +77,16 @@ export function EditPriceModal({
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Precio actual
             </label>
-            <div className="text-2xl font-semibold text-[#1F2A37]">
+            <div className="text-2xl font-semibold text-text-main">
               S/ {storeProduct.price.toFixed(2)}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Nuevo precio (S/) *
             </label>
             <input
@@ -96,7 +96,7 @@ export function EditPriceModal({
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               placeholder="0.00"
             />
           </div>
@@ -118,7 +118,7 @@ export function EditPriceModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 h-10 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Guardando...' : 'Guardar'}
             </button>

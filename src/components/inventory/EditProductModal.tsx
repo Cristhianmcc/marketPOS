@@ -316,7 +316,7 @@ export function EditProductModal({
   if (!isOpen) return null;
 
   const isGlobal = storeProduct.product.isGlobal;
-  const inputClass = "w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A] text-sm";
+  const inputClass = "w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm";
   const disabledClass = "w-full h-10 px-3 border border-gray-200 rounded-md bg-gray-50 text-gray-500 text-sm cursor-not-allowed";
 
   return (
@@ -325,7 +325,7 @@ export function EditProductModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-[#1F2A37]">Editar Producto</h2>
+            <h2 className="text-lg font-semibold text-text-main">Editar Producto</h2>
             <p className="text-sm text-gray-500 mt-0.5 truncate">{storeProduct.product.name}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-md transition-colors">
@@ -344,7 +344,7 @@ export function EditProductModal({
 
           {/* Nombre */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">Nombre *</label>
+            <label className="block text-sm font-medium text-text-main mb-2">Nombre *</label>
             {isGlobal ? (
               <input className={disabledClass} value={form.name} disabled />
             ) : (
@@ -360,7 +360,7 @@ export function EditProductModal({
 
           {/* Código de barras */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Código de barras
               <span className="text-xs text-gray-500 ml-2">(Puedes usar pistola escáner)</span>
             </label>
@@ -379,7 +379,7 @@ export function EditProductModal({
           {/* Imagen */}
           {!isGlobal && (
             <div>
-              <label className="block text-sm font-medium text-[#1F2A37] mb-2">Imagen del producto</label>
+              <label className="block text-sm font-medium text-text-main mb-2">Imagen del producto</label>
               <div className="flex items-center gap-3">
                 {form.imageUrl && (
                   <div className="relative">
@@ -429,7 +429,7 @@ export function EditProductModal({
 
           {/* Unidad de medida */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">Unidad de medida *</label>
+            <label className="block text-sm font-medium text-text-main mb-2">Unidad de medida *</label>
             {isGlobal ? (
               <input
                 className={disabledClass}
@@ -461,7 +461,7 @@ export function EditProductModal({
 
           {/* Categoría */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">Categoría *</label>
+            <label className="block text-sm font-medium text-text-main mb-2">Categoría *</label>
             {isGlobal ? (
               <input className={disabledClass} value={form.category} disabled />
             ) : (
@@ -480,7 +480,7 @@ export function EditProductModal({
 
           {/* Marca */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">Marca</label>
+            <label className="block text-sm font-medium text-text-main mb-2">Marca</label>
             {isGlobal ? (
               <input className={disabledClass} value={form.brand} disabled />
             ) : (
@@ -495,7 +495,7 @@ export function EditProductModal({
 
           {/* Contenido */}
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">Contenido</label>
+            <label className="block text-sm font-medium text-text-main mb-2">Contenido</label>
             {isGlobal ? (
               <input className={disabledClass} value={form.content} disabled />
             ) : (
@@ -689,11 +689,11 @@ export function EditProductModal({
 
           {/* Sección tienda */}
           <div className="border-t border-gray-200 pt-4">
-            <p className="text-sm font-medium text-[#1F2A37] mb-3">Configuración para tu tienda</p>
+            <p className="text-sm font-medium text-text-main mb-3">Configuración para tu tienda</p>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Precio de compra (S/)
                     <span className="text-xs text-gray-400 ml-1">Opcional</span>
                   </label>
@@ -708,7 +708,7 @@ export function EditProductModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     % Ganancia
                     <span className="text-xs text-gray-400 ml-1">Opcional</span>
                   </label>
@@ -724,7 +724,7 @@ export function EditProductModal({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">Precio de venta (S/) *</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Precio de venta (S/) *</label>
                 <input
                   type="number"
                   step="0.01"
@@ -744,7 +744,7 @@ export function EditProductModal({
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">Stock mínimo (Opcional)</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Stock mínimo (Opcional)</label>
                 <input
                   type="number"
                   min="0"
@@ -758,7 +758,7 @@ export function EditProductModal({
 
               {/* Tributos: definen el comprobante SUNAT y el total del cobro */}
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">Tipo de IGV</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Tipo de IGV</label>
                 <select
                   className={inputClass}
                   value={form.igvAffectation}
@@ -779,7 +779,7 @@ export function EditProductModal({
                   checked={form.icbper}
                   onChange={e => setForm(prev => ({ ...prev, icbper: e.target.checked }))}
                 />
-                <span className="text-sm text-[#1F2A37]">
+                <span className="text-sm text-text-main">
                   Bolsa plástica (ICBPER)
                   <span className="block text-xs text-gray-500">Suma S/ 0.50 por bolsa al total, aparte del precio.</span>
                 </span>
@@ -790,12 +790,12 @@ export function EditProductModal({
                 <label className="flex items-center gap-3 p-3 bg-green-50/50 border border-green-100 rounded-lg cursor-pointer hover:bg-green-50 transition-colors group">
                   <input
                     type="checkbox"
-                    className="w-5 h-5 rounded border-gray-300 text-[#16A34A] focus:ring-[#16A34A]"
+                    className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary/40"
                     checked={form.publishInCatalog}
                     onChange={e => setForm(prev => ({ ...prev, publishInCatalog: e.target.checked }))}
                   />
                   <div>
-                    <span className="block text-sm font-semibold text-[#1F2A37]">Mostrar en Catálogo Web</span>
+                    <span className="block text-sm font-semibold text-text-main">Mostrar en Catálogo Web</span>
                     <span className="block text-[11px] text-gray-500">Los clientes podrán ver este producto en tu página pública.</span>
                   </div>
                 </label>
@@ -822,7 +822,7 @@ export function EditProductModal({
           <button
             onClick={handleSubmit}
             disabled={loading || uploadingImage}
-            className="flex-1 h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 h-10 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Guardando...' : 'Guardar cambios'}
           </button>

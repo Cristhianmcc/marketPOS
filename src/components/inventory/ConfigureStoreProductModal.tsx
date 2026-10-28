@@ -86,7 +86,7 @@ export function ConfigureStoreProductModal({
       <div className="bg-white rounded-lg max-w-md w-full">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
-            <h2 className="text-lg font-semibold text-[#1F2A37]">
+            <h2 className="text-lg font-semibold text-text-main">
               Configurar para mi tienda
             </h2>
             <p className="text-sm text-gray-500 mt-1">{product.name}</p>
@@ -101,7 +101,7 @@ export function ConfigureStoreProductModal({
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Precio (S/) *
             </label>
             <input
@@ -111,7 +111,7 @@ export function ConfigureStoreProductModal({
               value={formData.price}
               onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               placeholder="0.00"
             />
           </div>
@@ -119,7 +119,7 @@ export function ConfigureStoreProductModal({
           {product.unitType === 'UNIT' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Stock inicial *
                 </label>
                 <input
@@ -129,7 +129,7 @@ export function ConfigureStoreProductModal({
                   value={formData.stock}
                   onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                   required={product.unitType === 'UNIT'}
-                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -138,7 +138,7 @@ export function ConfigureStoreProductModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Stock mínimo
                 </label>
                 <input
@@ -147,7 +147,7 @@ export function ConfigureStoreProductModal({
                   min="0"
                   value={formData.minStock}
                   onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
-                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                   placeholder="0"
                 />
               </div>
@@ -169,9 +169,9 @@ export function ConfigureStoreProductModal({
               id="active"
               checked={formData.active}
               onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
-              className="w-4 h-4 text-[#16A34A] border-gray-300 rounded focus:ring-[#16A34A]"
+              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary/40"
             />
-            <label htmlFor="active" className="text-sm text-[#1F2A37]">
+            <label htmlFor="active" className="text-sm text-text-main">
               Producto activo
             </label>
           </div>
@@ -193,7 +193,7 @@ export function ConfigureStoreProductModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 h-10 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Configurando...' : 'Configurar'}
             </button>

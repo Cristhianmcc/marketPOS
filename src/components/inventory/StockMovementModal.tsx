@@ -131,7 +131,7 @@ export function StockMovementModal({
       <div className="bg-white rounded-lg max-w-md w-full">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div>
-            <h2 className="text-lg font-semibold text-[#1F2A37]">
+            <h2 className="text-lg font-semibold text-text-main">
               Movimiento de Stock
             </h2>
             <p className="text-sm text-gray-500 mt-1">
@@ -148,10 +148,10 @@ export function StockMovementModal({
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Stock actual
             </label>
-            <div className="text-2xl font-semibold text-[#1F2A37]">
+            <div className="text-2xl font-semibold text-text-main">
               {storeProduct.stock !== null ? (
                 <>
                   {storeProduct.stock} {isUnit ? 'unidades' : 'kg'}
@@ -163,14 +163,14 @@ export function StockMovementModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Tipo de movimiento *
             </label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as 'PURCHASE' | 'ADJUSTMENT')}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               {!tracksLots && <option value="PURCHASE">Entrada (Compra)</option>}
               <option value="ADJUSTMENT">Ajuste</option>
@@ -191,12 +191,12 @@ export function StockMovementModal({
                   aquí solo se descuenta (merma, vencido, rotura) indicando el lote.
                 </p>
               </div>
-              <label className="block text-sm font-medium text-[#1F2A37] mb-2">Lote *</label>
+              <label className="block text-sm font-medium text-text-main mb-2">Lote *</label>
               <select
                 value={batchId}
                 onChange={(e) => setBatchId(e.target.value)}
                 required
-                className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               >
                 <option value="">Selecciona un lote</option>
                 {lots.map((lot) => (
@@ -209,7 +209,7 @@ export function StockMovementModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+            <label className="block text-sm font-medium text-text-main mb-2">
               Cantidad *
             </label>
             <input
@@ -218,7 +218,7 @@ export function StockMovementModal({
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
               placeholder={
                 tracksLots ? 'Negativo, ej. -2' : type === 'ADJUSTMENT' ? 'Positivo o negativo' : isUnit ? '1' : '0.00'
               }
@@ -232,7 +232,7 @@ export function StockMovementModal({
 
           {type === 'PURCHASE' && (
             <div>
-              <label className="block text-sm font-medium text-[#1F2A37] mb-2">
+              <label className="block text-sm font-medium text-text-main mb-2">
                 Precio unitario (S/)
               </label>
               <input
@@ -241,7 +241,7 @@ export function StockMovementModal({
                 min="0"
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(e.target.value)}
-                className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+                className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                 placeholder="Opcional"
               />
             </div>
@@ -261,7 +261,7 @@ export function StockMovementModal({
             <div className="p-3 bg-gray-50 rounded-md">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Total:</span>
-                <span className="font-semibold text-[#1F2A37]">
+                <span className="font-semibold text-text-main">
                   S/ {(parseFloat(unitPrice) * parseFloat(quantity)).toFixed(2)}
                 </span>
               </div>
@@ -269,12 +269,12 @@ export function StockMovementModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-[#1F2A37] mb-2">Notas</label>
+            <label className="block text-sm font-medium text-text-main mb-2">Notas</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A] resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
               placeholder="Observaciones opcionales"
             />
           </div>
@@ -296,7 +296,7 @@ export function StockMovementModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 h-10 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Guardando...' : 'Aplicar'}
             </button>
