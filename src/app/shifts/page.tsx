@@ -191,7 +191,7 @@ export default function ShiftsPage() {
     return (
       <AuthLayout storeName="Turnos / Caja">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </AuthLayout>
     );
@@ -203,8 +203,8 @@ export default function ShiftsPage() {
     <AuthLayout storeName="Turnos / Caja">
       <div className="space-y-6">
         {/* Estado actual */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-6">Estado Actual</h2>
+        <div className="bg-surface-light dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark shadow-soft p-6">
+          <h2 className="text-lg font-bold text-text-main dark:text-text-light mb-6">Estado Actual</h2>
 
           {!currentShift ? (
             <div className="text-center py-12">
@@ -227,34 +227,34 @@ export default function ShiftsPage() {
             <div className="space-y-6">
               {/* Resumen principal: Total Ventas + Efectivo en Caja */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-blue-50/40 p-6 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-600 font-medium mb-1">Total Ventas del Turno</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                <div className="bg-monterrial-forest text-monterrial-cream p-6 rounded-2xl shadow-medium">
+                  <p className="text-xs uppercase tracking-wider text-monterrial-gold font-semibold mb-1">Total Ventas del Turno</p>
+                  <p className="text-3xl font-bold">
                     {formatMoney(Object.values(salesByMethod).reduce((sum, d) => sum + d.total, 0))}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Todos los métodos de pago</p>
+                  <p className="text-xs text-monterrial-cream/70 mt-1">Todos los métodos de pago</p>
                 </div>
-                <div className="bg-yellow-50/40 p-6 rounded-lg border border-yellow-200">
-                  <p className="text-sm text-yellow-700 font-medium mb-1">Efectivo en Caja</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatMoney(expectedCash)}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                <div className="bg-primary text-white p-6 rounded-2xl shadow-medium">
+                  <p className="text-xs uppercase tracking-wider text-white/80 font-semibold mb-1">Efectivo en Caja</p>
+                  <p className="text-3xl font-bold">{formatMoney(expectedCash)}</p>
+                  <p className="text-xs text-white/75 mt-1">
                     Apertura ({formatMoney(currentShift.openingCash)}) + Efectivo ({formatMoney(cashSales)})
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-50/30 p-5 rounded-lg border border-gray-200">
+                <div className="bg-background-light dark:bg-background-dark p-5 rounded-2xl border border-border-light dark:border-border-dark">
                   <p className="text-sm text-gray-500 mb-2">Hora de apertura</p>
                   <p className="text-base font-semibold text-gray-900" suppressHydrationWarning>
                     {new Date(currentShift.openedAt).toLocaleString('es-PE')}
                   </p>
                 </div>
-                <div className="bg-green-50/30 p-5 rounded-lg border border-gray-200">
+                <div className="bg-background-light dark:bg-background-dark p-5 rounded-2xl border border-border-light dark:border-border-dark">
                   <p className="text-sm text-gray-500 mb-2">Caja inicial</p>
                   <p className="text-base font-semibold text-gray-900">{formatMoney(currentShift.openingCash)}</p>
                 </div>
-                <div className="bg-purple-50/30 p-5 rounded-lg border border-gray-200">
+                <div className="bg-background-light dark:bg-background-dark p-5 rounded-2xl border border-border-light dark:border-border-dark">
                   <p className="text-sm text-gray-500 mb-2">Ventas en efectivo</p>
                   <p className="text-base font-semibold text-gray-900">{formatMoney(cashSales)}</p>
                 </div>
@@ -262,11 +262,11 @@ export default function ShiftsPage() {
 
               {/* Desglose por método de pago */}
               {Object.keys(salesByMethod).length > 0 && (
-                <div className="border border-gray-200 rounded-lg p-5">
+                <div className="border border-border-light dark:border-border-dark rounded-2xl p-5">
                   <p className="text-sm font-medium text-gray-700 mb-4">Ventas por Método de Pago</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {Object.entries(salesByMethod).map(([method, data]) => (
-                      <div key={method} className="bg-gray-50/50 p-4 rounded-lg">
+                      <div key={method} className="bg-background-light dark:bg-background-dark p-4 rounded-xl">
                         <p className="text-xs text-gray-500 mb-1">
                           {method === 'CASH' ? 'Efectivo' :
                            method === 'YAPE' ? 'Yape' :
@@ -278,17 +278,17 @@ export default function ShiftsPage() {
                       </div>
                     ))}
                     {mixedInfo.count > 0 && (
-                      <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
-                        <p className="text-xs text-indigo-600 font-medium mb-1">Mixto</p>
+                      <div className="bg-monterrial-gold/10 p-4 rounded-xl border border-monterrial-gold/30">
+                        <p className="text-xs text-[#7a5f22] dark:text-monterrial-gold font-semibold mb-1">Mixto</p>
                         <p className="text-base font-bold text-gray-900">{formatMoney(mixedInfo.total)}</p>
                         <p className="text-xs text-gray-500 mb-2">{mixedInfo.count} ticket{mixedInfo.count !== 1 ? 's' : ''}</p>
                         {Object.keys(mixedInfo.splitTotals).length > 0 && (
-                          <div className="space-y-1 border-t border-indigo-100 pt-2">
+                          <div className="space-y-1 border-t border-monterrial-gold/30 pt-2">
                             {Object.entries(mixedInfo.splitTotals)
                               .sort((a, b) => b[1] - a[1])
                               .map(([method, amount]) => (
                                 <div key={method} className="flex justify-between text-xs">
-                                  <span className="text-indigo-500">{method}</span>
+                                  <span className="text-[#7a5f22] dark:text-monterrial-gold">{method}</span>
                                   <span className="font-medium text-gray-700">{formatMoney(amount)}</span>
                                 </div>
                               ))}
@@ -303,9 +303,9 @@ export default function ShiftsPage() {
 
               {/* Rentabilidad del turno - Dashboard profesional */}
               {profitData && profitData.totalCost > 0 && (
-                <div className="border border-emerald-200 rounded-lg bg-white overflow-hidden">
+                <div className="border border-primary/30 rounded-2xl bg-white overflow-hidden">
                   {/* Header con ganancia principal */}
-                  <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-4 text-white">
+                  <div className="bg-gradient-to-r from-primary to-monterrial-forest px-5 py-4 text-white">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-emerald-100 text-xs font-medium uppercase tracking-wide">Ganancia del Turno</p>
@@ -326,7 +326,7 @@ export default function ShiftsPage() {
                           <span>Venta {formatMoney(profitData.totalSales)}</span>
                         </div>
                         <div className="h-2 bg-emerald-900/30 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-300 rounded-full" style={{ width: `${Math.min(100, (profitData.totalCost / profitData.totalSales) * 100)}%` }} />
+                          <div className="h-full bg-monterrial-gold rounded-full" style={{ width: `${Math.min(100, (profitData.totalCost / profitData.totalSales) * 100)}%` }} />
                         </div>
                       </div>
                     )}
@@ -342,7 +342,7 @@ export default function ShiftsPage() {
                           const maxProfit = Math.max(...profitByProduct.map(x => Math.abs(x.profit)));
                           const barW = maxProfit > 0 ? (Math.abs(p.profit) / maxProfit) * 100 : 0;
                           return (
-                            <div key={i} className="border border-gray-100 rounded-lg p-3 hover:bg-gray-50/50 transition-colors">
+                            <div key={i} className="border border-border-light rounded-xl p-3 hover:bg-background-light transition-colors">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                   <p className="text-sm font-medium text-gray-900 truncate" title={p.productName}>{p.productName}</p>
@@ -370,7 +370,7 @@ export default function ShiftsPage() {
 
               <button
                 onClick={() => setShowCloseModal(true)}
-                className="w-full px-5 py-2.5 bg-white text-gray-700 border-2 border-primary rounded-lg hover:bg-primary hover:text-white font-medium transition-colors"
+                className="w-full px-5 py-2.5 bg-white text-primary border-2 border-primary rounded-xl hover:bg-primary hover:text-white font-semibold transition-colors"
               >
                 Cerrar Turno
               </button>
@@ -379,9 +379,9 @@ export default function ShiftsPage() {
         </div>
 
         {/* Historial */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className="bg-surface-light dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark shadow-soft p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Historial de Turnos</h2>
+            <h2 className="text-lg font-bold text-text-main dark:text-text-light">Historial de Turnos</h2>
             {historyTotal > 0 && (
               <span className="text-sm text-gray-500">{historyTotal} turno{historyTotal !== 1 ? 's' : ''}</span>
             )}
@@ -397,7 +397,7 @@ export default function ShiftsPage() {
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { setHistoryPage(1); fetchHistory(1, historyFrom, historyTo, historySearch); } }}
-                className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
               />
               {historySearch && (
                 <button onClick={() => { setHistorySearch(''); setHistoryPage(1); fetchHistory(1, historyFrom, historyTo, ''); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -411,7 +411,7 @@ export default function ShiftsPage() {
                 type="date"
                 value={historyFrom}
                 onChange={(e) => setHistoryFrom(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
               />
             </div>
             <div>
@@ -420,12 +420,12 @@ export default function ShiftsPage() {
                 type="date"
                 value={historyTo}
                 onChange={(e) => setHistoryTo(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
               />
             </div>
             <button
               onClick={() => { setHistoryPage(1); fetchHistory(1, historyFrom, historyTo, historySearch); }}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
             >
               Buscar
             </button>
@@ -441,7 +441,7 @@ export default function ShiftsPage() {
 
           {historyLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
             </div>
           ) : history.length === 0 ? (
             <div className="text-center py-12">
@@ -456,7 +456,7 @@ export default function ShiftsPage() {
             <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-background-light dark:bg-background-dark">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Apertura</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cierre</th>
@@ -505,7 +505,7 @@ export default function ShiftsPage() {
                           <div className="inline-flex items-center gap-2">
                             <button
                               onClick={() => router.push(`/sales?turno=${shift.id}`)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white text-xs rounded-md hover:bg-primary-hover transition-colors"
                             >
                               Ver ventas
                             </button>
@@ -518,7 +518,7 @@ export default function ShiftsPage() {
                                 a.click();
                                 document.body.removeChild(a);
                               }}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-md hover:bg-emerald-700 transition-colors"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-monterrial-forest text-monterrial-cream text-xs rounded-lg hover:bg-monterrial-forest-light transition-colors"
                               title="Exportar turno a Excel"
                             >
                               Exportar
@@ -563,8 +563,8 @@ export default function ShiftsPage() {
 
       {/* Modal abrir turno */}
       {showOpenModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-strong p-6 w-full max-w-md">
             <h3 className="text-lg font-bold text-gray-900 mb-5">Abrir Turno</h3>
             <div className="space-y-5">
               <div>
@@ -603,8 +603,8 @@ export default function ShiftsPage() {
 
       {/* Modal cerrar turno */}
       {showCloseModal && currentShift && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-strong p-6 w-full max-w-md">
             <h3 className="text-lg font-bold text-gray-900 mb-5">Cerrar Turno</h3>
 
             <div className="bg-yellow-50/40 p-5 rounded-lg mb-5 border border-gray-200">
