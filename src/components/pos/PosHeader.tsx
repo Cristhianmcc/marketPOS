@@ -1,17 +1,19 @@
 // src/components/pos/PosHeader.tsx
-// Cabecera del POS: banner Monterrial con saludo, fecha y estado del turno
+// Cabecera del POS: saludo, fecha y estado del turno
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 interface PosHeaderProps {
   shiftOpen: boolean;
   openingCashLabel?: string;
   onOpenShift: () => void;
+  /** Acciones extra a la derecha (p. ej. accesos de superadmin) */
+  actions?: ReactNode;
 }
 
-export function PosHeader({ shiftOpen, openingCashLabel, onOpenShift }: PosHeaderProps) {
+export function PosHeader({ shiftOpen, openingCashLabel, onOpenShift, actions }: PosHeaderProps) {
   const [firstName, setFirstName] = useState<string | null>(null);
   const [today, setToday] = useState('');
 
@@ -28,53 +30,33 @@ export function PosHeader({ shiftOpen, openingCashLabel, onOpenShift }: PosHeade
   }, []);
 
   return (
-    <div className="relative mb-4 overflow-hidden rounded-3xl bg-monterrial-forest text-monterrial-cream shadow-medium">
-      {/* Montañas decorativas */}
-      <svg
-        className="absolute right-0 bottom-0 h-full w-1/2 max-w-md opacity-90 pointer-events-none"
-        viewBox="0 0 400 160"
-        preserveAspectRatio="xMaxYMax meet"
-        aria-hidden="true"
-      >
-        <path d="M120 160 L230 40 L280 95 L310 65 L400 160 Z" fill="#16856B" opacity="0.6" />
-        <path d="M170 160 L260 70 L300 110 L330 85 L400 150 L400 160 Z" fill="#f3f1ec" opacity="0.92" />
-        <path d="M260 70 L245 92 L262 86 L272 100 Z" fill="#D9B66F" />
-      </svg>
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm text-text-secondary dark:text-gray-400 first-letter:uppercase">{today || ' '}</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-text-main dark:text-text-light">
+          Hola{firstName ? `, ${firstName}` : ''}
+        </h1>
+      </div>
 
-      <div className="relative flex flex-wrap items-start justify-between gap-3 px-6 py-5 md:px-8">
-        <div className="min-w-0">
-          <span className="inline-block rounded-full bg-monterrial-gold px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-monterrial-forest">
-            Monterrial POS
-          </span>
-          <h1 className="mt-2 text-3xl md:text-4xl font-extrabold tracking-tight">
-            Hola{firstName ? ', ' : ''}<span className="text-monterrial-gold">{firstName}</span>
-          </h1>
-          <p className="mt-1 text-sm text-monterrial-cream/75">
-            {today && <span className="capitalize">{today}</span>}
-            <span className="hidden sm:inline"> · Vende rápido, factura sin líos</span>
-          </p>
-        </div>
-
+      <div className="flex items-center gap-2">
+        {actions}
         {shiftOpen ? (
-          <div className="flex items-center gap-2 rounded-full bg-white/10 backdrop-blur px-4 py-2">
-            <span className="w-2 h-2 rounded-full bg-monterrial-gold animate-pulse" />
-            <span className="text-sm font-semibold">Turno abierto</span>
+          <div className="flex items-center gap-2 h-9 rounded-lg border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark px-3 text-sm">
+            <span className="w-2 h-2 rounded-full bg-primary" />
+            <span className="font-medium text-text-main dark:text-text-light">Turno abierto</span>
             {openingCashLabel && (
-              <span className="text-sm text-monterrial-cream/75">· Caja inicial {openingCashLabel}</span>
+              <span className="text-text-secondary dark:text-gray-400">· Caja inicial {openingCashLabel}</span>
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-3 rounded-2xl bg-white/10 backdrop-blur pl-4 pr-2 py-2">
-            <AlertCircle className="w-5 h-5 text-monterrial-gold flex-shrink-0" />
-            <div className="text-sm">
-              <p className="font-semibold">Debes abrir turno para vender</p>
-              <p className="text-monterrial-cream/70">Las ventas requieren un turno activo</p>
-            </div>
+          <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 pl-3 pr-1.5 py-1.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <span className="text-sm font-medium text-amber-900 dark:text-amber-200">Abre un turno para vender</span>
             <button
               onClick={onOpenShift}
-              className="ml-2 h-10 px-4 rounded-xl bg-monterrial-gold hover:bg-monterrial-gold-light text-monterrial-forest text-sm font-bold transition-colors"
+              className="h-8 px-3 rounded-md bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-colors"
             >
-              Abrir Turno
+              Abrir turno
             </button>
           </div>
         )}

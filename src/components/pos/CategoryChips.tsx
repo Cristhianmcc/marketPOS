@@ -24,12 +24,12 @@ const ICONS: Record<string, LucideIcon> = {
 function CategoryIcon({ icon }: { icon: string | null }) {
   if (icon && ICONS[icon]) {
     const Icon = ICONS[icon];
-    return <Icon className="w-6 h-6" />;
+    return <Icon className="w-4 h-4" />;
   }
   if (icon && /[^\x00-\x7F]/.test(icon)) {
-    return <span className="text-2xl leading-none">{icon}</span>;
+    return <span className="text-sm leading-none">{icon}</span>;
   }
-  return <Package className="w-6 h-6" />;
+  return <Package className="w-4 h-4" />;
 }
 
 interface CategoryChipsProps {
@@ -53,18 +53,17 @@ export function CategoryChips({ selected, onSelect }: CategoryChipsProps) {
   if (categories.length === 0) return null;
 
   const chip = (active: boolean) =>
-    `flex flex-col items-center justify-center gap-2 min-w-[92px] h-[92px] px-2 rounded-2xl text-xs font-semibold transition-all flex-shrink-0 ${
+    `flex items-center gap-2 h-9 px-3.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${
       active
-        ? 'bg-primary text-white shadow-medium'
-        : 'bg-surface-light dark:bg-surface-dark text-text-main dark:text-text-light border border-border-light dark:border-border-dark hover:border-primary/50 hover:shadow-soft'
+        ? 'bg-monterrial-forest border-monterrial-forest text-white'
+        : 'bg-surface-light dark:bg-surface-dark text-text-main dark:text-text-light border-border-light dark:border-border-dark hover:border-primary/50'
     }`;
 
   return (
     <div>
-      <h3 className="mb-3 text-lg font-bold text-text-main dark:text-text-light">Categorías</h3>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 mask-fade-right">
         <button onClick={() => onSelect(null)} className={chip(selected === null)}>
-          <LayoutGrid className="w-6 h-6" />
+          <LayoutGrid className="w-4 h-4" />
           <span>Todo</span>
         </button>
         {categories.map(cat => (
@@ -74,7 +73,7 @@ export function CategoryChips({ selected, onSelect }: CategoryChipsProps) {
             className={chip(selected === cat.name)}
           >
             <CategoryIcon icon={cat.icon} />
-            <span className="line-clamp-2 text-center leading-tight">{cat.name}</span>
+            <span>{cat.name}</span>
           </button>
         ))}
       </div>

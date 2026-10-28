@@ -453,22 +453,22 @@ function SalesPageContent() {
               <>
               <table className="w-full table-auto">
                 <colgroup>
-                  <col style={{width: '4%'}} /> {/* N° Ticket */}
-                  <col style={{width: '7%'}} /> {/* Fecha */}
-                  <col style={{width: '18%'}} /> {/* Productos */}
-                  <col style={{width: '4%'}} /> {/* Promociones */}
-                  <col style={{width: '4%'}} /> {/* Cat. Promos */}
-                  <col style={{width: '4%'}} /> {/* Pack */}
-                  <col style={{width: '4%'}} /> {/* N-ésimo */}
-                  <col style={{width: '4%'}} /> {/* Descuentos */}
-                  <col style={{width: '5%'}} /> {/* Cupón */}
-                  <col style={{width: '6%'}} /> {/* Total */}
-                  <col style={{width: '5%'}} /> {/* Pago */}
-                  <col style={{width: '7%'}} /> {/* Cajero */}
-                  <col style={{width: '4%'}} /> {/* Estado */}
-                  {patientsEnabled && <col style={{width: '8%'}} />} {/* Paciente */}
-                  {sunatEnabled && <col style={{width: '12%'}} />} {/* SUNAT */}
-                  <col style={{width: sunatEnabled ? '12%' : '14%'}} /> {/* Acciones */}
+                  <col style={{width: '4%'}} />{/* N° Ticket */}
+                  <col style={{width: '7%'}} />{/* Fecha */}
+                  <col style={{width: '18%'}} />{/* Productos */}
+                  <col style={{width: '4%'}} />{/* Promociones */}
+                  <col style={{width: '4%'}} />{/* Cat. Promos */}
+                  <col style={{width: '4%'}} />{/* Pack */}
+                  <col style={{width: '4%'}} />{/* N-ésimo */}
+                  <col style={{width: '4%'}} />{/* Descuentos */}
+                  <col style={{width: '5%'}} />{/* Cupón */}
+                  <col style={{width: '6%'}} />{/* Total */}
+                  <col style={{width: '5%'}} />{/* Pago */}
+                  <col style={{width: '7%'}} />{/* Cajero */}
+                  <col style={{width: '4%'}} />{/* Estado */}
+                  {patientsEnabled && <col style={{width: '8%'}} />}{/* Paciente */}
+                  {sunatEnabled && <col style={{width: '12%'}} />}{/* SUNAT */}
+                  <col style={{width: sunatEnabled ? '12%' : '14%'}} />{/* Acciones */}
                 </colgroup>
                 <thead className="bg-background-light dark:bg-background-dark border-b border-border-light dark:border-border-dark">
                   <tr>
