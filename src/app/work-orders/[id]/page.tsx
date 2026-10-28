@@ -7,7 +7,7 @@ import { ArrowLeft, Printer, Zap, CalendarClock, Wallet, Receipt, XCircle, Alert
 import { toast, Toaster } from 'sonner';
 import {
   METHOD_LABEL, OPEN_STATUSES, STATUS_STYLE, balanceOf, formatDateTime, isOverdue, money, num,
-  printReceptionTicket, readyWhatsappLink, useWorkOrderContext, type ApiWorkOrder, type WorkOrderStatusName,
+  openWhatsappNotice, printReceptionTicket, readyWhatsappLink, useWorkOrderContext, type ApiWorkOrder, type WorkOrderStatusName,
 } from '../shared';
 
 const PAY_METHODS = ['CASH', 'YAPE', 'PLIN', 'CARD', 'FIADO'] as const;
@@ -207,9 +207,9 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
                 </button>
               )}
               {whatsapp && (
-                <a href={whatsapp} target="_blank" rel="noopener noreferrer" className="px-4 py-2 border border-green-500 text-green-700 rounded-lg hover:bg-green-50">
+                <button type="button" onClick={() => openWhatsappNotice(whatsapp, toast)} className="px-4 py-2 border border-green-500 text-green-700 rounded-lg hover:bg-green-50">
                   <MessageCircle className="inline w-4 h-4 mr-1" />Avisar por WhatsApp
-                </a>
+                </button>
               )}
               {balance > 0 && <button disabled={busy} onClick={() => setShowAdvance(true)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"><Wallet className="inline w-4 h-4 mr-1" />Adelanto</button>}
               <button disabled={busy} onClick={toggleExpress} className="px-4 py-2 border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50"><Zap className="inline w-4 h-4 mr-1" />{order.express ? 'Quitar express' : 'Hacer express'}</button>

@@ -59,6 +59,15 @@ export function readyWhatsappLink(order: ApiWorkOrder, storeName: string, isLaun
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
+/** Abre el aviso de WhatsApp y explica qué pasó si no se pudo abrir. */
+export async function openWhatsappNotice(url: string, notify: { success: (m: string) => void; error: (m: string) => void }) {
+  const { openExternalLink } = await import('@/lib/openExternalLink');
+  const result = await openExternalLink(url);
+  if (result.ok) return;
+  if (result.copied) notify.error('No se pudo abrir WhatsApp en esta PC. El enlace se copió: pégalo en el navegador.');
+  else notify.error(`No se pudo abrir WhatsApp${result.error ? `: ${result.error}` : ''}`);
+}
+
 export const OPEN_STATUSES: WorkOrderStatusName[] = ['DRAFT', 'APPROVED', 'IN_PROGRESS', 'READY'];
 
 export const STATUS_STYLE: Record<WorkOrderStatusName, string> = {

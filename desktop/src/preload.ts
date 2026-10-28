@@ -19,6 +19,8 @@ interface DesktopAPI {
   // Información del sistema
   platform: NodeJS.Platform;
   isDesktop: boolean;
+  /** Abre un enlace https/mailto en el navegador o la app del sistema (WhatsApp, catálogo web). */
+  openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
   version: string;
 
   // Ventana
@@ -518,6 +520,7 @@ const desktopAPI: DesktopAPI = {
   // Información básica del sistema
   platform: process.platform,
   isDesktop: true,
+  openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
   version: process.env.npm_package_version || 'unknown',
 
   // Control de ventana

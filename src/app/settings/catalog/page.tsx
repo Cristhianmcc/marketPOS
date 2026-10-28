@@ -16,6 +16,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { openExternalLink } from '@/lib/openExternalLink';
 import { useRouter } from 'next/navigation';
 
 interface CatalogSettings {
@@ -289,6 +290,12 @@ export default function CatalogSettingsPage() {
             href={catalogUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={async (e) => {
+              // En el escritorio el enlace se abre con el navegador del sistema
+              e.preventDefault();
+              const result = await openExternalLink(catalogUrl);
+              if (!result.ok) toast.error(result.copied ? 'No se pudo abrir el navegador. El enlace del catálogo se copió.' : 'No se pudo abrir el catálogo');
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
           >
             Ver catálogo <ExternalLink className="w-4 h-4" />
@@ -615,10 +622,12 @@ export default function CatalogSettingsPage() {
               <div>
                 {!cloudinaryOk ? (
                   <>
-                    <h4 className="font-semibold text-red-900 text-sm">No se pueden subir imágenes todavía</h4>
+                    <h4 className="font-semibold text-red-900 text-sm">Esta tienda aún no está registrada en la nube</h4>
                     <p className="text-red-700 text-xs mt-1">
-                      Las imágenes se suben a la web a través del servidor en la nube, y para eso la
-                      tienda debe tener su licencia registrada en la nube (Administración de tiendas).
+                      Las imágenes y el catálogo se publican a través del servidor web, que reconoce a cada
+                      tienda por su licencia. Para registrarla: entra como superadministrador → Administración
+                      de tiendas → en esta tienda pulsa <strong>Registrar licencia</strong>. Luego vuelve aquí,
+                      sube las imágenes y publica.
                     </p>
                   </>
                 ) : pendingImages > 0 ? (

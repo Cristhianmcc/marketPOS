@@ -208,6 +208,26 @@ async function syncLocalImages(serverUrl: string): Promise<void> {
  * Aplica configuraciones de seguridad a nivel de aplicación.
  * Estas configuraciones protegen contra ataques comunes.
  */
+/**
+ * Abre un enlace en el navegador del sistema. Si el shell de Windows falla, se
+ * intenta con el explorador, que también entrega la URL al navegador por defecto.
+ */
+async function openExternalUrl(url: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (error) {
+    console.warn('[Shell] openExternal falló, probando con explorer:', error);
+    try {
+      const { spawn } = await import('child_process');
+      spawn('explorer.exe', [url], { detached: true, stdio: 'ignore' }).unref();
+      return { ok: true };
+    } catch (fallbackError) {
+      return { ok: false, error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) };
+    }
+  }
+}
+
 function setupSecurityPolicies(): void {
   // Limitar la navegación al origen exacto del servidor iniciado. El origen se
   // consulta en cada evento porque el puerto puede cambiar tras un reinicio.
@@ -229,7 +249,7 @@ function setupSecurityPolicies(): void {
       }
 
       if (disposition === 'external') {
-        void shell.openExternal(url);
+        void openExternalUrl(url);
       }
 
       return { action: 'deny' };
@@ -959,6 +979,14 @@ function setupEscposIpcHandlers(): void {
       return { success: false, error: 'EscposPrintManager no inicializado', fallbackToHtml: true };
     }
     return await manager.printSale(saleId);
+  });
+
+  // Enlaces externos pedidos por la app (WhatsApp, catálogo web)
+  ipcMain.handle('shell:open-external', async (_event, url: string) => {
+    if (classifyWindowOpenUrl(String(url), serverUrl) !== 'external') {
+      return { ok: false, error: 'Enlace no permitido' };
+    }
+    return openExternalUrl(String(url));
   });
 
   // Ticket de recepción de una orden de trabajo (lavandería / taller)

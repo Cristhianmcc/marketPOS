@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ClipboardList, MessageCircle, PackageCheck, ShoppingCart } from 'lucide-react';
-import { Toaster } from 'sonner';
+import { toast, Toaster } from 'sonner';
 import { ReceptionForm } from './ReceptionForm';
-import { balanceOf, formatDateTime, money, readyWhatsappLink, useWorkOrderContext, type ApiWorkOrder } from './shared';
+import { balanceOf, formatDateTime, money, openWhatsappNotice, readyWhatsappLink, useWorkOrderContext, type ApiWorkOrder } from './shared';
 
 /**
  * Punto de venta de lavandería: la pantalla principal es la recepción de ropa.
@@ -59,10 +59,10 @@ export function LaundryPos({ onDirectSale }: { onDirectSale: () => void }) {
                       </div>
                     </Link>
                     {whatsapp && (
-                      <a href={whatsapp} target="_blank" rel="noopener noreferrer" title="Avisar por WhatsApp" aria-label={`Avisar a ${order.customer?.name ?? 'cliente'} por WhatsApp`}
+                      <button type="button" onClick={() => openWhatsappNotice(whatsapp, toast)} title="Avisar por WhatsApp" aria-label={`Avisar a ${order.customer?.name ?? 'cliente'} por WhatsApp`}
                         className="flex items-center px-2 border-l border-green-200 text-green-600 hover:bg-green-50">
                         <MessageCircle className="w-4 h-4" />
-                      </a>
+                      </button>
                     )}
                   </div>
                 );
