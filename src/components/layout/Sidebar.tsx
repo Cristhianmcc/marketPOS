@@ -2,23 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  ShoppingCart, 
-  DollarSign, 
-  FileText, 
-  Receipt, 
-  Package, 
-  BarChart3, 
-  Tag, 
-  Settings, 
-  LogOut, 
-  ChevronDown, 
-  ChevronRight, 
-  PanelLeftClose, 
-  PanelLeftOpen,
-  Globe,
-  Pill
-} from 'lucide-react';
+import {
+  ShoppingCartIcon as ShoppingCart,
+  BanknotesIcon as DollarSign,
+  DocumentTextIcon as FileText,
+  DocumentCurrencyDollarIcon as Receipt,
+  ArchiveBoxIcon as Package,
+  ChartBarIcon as BarChart3,
+  TagIcon as Tag,
+  Cog6ToothIcon as Settings,
+  ArrowLeftStartOnRectangleIcon as LogOut,
+  ChevronDownIcon as ChevronDown,
+  ChevronRightIcon as ChevronRight,
+  ChevronDoubleLeftIcon as PanelLeftClose,
+  ChevronDoubleRightIcon as PanelLeftOpen,
+  GlobeAltIcon as Globe,
+  BeakerIcon as Pill,
+} from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { ShortcutsButton } from '@/components/shortcuts/ShortcutsModal';

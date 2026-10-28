@@ -3,11 +3,17 @@ import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
 import Link from 'next/link';
 import { LogoutButton } from '@/components/LogoutButton';
+import type { ComponentType, SVGProps } from 'react';
 import {
-  ShoppingCart, Package, BarChart3, Wallet, Receipt, Users, Gift, Ticket, Tags, PackageOpen, Repeat, Zap,
-  Settings, SlidersHorizontal, ShieldCheck, ClipboardList, Activity, Building2, CreditCard, PlayCircle,
-  type LucideIcon,
-} from 'lucide-react';
+  ShoppingCartIcon as ShoppingCart, ArchiveBoxIcon as Package, ChartBarIcon as BarChart3, WalletIcon as Wallet,
+  DocumentTextIcon as Receipt, UsersIcon as Users, GiftIcon as Gift, TicketIcon as Ticket, TagIcon as Tags,
+  CubeIcon as PackageOpen, ArrowPathRoundedSquareIcon as Repeat, BoltIcon as Zap, Cog6ToothIcon as Settings,
+  AdjustmentsHorizontalIcon as SlidersHorizontal, ShieldCheckIcon as ShieldCheck,
+  ClipboardDocumentListIcon as ClipboardList, SignalIcon as Activity, BuildingStorefrontIcon as Building2,
+  CreditCardIcon as CreditCard, PlayCircleIcon as PlayCircle,
+} from '@heroicons/react/24/outline';
+
+type LucideIcon = ComponentType<SVGProps<SVGSVGElement>>;
 import { getAllFeatureFlags } from '@/lib/featureFlags';
 import { FeatureFlagKey } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
@@ -77,29 +83,29 @@ export default async function HomePage() {
   // Módulos visibles según rol, plan y funcionalidades activas
   type ModuleCard = { href: string; title: string; subtitle: string; icon: LucideIcon; tint: string };
   const modules: ModuleCard[] = [
-    { href: '/sales', title: 'Ventas', subtitle: 'Historial de ventas', icon: Receipt, tint: 'bg-[#EEE8FE] text-[#6544E6]' },
+    { href: '/sales', title: 'Ventas', subtitle: 'Historial de ventas', icon: Receipt, tint: 'bg-[#F1F0F8] text-[#3F3B63]' },
   ];
   if (isOwner) {
-    modules.push({ href: '/admin/users', title: 'Usuarios', subtitle: 'Gestionar cajeros', icon: Users, tint: 'bg-[#E3EEFF] text-[#2F6FE4]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_PROMOTIONS)) modules.push({ href: '/promotions', title: 'Promociones', subtitle: 'Gestionar promociones', icon: Gift, tint: 'bg-[#FFE8EF] text-[#E0457B]' });
-    if (hasFlag(FeatureFlagKey.ALLOW_COUPONS)) modules.push({ href: '/coupons', title: 'Cupones', subtitle: 'Códigos de descuento', icon: Ticket, tint: 'bg-[#E6F6DD] text-[#3E9B2F]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_CATEGORY_PROMOS)) modules.push({ href: '/category-promotions', title: 'Promos Categoría', subtitle: 'Descuentos por categoría', icon: Tags, tint: 'bg-[#FFF5CC] text-[#B98900]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_VOLUME_PROMOS)) modules.push({ href: '/volume-promotions', title: 'Promos Pack', subtitle: 'Por volumen (3x S/5)', icon: PackageOpen, tint: 'bg-[#FFEBD9] text-[#E06A12]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_NTH_PROMOS)) modules.push({ href: '/nth-promotions', title: 'Promos N-ésimo', subtitle: '2do al 50%, 3ro gratis', icon: Repeat, tint: 'bg-[#EEE8FE] text-[#6544E6]' });
-    modules.push({ href: '/admin/quick-sell', title: 'Productos Rápidos', subtitle: 'Botones rápidos POS', icon: Zap, tint: 'bg-[#FFF5CC] text-[#B98900]' });
-    modules.push({ href: '/settings', title: 'Configuración', subtitle: 'Ajustes de la tienda', icon: Settings, tint: 'bg-[#EEEDF5] text-[#5B5873]' });
+    modules.push({ href: '/admin/users', title: 'Usuarios', subtitle: 'Gestionar cajeros', icon: Users, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_PROMOTIONS)) modules.push({ href: '/promotions', title: 'Promociones', subtitle: 'Gestionar promociones', icon: Gift, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+    if (hasFlag(FeatureFlagKey.ALLOW_COUPONS)) modules.push({ href: '/coupons', title: 'Cupones', subtitle: 'Códigos de descuento', icon: Ticket, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_CATEGORY_PROMOS)) modules.push({ href: '/category-promotions', title: 'Promos Categoría', subtitle: 'Descuentos por categoría', icon: Tags, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_VOLUME_PROMOS)) modules.push({ href: '/volume-promotions', title: 'Promos Pack', subtitle: 'Por volumen (3x S/5)', icon: PackageOpen, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_NTH_PROMOS)) modules.push({ href: '/nth-promotions', title: 'Promos N-ésimo', subtitle: '2do al 50%, 3ro gratis', icon: Repeat, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+    modules.push({ href: '/admin/quick-sell', title: 'Productos Rápidos', subtitle: 'Botones rápidos POS', icon: Zap, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+    modules.push({ href: '/settings', title: 'Configuración', subtitle: 'Ajustes de la tienda', icon: Settings, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
     if (!isStarterPlan) {
-      modules.push({ href: '/admin/feature-flags', title: 'Funcionalidades', subtitle: 'Activar/desactivar', icon: SlidersHorizontal, tint: 'bg-[#E3EEFF] text-[#2F6FE4]' });
-      modules.push({ href: '/settings/limits', title: 'Límites Operativos', subtitle: 'Configurar límites', icon: ShieldCheck, tint: 'bg-[#FFE8EF] text-[#E0457B]' });
-      modules.push({ href: '/admin/audit', title: 'Auditoría', subtitle: 'Historial de operaciones', icon: ClipboardList, tint: 'bg-[#EEEDF5] text-[#5B5873]' });
-      modules.push({ href: '/admin/system', title: 'Observabilidad', subtitle: 'Estado del sistema', icon: Activity, tint: 'bg-[#E6F6DD] text-[#3E9B2F]' });
+      modules.push({ href: '/admin/feature-flags', title: 'Funcionalidades', subtitle: 'Activar/desactivar', icon: SlidersHorizontal, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+      modules.push({ href: '/settings/limits', title: 'Límites Operativos', subtitle: 'Configurar límites', icon: ShieldCheck, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+      modules.push({ href: '/admin/audit', title: 'Auditoría', subtitle: 'Historial de operaciones', icon: ClipboardList, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
+      modules.push({ href: '/admin/system', title: 'Observabilidad', subtitle: 'Estado del sistema', icon: Activity, tint: 'bg-[#F1F0F8] text-[#3F3B63]' });
     }
   }
   const platformModules: ModuleCard[] = isSuperAdminUser
     ? [
-        { href: '/admin/stores', title: 'Tiendas', subtitle: 'Administrar todas las tiendas', icon: Building2, tint: 'bg-[#EEE8FE] text-[#6544E6]' },
-        { href: '/admin/billing', title: 'Licencias SaaS', subtitle: 'Suscripciones y pagos', icon: CreditCard, tint: 'bg-[#E6F6DD] text-[#3E9B2F]' },
-        { href: '/admin/demo', title: 'Demo Mode', subtitle: 'Activar/resetear demos', icon: PlayCircle, tint: 'bg-[#FFF5CC] text-[#B98900]' },
+        { href: '/admin/stores', title: 'Tiendas', subtitle: 'Administrar todas las tiendas', icon: Building2, tint: 'bg-[#F1F0F8] text-[#3F3B63]' },
+        { href: '/admin/billing', title: 'Licencias SaaS', subtitle: 'Suscripciones y pagos', icon: CreditCard, tint: 'bg-[#F1F0F8] text-[#3F3B63]' },
+        { href: '/admin/demo', title: 'Demo Mode', subtitle: 'Activar/resetear demos', icon: PlayCircle, tint: 'bg-[#F1F0F8] text-[#3F3B63]' },
       ]
     : [];
 
@@ -107,12 +113,12 @@ export default async function HomePage() {
     <Link
       key={m.href}
       href={m.href}
-      className="group flex flex-col items-center text-center gap-3 rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium hover:-translate-y-0.5 transition-all"
+      className="group flex items-center gap-4 rounded-2xl bg-surface-light dark:bg-surface-dark p-4 shadow-soft hover:shadow-medium transition-shadow"
     >
-      <span className={`w-14 h-14 rounded-2xl ${m.tint} flex items-center justify-center`}>
-        <m.icon className="w-7 h-7" strokeWidth={1.8} />
+      <span className={`w-11 h-11 rounded-xl ${m.tint} flex items-center justify-center flex-shrink-0 transition-colors group-hover:bg-primary group-hover:text-white`}>
+        <m.icon className="w-6 h-6" />
       </span>
-      <span>
+      <span className="min-w-0">
         <span className="block text-sm font-bold text-text-main dark:text-text-light">{m.title}</span>
         <span className="block text-xs text-text-secondary dark:text-gray-400 mt-0.5">{m.subtitle}</span>
       </span>
@@ -174,7 +180,7 @@ export default async function HomePage() {
                 <a href="/inventory/expiry-alerts?status=EXPIRED" className="flex-1 flex items-center gap-4 bg-red-50 border border-red-200 rounded-xl p-4 hover:bg-red-100 transition-colors">
                   <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
                     <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                   </div>
                   <div>
@@ -187,7 +193,7 @@ export default async function HomePage() {
                 <a href="/inventory/expiry-alerts?status=WARNING" className="flex-1 flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-xl p-4 hover:bg-amber-100 transition-colors">
                   <div className="p-2 bg-amber-100 rounded-lg flex-shrink-0">
                     <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
@@ -203,22 +209,22 @@ export default async function HomePage() {
         {/* Acciones rápidas */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Link href="/pos" className="group relative overflow-hidden rounded-2xl bg-primary p-5 text-white shadow-lg shadow-primary/30 hover:bg-primary-hover transition">
-            <span className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center"><ShoppingCart className="w-6 h-6" strokeWidth={2} /></span>
+            <span className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center"><ShoppingCart className="w-6 h-6" /></span>
             <p className="mt-4 text-lg font-bold">Punto de Venta</p>
             <p className="text-sm text-white/80">Iniciar nueva venta</p>
           </Link>
           <Link href="/inventory" className="group rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium transition">
-            <span className="w-12 h-12 rounded-xl bg-monterrial-gold text-monterrial-forest flex items-center justify-center"><Package className="w-6 h-6" strokeWidth={2} /></span>
+            <span className="w-12 h-12 rounded-xl bg-[#F1F0F8] text-[#3F3B63] flex items-center justify-center"><Package className="w-6 h-6" /></span>
             <p className="mt-4 text-lg font-bold text-text-main dark:text-text-light">Inventario</p>
             <p className="text-sm text-text-secondary dark:text-gray-400">Gestionar productos</p>
           </Link>
           <Link href="/reports" className="group rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium transition">
-            <span className="w-12 h-12 rounded-xl bg-monterrial-lime text-monterrial-forest flex items-center justify-center"><BarChart3 className="w-6 h-6" strokeWidth={2} /></span>
+            <span className="w-12 h-12 rounded-xl bg-[#F1F0F8] text-[#3F3B63] flex items-center justify-center"><BarChart3 className="w-6 h-6" /></span>
             <p className="mt-4 text-lg font-bold text-text-main dark:text-text-light">Reportes</p>
             <p className="text-sm text-text-secondary dark:text-gray-400">Ver estadísticas</p>
           </Link>
           <Link href="/shifts" className="group rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium transition">
-            <span className="w-12 h-12 rounded-xl bg-monterrial-lavender text-primary flex items-center justify-center"><Wallet className="w-6 h-6" strokeWidth={2} /></span>
+            <span className="w-12 h-12 rounded-xl bg-[#F1F0F8] text-[#3F3B63] flex items-center justify-center"><Wallet className="w-6 h-6" /></span>
             <p className="mt-4 text-lg font-bold text-text-main dark:text-text-light">Turnos</p>
             <p className="text-sm text-text-secondary dark:text-gray-400">Gestionar caja</p>
           </Link>
@@ -226,7 +232,7 @@ export default async function HomePage() {
 
         {/* Módulos del sistema */}
         <h2 className="mb-3 text-lg font-bold text-text-main dark:text-text-light">Módulos del sistema</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-8">
           {modules.map(moduleTile)}
         </div>
 
@@ -236,7 +242,7 @@ export default async function HomePage() {
               Administración de plataforma
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary">SuperAdmin</span>
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-8">
               {platformModules.map(moduleTile)}
             </div>
           </>
