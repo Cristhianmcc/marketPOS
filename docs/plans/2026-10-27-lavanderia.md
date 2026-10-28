@@ -39,15 +39,43 @@ por prenda; recargo express.
 - Ticket de recepción para el cliente: número de orden, prendas, fecha
   prometida, total, adelanto y saldo.
 
+## Resultado de la Fase 0 (2026-10-27)
+
+Banco: `npm run test:lavanderia:isolated` (con `--strict` sale con error si
+algo no pasa). 5/13 correctos.
+
+| Caso | Resultado | Detalle |
+| --- | --- | --- |
+| L1 rubro trae órdenes de trabajo | FALTA | El rubro solo activa `ENABLE_SERVICES`. |
+| L2 recibir 3,5 kg + 2 prendas = 47,50 | PASS | |
+| L3 precio del catálogo | REGLA | La orden acepta el precio que manda la pantalla (3 kg a S/ 1). Decidir si el cajero puede cambiar precios. |
+| L4 rechaza media prenda | FAIL | Acepta 1,5 de un servicio por prenda; no valida decimales por unidad. |
+| L5 Recibido → En proceso → Listo | PASS | |
+| L6 no entregar sin cobrar | FAIL | `PATCH` permite pasar a CLOSED sin venta; el estado se acepta tal cual llega. |
+| L7 adelanto | FALTA | No existe registro de pagos de la orden. |
+| L8 recargo express | FALTA | |
+| L9 entrega con cobro y vuelto | PASS | |
+| L10 IGV en la venta | FAIL | La venta queda con `tax = 0` y sin IGV por línea; reportes y ticket muestran IGV 0. La boleta sí calcula 40,25 + 7,25 porque lo recalcula desde el total. |
+| L11 cobro doble simultáneo | PASS (frágil) | Una sola venta en la prueba, pero el código revisa `saleId` fuera de la transacción y no condiciona la actualización. Se blinda en la Fase 2. |
+| L12 caja del turno | PASS | |
+| L13 anular venta de orden entregada | REGLA | La orden queda CLOSED apuntando a una venta anulada. Decidir si vuelve a Listo o se cancela. |
+
+Otros riesgos vistos en el código (sin caso propio todavía):
+`convert-to-sale` escribe el stock de productos como valor absoluto leído
+antes (patrón H14) y calcula el número de venta con máximo + 1; el número de
+orden también usa máximo + 1 fuera de la transacción.
+
 ## Fases
 
 0. Banco `scripts/test-lavanderia-flow-isolated.ts` (PostgreSQL desechable)
    que recorre: recibir orden 3,5 kg + 2 prendas, express, adelanto, cambios de
    estado, entrega con boleta, cierre de turno, anulación con adelanto.
    Documenta los fallos actuales antes de tocar código.
-1. Rubro: activar `ENABLE_WORK_ORDERS` en LAVANDERIA (y en el plan DEMO del
-   rubro), etiquetas de estado por rubro, servicios de ejemplo por kilo y
-   por prenda.
+1. Rubro y correcciones: activar `ENABLE_WORK_ORDERS` en LAVANDERIA (y en el
+   plan DEMO del rubro), etiquetas de estado por rubro, servicios de ejemplo
+   por kilo y por prenda; corregir L4 (decimales por unidad), L6 (transiciones
+   de estado válidas), L10 (IGV en venta e items con `computeLineTaxes`) y el
+   stock atómico al convertir.
 2. Adelanto: migración aditiva `WorkOrderPayment` + `Sale.advanceApplied`,
    API de cobro de adelanto, conversión a venta con saldo, cierre de turno y
    reporte de caja que cuentan adelanto y saldo una sola vez.

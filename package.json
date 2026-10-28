@@ -21,6 +21,7 @@
     "test:sunat:taxes": "tsx scripts/test-sunat-taxes-isolated.ts",
     "test:checkout:taxes": "tsx scripts/test-checkout-taxes-isolated.ts",
     "test:botica:isolated": "tsx scripts/test-botica-flow-isolated.ts",
+    "test:lavanderia:isolated": "tsx scripts/test-lavanderia-flow-isolated.ts",
     "test:desktop-env:isolated": "node scripts/test-desktop-package-env-isolated.cjs",
     "test:licenses:isolated": "tsx scripts/test-license-capabilities-isolated.ts",
     "db:studio": "prisma studio",
