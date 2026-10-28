@@ -7,7 +7,6 @@ import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import QuickSellGrid from '@/components/pos/QuickSellGrid';
 import CartPanel from '@/components/pos/CartPanel';
 import { PosHeader } from '@/components/pos/PosHeader';
-import { PosBanner } from '@/components/pos/PosBanner';
 import { CategoryChips } from '@/components/pos/CategoryChips';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
@@ -2208,9 +2207,6 @@ export default function POSPage() {
                 </button>
                 </div>
               </div>
-
-              {/* Banner (se oculta durante una búsqueda) */}
-              {!query.trim() && <PosBanner />}
 
               {/* Categorías del inventario */}
               {currentShift && !query.trim() && posTab === 'products' && (
