@@ -16,6 +16,9 @@ import { prisma } from '@/infra/db/prisma';
 import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature } from '@/lib/featureFlags';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
+import { consumeSaleInventory, InventoryMutationError } from '@/lib/inventory/stockMutations';
+
+class OrderAlreadyChargedError extends Error {}
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -130,6 +133,13 @@ export async function POST(
 
     // Ejecutar conversión en transacción ACID
     const result = await prisma.$transaction(async (tx) => {
+      // 0. Reservar la orden: solo una conversión puede pasarla a CLOSED.
+      const claimed = await tx.workOrder.updateMany({
+        where: { id: workOrder.id, storeId: session.storeId, saleId: null, status: { in: allowedStatuses } },
+        data: { status: WorkOrderStatus.CLOSED },
+      });
+      if (claimed.count !== 1) throw new OrderAlreadyChargedError();
+
       // 1. Obtener siguiente número de venta (excluir ventas demo >= 90000)
       const lastSale = await tx.sale.findFirst({
         where: {
@@ -226,34 +236,31 @@ export async function POST(
         });
       }
 
-      // 5. Crear Movements y decrementar stock (solo productos)
-      for (const woItem of workOrder.items) {
-        if (woItem.type === 'PRODUCT' && woItem.storeProductId && woItem.storeProduct) {
-          const qtyBase = woItem.quantityBase.toNumber();
-          
-          // Movement
-          await tx.movement.create({
-            data: {
-              storeId: session.storeId,
-              storeProductId: woItem.storeProductId,
-              type: 'SALE',
-              quantity: new Prisma.Decimal(-qtyBase),
-              unitPrice: woItem.unitPrice,
-              total: woItem.subtotal,
-              notes: `Venta #${nextSaleNumber} (OT #${workOrder.orderNumber})`,
-              createdById: session.userId,
-            },
-          });
-
-          // Decrementar stock
-          const currentStock = woItem.storeProduct.stock?.toNumber() ?? 0;
-          const newStock = currentStock - qtyBase;
-          
-          await tx.storeProduct.update({
-            where: { id: woItem.storeProductId },
-            data: { stock: new Prisma.Decimal(newStock) },
-          });
-        }
+      // 5. Descontar stock con deltas condicionados y registrar movimientos (solo productos)
+      const productItems = workOrder.items.filter((woItem) => woItem.type === 'PRODUCT' && woItem.storeProductId && woItem.storeProduct);
+      await consumeSaleInventory(tx, {
+        storeId: session.storeId,
+        products: productItems.map((woItem) => ({
+          storeProductId: woItem.storeProductId!,
+          productName: woItem.itemName,
+          quantity: woItem.quantityBase,
+          tracksStock: woItem.storeProduct!.stock !== null,
+        })),
+        batches: [],
+      });
+      for (const woItem of productItems) {
+        await tx.movement.create({
+          data: {
+            storeId: session.storeId,
+            storeProductId: woItem.storeProductId!,
+            type: 'SALE',
+            quantity: woItem.quantityBase.negated(),
+            unitPrice: woItem.unitPrice,
+            total: woItem.subtotal,
+            notes: `Venta #${nextSaleNumber} (OT #${workOrder.orderNumber})`,
+            createdById: session.userId,
+          },
+        });
       }
 
       // 6. Si es FIADO, crear Receivable
@@ -275,10 +282,7 @@ export async function POST(
       // 7. Actualizar WorkOrder - marcar como CLOSED y vincular con sale
       const updatedWorkOrder = await tx.workOrder.update({
         where: { id: workOrder.id },
-        data: {
-          status: WorkOrderStatus.CLOSED,
-          saleId: sale.id,
-        },
+        data: { saleId: sale.id },
       });
 
       return { sale, receivable, workOrder: updatedWorkOrder };
@@ -298,6 +302,12 @@ export async function POST(
     });
 
   } catch (error: any) {
+    if (error instanceof OrderAlreadyChargedError) {
+      return NextResponse.json({ error: 'Esta orden ya fue cobrada o cambió de estado' }, { status: 409 });
+    }
+    if (error instanceof InventoryMutationError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
     console.error('POST /api/work-orders/[id]/convert-to-sale error:', error);
     if (error.code === 'FEATURE_DISABLED') {
       return NextResponse.json({ error: 'Módulo no habilitado' }, { status: 403 });

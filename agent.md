@@ -117,6 +117,13 @@ es `docs/audits/2026-09-26-pos.md`.
   sin lote aunque los lotes se hayan agotado. Alta y baja de lotes usan
   `receiveStockAtomically` y `adjustStockAtomically`. Banco:
   `scripts/test-botica-flow-isolated.ts`.
+- Órdenes de trabajo (taller, lavandería): reglas en `src/lib/workOrders/rules.ts`.
+  CLOSED solo se alcanza cobrando (`convert-to-sale`, que reserva la orden con un
+  `updateMany` condicionado y descuenta stock con `consumeSaleInventory`);
+  CANCELLED solo por DELETE. Unidades sin decimales exigen enteros y solo OWNER
+  cambia el precio del catálogo. Anular la venta devuelve la orden a READY.
+  Lavandería muestra Recibido/Entregado. Banco:
+  `scripts/test-lavanderia-flow-isolated.ts`.
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

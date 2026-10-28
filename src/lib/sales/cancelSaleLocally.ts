@@ -33,6 +33,12 @@ export async function cancelSaleLocally(
     });
     if (claimed.count !== 1) return { cancelled: false };
 
+    // Una orden de trabajo entregada con esta venta vuelve a Listo para cobrarse de nuevo.
+    await tx.workOrder.updateMany({
+      where: { saleId, status: 'CLOSED' },
+      data: { status: 'READY', saleId: null },
+    });
+
     if (sale.couponCode && Number(sale.couponDiscount) > 0) {
       const coupon = await tx.coupon.findUnique({
         where: { storeId_code: { storeId: sale.storeId, code: sale.couponCode } },

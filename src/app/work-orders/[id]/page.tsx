@@ -9,6 +9,7 @@ import {
   AlertCircle, DollarSign
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { workOrderStatusLabels } from '@/lib/workOrders/rules';
 
 type WorkOrderStatus = 'DRAFT' | 'APPROVED' | 'IN_PROGRESS' | 'READY' | 'CLOSED' | 'CANCELLED';
 
@@ -55,6 +56,14 @@ const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; color: string; bgC
 export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
+  // Nombres de estado según el rubro (lavandería: Recibido / Entregado)
+  const [statusLabels, setStatusLabels] = useState(() => workOrderStatusLabels());
+  useEffect(() => {
+    fetch('/api/store/profile')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.businessProfile) setStatusLabels(workOrderStatusLabels(data.businessProfile)); })
+      .catch(() => undefined);
+  }, []);
   const [order, setOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -106,7 +115,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
         throw new Error(data.error || 'Error al actualizar');
       }
 
-      toast.success(`Estado actualizado a ${STATUS_CONFIG[newStatus].label}`);
+      toast.success(`Estado actualizado a ${statusLabels[newStatus]}`);
       loadOrder();
     } catch (error: any) {
       toast.error(error.message || 'Error al actualizar estado');
@@ -244,7 +253,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
                     OT #{order.number}
                   </h1>
                   <span className={`px-3 py-1 text-sm font-medium rounded-full ${statusConfig.bgColor} ${statusConfig.textColor}`}>
-                    {statusConfig.label}
+                    {statusLabels[order.status]}
                   </span>
                 </div>
                 <p className="text-gray-500 text-sm mt-1">

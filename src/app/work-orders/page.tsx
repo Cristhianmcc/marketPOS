@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import { useFlags } from '@/hooks/useFlags';
+import { workOrderStatusLabels } from '@/lib/workOrders/rules';
 
 type WorkOrderStatus = 'DRAFT' | 'APPROVED' | 'IN_PROGRESS' | 'READY' | 'CLOSED' | 'CANCELLED';
 
@@ -53,6 +54,14 @@ const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; color: string; bgC
 
 export default function WorkOrdersPage() {
   const router = useRouter();
+  // Nombres de estado según el rubro (lavandería: Recibido / Entregado)
+  const [statusLabels, setStatusLabels] = useState(() => workOrderStatusLabels());
+  useEffect(() => {
+    fetch('/api/store/profile')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.businessProfile) setStatusLabels(workOrderStatusLabels(data.businessProfile)); })
+      .catch(() => undefined);
+  }, []);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -121,7 +130,7 @@ export default function WorkOrdersPage() {
         throw new Error(data.error || 'Error al actualizar');
       }
 
-      toast.success(`Estado actualizado a ${STATUS_CONFIG[newStatus].label}`);
+      toast.success(`Estado actualizado a ${statusLabels[newStatus]}`);
       loadWorkOrders();
     } catch (error: any) {
       toast.error(error.message || 'Error al actualizar estado');
@@ -253,8 +262,8 @@ export default function WorkOrdersPage() {
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Todos los estados</option>
-                {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                  <option key={key} value={key}>{config.label}</option>
+                {Object.keys(STATUS_CONFIG).map((key) => (
+                  <option key={key} value={key}>{statusLabels[key as WorkOrderStatus]}</option>
                 ))}
               </select>
             </div>
@@ -275,7 +284,7 @@ export default function WorkOrdersPage() {
                   } bg-white transition-all`}
                 >
                   <div className={`text-2xl font-bold ${config.color}`}>{count}</div>
-                  <div className="text-xs text-gray-500">{config.label}</div>
+                  <div className="text-xs text-gray-500">{statusLabels[status as WorkOrderStatus]}</div>
                 </button>
               );
             })}
@@ -312,7 +321,7 @@ export default function WorkOrdersPage() {
                               OT #{order.number}
                             </span>
                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
-                              {statusConfig.label}
+                              {statusLabels[order.status]}
                             </span>
                             {order.sale && (
                               <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">

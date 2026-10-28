@@ -64,7 +64,9 @@ async function seed(db: PrismaClient) {
   const customer = await db.customer.create({ data: { storeId, name: 'Cliente Lavado', phone: '999111222' } });
   const kilo = await db.service.create({ data: { storeId, name: 'Lavado por kilo', price: 5, baseUnitId: kgm } });
   const terno = await db.service.create({ data: { storeId, name: 'Terno al seco', price: 15, baseUnitId: niu } });
-  return { storeId, ownerId: owner.id, shiftId: shift.id, customerId: customer.id, kilo: kilo.id, terno: terno.id, units: { niu, kgm } };
+  const master = await db.productMaster.create({ data: { internalSku: 'LV-DET', name: 'Detergente 1 kg', unitType: 'UNIT', baseUnitId: niu } });
+  const detergent = (await db.storeProduct.create({ data: { storeId, productId: master.id, price: 8, stock: 5 } })).id;
+  return { storeId, detergent, ownerId: owner.id, shiftId: shift.id, customerId: customer.id, kilo: kilo.id, terno: terno.id, units: { niu, kgm } };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -118,9 +120,15 @@ async function flowWorker(contextPath: string) {
   const mainId = main.body?.data?.id;
   steps.L2 = { result: { status: main.status }, order: mainId ? await orderState(mainId) : null };
 
-  // L3 Precio enviado por el cliente distinto al del catálogo (S/ 1 el kilo)
+  // L3 Precio distinto al catálogo (S/ 1 el kilo): el cajero cobra el de catálogo, el dueño puede cambiarlo
+  session.role = 'CASHIER';
   const cheap = await create([kiloItem(3, 1)]);
-  steps.L3 = { result: { status: cheap.status }, total: cheap.body?.data ? Number(cheap.body.data.total) : null };
+  session.role = 'OWNER';
+  const ownerPrice = await create([kiloItem(3, 4)]);
+  steps.L3 = {
+    cashierTotal: cheap.body?.data ? Number(cheap.body.data.total) : null,
+    ownerTotal: ownerPrice.body?.data ? Number(ownerPrice.body.data.total) : null,
+  };
 
   // L4 Media prenda: un servicio por prenda no admite 1,5 unidades
   const half = await create([ternoItem(1.5)]);
@@ -171,13 +179,21 @@ async function flowWorker(contextPath: string) {
   // L11 Doble cobro simultáneo de la misma orden (doble clic / dos cajas)
   const twice = await create([kiloItem(2)]);
   const twiceId = twice.body?.data?.id;
+  await setStatus(twiceId, 'APPROVED');
   await setStatus(twiceId, 'READY');
   const both = await Promise.all([
     charge(twiceId, { paymentMethod: 'CASH', amountPaid: 10 }),
     charge(twiceId, { paymentMethod: 'CASH', amountPaid: 10 }),
   ]);
   const salesForTwice = await prisma.saleItem.count({ where: { serviceId: ctx.kilo, quantity: 2, sale: { total: { gt: 0 } } } });
-  steps.L11 = { statuses: both.map((b) => b.status).sort(), sales: salesForTwice, order: await orderState(twiceId) };
+  // Segundo cobro con una lectura vieja de la orden (leída antes de que el primero terminara)
+  const stale = await prisma.workOrder.findUnique({ where: { id: twiceId }, include: { items: { include: { storeProduct: { include: { product: { include: { baseUnit: true } } } }, service: true } }, customer: true } });
+  const realFindFirst = prisma.workOrder.findFirst;
+  prisma.workOrder.findFirst = async () => ({ ...stale, status: 'READY', saleId: null });
+  const replay = await charge(twiceId, { paymentMethod: 'CASH', amountPaid: 10 });
+  prisma.workOrder.findFirst = realFindFirst;
+  const salesAfterReplay = await prisma.saleItem.count({ where: { serviceId: ctx.kilo, quantity: 2, sale: { total: { gt: 0 } } } });
+  steps.L11 = { statuses: both.map((b) => b.status).sort(), sales: salesForTwice, order: await orderState(twiceId), replay: replay.status, salesAfterReplay };
 
   // L12 Caja del turno: 100 inicial + ventas en efectivo
   const shiftRepo = new PrismaShiftRepository();
@@ -187,7 +203,19 @@ async function flowWorker(contextPath: string) {
 
   // L13 Anular la venta de una orden entregada
   const cancelled = sale ? await read(await cancel.POST(json(`/api/sales/${sale.id}/cancel`, 'POST', {}), { params: Promise.resolve({ id: sale.id }) })) : null;
-  steps.L13 = { result: cancelled ? { status: cancelled.status } : null, order: await orderState(mainId) };
+  const afterCancel = await orderState(mainId);
+  const recharge = await charge(mainId, { paymentMethod: 'CASH', amountPaid: 47.5 });
+  steps.L13 = { result: cancelled ? { status: cancelled.status } : null, order: afterCancel, recharge: recharge.status, final: await orderState(mainId) };
+
+  // L14 Producto dentro de la orden (detergente): descuenta stock y deja movimiento
+  const withProduct = await create([kiloItem(1), { type: 'PRODUCT', storeProductId: ctx.detergent, quantityBase: 2, unitPrice: 8 }]);
+  const wpId = withProduct.body?.data?.id;
+  await setStatus(wpId, 'APPROVED');
+  await setStatus(wpId, 'READY');
+  const wp = await charge(wpId, { paymentMethod: 'CASH', amountPaid: 50 });
+  const detergentState = await prisma.storeProduct.findUnique({ where: { id: ctx.detergent } });
+  const detergentMoves = await prisma.movement.findMany({ where: { storeProductId: ctx.detergent, type: 'SALE' } });
+  steps.L14 = { result: { status: wp.status, error: wp.body?.error }, stock: Number(detergentState.stock), moves: detergentMoves.map((m: any) => Number(m.quantity)) };
 
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
@@ -211,8 +239,10 @@ const EXPECTATIONS: Expectation[] = [
     ...(ok(s.L2) ? [] : [`respondió ${s.L2?.result?.status}`]),
     ...eq('orden', s.L2?.order && { status: s.L2.order.status, total: s.L2.order.total }, { status: 'DRAFT', total: 47.5 }),
   ] },
-  { id: 'L3', title: 'El precio sale del catálogo, no del cliente', kind: 'rule', check: (s) =>
-    eq('total de 3 kg', s.L3?.total, 15) },
+  { id: 'L3', title: 'Cajero cobra precio de catálogo; el dueño puede cambiarlo', check: (s) => [
+    ...eq('cajero, 3 kg', s.L3?.cashierTotal, 15),
+    ...eq('dueño, 3 kg a S/ 4', s.L3?.ownerTotal, 12),
+  ] },
   { id: 'L4', title: 'Rechaza media prenda', check: (s) =>
     (s.L4?.result?.status >= 400 && s.L4?.result?.status < 500) ? [] : [`respondió ${s.L4?.result?.status}`] },
   { id: 'L5', title: 'Recibido → En proceso → Listo', check: (s) => [
@@ -220,7 +250,7 @@ const EXPECTATIONS: Expectation[] = [
     ...eq('estado', s.L5?.order?.status, 'READY'),
   ] },
   { id: 'L6', title: 'No marca Entregado sin cobrar', check: (s) => [
-    ...(s.L6?.result?.status >= 400 ? [] : [`respondió ${s.L6?.result?.status}`]),
+    ...eq('respuesta', s.L6?.result?.status, 409),
     ...eq('estado', s.L6?.order?.status, 'APPROVED'),
   ] },
   { id: 'L7', title: 'Adelanto al recibir', kind: 'missing', check: (s) => [
@@ -235,21 +265,27 @@ const EXPECTATIONS: Expectation[] = [
     ...eq('vuelto', s.L9?.change, 2.5),
     ...eq('turno', s.L9?.shift, true),
   ] },
-  { id: 'L10', title: 'Venta y boleta con IGV: base 40,25 + IGV 7,25', check: (s) => [
-    ...eq('IGV de la venta', s.L10?.saleTax, 7.25),
-    ...eq('suma de IGV por línea', Math.round((s.L10?.items ?? []).reduce((t: number, i: any) => t + (i.igv ?? 0), 0) * 100) / 100, 7.25),
-    ...eq('boleta', s.L10?.totals, { taxable: 40.25, tax: 7.25, total: 47.5 }),
-  ] },
+  // La venta guarda tax = 0 igual que el cobro del POS; el IGV se calcula al emitir.
+  { id: 'L10', title: 'Boleta con IGV: base 40,25 + IGV 7,25', check: (s) =>
+    eq('boleta', s.L10?.totals, { taxable: 40.25, tax: 7.25, total: 47.5 }) },
   { id: 'L11', title: 'Cobro doble simultáneo genera una sola venta', check: (s) => [
     ...eq('ventas de la orden', s.L11?.sales, 1),
     ...((s.L11?.statuses?.[0] === 200 && s.L11?.statuses?.[1] >= 400 && s.L11?.statuses?.[1] < 500) ? [] : [`respuestas: ${JSON.stringify(s.L11?.statuses)} (el segundo cobro debe recibir un rechazo claro)`]),
     ...eq('estado', s.L11?.order?.status, 'CLOSED'),
+    ...eq('cobro con lectura vieja', [s.L11?.replay, s.L11?.salesAfterReplay], [409, 1]),
   ] },
   { id: 'L12', title: 'Caja del turno suma las ventas en efectivo', check: (s) =>
     eq('efectivo del turno', s.L12?.cashSales, s.L12?.cashSaleSum) },
-  { id: 'L13', title: 'Anular la venta no deja la orden como entregada', kind: 'rule', check: (s) => [
+  { id: 'L13', title: 'Anular la venta devuelve la orden a Listo y se puede volver a cobrar', check: (s) => [
     ...(ok(s.L13) ? [] : [`anulación respondió ${s.L13?.result?.status}`]),
-    ...(s.L13?.order?.status === 'CLOSED' ? [`la orden sigue ${s.L13.order.status} con la venta anulada`] : []),
+    ...eq('tras anular', s.L13?.order && { status: s.L13.order.status, saleId: s.L13.order.saleId }, { status: 'READY', saleId: null }),
+    ...eq('nuevo cobro', s.L13?.recharge, 200),
+    ...eq('final', s.L13?.final && { status: s.L13.final.status, saleTotal: s.L13.final.saleTotal }, { status: 'CLOSED', saleTotal: 47.5 }),
+  ] },
+  { id: 'L14', title: 'Producto de la orden descuenta stock con movimiento', check: (s) => [
+    ...(ok(s.L14) ? [] : [`respondió ${s.L14?.result?.status}: ${s.L14?.result?.error}`]),
+    ...eq('stock', s.L14?.stock, 3),
+    ...eq('movimientos', s.L14?.moves, [-2]),
   ] },
 ];
 

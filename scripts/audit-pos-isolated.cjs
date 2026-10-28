@@ -220,6 +220,7 @@ async function main() {
       },
       coupon: { findUnique: async () => null, update: async () => null },
       receivable: { updateMany: async () => ({ count: 0 }) },
+      workOrder: { updateMany: async () => ({ count: 0 }) },
       storeProduct: {
         update: async ({ data }) => {
           cancellationState.stock += Number(data.stock.increment);

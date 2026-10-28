@@ -65,6 +65,29 @@ Otros riesgos vistos en el código (sin caso propio todavía):
 antes (patrón H14) y calcula el número de venta con máximo + 1; el número de
 orden también usa máximo + 1 fuera de la transacción.
 
+## Resultado de la Fase 1 (2026-10-27)
+
+Banco 12/14; solo faltan L7 (adelanto, Fase 2) y L8 (express, Fase 3).
+
+- L1: el rubro activa `ENABLE_WORK_ORDERS`; las pantallas muestran Recibido y
+  Entregado en lavandería.
+- L3 (decisión del dueño): el cajero cobra el precio del catálogo; solo OWNER
+  puede cambiarlo en la orden.
+- L4: los servicios y productos con unidad sin decimales exigen enteros. Un
+  servicio sin unidad sigue admitiendo decimales (horas de mano de obra).
+- L6: CLOSED solo cobrando y CANCELLED solo anulando; responde 409.
+- L10: corregida la expectativa. La venta guarda `tax = 0` igual que el cobro
+  del POS; el IGV se calcula al emitir y la boleta da 40,25 + 7,25.
+- L11: el cobro reserva la orden dentro de la transacción. Se añadió un
+  segundo cobro con lectura vieja: sin la reserva crea una venta duplicada
+  (mutación detectada), con ella responde 409.
+- L13 (decisión del dueño): anular la venta devuelve la orden a Listo y se
+  puede volver a cobrar.
+- L14: los productos de la orden descuentan stock con deltas condicionados.
+
+Mutaciones detectadas: sin reserva de la orden (L11), sin control de estados
+(L6), anulación sin devolver la orden (L13).
+
 ## Fases
 
 0. Banco `scripts/test-lavanderia-flow-isolated.ts` (PostgreSQL desechable)

@@ -102,10 +102,11 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
   LAVANDERIA: {
     profile: 'LAVANDERIA' as BusinessProfile,
     name: 'Lavandería',
-    description: 'Servicios de lavado por prenda o kg. Sin inventario de productos, solo servicios.',
+    description: 'Servicios de lavado por prenda o kg con seguimiento de cada orden: recibido, en proceso, listo y entregado.',
     icon: '🧺',
     enabledFlags: [
       'ENABLE_SERVICES' as FeatureFlagKey, // Servicios (lavado, planchado)
+      'ENABLE_WORK_ORDERS' as FeatureFlagKey, // Órdenes: recibido → listo → entregado
     ],
     suggestedCategories: ['Lavado', 'Planchado', 'Tintorería', 'Express'],
   },

@@ -14,6 +14,7 @@ import { FeatureFlagKey, WorkOrderStatus, WorkOrderItemType, Prisma } from '@pri
 import { prisma } from '@/infra/db/prisma';
 import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature, isFeatureEnabled } from '@/lib/featureFlags';
+import { canEditTransition, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GET - Listar órdenes de trabajo
@@ -163,6 +164,8 @@ export async function POST(request: NextRequest) {
     for (const item of items) {
       let itemName = '';
       let itemContent: string | null = null;
+      let catalogPrice = 0;
+      let allowDecimals = true;
 
       if (item.type === 'PRODUCT') {
         if (!item.storeProductId) {
@@ -170,13 +173,15 @@ export async function POST(request: NextRequest) {
         }
         const sp = await prisma.storeProduct.findFirst({
           where: { id: item.storeProductId, storeId: session.storeId, active: true },
-          include: { product: { select: { name: true, content: true } } },
+          include: { product: { select: { name: true, content: true, unitType: true, baseUnit: { select: { allowDecimals: true } } } } },
         });
         if (!sp) {
           return NextResponse.json({ error: `Producto ${item.storeProductId} no encontrado` }, { status: 400 });
         }
         itemName = sp.product.name;
         itemContent = sp.product.content;
+        catalogPrice = sp.price.toNumber();
+        allowDecimals = sp.product.baseUnit?.allowDecimals ?? sp.product.unitType === 'KG';
       } else if (item.type === 'SERVICE') {
         if (!servicesEnabled) {
           return NextResponse.json({ error: 'Módulo de servicios no habilitado' }, { status: 403 });
@@ -186,15 +191,28 @@ export async function POST(request: NextRequest) {
         }
         const service = await prisma.service.findFirst({
           where: { id: item.serviceId, storeId: session.storeId, active: true },
+          include: { baseUnit: { select: { allowDecimals: true } } },
         });
         if (!service) {
           return NextResponse.json({ error: `Servicio ${item.serviceId} no encontrado` }, { status: 400 });
         }
         itemName = service.name;
         itemContent = '(Servicio)';
+        catalogPrice = service.price.toNumber();
+        allowDecimals = service.baseUnit ? service.baseUnit.allowDecimals : true;
       }
 
-      const itemSubtotal = item.quantityBase * item.unitPrice;
+      let unitPrice: number;
+      try {
+        unitPrice = resolveItemPrice({
+          itemName, quantityBase: item.quantityBase, allowDecimals, catalogPrice,
+          requestedPrice: item.unitPrice, isOwner: session.role === 'OWNER',
+        });
+      } catch (error) {
+        if (error instanceof WorkOrderRuleError) return NextResponse.json({ error: error.message }, { status: error.status });
+        throw error;
+      }
+      const itemSubtotal = item.quantityBase * unitPrice;
       subtotal += itemSubtotal;
 
       itemsToCreate.push({
@@ -207,7 +225,7 @@ export async function POST(request: NextRequest) {
         quantityOriginal: item.quantityOriginal ? new Prisma.Decimal(item.quantityOriginal) : null,
         quantityBase: new Prisma.Decimal(item.quantityBase),
         conversionFactor: item.conversionFactor ? new Prisma.Decimal(item.conversionFactor) : null,
-        unitPrice: new Prisma.Decimal(item.unitPrice),
+        unitPrice: new Prisma.Decimal(unitPrice),
         subtotal: new Prisma.Decimal(itemSubtotal),
         notes: item.notes || null,
       });
@@ -305,6 +323,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'No se puede editar una orden cerrada o cancelada' }, { status: 400 });
     }
 
+    if (status !== undefined && !canEditTransition(existingOrder.status, status)) {
+      const reason = status === WorkOrderStatus.CLOSED
+        ? 'Para entregar la orden hay que cobrarla'
+        : status === WorkOrderStatus.CANCELLED
+          ? 'Para anular la orden usa Cancelar'
+          : `No se puede pasar de ${existingOrder.status} a ${status}`;
+      return NextResponse.json({ error: reason }, { status: 409 });
+    }
+
     // Verificar servicos habilitados si hay items de servicio
     const servicesEnabled = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_SERVICES);
 
@@ -325,38 +352,49 @@ export async function PATCH(request: NextRequest) {
         for (const item of items) {
           let itemName = '';
           let itemContent: string | null = null;
+          let catalogPrice = 0;
+          let allowDecimals = true;
 
           if (item.type === 'PRODUCT') {
             if (!item.storeProductId) {
-              throw new Error('storeProductId requerido para productos');
+              throw new WorkOrderRuleError('storeProductId requerido para productos');
             }
             const sp = await tx.storeProduct.findFirst({
               where: { id: item.storeProductId, storeId: session.storeId, active: true },
-              include: { product: { select: { name: true, content: true } } },
+              include: { product: { select: { name: true, content: true, unitType: true, baseUnit: { select: { allowDecimals: true } } } } },
             });
             if (!sp) {
-              throw new Error(`Producto ${item.storeProductId} no encontrado`);
+              throw new WorkOrderRuleError(`Producto ${item.storeProductId} no encontrado`);
             }
             itemName = sp.product.name;
             itemContent = sp.product.content;
+            catalogPrice = sp.price.toNumber();
+            allowDecimals = sp.product.baseUnit?.allowDecimals ?? sp.product.unitType === 'KG';
           } else if (item.type === 'SERVICE') {
             if (!servicesEnabled) {
-              throw new Error('Módulo de servicios no habilitado');
+              throw new WorkOrderRuleError('Módulo de servicios no habilitado');
             }
             if (!item.serviceId) {
-              throw new Error('serviceId requerido para servicios');
+              throw new WorkOrderRuleError('serviceId requerido para servicios');
             }
             const service = await tx.service.findFirst({
               where: { id: item.serviceId, storeId: session.storeId, active: true },
+              include: { baseUnit: { select: { allowDecimals: true } } },
             });
             if (!service) {
-              throw new Error(`Servicio ${item.serviceId} no encontrado`);
+              throw new WorkOrderRuleError(`Servicio ${item.serviceId} no encontrado`);
             }
             itemName = service.name;
             itemContent = '(Servicio)';
+            catalogPrice = service.price.toNumber();
+            allowDecimals = service.baseUnit ? service.baseUnit.allowDecimals : true;
           }
 
-          const itemSubtotal = item.quantityBase * item.unitPrice;
+          const unitPrice = resolveItemPrice({
+            itemName, quantityBase: item.quantityBase, allowDecimals, catalogPrice,
+            requestedPrice: item.unitPrice, isOwner: session.role === 'OWNER',
+          });
+          const itemSubtotal = item.quantityBase * unitPrice;
           newSubtotal += itemSubtotal;
 
           itemsToCreate.push({
@@ -370,7 +408,7 @@ export async function PATCH(request: NextRequest) {
             quantityOriginal: item.quantityOriginal ? new Prisma.Decimal(item.quantityOriginal) : null,
             quantityBase: new Prisma.Decimal(item.quantityBase),
             conversionFactor: item.conversionFactor ? new Prisma.Decimal(item.conversionFactor) : null,
-            unitPrice: new Prisma.Decimal(item.unitPrice),
+            unitPrice: new Prisma.Decimal(unitPrice),
             subtotal: new Prisma.Decimal(itemSubtotal),
             notes: item.notes || null,
           });
@@ -415,6 +453,9 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ data: workOrder });
 
   } catch (error: any) {
+    if (error instanceof WorkOrderRuleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('PATCH /api/work-orders error:', error);
     if (error.code === 'FEATURE_DISABLED') {
       return NextResponse.json({ error: 'Módulo no habilitado' }, { status: 403 });
