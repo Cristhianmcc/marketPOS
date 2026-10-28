@@ -33,6 +33,23 @@ function getCloudBaseUrl(): string {
   return value;
 }
 
+/** Mensaje claro para el dueño según por qué falló el registro en la nube. */
+export function describeCloudRegistrationError(error: unknown): string {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error ? error.message : String(error);
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    return 'El servidor web tardó demasiado en responder (puede estar despertando). Espera un minuto e inténtalo de nuevo.';
+  }
+  if (message.startsWith('CLOUD_URL_')) return 'La dirección del servidor web (CLOUD_URL) no está configurada en este equipo.';
+  if (/401|unauthorized/i.test(message)) {
+    return 'El servidor web no aceptó tu sesión de superadministrador (dura 4 horas). Cierra sesión, vuelve a entrar como superadministrador y registra de nuevo.';
+  }
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|ECONNRESET|network/i.test(message)) {
+    return 'No hay conexión con el servidor web. Revisa el Internet de esta PC.';
+  }
+  return `El servidor web rechazó el registro: ${message}`;
+}
+
 export async function registerStoreInCloud(
   input: CloudStoreRegistration,
   cloudAdminToken: string,
@@ -45,7 +62,8 @@ export async function registerStoreInCloud(
     },
     body: JSON.stringify(input),
     cache: 'no-store',
-    signal: AbortSignal.timeout(10_000),
+    // Render gratuito puede tardar cerca de un minuto en despertar
+    signal: AbortSignal.timeout(60_000),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload?.licenseToken) {

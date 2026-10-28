@@ -11,7 +11,7 @@ import { syncFeatureFlagsFromPlan } from '@/lib/featureFlags';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIP } from '@/lib/rateLimit'; // ✅ MÓDULO S8
 import { findRecoverableSubscriptionSource } from '@/lib/restoredSubscription';
-import { isCloudLicenseRegistrationAvailable, registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
+import { describeCloudRegistrationError, isCloudLicenseRegistrationAvailable, registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
 import { getStoreLicenseCredential, saveStoreLicenseCredential } from '@/lib/licenseCredentialStore';
 
 // GET /api/admin/stores - Listar todas las tiendas (SUPERADMIN)
@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
         console.error('[CreateStore] Cloud license registration failed:', cloudError);
         cloudRegistration = {
           status: 'failed',
-          message: 'La tienda local fue creada, pero no pudo registrarse en Licencias. Reintenta con conexión.',
+          message: `La tienda local fue creada, pero no pudo registrarse en la nube. ${describeCloudRegistrationError(cloudError)} Luego usa "Registrar licencia".`,
         };
       }
     }

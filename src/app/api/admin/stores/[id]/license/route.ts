@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
-import { isCloudLicenseRegistrationAvailable, registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
+import { describeCloudRegistrationError, isCloudLicenseRegistrationAvailable, registerStoreInCloud } from '@/lib/cloudLicenseRegistration';
 import { saveStoreLicenseCredential } from '@/lib/licenseCredentialStore';
 
 export async function POST(
@@ -78,7 +78,7 @@ export async function POST(
   } catch (error) {
     console.error('[AdminStoreLicense] Cloud registration failed:', error);
     return NextResponse.json(
-      { error: 'No se pudo registrar la licencia. Verifica Internet y CLOUD_URL.' },
+      { error: `No se pudo registrar la licencia. ${describeCloudRegistrationError(error)}` },
       { status: 502 },
     );
   }
