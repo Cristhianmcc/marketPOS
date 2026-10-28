@@ -315,6 +315,10 @@ export async function POST(request: NextRequest) {
     const workOrderItemsCount = nestedCount('workOrders');
     if (purchaseOrderItemsCount !== undefined) actualCounts.purchaseOrderItems = purchaseOrderItemsCount;
     if (workOrderItemsCount !== undefined) actualCounts.workOrderItems = workOrderItemsCount;
+    if (Array.isArray(backupData.workOrders)) {
+      actualCounts.workOrderPayments = backupData.workOrders.reduce(
+        (sum: number, row: any) => sum + (Array.isArray(row.payments) ? row.payments.length : 0), 0);
+    }
     const mismatchedCount = Object.entries(actualCounts).find(([key, value]) =>
       typeof metadata.counts?.[key] === 'number' && metadata.counts[key] !== value
     );
@@ -868,6 +872,7 @@ export async function POST(request: NextRequest) {
             changeAmount: sale.changeAmount,
             paymentDetails: sale.paymentDetails,
             icbperTotal: sale.icbperTotal ?? 0,
+            advanceApplied: sale.advanceApplied ?? 0,
             shiftId: newShiftId,
             customerId: newCustomerId,
             userId: newUserId,
@@ -1057,6 +1062,7 @@ export async function POST(request: NextRequest) {
 
       // 10.2 Órdenes de trabajo, enlazadas a la venta en que se cobraron.
       let workOrderItemsRestored = 0;
+      let workOrderPaymentsRestored = 0;
       if (hasSection('workOrders')) {
         restorePhase = 'RESTORE_WORK_ORDERS';
         for (const order of backupData.workOrders) {
@@ -1070,6 +1076,7 @@ export async function POST(request: NextRequest) {
               subtotal: order.subtotal,
               discount: order.discount,
               total: order.total,
+              advancePaid: order.advancePaid ?? 0,
               saleId: order.saleId ? requireSale(order.saleId, 'una orden de trabajo') : null,
               createdAt: new Date(order.createdAt),
               items: {
@@ -1088,9 +1095,26 @@ export async function POST(request: NextRequest) {
                   notes: item.notes,
                 })),
               },
+              payments: {
+                create: (order.payments || []).map((payment: any) => {
+                  const newShiftId = shiftIdMap.get(payment.shiftId);
+                  if (!newShiftId) throw new Error('El respaldo contiene un adelanto de orden con turno inexistente');
+                  return {
+                    storeId: newStore.id,
+                    shiftId: newShiftId,
+                    kind: payment.kind,
+                    amount: payment.amount,
+                    method: payment.method,
+                    notes: payment.notes,
+                    createdById: userIdMap.get(payment.createdById) || newOwner.id,
+                    createdAt: new Date(payment.createdAt),
+                  };
+                }),
+              },
             },
           });
           workOrderItemsRestored += (order.items || []).length;
+          workOrderPaymentsRestored += (order.payments || []).length;
         }
       }
 
@@ -1323,6 +1347,7 @@ export async function POST(request: NextRequest) {
           purchaseOrderItems: purchaseOrderItemsRestored,
           workOrders: hasSection('workOrders') ? backupData.workOrders.length : 0,
           workOrderItems: workOrderItemsRestored,
+          workOrderPayments: workOrderPaymentsRestored,
           patients: patientIdMap.size,
           controlledBookEntries: hasSection('controlledBookEntries') ? backupData.controlledBookEntries.length : 0,
           fiscalDocuments: backupData.fiscalArchive?.data?.documents?.length || 0,

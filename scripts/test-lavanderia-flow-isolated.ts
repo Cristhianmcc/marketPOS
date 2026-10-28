@@ -89,10 +89,12 @@ async function flowWorker(contextPath: string) {
   const { prisma } = require('../src/infra/db/prisma');
   const workOrders = require('../src/app/api/work-orders/route');
   const convert = require('../src/app/api/work-orders/[id]/convert-to-sale/route');
+  const payments = require('../src/app/api/work-orders/[id]/payments/route');
   const cancel = require('../src/app/api/sales/[id]/cancel/route');
   const { getProfileFlags } = require('../src/lib/businessProfiles');
   const { PrismaShiftRepository } = require('../src/infra/db/repositories/PrismaShiftRepository');
   const { buildPayloadFromSale } = require('../src/lib/sunat/buildPayloadFromSale');
+  const { recordAdvance } = require('../src/lib/workOrders/payments');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
   const json = (url: string, method: string, body?: unknown) =>
@@ -107,8 +109,15 @@ async function flowWorker(contextPath: string) {
     read(await convert.POST(json(`/api/work-orders/${id}/convert-to-sale`, 'POST', body), { params: Promise.resolve({ id }) }));
   const orderState = async (id: string) => {
     const o = await prisma.workOrder.findUnique({ where: { id }, include: { sale: true } });
-    return o ? { status: o.status, total: Number(o.total), saleId: o.saleId, saleTotal: o.sale ? Number(o.sale.total) : null } : null;
+    return o ? { status: o.status, total: Number(o.total), advancePaid: Number(o.advancePaid), saleId: o.saleId, saleTotal: o.sale ? Number(o.sale.total) : null } : null;
   };
+  const advance = async (id: string, amount: number, method = 'CASH') =>
+    read(await payments.POST(json(`/api/work-orders/${id}/payments`, 'POST', { amount, method }), { params: Promise.resolve({ id }) }));
+  const shiftRepo = new PrismaShiftRepository();
+  const cashOfShift = async () => ({
+    cash: await shiftRepo.getCashSalesTotal(ctx.shiftId),
+    byMethod: (await shiftRepo.getSalesByMethod(ctx.shiftId)).byMethod,
+  });
 
   const steps: Record<string, unknown> = {};
 
@@ -149,22 +158,43 @@ async function flowWorker(contextPath: string) {
   const closed = await setStatus(skipId, 'CLOSED');
   steps.L6 = { result: { status: closed.status }, order: await orderState(skipId) };
 
-  // L7 Adelanto al recibir: S/ 20 a cuenta que entra a la caja del turno
+  // L7 Adelanto: S/ 20 en efectivo a cuenta de la orden de S/ 47,50; luego S/ 30 más (excede)
+  const first = await advance(mainId, 20);
+  const excess = await advance(mainId, 30);
+  // Dos adelantos simultáneos de S/ 20 en una orden de S/ 30: el primero mantiene
+  // su transacción abierta mientras llega el segundo; solo uno debe entrar.
+  const pair = await create([kiloItem(6)]);
+  const pairId = pair.body?.data?.id;
+  await setStatus(pairId, 'APPROVED');
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const slowFirst = prisma.$transaction(async (tx: any) => {
+    await recordAdvance(tx, { storeId: ctx.storeId, workOrderId: pairId, shiftId: ctx.shiftId, userId: ctx.ownerId, amount: 20, method: 'CASH' });
+    await sleep(800);
+  }, { timeout: 10_000 }).then(() => ({ status: 201 }), () => ({ status: 409 }));
+  await sleep(200);
+  const racing = await Promise.all([slowFirst, advance(pairId, 20)]);
   steps.L7 = {
-    paymentModel: typeof prisma.workOrderPayment?.create === 'function',
-    advanceField: 'advanceApplied' in (prisma.sale.fields ?? {}),
+    first: { status: first.status, balance: first.body?.data?.balance },
+    excess: excess.status,
+    racing: racing.map((r) => r.status).sort(),
+    main: await orderState(mainId),
+    pair: await orderState(pairId),
+    paymentsOfPair: await prisma.workOrderPayment.count({ where: { workOrderId: pairId } }),
   };
 
   // L8 Recargo express en la orden
   steps.L8 = { expressField: 'express' in (prisma.workOrder.fields ?? {}) };
 
-  // L9 Entrega: cobro en efectivo de S/ 50 por la orden de S/ 47,50
-  const paid = await charge(mainId, { paymentMethod: 'CASH', amountPaid: 50 });
+  // L9 Entrega: saldo de S/ 27,50 (47,50 - adelanto 20) pagado con S/ 30
+  const short = await charge(mainId, { paymentMethod: 'CASH', amountPaid: 25 });
+  const paid = await charge(mainId, { paymentMethod: 'CASH', amountPaid: 30 });
   const sale = paid.body?.data?.saleId ? await prisma.sale.findUnique({ where: { id: paid.body.data.saleId }, include: { items: true } }) : null;
   steps.L9 = {
     result: { status: paid.status, error: paid.body?.error },
     order: await orderState(mainId),
     change: sale ? Number(sale.changeAmount) : null,
+    advanceApplied: sale ? Number(sale.advanceApplied) : null,
+    short: short.status,
     shift: sale?.shiftId === ctx.shiftId,
   };
 
@@ -195,16 +225,13 @@ async function flowWorker(contextPath: string) {
   const salesAfterReplay = await prisma.saleItem.count({ where: { serviceId: ctx.kilo, quantity: 2, sale: { total: { gt: 0 } } } });
   steps.L11 = { statuses: both.map((b) => b.status).sort(), sales: salesForTwice, order: await orderState(twiceId), replay: replay.status, salesAfterReplay };
 
-  // L12 Caja del turno: 100 inicial + ventas en efectivo
-  const shiftRepo = new PrismaShiftRepository();
-  const cashSales = await shiftRepo.getCashSalesTotal(ctx.shiftId);
-  const cashSaleSum = (await prisma.sale.aggregate({ where: { shiftId: ctx.shiftId, paymentMethod: 'CASH', total: { gt: 0 } }, _sum: { total: true } }))._sum.total;
-  steps.L12 = { cashSales, cashSaleSum: Number(cashSaleSum ?? 0) };
+  // L12 Caja: adelantos 20 + 20, saldo 27,50 y la orden de 10 = 77,50 (el adelanto no se cuenta dos veces)
+  steps.L12 = await cashOfShift();
 
   // L13 Anular la venta de una orden entregada
   const cancelled = sale ? await read(await cancel.POST(json(`/api/sales/${sale.id}/cancel`, 'POST', {}), { params: Promise.resolve({ id: sale.id }) })) : null;
   const afterCancel = await orderState(mainId);
-  const recharge = await charge(mainId, { paymentMethod: 'CASH', amountPaid: 47.5 });
+  const recharge = await charge(mainId, { paymentMethod: 'CASH', amountPaid: 27.5 });
   steps.L13 = { result: cancelled ? { status: cancelled.status } : null, order: afterCancel, recharge: recharge.status, final: await orderState(mainId) };
 
   // L14 Producto dentro de la orden (detergente): descuenta stock y deja movimiento
@@ -216,6 +243,20 @@ async function flowWorker(contextPath: string) {
   const detergentState = await prisma.storeProduct.findUnique({ where: { id: ctx.detergent } });
   const detergentMoves = await prisma.movement.findMany({ where: { storeProductId: ctx.detergent, type: 'SALE' } });
   steps.L14 = { result: { status: wp.status, error: wp.body?.error }, stock: Number(detergentState.stock), moves: detergentMoves.map((m: any) => Number(m.quantity)) };
+
+  // L16 Editar la orden con adelanto 20 a un total de S/ 5: se rechaza
+  const shrink = await read(await workOrders.PATCH(json('/api/work-orders', 'PATCH', { id: pairId, items: [kiloItem(1)] })));
+  steps.L16 = { status: shrink.status, order: await orderState(pairId) };
+
+  // L15 Cancelar la orden con adelanto (20 efectivo + 5 Yape): se devuelve por método
+  await advance(pairId, 5, 'YAPE');
+  const dropped = await read(await workOrders.DELETE(json('/api/work-orders', 'DELETE', { id: pairId })));
+  const refunds = await prisma.workOrderPayment.findMany({ where: { workOrderId: pairId, kind: 'REFUND' }, orderBy: { method: 'asc' } });
+  steps.L15 = {
+    status: dropped.status, refunded: dropped.body?.refunded, order: await orderState(pairId),
+    refunds: refunds.map((r: any) => `${r.method}:${Number(r.amount)}`),
+    shift: await cashOfShift(),
+  };
 
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
@@ -253,13 +294,18 @@ const EXPECTATIONS: Expectation[] = [
     ...eq('respuesta', s.L6?.result?.status, 409),
     ...eq('estado', s.L6?.order?.status, 'APPROVED'),
   ] },
-  { id: 'L7', title: 'Adelanto al recibir', kind: 'missing', check: (s) => [
-    ...(s.L7?.paymentModel ? [] : ['no existe registro de pagos de la orden']),
-    ...(s.L7?.advanceField ? [] : ['la venta no guarda el adelanto aplicado']),
+  { id: 'L7', title: 'Adelanto: entra a cuenta, no excede el total, uno solo si llegan juntos', check: (s) => [
+    ...eq('adelanto de 20', s.L7?.first, { status: 201, balance: 27.5 }),
+    ...eq('adelanto que excede', s.L7?.excess, 409),
+    ...eq('orden', s.L7?.main?.advancePaid, 20),
+    ...eq('adelantos simultáneos', s.L7?.racing, [201, 409]),
+    ...eq('orden de 30', [s.L7?.pair?.advancePaid, s.L7?.paymentsOfPair], [20, 1]),
   ] },
   { id: 'L8', title: 'Recargo express', kind: 'missing', check: (s) =>
     s.L8?.expressField ? [] : ['la orden no tiene recargo express'] },
-  { id: 'L9', title: 'Entrega cobra S/ 47,50, vuelto 2,50 y cierra la orden', check: (s) => [
+  { id: 'L9', title: 'Entrega cobra el saldo 27,50 (vuelto 2,50) y la venta queda por 47,50', check: (s) => [
+    ...eq('pago menor al saldo', s.L9?.short, 400),
+    ...eq('adelanto aplicado', s.L9?.advanceApplied, 20),
     ...(ok(s.L9) ? [] : [`respondió ${s.L9?.result?.status}: ${s.L9?.result?.error}`]),
     ...eq('orden', s.L9?.order && { status: s.L9.order.status, saleTotal: s.L9.order.saleTotal }, { status: 'CLOSED', saleTotal: 47.5 }),
     ...eq('vuelto', s.L9?.change, 2.5),
@@ -274,13 +320,28 @@ const EXPECTATIONS: Expectation[] = [
     ...eq('estado', s.L11?.order?.status, 'CLOSED'),
     ...eq('cobro con lectura vieja', [s.L11?.replay, s.L11?.salesAfterReplay], [409, 1]),
   ] },
-  { id: 'L12', title: 'Caja del turno suma las ventas en efectivo', check: (s) =>
-    eq('efectivo del turno', s.L12?.cashSales, s.L12?.cashSaleSum) },
+  { id: 'L12', title: 'Caja cuenta adelanto y saldo una sola vez', check: (s) => [
+    ...eq('efectivo del turno', s.L12?.cash, 77.5),
+    ...eq('efectivo por método', s.L12?.byMethod?.CASH?.total, 77.5),
+  ] },
   { id: 'L13', title: 'Anular la venta devuelve la orden a Listo y se puede volver a cobrar', check: (s) => [
     ...(ok(s.L13) ? [] : [`anulación respondió ${s.L13?.result?.status}`]),
     ...eq('tras anular', s.L13?.order && { status: s.L13.order.status, saleId: s.L13.order.saleId }, { status: 'READY', saleId: null }),
-    ...eq('nuevo cobro', s.L13?.recharge, 200),
+    ...eq('adelanto conservado', s.L13?.order?.advancePaid, 20),
+    ...eq('nuevo cobro del saldo', s.L13?.recharge, 200),
     ...eq('final', s.L13?.final && { status: s.L13.final.status, saleTotal: s.L13.final.saleTotal }, { status: 'CLOSED', saleTotal: 47.5 }),
+  ] },
+  { id: 'L15', title: 'Cancelar con adelanto lo devuelve por método y la caja cuadra', check: (s) => [
+    ...eq('respuesta', [s.L15?.status, s.L15?.refunded], [200, 25]),
+    ...eq('orden', s.L15?.order && { status: s.L15.order.status, advancePaid: s.L15.order.advancePaid }, { status: 'CANCELLED', advancePaid: 0 }),
+    ...eq('devoluciones', s.L15?.refunds, ['CASH:20', 'YAPE:5']),
+    // 77,50 - 27,50 anulado + 27,50 recobrado + 21 de L14 - 20 devuelto
+    ...eq('efectivo final', s.L15?.shift?.cash, 78.5),
+    ...eq('Yape neto', s.L15?.shift?.byMethod?.YAPE?.total ?? 0, 0),
+  ] },
+  { id: 'L16', title: 'No deja el total por debajo del adelanto', check: (s) => [
+    ...eq('respuesta', s.L16?.status, 409),
+    ...eq('total', s.L16?.order?.total, 30),
   ] },
   { id: 'L14', title: 'Producto de la orden descuenta stock con movimiento', check: (s) => [
     ...(ok(s.L14) ? [] : [`respondió ${s.L14?.result?.status}: ${s.L14?.result?.error}`]),

@@ -1,6 +1,7 @@
 // Prisma implementation of IShiftRepository
 
 import { Prisma } from '@prisma/client';
+import { advancesByMethodForShift } from '@/lib/workOrders/payments';
 import { prisma } from '@/infra/db/prisma';
 import { IShiftRepository } from '@/repositories/IShiftRepository';
 import { Shift, ShiftWithUsers, OpenShiftData, CloseShiftData } from '@/domain/types';
@@ -189,10 +190,12 @@ export class PrismaShiftRepository implements IShiftRepository {
       },
       _sum: {
         total: true,
+        advanceApplied: true,
       },
     });
 
-    const cashSalesTotal = salesResult._sum.total?.toNumber() || 0;
+    // El adelanto de una orden ya entró a caja cuando se cobró (ver punto 4)
+    const cashSalesTotal = (salesResult._sum.total?.toNumber() || 0) - (salesResult._sum.advanceApplied?.toNumber() || 0);
 
     // 2. Pagos de FIADO en CASH durante este turno
     const paymentsResult = await prisma.receivablePayment.aggregate({
@@ -229,8 +232,12 @@ export class PrismaShiftRepository implements IShiftRepository {
       }
     }
 
-    // Total = Ventas CASH + Pagos FIADO CASH + Porción CASH de MIXED
-    return cashSalesTotal + cashPaymentsTotal + mixedCashTotal;
+    // 4. Adelantos de órdenes en CASH cobrados (menos devueltos) en este turno
+    const advances = await advancesByMethodForShift(prisma, shiftId);
+    const cashAdvancesTotal = advances.CASH?.total ?? 0;
+
+    // Total = Ventas CASH (sin adelanto) + Pagos FIADO CASH + Porción CASH de MIXED + Adelantos CASH
+    return Math.round((cashSalesTotal + cashPaymentsTotal + mixedCashTotal + cashAdvancesTotal) * 100) / 100;
   }
 
   async getSalesByMethod(shiftId: string): Promise<{ byMethod: Record<string, { total: number; count: number }>; mixedInfo: { count: number; total: number; details: string[]; splitTotals: Record<string, number> } }> {
@@ -242,16 +249,24 @@ export class PrismaShiftRepository implements IShiftRepository {
         total: { gt: 0 },
         paymentMethod: { not: 'MIXED' },
       },
-      _sum: { total: true },
+      _sum: { total: true, advanceApplied: true },
       _count: { _all: true },
     });
 
+    // Lo cobrado por método: las ventas de órdenes descuentan el adelanto, que
+    // se suma aparte en el turno y método en que se cobró.
     const result: Record<string, { total: number; count: number }> = {};
     for (const g of groups) {
       result[g.paymentMethod] = {
-        total: g._sum.total?.toNumber() || 0,
+        total: Math.round(((g._sum.total?.toNumber() || 0) - (g._sum.advanceApplied?.toNumber() || 0)) * 100) / 100,
         count: g._count._all,
       };
+    }
+    for (const [method, advance] of Object.entries(await advancesByMethodForShift(prisma, shiftId))) {
+      const entry = result[method] ?? { total: 0, count: 0 };
+      entry.total = Math.round((entry.total + advance.total) * 100) / 100;
+      entry.count += advance.count;
+      result[method] = entry;
     }
 
     // 2. Desglosar ventas MIXED: sumar cada split al método correspondiente

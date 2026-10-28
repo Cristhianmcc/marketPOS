@@ -124,6 +124,13 @@ es `docs/audits/2026-09-26-pos.md`.
   cambia el precio del catálogo. Anular la venta devuelve la orden a READY.
   Lavandería muestra Recibido/Entregado. Banco:
   `scripts/test-lavanderia-flow-isolated.ts`.
+- Adelantos de órdenes (`WorkOrderPayment`, `WorkOrder.advancePaid`,
+  `Sale.advanceApplied`; `src/lib/workOrders/payments.ts`): se cobran con
+  `POST /api/work-orders/[id]/payments` en el turno abierto, bloqueando la orden
+  con `SELECT ... FOR UPDATE`. La venta de entrega guarda el total y descuenta
+  el adelanto; `getCashSalesTotal` y `getSalesByMethod` restan `advanceApplied`
+  y suman los adelantos netos del turno. Cancelar una orden con adelanto lo
+  devuelve por método (REFUND). El respaldo 1.1 incluye `workOrders[].payments`.
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

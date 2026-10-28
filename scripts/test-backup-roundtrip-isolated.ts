@@ -309,8 +309,13 @@ async function seedStore(db: PrismaClient) {
   });
 
   const workOrder = await db.workOrder.create({
-    data: { storeId, orderNumber: 1, customerId: customer.id, status: 'CLOSED', notes: 'Cableado cocina', subtotal: 78, total: 78, saleId: saleService.id, createdAt: d('2026-10-19T14:00:00Z') },
+    data: { storeId, orderNumber: 1, customerId: customer.id, status: 'CLOSED', notes: 'Cableado cocina', subtotal: 78, total: 78, advancePaid: 20, saleId: saleService.id, createdAt: d('2026-10-19T14:00:00Z') },
   });
+  // Adelanto cobrado al recibir y aplicado en la venta de entrega
+  await db.workOrderPayment.create({
+    data: { storeId, workOrderId: workOrder.id, shiftId: shift.id, kind: 'ADVANCE', amount: 20, method: 'YAPE', notes: 'A cuenta', createdById: cashier.id, createdAt: d('2026-10-19T14:05:00Z') },
+  });
+  await db.sale.update({ where: { id: saleService.id }, data: { advanceApplied: 20 } });
   await db.workOrderItem.createMany({
     data: [
       { workOrderId: workOrder.id, type: 'SERVICE', serviceId: service.id, itemName: 'Instalación eléctrica', unitIdUsed: await unit('ZZ'), quantityBase: 1, unitPrice: 35, subtotal: 35 },
@@ -379,6 +384,7 @@ const COMPARED: Array<{ model: string; where: (storeId: string) => Row }> = [
   { model: 'ReceivablePayment', where: (s) => ({ storeId: s }) },
   { model: 'WorkOrder', where: (s) => ({ storeId: s }) },
   { model: 'WorkOrderItem', where: (s) => ({ workOrder: { storeId: s } }) },
+  { model: 'WorkOrderPayment', where: (s) => ({ storeId: s }) },
   { model: 'Patient', where: (s) => ({ storeId: s }) },
   { model: 'PatientMedication', where: (s) => ({ patient: { storeId: s } }) },
   { model: 'ControlledBookEntry', where: (s) => ({ storeId: s }) },
@@ -393,7 +399,7 @@ const COMPARED: Array<{ model: string; where: (storeId: string) => Row }> = [
 /** Registros históricos cuya fecha de creación forma parte del dato. */
 const HISTORICAL = new Set([
   'Shift', 'Sale', 'Movement', 'Receivable', 'ReceivablePayment', 'PurchaseOrder',
-  'WorkOrder', 'ControlledBookEntry', 'DrugInteractionLog',
+  'WorkOrder', 'WorkOrderPayment', 'ControlledBookEntry', 'DrugInteractionLog',
 ]);
 
 /**
@@ -563,6 +569,7 @@ async function inspectExport(zipPath: string, source: PrismaClient, storeId: str
     ((data[section] as Row[] | undefined) || []).reduce((sum, row) => sum + ((row[child] as unknown[]) || []).length, 0);
   check('ítems de compras', nested('purchaseOrders', 'items') === 2 && metadata.counts?.purchaseOrderItems === 2, `zip=${nested('purchaseOrders', 'items')}`);
   check('ítems de órdenes de trabajo', nested('workOrders', 'items') === 2 && metadata.counts?.workOrderItems === 2, `zip=${nested('workOrders', 'items')}`);
+  check('adelantos de órdenes de trabajo', nested('workOrders', 'payments') === 1 && metadata.counts?.workOrderPayments === 1, `zip=${nested('workOrders', 'payments')}`);
   check('límites operativos', !!data.operationalLimit && metadata.counts?.operationalLimits === 1, 'objeto único');
   check('catálogo público', !!data.catalogSettings && metadata.counts?.catalogSettings === 1, 'objeto único');
 

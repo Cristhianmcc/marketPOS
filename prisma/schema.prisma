@@ -128,6 +128,12 @@ enum WorkOrderItemType {
   SERVICE
 }
 
+// Pagos a cuenta de una orden de trabajo (lavandería: adelanto al recibir)
+enum WorkOrderPaymentKind {
+  ADVANCE
+  REFUND
+}
+
 enum BusinessProfile {
   BODEGA
   FERRETERIA
@@ -235,6 +241,7 @@ model User {
   // Receivables created
   receivablesCreated Receivable[]        @relation("ReceivableCreatedBy")
   receivablePayments ReceivablePayment[] @relation("PaymentCreatedBy")
+  workOrderPayments  WorkOrderPayment[]  @relation("WorkOrderPaymentCreatedBy")
 
   // MÓDULO 15: Auditoría
   auditLogs AuditLog[]
@@ -402,6 +409,7 @@ model Shift {
 
   sales              Sale[]
   receivablePayments ReceivablePayment[] // ✅ Pagos de FIADO en este turno
+  workOrderPayments  WorkOrderPayment[] // Adelantos y devoluciones de órdenes en este turno
 
   @@index([storeId, openedAt])
   @@map("shifts")
@@ -439,6 +447,8 @@ model Sale {
 
   // Impuesto a las bolsas plásticas, incluido en total (aparte del IGV)
   icbperTotal Decimal @default(0) @map("icbper_total") @db.Decimal(10, 2)
+  // Adelanto de la orden de trabajo descontado del cobro (ya entró a caja antes)
+  advanceApplied Decimal @default(0) @map("advance_applied") @db.Decimal(12, 2)
 
   printedAt DateTime? @map("printed_at")
 
@@ -1401,6 +1411,9 @@ model WorkOrder {
   discount Decimal @default(0) @db.Decimal(12, 2)
   total    Decimal @default(0) @db.Decimal(12, 2)
 
+  // Suma neta de adelantos (ADVANCE − REFUND); se actualiza con la orden bloqueada
+  advancePaid Decimal @default(0) @map("advance_paid") @db.Decimal(12, 2)
+
   saleId String? @unique @map("sale_id")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1410,12 +1423,36 @@ model WorkOrder {
   customer Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   sale     Sale?           @relation(fields: [saleId], references: [id], onDelete: SetNull)
   items    WorkOrderItem[]
+  payments WorkOrderPayment[]
 
   @@unique([storeId, orderNumber])
   @@index([storeId])
   @@index([status])
   @@index([customerId])
   @@map("work_orders")
+}
+
+model WorkOrderPayment {
+  id          String               @id @default(cuid())
+  storeId     String               @map("store_id")
+  workOrderId String               @map("work_order_id")
+  shiftId     String               @map("shift_id")
+  kind        WorkOrderPaymentKind @default(ADVANCE)
+  amount      Decimal              @db.Decimal(12, 2)
+  method      PaymentMethod
+  notes       String?
+  createdById String               @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  shift     Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("WorkOrderPaymentCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([workOrderId])
+  @@index([shiftId])
+  @@map("work_order_payments")
 }
 
 // Items de órdenes de trabajo

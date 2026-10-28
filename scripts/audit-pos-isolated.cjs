@@ -1228,6 +1228,7 @@ async function main() {
   const shiftRepositoryModule = loadRoute('src/infra/db/repositories/PrismaShiftRepository.ts', {
     '@prisma/client': { Prisma: { Decimal: TestDecimal } },
     '@/infra/db/prisma': { prisma: shiftPrisma },
+    '@/lib/workOrders/payments': { advancesByMethodForShift: async () => ({}) },
     '@/repositories/IShiftRepository': {},
     '@/domain/types': {},
   });

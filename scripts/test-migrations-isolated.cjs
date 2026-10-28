@@ -80,7 +80,10 @@ async function main() {
   if (!fs.existsSync(baseline) || fs.statSync(baseline).size < 10000) {
     throw new Error('The versioned baseline migration is missing or incomplete');
   }
-  const expectedTables = (fs.readFileSync(baseline, 'utf8').match(/^CREATE TABLE /gm) || []).length + 1;
+  // Tablas creadas por todas las migraciones (baseline y aditivas) + _prisma_migrations
+  const expectedTables = fs.readdirSync(migrationsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(migrationsDir, entry.name, 'migration.sql')))
+    .reduce((sum, entry) => sum + (fs.readFileSync(path.join(migrationsDir, entry.name, 'migration.sql'), 'utf8').match(/^CREATE TABLE /gm) || []).length, 0) + 1;
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'marketpos-h04-'));
   const dataDir = path.join(tempRoot, 'data');

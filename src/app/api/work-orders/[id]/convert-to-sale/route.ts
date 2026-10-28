@@ -19,6 +19,9 @@ import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftReposi
 import { consumeSaleInventory, InventoryMutationError } from '@/lib/inventory/stockMutations';
 
 class OrderAlreadyChargedError extends Error {}
+class InsufficientPaymentError extends Error {}
+
+const round2 = (value: number) => Math.round(value * 100) / 100;
 
 const shiftRepo = new PrismaShiftRepository();
 
@@ -106,10 +109,12 @@ export async function POST(
       return NextResponse.json({ error: 'Cliente requerido para ventas FIADO' }, { status: 400 });
     }
 
-    // Validar pago en efectivo
+    // Validar pago en efectivo contra el saldo (total − adelanto); se vuelve a
+    // comprobar dentro de la transacción con el adelanto definitivo.
     const total = workOrder.total.toNumber();
+    const balanceBefore = round2(total - workOrder.advancePaid.toNumber());
     if (paymentMethod === 'CASH') {
-      if (amountPaid === undefined || amountPaid < total) {
+      if (amountPaid === undefined || amountPaid < balanceBefore) {
         return NextResponse.json({ error: 'Monto pagado insuficiente' }, { status: 400 });
       }
     }
@@ -140,6 +145,14 @@ export async function POST(
       });
       if (claimed.count !== 1) throw new OrderAlreadyChargedError();
 
+      // Adelanto definitivo: la reserva ya impide nuevos adelantos
+      const claimedOrder = await tx.workOrder.findUniqueOrThrow({ where: { id: workOrder.id }, select: { advancePaid: true } });
+      const advanceApplied = claimedOrder.advancePaid.toNumber();
+      const balance = round2(workOrder.total.toNumber() - advanceApplied);
+      if (paymentMethod === 'CASH' && (amountPaid === undefined || amountPaid < balance)) {
+        throw new InsufficientPaymentError();
+      }
+
       // 1. Obtener siguiente número de venta (excluir ventas demo >= 90000)
       const lastSale = await tx.sale.findFirst({
         where: {
@@ -156,7 +169,7 @@ export async function POST(
       const subtotal = workOrder.subtotal.toNumber();
       const discount = workOrder.discount.toNumber();
       const saleTotal = workOrder.total.toNumber();
-      const changeAmount = paymentMethod === 'CASH' && amountPaid ? amountPaid - saleTotal : null;
+      const changeAmount = paymentMethod === 'CASH' && amountPaid !== undefined ? round2(amountPaid - balance) : null;
 
       // 3. Crear Sale
       const saleData: any = {
@@ -170,6 +183,7 @@ export async function POST(
         totalBeforeCoupon: new Prisma.Decimal(subtotal),
         couponDiscount: new Prisma.Decimal(0),
         total: new Prisma.Decimal(saleTotal),
+        advanceApplied: new Prisma.Decimal(advanceApplied),
         paymentMethod: paymentMethod as PaymentMethod,
       };
 
@@ -265,14 +279,14 @@ export async function POST(
 
       // 6. Si es FIADO, crear Receivable
       let receivable = null;
-      if (paymentMethod === 'FIADO') {
+      if (paymentMethod === 'FIADO' && balance > 0) {
         receivable = await tx.receivable.create({
           data: {
             storeId: session.storeId,
             customerId: finalCustomerId!,
             saleId: sale.id,
-            originalAmount: new Prisma.Decimal(saleTotal),
-            balance: new Prisma.Decimal(saleTotal),
+            originalAmount: new Prisma.Decimal(balance),
+            balance: new Prisma.Decimal(balance),
             status: 'OPEN',
             createdById: session.userId,
           },
@@ -296,12 +310,17 @@ export async function POST(
         workOrderId: result.workOrder.id,
         workOrderNumber: result.workOrder.orderNumber,
         total: result.sale.total,
+        advanceApplied: result.sale.advanceApplied,
+        balance: round2(result.sale.total.toNumber() - result.sale.advanceApplied.toNumber()),
         paymentMethod: result.sale.paymentMethod,
         receivableId: result.receivable?.id,
       },
     });
 
   } catch (error: any) {
+    if (error instanceof InsufficientPaymentError) {
+      return NextResponse.json({ error: 'Monto pagado insuficiente' }, { status: 400 });
+    }
     if (error instanceof OrderAlreadyChargedError) {
       return NextResponse.json({ error: 'Esta orden ya fue cobrada o cambió de estado' }, { status: 409 });
     }

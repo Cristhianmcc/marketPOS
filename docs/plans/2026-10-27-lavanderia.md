@@ -88,6 +88,33 @@ Banco 12/14; solo faltan L7 (adelanto, Fase 2) y L8 (express, Fase 3).
 Mutaciones detectadas: sin reserva de la orden (L11), sin control de estados
 (L6), anulación sin devolver la orden (L13).
 
+## Resultado de la Fase 2 (2026-10-27)
+
+Banco 15/16; solo falta L8 (express, Fase 3).
+
+- Migración aditiva `20261028000000_work_order_payments`: tabla
+  `work_order_payments` (ADVANCE/REFUND, turno, método, usuario),
+  `work_orders.advance_paid` y `sales.advance_applied`.
+- L7: adelanto en el turno abierto, nunca mayor al total. Dos adelantos que
+  se cruzan: el segundo espera el bloqueo de la orden y responde 409.
+- L9: la entrega cobra solo el saldo (pago menor al saldo: 400); la venta y la
+  boleta quedan por el total.
+- L12: la caja suma adelanto y saldo una sola vez (77,50 en el caso).
+- L13: anular la venta conserva el adelanto en la orden; el nuevo cobro es el
+  saldo.
+- L15: cancelar con adelanto lo devuelve por método en el turno abierto; la
+  caja cuadra (78,50) y Yape neto 0.
+- L16: no se puede editar la orden a un total menor que el adelanto.
+- Respaldo: exporta y restaura los adelantos; roundtrip 35/35 modelos.
+
+Mutaciones detectadas: sin bloqueo de la orden (L7, con una transacción que
+queda abierta mientras llega el segundo adelanto), caja que cuenta el adelanto
+dos veces (L12, L15), cobro que ignora el adelanto (L9), cancelar sin devolver
+(L15).
+
+Pendiente de pantalla (Fase 4): botón de adelanto en la orden, saldo visible y
+el adelanto en ticket y cierre de turno.
+
 ## Fases
 
 0. Banco `scripts/test-lavanderia-flow-isolated.ts` (PostgreSQL desechable)

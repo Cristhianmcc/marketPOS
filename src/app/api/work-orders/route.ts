@@ -15,6 +15,10 @@ import { prisma } from '@/infra/db/prisma';
 import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature, isFeatureEnabled } from '@/lib/featureFlags';
 import { canEditTransition, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
+import { lockWorkOrder, refundAdvances } from '@/lib/workOrders/payments';
+import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
+
+const shiftRepo = new PrismaShiftRepository();
 
 // ══════════════════════════════════════════════════════════════════════════════
 // GET - Listar órdenes de trabajo
@@ -336,6 +340,12 @@ export async function PATCH(request: NextRequest) {
     const servicesEnabled = await isFeatureEnabled(session.storeId, FeatureFlagKey.ENABLE_SERVICES);
 
     const workOrder = await prisma.$transaction(async (tx) => {
+      // Bloquear la orden: un adelanto simultáneo no puede quedar mayor al total
+      const locked = await lockWorkOrder(tx, session.storeId, id);
+      if (locked.status === WorkOrderStatus.CLOSED || locked.status === WorkOrderStatus.CANCELLED) {
+        throw new WorkOrderRuleError('No se puede editar una orden cerrada o cancelada', 409);
+      }
+
       // Si se proporcionan items, recalcular y reemplazar
       let newSubtotal = existingOrder.subtotal.toNumber();
 
@@ -415,6 +425,10 @@ export async function PATCH(request: NextRequest) {
         }
 
         await tx.workOrderItem.createMany({ data: itemsToCreate });
+      }
+
+      if (newSubtotal + 0.005 < locked.advancePaid.toNumber()) {
+        throw new WorkOrderRuleError(`El total no puede quedar por debajo del adelanto ya cobrado (S/ ${locked.advancePaid.toFixed(2)})`, 409);
       }
 
       // Actualizar orden
@@ -506,6 +520,27 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: 'Orden marcada como cancelada (ya tiene venta asociada)' });
     }
 
+    // Con adelanto: se cancela (no se borra) y se devuelve el adelanto en el turno abierto
+    if (order.advancePaid.toNumber() > 0) {
+      const shift = await shiftRepo.getCurrentShift(session.storeId, session.userId);
+      if (!shift) {
+        return NextResponse.json({ error: 'La orden tiene adelanto: abre tu turno para registrar la devolución.' }, { status: 400 });
+      }
+      const refunded = await prisma.$transaction(async (tx) => {
+        const locked = await lockWorkOrder(tx, session.storeId, id);
+        if (locked.saleId || locked.status === WorkOrderStatus.CLOSED || locked.status === WorkOrderStatus.CANCELLED) {
+          throw new WorkOrderRuleError('La orden ya fue cobrada o cancelada', 409);
+        }
+        const amount = await refundAdvances(tx, {
+          storeId: session.storeId, workOrderId: id, shiftId: shift.id, userId: session.userId,
+          reason: `Devolución por cancelación de OT #${locked.orderNumber}`,
+        });
+        await tx.workOrder.update({ where: { id }, data: { status: WorkOrderStatus.CANCELLED } });
+        return amount;
+      });
+      return NextResponse.json({ message: 'Orden cancelada y adelanto devuelto', refunded });
+    }
+
     // Si es DRAFT, eliminar completamente
     if (order.status === WorkOrderStatus.DRAFT) {
       await prisma.workOrder.delete({
@@ -519,10 +554,11 @@ export async function DELETE(request: NextRequest) {
       where: { id },
       data: { status: WorkOrderStatus.CANCELLED },
     });
-
     return NextResponse.json({ message: 'Orden cancelada' });
-
   } catch (error: any) {
+    if (error instanceof WorkOrderRuleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('DELETE /api/work-orders error:', error);
     if (error.code === 'FEATURE_DISABLED') {
       return NextResponse.json({ error: 'Módulo no habilitado' }, { status: 403 });
