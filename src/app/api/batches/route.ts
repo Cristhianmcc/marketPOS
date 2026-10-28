@@ -18,6 +18,7 @@ import {
   guardErrorToResponse,
 } from '@/lib/guards/requireFlag';
 import { prisma } from '@/infra/db/prisma';
+import { InventoryMutationError, receiveStockAtomically } from '@/lib/inventory/stockMutations';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -191,11 +192,11 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Actualizar stock del storeProduct
-      const currentStock = sp.stock?.toNumber() ?? 0;
-      await tx.storeProduct.update({
-        where: { id: data.storeProductId },
-        data: { stock: currentStock + data.quantity },
+      // Incremento atómico: no reescribe un stock leído antes de la transacción
+      await receiveStockAtomically(tx, {
+        storeId: session.storeId,
+        storeProductId: data.storeProductId,
+        quantity: data.quantity,
       });
 
       return newBatch;
@@ -217,6 +218,9 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof InventoryMutationError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
     return guardErrorToResponse(error);
   }
 }

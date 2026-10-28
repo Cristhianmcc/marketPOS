@@ -110,6 +110,55 @@ export async function consumeSaleInventory(
   }
 }
 
+/**
+ * Adds stock received with a lot. A product that did not track stock yet
+ * (stock = null) starts tracking it with the received quantity.
+ */
+export async function receiveStockAtomically(
+  tx: Prisma.TransactionClient,
+  input: { storeId: string; storeProductId: string; quantity: Prisma.Decimal.Value }
+): Promise<void> {
+  const quantity = new Prisma.Decimal(input.quantity);
+  const incremented = await tx.storeProduct.updateMany({
+    where: { id: input.storeProductId, storeId: input.storeId, stock: { not: null } },
+    data: { stock: { increment: quantity } },
+  });
+  if (incremented.count === 1) return;
+  const initialized = await tx.storeProduct.updateMany({
+    where: { id: input.storeProductId, storeId: input.storeId, stock: null },
+    data: { stock: quantity },
+  });
+  if (initialized.count !== 1) {
+    throw new InventoryMutationError('STOCK_CONFLICT', 'El producto cambió durante el ingreso del lote', {
+      storeProductId: input.storeProductId,
+    });
+  }
+}
+
+/** Decrements one lot with a guarded update; general stock is adjusted separately. */
+export async function decrementBatchAtomically(
+  tx: Prisma.TransactionClient,
+  input: { storeId: string; storeProductId: string; batchId: string; quantity: Prisma.Decimal.Value }
+): Promise<void> {
+  const quantity = new Prisma.Decimal(input.quantity);
+  const updated = await tx.productBatch.updateMany({
+    where: {
+      id: input.batchId,
+      storeId: input.storeId,
+      storeProductId: input.storeProductId,
+      active: true,
+      quantityAvailable: { gte: quantity },
+    },
+    data: { quantityAvailable: { decrement: quantity } },
+  });
+  if (updated.count !== 1) {
+    throw new InventoryMutationError('INSUFFICIENT_BATCH_STOCK', 'El lote no tiene stock suficiente para el ajuste', {
+      batchId: input.batchId,
+      requested: quantity.toString(),
+    });
+  }
+}
+
 /** Applies a manual stock delta; movement creation belongs to the same transaction. */
 export async function adjustStockAtomically(
   tx: Prisma.TransactionClient,

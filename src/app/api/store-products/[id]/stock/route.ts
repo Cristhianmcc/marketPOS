@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
 import { StockMovementSchema } from '@/domain/schemas/inventory';
 import { prisma } from '@/lib/prisma';
-import { adjustStockAtomically, InventoryMutationError } from '@/lib/inventory/stockMutations';
+import { adjustStockAtomically, decrementBatchAtomically, InventoryMutationError } from '@/lib/inventory/stockMutations';
+import { isFeatureEnabled } from '@/lib/featureFlags';
+import { FeatureFlagKey } from '@prisma/client';
 
 export async function PATCH(
   req: NextRequest,
@@ -78,10 +80,47 @@ export async function PATCH(
       );
     }
 
+    // Productos controlados por lote (botica): todo el stock debe tener lote.
+    // Las entradas se registran en Lotes (número y vencimiento) y las salidas
+    // indican de qué lote salen, para que stock general y lotes coincidan.
+    const batchesEnabled = await isFeatureEnabled(storeId, FeatureFlagKey.ENABLE_BATCH_EXPIRY);
+    // Basta con que haya tenido un lote alguna vez: agotarlos no lo libera.
+    const tracksLots = batchesEnabled && (await prisma.productBatch.count({
+      where: { storeId, storeProductId: id },
+    })) > 0;
+    let batchId: string | null = null;
+    if (tracksLots) {
+      if (data.quantity > 0) {
+        return NextResponse.json(
+          {
+            error: 'Este producto se controla por lotes: registra la entrada en "Lotes" con número de lote y vencimiento.',
+            code: 'LOT_REQUIRED',
+          },
+          { status: 409 }
+        );
+      }
+      if (!data.batchId) {
+        return NextResponse.json(
+          { error: 'Indica de qué lote sale este ajuste.', code: 'LOT_REQUIRED' },
+          { status: 400 }
+        );
+      }
+      batchId = data.batchId;
+    }
+
     // Aplicar el ajuste y registrar el movimiento dentro de una sola transacción.
     // El helper vuelve a validar el stock con un UPDATE condicional para evitar
     // que dos ajustes o una venta concurrente sobrescriban cantidades.
     const updated = await prisma.$transaction(async (tx) => {
+      if (batchId) {
+        await decrementBatchAtomically(tx, {
+          storeId,
+          storeProductId: id,
+          batchId,
+          quantity: Math.abs(data.quantity),
+        });
+      }
+
       await adjustStockAtomically(tx, {
         storeId,
         storeProductId: id,
@@ -98,6 +137,7 @@ export async function PATCH(
           total: data.total ?? null,
           notes: data.notes ?? null,
           createdById: user.userId,
+          batchId,
         },
       });
 

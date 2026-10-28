@@ -17,6 +17,7 @@ import {
   guardErrorToResponse,
 } from '@/lib/guards/requireFlag';
 import { prisma } from '@/infra/db/prisma';
+import { adjustStockAtomically, InventoryMutationError } from '@/lib/inventory/stockMutations';
 
 export async function PATCH(
   request: NextRequest,
@@ -86,10 +87,15 @@ export async function PATCH(
     const qtyToRevert = batch.quantityAvailable.toNumber();
 
     await prisma.$transaction(async (tx) => {
-      await tx.productBatch.update({
-        where: { id },
+      // Se reclama el lote con la cantidad observada: si una venta lo tocó
+      // entretanto, la baja se rechaza en vez de descontar un saldo obsoleto.
+      const claimed = await tx.productBatch.updateMany({
+        where: { id, storeId, active: true, quantityAvailable: batch.quantityAvailable },
         data: { active: false, quantityAvailable: 0 },
       });
+      if (claimed.count !== 1) {
+        throw new InventoryMutationError('STOCK_CONFLICT', 'El lote cambió mientras se daba de baja; vuelve a intentarlo');
+      }
 
       if (qtyToRevert > 0) {
         await tx.movement.create({
@@ -106,20 +112,20 @@ export async function PATCH(
           },
         });
 
-        const sp = await tx.storeProduct.findUnique({
-          where: { id: batch.storeProductId },
-        });
-        const currentStock = sp?.stock?.toNumber() ?? 0;
-        const newStock = Math.max(0, currentStock - qtyToRevert);
-        await tx.storeProduct.update({
-          where: { id: batch.storeProductId },
-          data: { stock: newStock },
+        // Decremento atómico del stock general por lo que quedaba en el lote
+        await adjustStockAtomically(tx, {
+          storeId,
+          storeProductId: batch.storeProductId,
+          quantity: -qtyToRevert,
         });
       }
     });
 
     return NextResponse.json({ message: 'Lote desactivado correctamente' });
   } catch (error) {
+    if (error instanceof InventoryMutationError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
     return guardErrorToResponse(error);
   }
 }

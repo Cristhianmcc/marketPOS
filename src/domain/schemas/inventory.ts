@@ -49,4 +49,6 @@ export const StockMovementSchema = z.object({
   unitPrice: z.number().positive().optional().nullable(),
   total: z.number().optional().nullable(),
   notes: z.string().optional().nullable(),
+  /** Lote del que sale un ajuste negativo en productos controlados por lote. */
+  batchId: z.string().min(1).optional().nullable(),
 });

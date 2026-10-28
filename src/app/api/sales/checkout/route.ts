@@ -645,17 +645,24 @@ async function executeCheckout(
           orderBy: { expiryDate: 'asc' },
         });
 
-        if (activeBatches.length === 0) continue; // Producto sin lotes: usar flujo normal
+        const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
+
+        if (activeBatches.length === 0) {
+          // Producto que nunca tuvo lotes: flujo normal. Si ya se controla por
+          // lote y estos se agotaron, el stock restante no tiene lote y no se vende.
+          const everTracked = await tx.productBatch.count({
+            where: { storeProductId: item.storeProductId, storeId: session.storeId },
+          });
+          if (everTracked === 0) continue;
+        }
 
         // Filtrar vencidos según política
         const usableBatches = blockExpired
           ? activeBatches.filter((b) => b.expiryDate > now)
           : activeBatches;
 
-        const sp = storeProducts.find((p) => p.id === item.storeProductId)!;
-
         // Si política BLOCK_EXPIRED y todos están vencidos
-        if (blockExpired && usableBatches.length === 0) {
+        if (blockExpired && activeBatches.length > 0 && usableBatches.length === 0) {
           throw new CheckoutError(
             'EXPIRED_BATCH_ONLY',
             409,
@@ -673,7 +680,7 @@ async function executeCheckout(
           throw new CheckoutError(
             'INSUFFICIENT_BATCH_STOCK',
             409,
-            `${sp.product.name}: stock insuficiente en lotes (disponible en lotes: ${totalAvailable})`,
+            `${sp.product.name}: solo hay ${totalAvailable} con lote vigente. Si llegó mercadería nueva, regístrala en "Lotes" con número y vencimiento.`,
             {
               productId: sp.id,
               productName: sp.product.name,

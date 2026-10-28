@@ -106,6 +106,9 @@ async function flowWorker(contextPath: string) {
   const checkout = require('../src/app/api/sales/checkout/route');
   const cancel = require('../src/app/api/sales/[id]/cancel/route');
   const expiryAlerts = require('../src/app/api/expiry-alerts/route');
+  const stockRoute = require('../src/app/api/store-products/[id]/stock/route');
+  const batchesRoute = require('../src/app/api/batches/route');
+  const batchRoute = require('../src/app/api/batches/[id]/route');
   const { buildPayloadFromSale } = require('../src/lib/sunat/buildPayloadFromSale');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -207,9 +210,42 @@ async function flowWorker(contextPath: string) {
     await record('C12', await read(await cancel.POST(json(`/api/sales/${fefo.body.saleId}/cancel`, 'POST', {}), { params: Promise.resolve({ id: fefo.body.saleId }) })));
   }
 
-  // C13 Stock suelto: 5 unidades agregadas sin lote a un producto con lotes
+  // Regla de botica: un producto con lotes no admite stock sin lote.
+  const adjust = async (body: Record<string, unknown>) =>
+    read(await stockRoute.PATCH(json(`/api/store-products/${ctx.sp.para}/stock`, 'PATCH', { type: 'ADJUSTMENT', ...body }), { params: Promise.resolve({ id: ctx.sp.para }) }));
+  const lotId = async (batchNumber: string) => (await prisma.productBatch.findFirst({ where: { storeProductId: ctx.sp.para, batchNumber } })).id;
+
+  // C13 Entrada manual sin lote: se rechaza y el stock no cambia
+  await record('C13', await adjust({ quantity: 5, notes: 'sin lote' }));
+
+  // C14 Salida manual sin indicar lote: se rechaza
+  await record('C14', await adjust({ quantity: -2 }));
+
+  // C15 Salida manual de 2 del lote PARA-A: baja lote y stock juntos
+  await record('C15', await adjust({ quantity: -2, batchId: await lotId('PARA-A'), notes: 'rotura' }), {
+    movementBatch: (await prisma.movement.findFirst({ where: { storeProductId: ctx.sp.para, notes: 'rotura' }, include: { batch: true } }))?.batch?.batchNumber ?? null,
+  });
+
+  // C16 Salida de 25 del lote PARA-B (tiene 20; el stock general sí alcanza): se rechaza sin tocar nada
+  await record('C16', await adjust({ quantity: -25, batchId: await lotId('PARA-B') }));
+
+  // C17 Entrada correcta por Lotes: PARA-C con 5 unidades
+  const newLot = (batchNumber: string, quantity: number) => batchesRoute.POST(json('/api/batches', 'POST', {
+    storeProductId: ctx.sp.para, batchNumber, quantity, expiryDate: new Date(Date.now() + 300 * DAY).toISOString(),
+  }));
+  await record('C17', await read(await newLot('PARA-C', 5)));
+
+  // C18 Registrar PARA-D (4) y darlo de baja: el stock vuelve a lo anterior
+  await read(await newLot('PARA-D', 4));
+  const lotD = await lotId('PARA-D');
+  await record('C18', await read(await batchRoute.PATCH(json(`/api/batches/${lotD}?action=deactivate`, 'PATCH'), { params: Promise.resolve({ id: lotD }) })));
+
+  // C19 Venta de todo el stock (33) consume los tres lotes vigentes
+  await record('C19', await sell([{ storeProductId: ctx.sp.para, quantity: 33, unitPrice: 1.5 }]));
+
+  // C20 Stock suelto heredado (anterior a la regla): no se vende sin lote y el mensaje orienta a Lotes
   await prisma.storeProduct.update({ where: { id: ctx.sp.para }, data: { stock: { increment: 5 } } });
-  await record('C13', await sell([{ storeProductId: ctx.sp.para, quantity: 33, unitPrice: 1.5 }]));
+  await record('C20', await sell([{ storeProductId: ctx.sp.para, quantity: 1, unitPrice: 1.5 }]));
 
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
@@ -277,8 +313,39 @@ const EXPECTATIONS: Expectation[] = [
     ...(ok(s.C12) ? [] : [`respondió ${s.C12?.result?.status} ${JSON.stringify(s.C12?.result?.body)}`]),
     ...eq('paracetamol', s.C12?.state?.['BT-PARA'], { stock: 30, batches: { 'PARA-A': 10, 'PARA-B': 20 } }),
   ] },
-  { id: 'C13', title: 'Stock sin lote en producto con lotes (33 de 30 en lotes + 5 sueltas)', rule: true, check: (s) => [
-    ...(ok(s.C13) ? [] : [`respondió ${s.C13?.result?.status} ${s.C13?.result?.body?.code}: ${s.C13?.result?.body?.message}`]),
+  { id: 'C13', title: 'Rechaza entrada manual sin lote', check: (s) => [
+    ...eq('respuesta', [s.C13?.result?.status, s.C13?.result?.body?.code], [409, 'LOT_REQUIRED']),
+    ...eq('paracetamol', s.C13?.state?.['BT-PARA'], { stock: 30, batches: { 'PARA-A': 10, 'PARA-B': 20 } }),
+  ] },
+  { id: 'C14', title: 'Rechaza salida manual sin lote', check: (s) => [
+    ...eq('respuesta', [s.C14?.result?.status, s.C14?.result?.body?.code], [400, 'LOT_REQUIRED']),
+    ...eq('paracetamol', s.C14?.state?.['BT-PARA']?.stock, 30),
+  ] },
+  { id: 'C15', title: 'Salida manual con lote baja lote y stock', check: (s) => [
+    ...(ok(s.C15) ? [] : [`respondió ${s.C15?.result?.status} ${JSON.stringify(s.C15?.result?.body)}`]),
+    ...eq('paracetamol', s.C15?.state?.['BT-PARA'], { stock: 28, batches: { 'PARA-A': 8, 'PARA-B': 20 } }),
+    ...eq('lote del movimiento', s.C15?.movementBatch, 'PARA-A'),
+  ] },
+  { id: 'C16', title: 'Rechaza salida mayor que el lote sin tocar stock', check: (s) => [
+    ...eq('respuesta', s.C16?.result?.status, 409),
+    ...eq('paracetamol', s.C16?.state?.['BT-PARA'], { stock: 28, batches: { 'PARA-A': 8, 'PARA-B': 20 } }),
+  ] },
+  { id: 'C17', title: 'Entrada por Lotes suma al stock', check: (s) => [
+    ...eq('respuesta', s.C17?.result?.status, 201),
+    ...eq('paracetamol', s.C17?.state?.['BT-PARA'], { stock: 33, batches: { 'PARA-A': 8, 'PARA-B': 20, 'PARA-C': 5 } }),
+  ] },
+  { id: 'C18', title: 'Baja de lote descuenta lo que quedaba', check: (s) => [
+    ...(ok(s.C18) ? [] : [`respondió ${s.C18?.result?.status} ${JSON.stringify(s.C18?.result?.body)}`]),
+    ...eq('paracetamol', s.C18?.state?.['BT-PARA'], { stock: 33, batches: { 'PARA-A': 8, 'PARA-B': 20, 'PARA-C': 5, 'PARA-D': 0 } }),
+  ] },
+  { id: 'C19', title: 'Vende todo el stock y cuadra con los lotes', check: (s) => [
+    ...(ok(s.C19) ? [] : [`respondió ${s.C19?.result?.status} ${s.C19?.result?.body?.code}: ${s.C19?.result?.body?.message}`]),
+    ...eq('paracetamol', s.C19?.state?.['BT-PARA'], { stock: 0, batches: { 'PARA-A': 0, 'PARA-B': 0, 'PARA-C': 0, 'PARA-D': 0 } }),
+  ] },
+  { id: 'C20', title: 'Sin lote vigente no vende y orienta a Lotes', check: (s) => [
+    ...eq('respuesta', [s.C20?.result?.status, s.C20?.result?.body?.code], [409, 'INSUFFICIENT_BATCH_STOCK']),
+    ...eq('paracetamol', s.C20?.state?.['BT-PARA']?.stock, 5),
+    ...(/Lotes/.test(s.C20?.result?.body?.message ?? s.C20?.result?.body?.error ?? '') ? [] : [`mensaje: ${JSON.stringify(s.C20?.result?.body)}`]),
   ] },
 ];
 

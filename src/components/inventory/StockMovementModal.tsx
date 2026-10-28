@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Package } from 'lucide-react';
 import { useFlags } from '@/hooks/useFlags';
 
@@ -33,6 +33,32 @@ export function StockMovementModal({
 
   const { isOn } = useFlags();
   const batchesEnabled = isOn('ENABLE_BATCH_EXPIRY');
+  // Lotes activos: si existen, el producto se controla por lote y el ajuste
+  // manual solo admite salidas indicando el lote (las entradas van en Lotes).
+  const [lots, setLots] = useState<{ id: string; batchNumber: string; expiryDate: string; quantityAvailable: number }[]>([]);
+  const [batchId, setBatchId] = useState('');
+  const [hasLotHistory, setHasLotHistory] = useState(false);
+  const tracksLots = batchesEnabled && hasLotHistory;
+
+  useEffect(() => {
+    if (!isOpen || !batchesEnabled) {
+      setLots([]);
+      setHasLotHistory(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/batches?storeProductId=${encodeURIComponent(storeProduct.id)}`)
+      .then((res) => (res.ok ? res.json() : { batches: [] }))
+      .then((data) => {
+        if (cancelled) return;
+        const all = data.batches ?? [];
+        setLots(all.filter((b: { active: boolean; quantityAvailable: number }) => b.active && b.quantityAvailable > 0));
+        setHasLotHistory(all.length > 0);
+        if (all.length > 0) setType('ADJUSTMENT');
+      })
+      .catch(() => { if (!cancelled) setLots([]); });
+    return () => { cancelled = true; };
+  }, [isOpen, batchesEnabled, storeProduct.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,12 +67,25 @@ export function StockMovementModal({
 
     try {
       const qty = parseFloat(quantity);
+      if (tracksLots) {
+        if (!(qty < 0)) {
+          setError('Este producto se controla por lotes: las entradas se registran en "Lotes". Aquí solo puedes descontar (cantidad negativa).');
+          setLoading(false);
+          return;
+        }
+        if (!batchId) {
+          setError('Elige de qué lote sale el ajuste.');
+          setLoading(false);
+          return;
+        }
+      }
       const payload = {
         type,
         quantity: type === 'ADJUSTMENT' && qty > 0 ? qty : qty,
         unitPrice: unitPrice ? parseFloat(unitPrice) : null,
         total: unitPrice && quantity ? parseFloat(unitPrice) * parseFloat(quantity) : null,
         notes: notes || null,
+        batchId: tracksLots ? batchId : null,
       };
 
       const res = await fetch(`/api/store-products/${storeProduct.id}/stock`, {
@@ -78,6 +117,7 @@ export function StockMovementModal({
     setQuantity('');
     setUnitPrice('');
     setNotes('');
+    setBatchId('');
     setError('');
     setLoading(false);
   };
@@ -132,7 +172,7 @@ export function StockMovementModal({
               required
               className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
             >
-              <option value="PURCHASE">Entrada (Compra)</option>
+              {!tracksLots && <option value="PURCHASE">Entrada (Compra)</option>}
               <option value="ADJUSTMENT">Ajuste</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
@@ -141,6 +181,32 @@ export function StockMovementModal({
                 : 'Corrección de stock (positivo/negativo)'}
             </p>
           </div>
+
+          {tracksLots && (
+            <div>
+              <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <Package className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <p className="text-xs text-amber-800">
+                  Producto controlado por lotes. Las entradas se registran en <strong>Lotes</strong>;
+                  aquí solo se descuenta (merma, vencido, rotura) indicando el lote.
+                </p>
+              </div>
+              <label className="block text-sm font-medium text-[#1F2A37] mb-2">Lote *</label>
+              <select
+                value={batchId}
+                onChange={(e) => setBatchId(e.target.value)}
+                required
+                className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
+              >
+                <option value="">Selecciona un lote</option>
+                {lots.map((lot) => (
+                  <option key={lot.id} value={lot.id}>
+                    {lot.batchNumber} · vence {new Date(lot.expiryDate).toLocaleDateString('es-PE')} · disp. {lot.quantityAvailable}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-[#1F2A37] mb-2">
@@ -154,7 +220,7 @@ export function StockMovementModal({
               required
               className="w-full h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
               placeholder={
-                type === 'ADJUSTMENT' ? 'Positivo o negativo' : isUnit ? '1' : '0.00'
+                tracksLots ? 'Negativo, ej. -2' : type === 'ADJUSTMENT' ? 'Positivo o negativo' : isUnit ? '1' : '0.00'
               }
             />
             {isUnit && (

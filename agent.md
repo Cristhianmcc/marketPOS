@@ -111,6 +111,12 @@ es `docs/audits/2026-09-26-pos.md`.
 - El stock general y los lotes FEFO se consumen dentro de la transacción del
   checkout. Un conflicto revierte venta, items, movimientos y stock. El ajuste
   manual también registra su `Movement` dentro de la misma transacción.
+- Botica: con `ENABLE_BATCH_EXPIRY`, un producto que tuvo algún lote se controla
+  por lote para siempre. El ajuste manual rechaza entradas (`LOT_REQUIRED`, van
+  por `/api/batches`) y exige `batchId` en salidas; el checkout no vende stock
+  sin lote aunque los lotes se hayan agotado. Alta y baja de lotes usan
+  `receiveStockAtomically` y `adjustStockAtomically`. Banco:
+  `scripts/test-botica-flow-isolated.ts`.
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,
