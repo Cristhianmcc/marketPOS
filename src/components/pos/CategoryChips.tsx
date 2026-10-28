@@ -3,33 +3,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Package, Coffee, Cookie, Milk, Beef, Apple, Croissant, Sparkles, Lightbulb, Flower2,
-  Shield, Hammer, Car, Paperclip, Droplets, Palette, Anchor, Building2, Zap, User,
-  MoreHorizontal, LayoutGrid, type LucideIcon,
-} from 'lucide-react';
+import { categoryEmoji } from './categoryEmoji';
 
 interface Category {
   id: string;
   name: string;
   icon: string | null;
-}
-
-// Las categorías guardan un nombre de icono lucide o un emoji
-const ICONS: Record<string, LucideIcon> = {
-  Package, Coffee, Cookie, Milk, Beef, Apple, Croissant, Sparkles, Lightbulb, Flower2,
-  Shield, Hammer, Car, Paperclip, Droplets, Palette, Anchor, Building2, Zap, User, MoreHorizontal,
-};
-
-function CategoryIcon({ icon }: { icon: string | null }) {
-  if (icon && ICONS[icon]) {
-    const Icon = ICONS[icon];
-    return <Icon className="w-4 h-4" />;
-  }
-  if (icon && /[^\x00-\x7F]/.test(icon)) {
-    return <span className="text-sm leading-none">{icon}</span>;
-  }
-  return <Package className="w-4 h-4" />;
 }
 
 interface CategoryChipsProps {
@@ -53,17 +32,18 @@ export function CategoryChips({ selected, onSelect }: CategoryChipsProps) {
   if (categories.length === 0) return null;
 
   const chip = (active: boolean) =>
-    `flex items-center gap-2 h-9 px-3.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${
+    `flex flex-col items-center justify-center gap-1.5 w-[92px] h-[92px] px-1.5 rounded-2xl text-xs font-semibold transition-all flex-shrink-0 ${
       active
-        ? 'bg-monterrial-forest border-monterrial-forest text-white'
-        : 'bg-surface-light dark:bg-surface-dark text-text-main dark:text-text-light border-border-light dark:border-border-dark hover:border-primary/50'
+        ? 'bg-primary text-white shadow-lg shadow-primary/30'
+        : 'bg-surface-light dark:bg-surface-dark text-text-secondary dark:text-gray-300 shadow-soft hover:shadow-medium hover:text-text-main'
     }`;
 
   return (
     <div>
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 mask-fade-right">
+      <h3 className="mb-3 text-lg font-bold text-text-main dark:text-text-light">Categorías</h3>
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
         <button onClick={() => onSelect(null)} className={chip(selected === null)}>
-          <LayoutGrid className="w-4 h-4" />
+          <span className="text-3xl leading-none">🏪</span>
           <span>Todo</span>
         </button>
         {categories.map(cat => (
@@ -71,9 +51,10 @@ export function CategoryChips({ selected, onSelect }: CategoryChipsProps) {
             key={cat.id}
             onClick={() => onSelect(selected === cat.name ? null : cat.name)}
             className={chip(selected === cat.name)}
+            title={cat.name}
           >
-            <CategoryIcon icon={cat.icon} />
-            <span>{cat.name}</span>
+            <span className="text-3xl leading-none">{categoryEmoji(cat.name, cat.icon)}</span>
+            <span className="w-full line-clamp-2 text-center text-[11px] leading-tight">{cat.name}</span>
           </button>
         ))}
       </div>

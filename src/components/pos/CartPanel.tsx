@@ -284,11 +284,11 @@ function CartPanelComponent({
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="hidden md:flex md:flex-col h-full w-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl overflow-hidden">
+    <div className="hidden md:flex md:flex-col h-full w-full bg-surface-light dark:bg-surface-dark rounded-2xl shadow-soft overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-4 border-b border-border-light dark:border-border-dark shrink-0">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-lg font-semibold text-text-main dark:text-white">Pedido actual</h2>
+          <h2 className="text-xl font-bold text-text-main dark:text-white">Pedido actual</h2>
           {cart.length > 0 && (
             <button
               onClick={onClearCart}
@@ -356,7 +356,7 @@ function CartPanelComponent({
               return (
                 <div
                   key={item.storeProduct.id}
-                  className="flex gap-3 p-2.5 rounded-lg bg-background-light/70 dark:bg-background-dark border border-border-light dark:border-border-dark"
+                  className="flex gap-3 p-2.5 rounded-xl bg-background-light/60 dark:bg-background-dark"
                 >
                   {/* Product Image */}
                   <div className="relative w-14 h-14 rounded-xl bg-surface-light dark:bg-surface-dark overflow-hidden flex-shrink-0">
@@ -574,7 +574,7 @@ function CartPanelComponent({
             <button
               onClick={onFinalizeSale}
               disabled={processing || cart.length === 0}
-              className="w-full h-12 bg-primary hover:bg-primary-hover text-white text-base font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-14 bg-monterrial-checkout hover:bg-monterrial-checkout-hover text-white text-base font-bold rounded-2xl shadow-lg shadow-monterrial-checkout/30 transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {processing ? (
                 <>

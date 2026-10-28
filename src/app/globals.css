@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 @layer base {
-  /* Verde esmeralda de acción Monterrial (blanco encima: contraste 4.56) */
+  /* Morado de acción (blanco encima: contraste ~5.4) */
   :root {
-    --color-primary: 22 133 107;      /* #16856B */
-    --color-primary-hover: 17 112 90; /* #11705A */
+    --color-primary: 101 68 230;     /* #6544E6 */
+    --color-primary-hover: 82 50 208; /* #5232D0 */
   }
 
   /* ✅ Stitch Design System Base Styles */

@@ -77,7 +77,7 @@ export default async function HomePage() {
           <div>
             <div className="flex items-center gap-2.5 mb-5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/monterrial-logo.png" alt="Monterrial" className="w-8 h-8 rounded-lg" />
+              <img src="/images/monterrial-logo-dark.png" alt="Monterrial" className="w-8 h-8 rounded-lg" />
               <span className="text-sm font-semibold text-text-main dark:text-text-light">Monterrial</span>
             </div>
             <h1 className="text-3xl font-semibold tracking-tight text-text-main dark:text-text-light">

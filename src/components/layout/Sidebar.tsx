@@ -73,8 +73,8 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
   // ThemeToggle/ShortcutsButton traen estilos para fondo claro; se adaptan al sidebar oscuro
   const footerTools = '[&_button]:!bg-transparent [&_button:hover]:!bg-white/10 [&_svg]:!text-monterrial-cream/80';
-  const navIdle = 'text-monterrial-cream/70 hover:bg-white/10 hover:text-monterrial-cream';
-  const navActive = 'bg-monterrial-gold text-monterrial-forest font-semibold shadow-md shadow-black/20';
+  const navIdle = 'text-monterrial-sage hover:bg-white/5 hover:text-white';
+  const navActive = 'bg-monterrial-gold text-monterrial-forest font-bold shadow-md shadow-black/20';
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -88,7 +88,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
   return (
     <aside className={`
-      flex flex-col my-3 ml-3 rounded-3xl bg-monterrial-forest text-monterrial-cream shadow-strong
+      flex flex-col my-3 ml-3 rounded-3xl bg-gradient-to-b from-monterrial-forest to-monterrial-forest-deep text-monterrial-cream shadow-strong
       dark:ring-1 dark:ring-white/5 overflow-hidden
       transition-all duration-300 ease-in-out flex-shrink-0
       ${collapsed ? 'w-[72px]' : 'w-64'}
@@ -98,13 +98,13 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
         <div className={`flex items-center gap-3 min-w-0 ${collapsed ? '' : 'pl-5 flex-1'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/images/monterrial-logo.png"
+            src="/images/monterrial-logo-dark.png"
             alt="Monterrial"
             className="w-11 h-11 rounded-xl ring-1 ring-white/10 flex-shrink-0"
           />
           {!collapsed && (
             <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight text-monterrial-cream">Monterrial</h1>
+              <h1 className="text-2xl font-extrabold italic tracking-tight text-white">Monterrial</h1>
               <p className="text-[11px] uppercase tracking-[0.18em] text-monterrial-gold">Punto de venta</p>
             </div>
           )}
@@ -150,7 +150,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto scrollbar-hide px-3 py-3 space-y-1.5">
+      <nav className="flex-1 overflow-y-auto scrollbar-hide px-3 py-3 space-y-1">
         {mainNavItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -277,8 +277,24 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
         )}
       </nav>
 
+      {/* Promo Monterrial: solo con menú expandido y pantallas altas */}
+      {!collapsed && (
+        <div className="mx-3 mb-3 hidden [@media(min-height:900px)]:block">
+          <div className="relative overflow-hidden rounded-2xl h-36">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/bg-bodega.jpg" alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#2a0f6b] via-[#3b1a8f]/80 to-transparent" />
+            <div className="relative h-full flex flex-col justify-end p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-monterrial-gold">Factura electrónica</p>
+              <p className="text-base font-extrabold leading-tight text-white">Boletas y facturas SUNAT</p>
+              <p className="text-[11px] text-white/80">Directo desde tu caja</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer Actions */}
-      <div className="py-4 px-3 space-y-1.5 border-t border-white/10">
+      <div className="py-3 px-3 space-y-1 border-t border-white/10">
         {/* Theme & Shortcuts */}
         {!collapsed && (
           <div className={`flex items-center gap-2 px-2 py-1.5 mb-2 rounded-xl bg-white/5 ${footerTools}`}>

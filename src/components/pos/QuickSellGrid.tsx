@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, Plus } from 'lucide-react';
+import { categoryEmoji } from './categoryEmoji';
 
 interface QuickSellProduct {
   id: string;
@@ -83,13 +84,13 @@ function QuickSellGridComponent({ onAddProduct, disabled = false }: QuickSellGri
   return (
     <div>
       {/* ✅ Header */}
-      <div className="flex items-center gap-2 mb-2">
-        <h3 className="text-sm font-semibold text-text-main dark:text-text-light">Productos rápidos</h3>
-        <span className="ml-auto text-xs text-text-secondary dark:text-gray-400">Toca para agregar</span>
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="text-lg font-bold text-text-main dark:text-text-light">Productos rápidos</h3>
+        <span className="ml-auto rounded-full bg-surface-light dark:bg-surface-dark px-3 py-1 text-xs font-semibold text-text-secondary shadow-soft">Toca para agregar</span>
       </div>
 
       {/* ✅ Grid de productos - Responsive con botones grandes táctiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
         {products.map((product) => {
           const isOutOfStock = product.stock !== null && product.stock <= 0;
           const isLowStock = product.stock !== null && product.stock > 0 && product.stock <= 5;
@@ -101,18 +102,18 @@ function QuickSellGridComponent({ onAddProduct, disabled = false }: QuickSellGri
               onClick={() => !isDisabled && onAddProduct(product.id)}
               disabled={isDisabled}
               className={`
-                relative flex flex-col gap-1.5 p-2 rounded-xl text-left
-                bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark
-                transition-colors duration-150
+                relative flex flex-col gap-2 p-3 rounded-2xl text-left
+                bg-surface-light dark:bg-surface-dark shadow-soft
+                transition-shadow duration-150
                 ${
                   isDisabled
                     ? 'cursor-not-allowed opacity-60'
-                    : 'hover:border-primary/40 active:scale-[0.98] cursor-pointer touch-manipulation'
+                    : 'hover:shadow-medium active:scale-[0.98] cursor-pointer touch-manipulation'
                 }
               `}
             >
               {/* ✅ Imagen o Inicial - Tamaño táctil */}
-              <div className="w-full h-20 rounded-lg bg-background-light dark:bg-background-dark flex items-center justify-center overflow-hidden">
+              <div className="w-full h-28 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark flex items-center justify-center overflow-hidden">
                 {product.imageUrl ? (
                   <img
                     src={product.imageUrl}
@@ -120,42 +121,42 @@ function QuickSellGridComponent({ onAddProduct, disabled = false }: QuickSellGri
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-xl font-semibold text-text-secondary/40">
-                    {product.name.charAt(0).toUpperCase()}
+                  <span className="text-5xl leading-none select-none">
+                    {categoryEmoji(product.category)}
                   </span>
                 )}
               </div>
 
               {/* ✅ Nombre del producto (truncado) */}
               <div className="w-full">
-                <p className="text-[13px] font-medium text-text-main dark:text-text-light line-clamp-2 leading-snug min-h-[2.4em]">
+                <p className="text-sm font-bold text-text-main dark:text-text-light line-clamp-2 leading-snug min-h-[2.5em]">
                   {product.name}
                 </p>
               </div>
 
               {/* ✅ Precio - Tamaño táctil */}
-              <div className="mt-auto pr-9 text-sm font-semibold text-text-main dark:text-text-light">
+              <div className="mt-auto pr-10 text-lg font-extrabold text-primary">
                 S/ {Number(product.price).toFixed(2)}
               </div>
 
               {/* ✅ Badge de stock bajo */}
               {isLowStock && !isOutOfStock && (
-                <div className="absolute top-3 right-3 bg-orange-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
                   {product.stock}
                 </div>
               )}
 
               {/* ✅ Badge sin stock */}
               {isOutOfStock && (
-                <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
                   Sin stock
                 </div>
               )}
 
               {/* ✅ Icono de agregar */}
               {!isDisabled && (
-                <div className="absolute bottom-2 right-2 w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center">
-                  <Plus className="w-4 h-4" />
+                <div className="absolute bottom-3 right-3 w-9 h-9 rounded-lg bg-primary text-white flex items-center justify-center shadow-md shadow-primary/30">
+                  <Plus className="w-5 h-5" />
                 </div>
               )}
             </button>

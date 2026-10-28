@@ -8,6 +8,9 @@ import QuickSellGrid from '@/components/pos/QuickSellGrid';
 import CartPanel from '@/components/pos/CartPanel';
 import { PosHeader } from '@/components/pos/PosHeader';
 import { CategoryChips } from '@/components/pos/CategoryChips';
+import { PosBanner } from '@/components/pos/PosBanner';
+import { ShiftCard } from '@/components/pos/ShiftCard';
+import { categoryEmoji } from '@/components/pos/categoryEmoji';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
 import AdvancedUnitSelector from '@/components/pos/AdvancedUnitSelector'; // ✅ MÓDULO F1
@@ -1988,17 +1991,17 @@ export default function POSPage() {
     return (
       <div
         key={sp.id}
-        className="group flex flex-col rounded-xl bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-2 transition-colors hover:border-primary/40"
+        className="group flex flex-col rounded-2xl bg-surface-light dark:bg-surface-dark p-3 shadow-soft hover:shadow-medium transition-shadow"
       >
-        {/* Imagen del producto */}
-        <div className="relative h-20 mb-2 rounded-lg bg-background-light dark:bg-background-dark overflow-hidden flex items-center justify-center">
+        {/* Imagen del producto (o emoji de su categoría) */}
+        <div className="relative h-28 mb-3 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark overflow-hidden flex items-center justify-center">
           {sp.product.imageUrl ? (
             <img src={sp.product.imageUrl} alt={sp.product.name} className="w-full h-full object-cover" />
           ) : (
-            <PackageIcon className="w-6 h-6 text-text-secondary/30" />
+            <span className="text-5xl leading-none select-none">{categoryEmoji(sp.product.category)}</span>
           )}
           {(expiryBadge || (medicineSearchEnabled && sp.product.requiresPrescription)) && (
-            <div className="absolute top-1 left-1 flex flex-wrap gap-1">
+            <div className="absolute top-1.5 left-1.5 flex flex-wrap gap-1">
               {/* ✅ MÓDULO PH5: Badge Rx */}
               {medicineSearchEnabled && sp.product.requiresPrescription && (
                 <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">Rx</span>
@@ -2007,29 +2010,34 @@ export default function POSPage() {
               {expiryBadge}
             </div>
           )}
+          {(outOfStock || lowStock) && (
+            <span className={`absolute top-1.5 right-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${outOfStock ? 'bg-red-500' : 'bg-orange-500'}`}>
+              {outOfStock ? 'Sin stock' : `Quedan ${sp.stock}`}
+            </span>
+          )}
         </div>
 
-        <p className="text-[13px] font-medium leading-snug text-text-main dark:text-text-light line-clamp-2 min-h-[2.4em]" title={sp.product.name}>
+        <p className="text-sm font-bold leading-snug text-text-main dark:text-text-light line-clamp-2 min-h-[2.5em]" title={sp.product.name}>
           {sp.product.name}
         </p>
         {(sp.product.brand || sp.product.content) && (
-          <p className="text-[11px] text-text-secondary dark:text-gray-400 truncate">
+          <p className="text-xs text-text-secondary dark:text-gray-400 truncate">
             {[sp.product.brand, sp.product.content].filter(Boolean).join(' · ')}
           </p>
         )}
         {/* ✅ MÓDULO PH5: Info farmacéutica */}
         {medicineSearchEnabled && (sp.product.genericName || sp.product.concentration) && (
-          <p className="text-[11px] text-text-secondary dark:text-gray-400 truncate">
+          <p className="text-xs text-text-secondary dark:text-gray-400 truncate">
             {sp.product.genericName}
-            {sp.product.concentration && <span className="font-medium text-primary"> {sp.product.concentration}</span>}
+            {sp.product.concentration && <span className="font-semibold text-primary"> {sp.product.concentration}</span>}
           </p>
         )}
 
-        <div className="mt-auto pt-2 flex items-center justify-between gap-1">
+        <div className="mt-auto pt-2 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-text-main dark:text-text-light leading-none">S/ {sp.price.toFixed(2)}</p>
-            <p className={`mt-1 text-[10px] leading-none ${outOfStock ? 'text-red-600 font-semibold' : lowStock ? 'text-orange-600 font-medium' : 'text-text-secondary'}`}>
-              {outOfStock ? 'Sin stock' : sp.stock !== null ? `Stock ${sp.stock}` : sp.product.unitType === 'UNIT' ? 'por unidad' : 'por kg'}
+            <p className="text-lg font-extrabold text-primary leading-none">S/ {sp.price.toFixed(2)}</p>
+            <p className="mt-1 text-[11px] leading-none text-text-secondary">
+              {sp.stock !== null && !outOfStock ? `Stock ${sp.stock}` : sp.product.unitType === 'UNIT' ? 'por unidad' : 'por kg'}
             </p>
           </div>
           <button
@@ -2037,9 +2045,9 @@ export default function POSPage() {
             disabled={outOfStock}
             title={outOfStock ? 'Sin stock' : 'Agregar al carrito'}
             aria-label={outOfStock ? 'Sin stock' : `Agregar ${sp.product.name}`}
-            className="w-8 h-8 flex-shrink-0 rounded-lg bg-primary hover:bg-primary-hover text-white flex items-center justify-center transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+            className="w-9 h-9 flex-shrink-0 rounded-lg bg-primary hover:bg-primary-hover text-white flex items-center justify-center shadow-md shadow-primary/30 transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -2055,12 +2063,11 @@ export default function POSPage() {
           {/* Saludo + estado de turno */}
           <PosHeader
             shiftOpen={!!currentShift}
-            openingCashLabel={currentShift ? formatMoney(currentShift.openingCash) : undefined}
             onOpenShift={() => setShowOpenShiftModal(true)}
             actions={isSuperAdmin ? (
               <a
                 href="/admin/backups"
-                className="flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark text-sm font-medium text-text-secondary hover:text-text-main transition-colors"
+                className="flex items-center gap-1.5 h-11 px-4 rounded-2xl bg-surface-light dark:bg-surface-dark shadow-soft text-sm font-semibold text-text-secondary hover:text-text-main transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
@@ -2088,9 +2095,9 @@ export default function POSPage() {
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
             {/* Columna Izquierda: Búsqueda y Productos */}
-            <div className="lg:col-span-2 space-y-4 overflow-y-auto scrollbar-hide pb-2 pr-1">
+            <div className="lg:col-span-2 space-y-5 overflow-y-auto scrollbar-hide pb-2 pr-1">
               {/* Search - Optimizado para táctil */}
-              <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-4">
+              <div className="bg-surface-light dark:bg-surface-dark rounded-2xl p-4 shadow-soft">
                 {/* ✅ MÓDULO 17.1: Hints de atajos */}
                 <div className="mb-3 hidden lg:flex items-center gap-3 text-xs text-text-secondary dark:text-gray-400">
                   <span className="px-2 py-1 bg-background-light dark:bg-background-dark rounded-md border border-border-light dark:border-border-dark font-mono">F2</span>
@@ -2164,14 +2171,14 @@ export default function POSPage() {
                           }
                         }
                       }}
-                      className="w-full h-12 md:h-14 pl-12 pr-4 bg-background-light dark:bg-background-dark text-text-main dark:text-text-light border border-transparent rounded-lg placeholder:text-text-secondary/70 focus:outline-none focus:bg-surface-light dark:focus:bg-surface-dark focus:border-primary focus:ring-2 focus:ring-primary/20 text-base md:text-sm"
+                      className="w-full h-12 md:h-14 pl-12 pr-4 bg-background-light dark:bg-background-dark text-text-main dark:text-text-light border border-transparent rounded-xl placeholder:text-text-secondary/70 focus:outline-none focus:bg-surface-light dark:focus:bg-surface-dark focus:border-primary focus:ring-2 focus:ring-primary/20 text-base md:text-sm"
                       style={{ fontSize: '16px' }}
                     />
                   </div>
                   <button
                     onClick={handleSearch}
                     disabled={loading}
-                    className="h-12 md:h-14 px-4 md:px-6 bg-primary text-white rounded-lg font-semibold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
+                    className="h-12 md:h-14 px-4 md:px-6 bg-primary text-white rounded-xl font-semibold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
                   >
                     {loading ? 'Buscando...' : 'Buscar'}
                   </button>
@@ -2185,12 +2192,15 @@ export default function POSPage() {
                     setShowFreeItemModal(true);
                   }}
                   title="Vender producto sin registrar en inventario"
-                  className="w-full h-10 px-4 bg-transparent border border-dashed border-primary/50 text-primary rounded-lg font-medium hover:bg-primary/10 hover:border-primary transition-colors touch-manipulation flex items-center justify-center gap-2 text-sm"
+                  className="w-full h-10 px-4 bg-transparent border border-dashed border-primary/50 text-primary rounded-xl font-medium hover:bg-primary/10 hover:border-primary transition-colors touch-manipulation flex items-center justify-center gap-2 text-sm"
                 >
                   <span className="text-lg font-bold">+</span> Venta libre (producto no registrado)
                 </button>
                 </div>
               </div>
+
+              {/* Banner (se oculta durante una búsqueda) */}
+              {!query.trim() && <PosBanner />}
 
               {/* Categorías del inventario */}
               {currentShift && !query.trim() && posTab === 'products' && (
@@ -2241,11 +2251,11 @@ export default function POSPage() {
               {/* Productos de la categoría seleccionada */}
               {currentShift && !query.trim() && posTab === 'products' && selectedCategory && (
                 <div>
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-text-main dark:text-text-light">{selectedCategory}</h3>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-text-main dark:text-text-light">{selectedCategory}</h3>
                     <button
                       onClick={() => setSelectedCategory(null)}
-                      className="text-xs font-medium text-primary hover:underline"
+                      className="rounded-full bg-surface-light dark:bg-surface-dark px-3 py-1 text-xs font-semibold text-text-main dark:text-text-light shadow-soft hover:text-primary"
                     >
                       Ver todo
                     </button>
@@ -2255,7 +2265,7 @@ export default function POSPage() {
                   ) : categoryProducts.length === 0 ? (
                     <div className="py-10 text-center text-sm text-text-secondary">No hay productos activos en esta categoría</div>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                       {categoryProducts.map((sp) => renderProductCard(sp, () => addToCart(sp)))}
                     </div>
                   )}
@@ -2311,10 +2321,10 @@ export default function POSPage() {
               {/* Results */}
               {products.length > 0 && (
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold text-text-main dark:text-text-light">
+                  <h3 className="mb-3 text-lg font-bold text-text-main dark:text-text-light">
                     Resultados de búsqueda <span className="text-sm font-medium text-text-secondary">({products.length})</span>
                   </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                     {products.map((sp) => renderProductCard(sp, () => {
                       addToCart(sp);
                       setQuery('');
@@ -2333,7 +2343,12 @@ export default function POSPage() {
             </div>
 
             {/* Columna Derecha: Carrito Desktop/Tablet */}
-            <div className="lg:col-span-1 h-full overflow-hidden flex flex-col pb-1">
+            <div className="lg:col-span-1 h-full overflow-hidden flex flex-col gap-3 pb-1">
+              {currentShift && (
+                <div className="hidden md:block flex-shrink-0">
+                  <ShiftCard openingCashLabel={formatMoney(currentShift.openingCash)} />
+                </div>
+              )}
               <CartPanel
                 cart={cart}
                 onUpdateQuantity={changeQuantityByDelta}
