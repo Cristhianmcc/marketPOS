@@ -301,6 +301,14 @@ export class TicketFormatter {
 
   private printPayment(data: PrintSaleData): void {
     const { payment } = data;
+    const advance = payment.advanceApplied ?? 0;
+    const total = data.fiscal?.total ?? data.total;
+    if (advance > 0) {
+      this.line(this.lr('ADELANTO', `-S/${advance.toFixed(2)}`));
+      this.push(CMD.BOLD_ON);
+      this.line(this.lr('SALDO PAGADO', this.money(Math.round((total - advance) * 100) / 100)));
+      this.push(CMD.BOLD_OFF);
+    }
     const METHOD: Record<string, string> = {
       CASH:     'EFECTIVO',
       CARD:     'TARJETA',
@@ -312,7 +320,7 @@ export class TicketFormatter {
     };
     // Comprobante: medio de pago e importe en una línea; vuelto solo si hay.
     if (data.fiscal && payment.method !== 'FIADO') {
-      const paid = payment.method === 'CASH' && payment.amountPaid !== undefined ? payment.amountPaid : data.fiscal.total;
+      const paid = payment.method === 'CASH' && payment.amountPaid !== undefined ? payment.amountPaid : Math.round((data.fiscal.total - advance) * 100) / 100;
       this.line(this.lr(METHOD[payment.method] ?? payment.method, this.money(paid)));
       if (payment.method === 'CASH' && payment.change !== undefined && payment.change > 0) {
         this.line(this.lr('VUELTO', this.money(payment.change)));

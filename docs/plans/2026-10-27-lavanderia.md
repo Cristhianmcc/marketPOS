@@ -134,6 +134,28 @@ sin fecha prometida.
 Pendiente de pantalla (Fase 4): casilla express y fecha prometida al recibir,
 porcentaje en Ajustes y órdenes atrasadas en la lista.
 
+## Resultado de la Fase 4 (2026-10-28)
+
+Probado en el navegador contra PostgreSQL desechable (lavandería sembrada):
+recepción de 3,5 kg + 2 ternos con express, entrega 29/10 18:00 y adelanto
+20 (total 71,25, saldo 51,25); Listo; entrega cobrando 60 (vuelto 8,75);
+comprobante con adelanto y saldo pagado; lista con contadores; Ajustes con
+el % express; menú con Órdenes.
+
+Defectos previos encontrados y corregidos:
+- La pantalla de nueva orden no enviaba `quantityBase` y leía `data.data` y
+  `basePrice` que la API no devuelve: crear órdenes desde la pantalla no
+  funcionaba. Las tres pantallas se reescribieron sobre la API real.
+- Servicios: la lista leía `data.data` (salía vacía), guardaba la respuesta
+  de `/api/auth/me` como usuario (nunca reconocía al dueño) y solo ofrecía
+  unidades de servicio (sin kg ni und).
+- El menú no tenía enlace a Órdenes.
+- Ticket ESC/POS: la línea del adelanto salía cortada; cubierto en
+  `test-fiscal-ticket-isolated.ts`.
+
+Sin verificar: impresión física del ticket de recepción en la térmica del
+portable y la emisión SUNAT desde el comprobante de una orden.
+
 ## Fases
 
 0. Banco `scripts/test-lavanderia-flow-isolated.ts` (PostgreSQL desechable)

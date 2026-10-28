@@ -71,6 +71,7 @@ interface Sale {
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED';
   amountPaid: number | null;
   changeAmount: number | null;
+  advanceApplied?: number | string | null;
   paymentDetails: any | null; // Desglose de pago mixto
   createdAt: string;
   printedAt: string | null;
@@ -577,6 +578,18 @@ export default function ReceiptPage() {
                 </div>
                 {fiscal && (
                   <div style={{ fontSize: '11px', marginTop: '4px' }}>{fiscal.amountInWords}</div>
+                )}
+                {Number(sale.advanceApplied ?? 0) > 0 && (
+                  <>
+                    <div className="total-row">
+                      <span>Adelanto:</span>
+                      <span>-{formatMoney(Number(sale.advanceApplied))}</span>
+                    </div>
+                    <div className="total-row" style={{ fontWeight: 'bold' }}>
+                      <span>Saldo pagado:</span>
+                      <span>{formatMoney(Number(fiscal ? fiscal.total : sale.total) - Number(sale.advanceApplied))}</span>
+                    </div>
+                  </>
                 )}
               </div>
 

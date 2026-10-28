@@ -1,608 +1,319 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/AuthLayout';
-import { 
-  ArrowLeft, Plus, Trash2, Search, User, Package, Wrench,
-  Save, Calculator, AlertCircle
-} from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Search, User, Package, Zap, CalendarClock, Wallet, Save, Printer } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
+import { METHOD_LABEL, money, printReceptionTicket, useWorkOrderContext, type ApiWorkOrder } from '../shared';
 
-interface Customer {
-  id: string;
-  name: string;
-  phone: string | null;
-}
+interface Customer { id: string; name: string; phone: string | null }
+interface Service { id: string; name: string; price: number; allowDecimals: boolean; unitSymbol: string | null; unitId: string | null }
+interface ProductHit { id: string; name: string; price: number; allowDecimals: boolean; unitSymbol: string | null }
 
-interface Product {
-  id: string;
-  storeProductId: string;
-  name: string;
-  content: string | null;
-  price: number;
-  stock: number;
-  units: { id: string; code: string; symbol: string | null; conversionFactor: number; price: number }[];
-}
-
-interface Service {
-  id: string;
-  name: string;
-  description: string | null;
-  basePrice: number;
-}
-
-interface OrderItem {
-  tempId: string;
+interface Line {
+  key: string;
   type: 'PRODUCT' | 'SERVICE';
-  storeProductId?: string;
-  serviceId?: string;
-  itemName: string;
-  itemContent?: string;
-  unitIdUsed?: string;
-  quantityOriginal: number;
-  quantityBase: number;
-  conversionFactor: number;
+  refId: string;
+  name: string;
+  quantity: number;
   unitPrice: number;
-  subtotal: number;
+  allowDecimals: boolean;
+  unitSymbol: string | null;
+  unitId: string | null;
   notes: string;
-  // UI helpers
-  selectedProduct?: Product;
-  selectedService?: Service;
 }
+
+const ADVANCE_METHODS = ['CASH', 'YAPE', 'PLIN', 'CARD'] as const;
 
 export default function NewWorkOrderPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const ctx = useWorkOrderContext();
+
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [productQuery, setProductQuery] = useState('');
+  const [productHits, setProductHits] = useState<ProductHit[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
+  const [express, setExpress] = useState(false);
+  const [promisedAt, setPromisedAt] = useState('');
+  const [notes, setNotes] = useState('');
+  const [advance, setAdvance] = useState('');
+  const [advanceMethod, setAdvanceMethod] = useState<(typeof ADVANCE_METHODS)[number]>('CASH');
+  const [printAfter, setPrintAfter] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Form state
-  const [customerId, setCustomerId] = useState('');
-  const [notes, setNotes] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [items, setItems] = useState<OrderItem[]>([]);
-
-  // Data
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-
-  // Search
-  const [productSearch, setProductSearch] = useState('');
-  const [serviceSearch, setServiceSearch] = useState('');
-  const [showProductSearch, setShowProductSearch] = useState(false);
-  const [showServiceSearch, setShowServiceSearch] = useState(false);
-
   useEffect(() => {
-    loadData();
+    fetch('/api/customers?activeOnly=true').then((r) => (r.ok ? r.json() : null)).then((data) => setCustomers(data?.customers ?? [])).catch(() => undefined);
+    fetch('/api/services').then((r) => (r.ok ? r.json() : null)).then((data) => {
+      setServices((data?.services ?? []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        price: Number(s.price),
+        // Un servicio sin unidad admite decimales (horas de mano de obra)
+        allowDecimals: s.baseUnit ? !!s.baseUnit.allowDecimals : true,
+        unitSymbol: s.baseUnit?.symbol ?? null,
+        unitId: s.baseUnit?.id ?? s.baseUnitId ?? null,
+      })));
+    }).catch(() => undefined);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [customersRes, productsRes, servicesRes] = await Promise.all([
-        fetch('/api/customers'),
-        fetch('/api/products?includeUnits=true'),
-        fetch('/api/services'),
-      ]);
-
-      if (customersRes.ok) {
-        const data = await customersRes.json();
-        setCustomers(data.customers || data.data || []);
-      }
-
-      if (productsRes.ok) {
-        const data = await productsRes.json();
-        const mapped = (data.products || data.data || []).map((p: any) => ({
+  // Búsqueda de productos (detergente, bolsas, repuestos...)
+  useEffect(() => {
+    if (productQuery.trim().length < 2) { setProductHits([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/api/inventory?query=${encodeURIComponent(productQuery.trim())}&active=true`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => setProductHits((data?.products ?? []).slice(0, 8).map((p: any) => ({
           id: p.id,
-          storeProductId: p.storeProductId || p.id,
-          name: p.name || p.product?.name,
-          content: p.content || p.product?.content,
-          price: p.price,
-          stock: p.stock,
-          units: p.units || [],
-        }));
-        setProducts(mapped);
-      }
+          name: p.product?.name ?? 'Producto',
+          price: Number(p.price),
+          // La unidad del producto la valida el servidor (enteros o decimales)
+          allowDecimals: true,
+          unitSymbol: null,
+        }))))
+        .catch(() => setProductHits([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [productQuery]);
 
-      if (servicesRes.ok) {
-        const data = await servicesRes.json();
-        setServices(data.data || []);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
+  const filteredCustomers = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase();
+    if (!q) return customers.slice(0, 50);
+    return customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone ?? '').includes(q)).slice(0, 50);
+  }, [customers, customerQuery]);
+
+  const addLine = (line: Omit<Line, 'key' | 'quantity' | 'notes'>) => {
+    setLines((prev) => [...prev, { ...line, key: `${line.refId}-${Date.now()}`, quantity: 1, notes: '' }]);
   };
+  const updateLine = (key: string, patch: Partial<Line>) => setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  const removeLine = (key: string) => setLines((prev) => prev.filter((l) => l.key !== key));
 
-  const addProduct = (product: Product, unitId?: string) => {
-    const unit = unitId ? product.units.find(u => u.id === unitId) : null;
-    const price = unit ? unit.price : product.price;
-    const conversionFactor = unit ? unit.conversionFactor : 1;
+  const subtotal = Math.round(lines.reduce((sum, l) => sum + l.quantity * l.unitPrice, 0) * 100) / 100;
+  const surcharge = express ? Math.round(subtotal * ctx.expressPercent + 1e-6) / 100 : 0;
+  const total = Math.round((subtotal + surcharge) * 100) / 100;
+  const advanceAmount = Math.max(0, Number(advance) || 0);
+  const invalidQuantity = lines.some((l) => !(l.quantity > 0) || (!l.allowDecimals && !Number.isInteger(l.quantity)));
 
-    const newItem: OrderItem = {
-      tempId: `temp-${Date.now()}`,
-      type: 'PRODUCT',
-      storeProductId: product.storeProductId,
-      itemName: product.name,
-      itemContent: product.content || undefined,
-      unitIdUsed: unitId,
-      quantityOriginal: 1,
-      quantityBase: conversionFactor,
-      conversionFactor,
-      unitPrice: price,
-      subtotal: price,
-      notes: '',
-      selectedProduct: product,
-    };
-
-    setItems([...items, newItem]);
-    setShowProductSearch(false);
-    setProductSearch('');
-  };
-
-  const addService = (service: Service) => {
-    const newItem: OrderItem = {
-      tempId: `temp-${Date.now()}`,
-      type: 'SERVICE',
-      serviceId: service.id,
-      itemName: service.name,
-      quantityOriginal: 1,
-      quantityBase: 1,
-      conversionFactor: 1,
-      unitPrice: service.basePrice,
-      subtotal: service.basePrice,
-      notes: '',
-      selectedService: service,
-    };
-
-    setItems([...items, newItem]);
-    setShowServiceSearch(false);
-    setServiceSearch('');
-  };
-
-  const updateItemQuantity = (tempId: string, qty: number) => {
-    setItems(items.map(item => {
-      if (item.tempId !== tempId) return item;
-      const quantityBase = qty * item.conversionFactor;
-      return {
-        ...item,
-        quantityOriginal: qty,
-        quantityBase,
-        subtotal: qty * item.unitPrice,
-      };
-    }));
-  };
-
-  const updateItemPrice = (tempId: string, price: number) => {
-    setItems(items.map(item => {
-      if (item.tempId !== tempId) return item;
-      return {
-        ...item,
-        unitPrice: price,
-        subtotal: item.quantityOriginal * price,
-      };
-    }));
-  };
-
-  const updateItemNotes = (tempId: string, notes: string) => {
-    setItems(items.map(item => 
-      item.tempId === tempId ? { ...item, notes } : item
-    ));
-  };
-
-  const removeItem = (tempId: string) => {
-    setItems(items.filter(item => item.tempId !== tempId));
-  };
-
-  const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const total = subtotal - discount;
-
-  const handleSave = async (asDraft: boolean) => {
-    if (items.length === 0) {
-      toast.error('Agrega al menos un item');
-      return;
-    }
+  const save = async (receive: boolean) => {
+    if (lines.length === 0) { toast.error('Agrega al menos un servicio o producto'); return; }
+    if (invalidQuantity) { toast.error('Revisa las cantidades: las prendas o unidades van en números enteros'); return; }
+    if (receive && advanceAmount > total) { toast.error('El adelanto no puede superar el total'); return; }
 
     setSaving(true);
     try {
-      const body = {
-        customerId: customerId || null,
-        status: asDraft ? 'DRAFT' : 'APPROVED',
-        notes: notes || null,
-        discount,
-        items: items.map(item => ({
-          type: item.type,
-          storeProductId: item.storeProductId || null,
-          serviceId: item.serviceId || null,
-          itemName: item.itemName,
-          itemContent: item.itemContent || null,
-          unitIdUsed: item.unitIdUsed || null,
-          quantityOriginal: item.quantityOriginal,
-          conversionFactor: item.conversionFactor,
-          unitPrice: item.unitPrice,
-          notes: item.notes || null,
-        })),
-      };
-
-      const res = await fetch('/api/work-orders', {
+      const created = await fetch('/api/work-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          customerId: customerId || null,
+          notes: notes.trim() || null,
+          express,
+          promisedAt: promisedAt ? new Date(promisedAt).toISOString() : null,
+          items: lines.map((l) => ({
+            type: l.type,
+            storeProductId: l.type === 'PRODUCT' ? l.refId : undefined,
+            serviceId: l.type === 'SERVICE' ? l.refId : undefined,
+            unitIdUsed: l.unitId || undefined,
+            quantityBase: l.quantity,
+            unitPrice: l.unitPrice,
+            notes: l.notes.trim() || undefined,
+          })),
+        }),
       });
+      const createdBody = await created.json();
+      if (!created.ok) throw new Error(createdBody.error || 'No se pudo crear la orden');
+      const orderId: string = createdBody.data.id;
+      const number: number = createdBody.data.orderNumber;
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Error al guardar');
+      if (receive) {
+        const approved = await fetch('/api/work-orders', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: orderId, status: 'APPROVED' }),
+        });
+        if (!approved.ok) throw new Error((await approved.json()).error || 'La orden se creó pero no se pudo marcar como recibida');
+
+        if (advanceAmount > 0) {
+          const paid = await fetch(`/api/work-orders/${orderId}/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: advanceAmount, method: advanceMethod }),
+          });
+          if (!paid.ok) {
+            toast.error(`Orden #${number} creada, pero el adelanto no se registró: ${(await paid.json()).error || 'error'}`);
+            router.push(`/work-orders/${orderId}`);
+            return;
+          }
+        }
+
+        if (printAfter) {
+          const detail = await fetch(`/api/work-orders/${orderId}`).then((r) => r.json());
+          const printed = await printReceptionTicket(detail.data as ApiWorkOrder, ctx);
+          if (!printed.ok) toast.error(`No se pudo imprimir: ${printed.error}`);
+        }
       }
 
-      const data = await res.json();
-      toast.success(`Orden #${data.data.number} creada exitosamente`);
-      router.push('/work-orders');
+      toast.success(receive ? `Orden #${number} ${ctx.labels.APPROVED.toLowerCase()}` : `Borrador #${number} guardado`);
+      router.push(`/work-orders/${orderId}`);
     } catch (error: any) {
-      toast.error(error.message || 'Error al crear orden');
+      toast.error(error.message || 'Error al guardar la orden');
     } finally {
       setSaving(false);
     }
   };
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    (p.content && p.content.toLowerCase().includes(productSearch.toLowerCase()))
-  );
-
-  const filteredServices = services.filter(s =>
-    s.name.toLowerCase().includes(serviceSearch.toLowerCase())
-  );
-
-  const formatMoney = (value: number) =>
-    new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN' }).format(value);
-
-  if (loading) {
-    return (
-      <AuthLayout>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </AuthLayout>
-    );
-  }
+  const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary';
 
   return (
     <AuthLayout>
       <Toaster position="top-right" richColors />
-
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-5xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => router.push('/work-orders')}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
+            <button onClick={() => router.push('/work-orders')} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Volver">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Nueva Orden de Trabajo</h1>
-              <p className="text-gray-500 text-sm">Cotización o pedido especial</p>
+              <h1 className="text-2xl font-bold text-gray-900">{ctx.isLaundry ? 'Recibir prendas' : 'Nueva orden de trabajo'}</h1>
+              <p className="text-gray-500 text-sm">{ctx.isLaundry ? 'Registra lo que deja el cliente, la fecha de entrega y el adelanto' : 'Registra el trabajo, la fecha de entrega y el adelanto'}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Form */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Customer */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <User className="w-5 h-5 text-primary" />
-                  Cliente (Opcional)
-                </h2>
-                <select
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                >
-                  <option value="">Sin cliente asignado</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.phone ? `(${c.phone})` : ''}
-                    </option>
-                  ))}
+              {/* Cliente */}
+              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <h2 className="font-medium text-gray-900 mb-3 flex items-center gap-2"><User className="w-5 h-5 text-primary" />Cliente</h2>
+                <input value={customerQuery} onChange={(e) => setCustomerQuery(e.target.value)} placeholder="Buscar por nombre o teléfono" className={`${inputClass} mb-2`} />
+                <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className={inputClass}>
+                  <option value="">Sin cliente</option>
+                  {filteredCustomers.map((c) => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
                 </select>
-              </div>
+              </section>
 
-              {/* Items */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="font-medium text-gray-900 mb-3">Items de la Orden</h2>
-
-                {/* Add buttons */}
-                <div className="flex gap-2 mb-4">
-                  <div className="relative flex-1">
-                    <button
-                      onClick={() => {
-                        setShowProductSearch(!showProductSearch);
-                        setShowServiceSearch(false);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/15"
-                    >
-                      <Package className="w-4 h-4" />
-                      Agregar Producto
-                    </button>
-
-                    {showProductSearch && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-64 overflow-auto">
-                        <div className="p-2 border-b border-gray-100">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                              type="text"
-                              placeholder="Buscar producto..."
-                              value={productSearch}
-                              onChange={(e) => setProductSearch(e.target.value)}
-                              autoFocus
-                              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/40"
-                            />
-                          </div>
-                        </div>
-                        <div className="max-h-48 overflow-auto">
-                          {filteredProducts.length === 0 ? (
-                            <p className="p-4 text-sm text-gray-500 text-center">No se encontraron productos</p>
-                          ) : (
-                            filteredProducts.slice(0, 20).map(product => (
-                              <div key={product.id} className="border-b border-gray-50 last:border-0">
-                                <button
-                                  onClick={() => addProduct(product)}
-                                  className="w-full text-left px-4 py-2 hover:bg-gray-50 flex justify-between items-center"
-                                >
-                                  <div>
-                                    <div className="font-medium text-gray-900">{product.name}</div>
-                                    {product.content && (
-                                      <div className="text-xs text-gray-500">{product.content}</div>
-                                    )}
-                                  </div>
-                                  <span className="text-sm font-medium text-primary">{formatMoney(product.price)}</span>
-                                </button>
-                                {product.units.length > 0 && (
-                                  <div className="px-4 pb-2 flex gap-1 flex-wrap">
-                                    {product.units.map(unit => (
-                                      <button
-                                        key={unit.id}
-                                        onClick={() => addProduct(product, unit.id)}
-                                        className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                                      >
-                                        {unit.symbol || unit.code} ({formatMoney(unit.price)})
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="relative flex-1">
-                    <button
-                      onClick={() => {
-                        setShowServiceSearch(!showServiceSearch);
-                        setShowProductSearch(false);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/15"
-                    >
-                      <Wrench className="w-4 h-4" />
-                      Agregar Servicio
-                    </button>
-
-                    {showServiceSearch && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-64 overflow-auto">
-                        <div className="p-2 border-b border-gray-100">
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                              type="text"
-                              placeholder="Buscar servicio..."
-                              value={serviceSearch}
-                              onChange={(e) => setServiceSearch(e.target.value)}
-                              autoFocus
-                              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/40"
-                            />
-                          </div>
-                        </div>
-                        <div className="max-h-48 overflow-auto">
-                          {filteredServices.length === 0 ? (
-                            <p className="p-4 text-sm text-gray-500 text-center">No se encontraron servicios</p>
-                          ) : (
-                            filteredServices.map(service => (
-                              <button
-                                key={service.id}
-                                onClick={() => addService(service)}
-                                className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-                              >
-                                <div className="flex justify-between items-center">
-                                  <div>
-                                    <div className="font-medium text-gray-900">{service.name}</div>
-                                    {service.description && (
-                                      <div className="text-xs text-gray-500">{service.description}</div>
-                                    )}
-                                  </div>
-                                  <span className="text-sm font-medium text-primary">{formatMoney(service.basePrice)}</span>
-                                </div>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Items list */}
-                {items.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Calculator className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                    <p>No hay items agregados</p>
-                    <p className="text-sm">Agrega productos o servicios para cotizar</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {items.map((item) => (
-                      <div 
-                        key={item.tempId} 
-                        className={`p-3 rounded-lg border ${
-                          item.type === 'SERVICE' 
-                            ? 'bg-primary/10 border-primary/20' 
-                            : 'bg-gray-50 border-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              {item.type === 'SERVICE' ? (
-                                <Wrench className="w-4 h-4 text-primary" />
-                              ) : (
-                                <Package className="w-4 h-4 text-primary" />
-                              )}
-                              <span className="font-medium text-gray-900">{item.itemName}</span>
-                              {item.itemContent && (
-                                <span className="text-xs text-gray-500">({item.itemContent})</span>
-                              )}
-                            </div>
-
-                            <div className="mt-2 flex flex-wrap items-center gap-3">
-                              <div className="flex items-center gap-2">
-                                <label className="text-xs text-gray-500">Cant:</label>
-                                <input
-                                  type="number"
-                                  min="0.01"
-                                  step="0.01"
-                                  value={item.quantityOriginal}
-                                  onChange={(e) => updateItemQuantity(item.tempId, parseFloat(e.target.value) || 0)}
-                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
-                                />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <label className="text-xs text-gray-500">Precio:</label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.unitPrice}
-                                  onChange={(e) => updateItemPrice(item.tempId, parseFloat(e.target.value) || 0)}
-                                  className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="mt-2">
-                              <input
-                                type="text"
-                                placeholder="Notas (medidas, especificaciones...)"
-                                value={item.notes}
-                                onChange={(e) => updateItemNotes(item.tempId, e.target.value)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col items-end gap-2">
-                            <span className="font-bold text-gray-900">{formatMoney(item.subtotal)}</span>
-                            <button
-                              onClick={() => removeItem(item.tempId)}
-                              className="p-1 text-red-500 hover:bg-red-100 rounded"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+              {/* Servicios y productos */}
+              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <h2 className="font-medium text-gray-900 mb-3">{ctx.isLaundry ? 'Servicios y prendas' : 'Servicios y productos'}</h2>
+                {services.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {services.map((s) => (
+                      <button key={s.id} type="button"
+                        onClick={() => addLine({ type: 'SERVICE', refId: s.id, name: s.name, unitPrice: s.price, allowDecimals: s.allowDecimals, unitSymbol: s.unitSymbol, unitId: s.unitId })}
+                        className="px-3 py-2 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 text-sm">
+                        <Plus className="inline w-4 h-4 mr-1" />{s.name} · {money(s.price)}{s.unitSymbol ? `/${s.unitSymbol}` : ''}
+                      </button>
                     ))}
                   </div>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="font-medium text-gray-900 mb-3">Notas Generales</h2>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Instrucciones especiales, detalles del trabajo, fecha de entrega..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
-                />
-              </div>
-            </div>
-
-            {/* Sidebar - Summary */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sticky top-4">
-                <h2 className="font-medium text-gray-900 mb-4">Resumen</h2>
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Items:</span>
-                    <span className="font-medium">{items.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">{formatMoney(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Descuento:</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={discount}
-                      onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                      className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
-                    />
-                  </div>
-                  <div className="pt-3 border-t border-gray-200 flex justify-between">
-                    <span className="font-medium text-gray-900">Total:</span>
-                    <span className="text-xl font-bold text-gray-900">{formatMoney(total)}</span>
-                  </div>
-                </div>
-
-                {items.length === 0 && (
-                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-                    <AlertCircle className="w-4 h-4 inline mr-1" />
-                    Agrega items para poder guardar
-                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 mb-4">No hay servicios. Créalos en Servicios (por ejemplo “Lavado por kilo” con unidad kg o “Terno al seco” por unidad).</p>
                 )}
 
-                <div className="mt-6 space-y-2">
-                  <button
-                    onClick={() => handleSave(true)}
-                    disabled={saving || items.length === 0}
-                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    <Save className="w-4 h-4" />
-                    Guardar como Borrador
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input value={productQuery} onChange={(e) => setProductQuery(e.target.value)} placeholder="Agregar producto (detergente, bolsa, repuesto...)" className={`${inputClass} pl-9`} />
+                  {productHits.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-auto">
+                      {productHits.map((p) => (
+                        <button key={p.id} type="button" className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm flex justify-between"
+                          onClick={() => { addLine({ type: 'PRODUCT', refId: p.id, name: p.name, unitPrice: p.price, allowDecimals: p.allowDecimals, unitSymbol: p.unitSymbol, unitId: null }); setProductQuery(''); setProductHits([]); }}>
+                          <span><Package className="inline w-4 h-4 mr-1 text-gray-400" />{p.name}</span><span>{money(p.price)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {lines.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">Toca un servicio para agregarlo</p>
+                ) : (
+                  <div className="space-y-3">
+                    {lines.map((l) => {
+                      const badQty = !(l.quantity > 0) || (!l.allowDecimals && !Number.isInteger(l.quantity));
+                      return (
+                        <div key={l.key} className="border border-gray-200 rounded-lg p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-medium text-gray-900">{l.name}</div>
+                            <button onClick={() => removeLine(l.key)} className="p-1 text-red-600 hover:bg-red-50 rounded" aria-label={`Quitar ${l.name}`}><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 mt-2 items-end">
+                            <label className="text-xs text-gray-500">Cantidad{l.unitSymbol ? ` (${l.unitSymbol})` : ''}
+                              <input type="number" min={l.allowDecimals ? '0.1' : '1'} step={l.allowDecimals ? '0.1' : '1'} value={l.quantity}
+                                onChange={(e) => updateLine(l.key, { quantity: Number(e.target.value) })}
+                                className={`${inputClass} mt-1 ${badQty ? 'border-red-400' : ''}`} />
+                            </label>
+                            <label className="text-xs text-gray-500">Precio
+                              <input type="number" min="0" step="0.1" value={l.unitPrice} disabled={!ctx.isOwner}
+                                onChange={(e) => updateLine(l.key, { unitPrice: Number(e.target.value) })}
+                                className={`${inputClass} mt-1 disabled:bg-gray-100`} />
+                            </label>
+                            <div className="text-right font-semibold text-gray-900 pb-2">{money(Math.round(l.quantity * l.unitPrice * 100) / 100)}</div>
+                          </div>
+                          {badQty && <p className="text-xs text-red-600 mt-1">{l.allowDecimals ? 'La cantidad debe ser mayor a 0' : 'Se cobra por unidad entera'}</p>}
+                          <input value={l.notes} onChange={(e) => updateLine(l.key, { notes: e.target.value })} placeholder={ctx.isLaundry ? 'Detalle: color, manchas, botones faltantes...' : 'Detalle del trabajo'} className={`${inputClass} mt-2 text-sm`} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={express} onChange={(e) => setExpress(e.target.checked)} className="w-5 h-5 accent-orange-500" />
+                  <span className="flex items-center gap-1 font-medium text-gray-900"><Zap className="w-4 h-4 text-orange-500" />Servicio express (+{ctx.expressPercent} %)</span>
+                </label>
+                <label className="block text-sm font-medium text-gray-900"><CalendarClock className="inline w-4 h-4 mr-1 text-primary" />Fecha y hora de entrega
+                  <input type="datetime-local" value={promisedAt} onChange={(e) => setPromisedAt(e.target.value)} className={`${inputClass} mt-1`} />
+                </label>
+                <label className="block text-sm font-medium text-gray-900">Observaciones
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className={`${inputClass} mt-1`} />
+                </label>
+              </section>
+            </div>
+
+            {/* Resumen */}
+            <aside className="space-y-4">
+              <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 lg:sticky lg:top-4">
+                <h2 className="font-medium text-gray-900 mb-3">Resumen</h2>
+                <dl className="space-y-1 text-sm">
+                  <div className="flex justify-between"><dt className="text-gray-600">Subtotal</dt><dd>{money(subtotal)}</dd></div>
+                  {express && <div className="flex justify-between text-orange-700"><dt>Recargo express</dt><dd>{money(surcharge)}</dd></div>}
+                  <div className="flex justify-between text-lg font-bold border-t pt-2"><dt>Total</dt><dd>{money(total)}</dd></div>
+                </dl>
+
+                <div className="mt-4 border-t pt-4">
+                  <h3 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-1"><Wallet className="w-4 h-4 text-primary" />Adelanto</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="number" min="0" step="0.1" value={advance} onChange={(e) => setAdvance(e.target.value)} placeholder="0.00" className={inputClass} aria-label="Monto del adelanto" />
+                    <select value={advanceMethod} onChange={(e) => setAdvanceMethod(e.target.value as typeof advanceMethod)} className={inputClass} aria-label="Medio de pago del adelanto">
+                      {ADVANCE_METHODS.map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex justify-between text-sm mt-2"><span className="text-gray-600">Saldo al entregar</span><strong>{money(Math.max(0, total - advanceAmount))}</strong></div>
+                  {advanceAmount > total && <p className="text-xs text-red-600 mt-1">El adelanto supera el total</p>}
+                  <p className="text-xs text-gray-500 mt-1">El adelanto entra a la caja del turno abierto.</p>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm mt-4">
+                  <input type="checkbox" checked={printAfter} onChange={(e) => setPrintAfter(e.target.checked)} />
+                  <Printer className="w-4 h-4 text-gray-500" />Imprimir ticket para el cliente
+                </label>
+
+                <div className="mt-4 space-y-2">
+                  <button onClick={() => save(true)} disabled={saving || lines.length === 0}
+                    className="w-full py-3 bg-primary text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50">
+                    {saving ? 'Guardando...' : ctx.isLaundry ? 'Recibir prendas' : 'Crear y aprobar'}
                   </button>
-                  <button
-                    onClick={() => handleSave(false)}
-                    disabled={saving || items.length === 0}
-                    className="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {saving ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Guardar y Aprobar
-                      </>
-                    )}
+                  <button onClick={() => save(false)} disabled={saving || lines.length === 0}
+                    className="w-full py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50">
+                    <Save className="inline w-4 h-4 mr-1" />Guardar como borrador
                   </button>
                 </div>
-              </div>
-            </div>
+              </section>
+            </aside>
           </div>
         </div>
       </div>

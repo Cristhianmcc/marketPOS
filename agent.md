@@ -136,6 +136,12 @@ es `docs/audits/2026-09-26-pos.md`.
   calcula en el servidor sobre el subtotal (`expressSurchargeFor`) al crear y
   editar; total = subtotal + recargo. Al cobrar sale como línea "Recargo
   express" (ZZ, gravada) para que las líneas sumen el total del comprobante.
+- Pantallas de órdenes (`src/app/work-orders/*`, compartido en `shared.ts`):
+  recepción con express, fecha de entrega y adelanto; detalle con estados por
+  rubro, adelantos, cobro del saldo y cancelación; lista por estado con
+  atrasadas. Ticket de recepción en `src/lib/workOrders/ticket.ts` (HTML
+  térmico por `window.desktop.printer.printHtml` o el navegador). El ticket de
+  venta y el ESC/POS muestran adelanto y saldo (`Sale.advanceApplied`).
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

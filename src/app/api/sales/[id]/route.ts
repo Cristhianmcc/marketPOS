@@ -41,6 +41,7 @@ export async function GET(
         paymentMethod: true,
         amountPaid: true,
         changeAmount: true,
+        advanceApplied: true,
         paymentDetails: true, // ✅ Pago Mixto: desglose de splits
         createdAt: true,
         printedAt: true,

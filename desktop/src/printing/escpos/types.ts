@@ -112,6 +112,7 @@ export interface PrintPayment {
   change?: number;
   customerName?: string;   // For FIADO
   customerBalance?: number; // For FIADO
+  advanceApplied?: number;  // Adelanto de la orden de trabajo, cobrado antes
 }
 
 /**

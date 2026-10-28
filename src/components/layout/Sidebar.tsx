@@ -18,6 +18,7 @@ import {
   ChevronDoubleRightIcon as PanelLeftOpen,
   GlobeAltIcon as Globe,
   BeakerIcon as Pill,
+  ClipboardDocumentListIcon as ClipboardList,
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -46,6 +47,8 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
     { icon: ShoppingCart, label: 'Punto de Venta', href: '/' },
     { icon: DollarSign, label: 'Turnos / Caja', href: '/shifts' },
     { icon: FileText, label: 'Ventas', href: '/sales' },
+    // Taller y lavandería: órdenes con seguimiento y adelanto
+    ...(isOn('ENABLE_WORK_ORDERS') ? [{ icon: ClipboardList, label: 'Órdenes', href: '/work-orders' }] : []),
     { icon: Receipt, label: 'Cuentas por Cobrar', href: '/receivables' },
     { icon: Package, label: 'Inventario', href: '/inventory' },
     { icon: Globe, label: 'Catálogo Web', href: '/settings/catalog' },

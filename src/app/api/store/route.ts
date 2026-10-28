@@ -16,6 +16,11 @@ export async function GET() {
         id: true,
         name: true,
         isDemoStore: true,
+        ruc: true,
+        address: true,
+        phone: true,
+        businessProfile: true,
+        settings: { select: { expressSurchargePercent: true } },
       },
     });
 

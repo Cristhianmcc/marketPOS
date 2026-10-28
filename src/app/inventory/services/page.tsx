@@ -61,7 +61,7 @@ export default function ServicesPage() {
           window.location.href = '/login';
           return;
         }
-        setUser(data);
+        setUser(data.user ?? data);
       })
       .catch(() => {
         window.location.href = '/login';
@@ -78,7 +78,7 @@ export default function ServicesPage() {
       const res = await fetch(`/api/services?${params.toString()}`);
       if (!res.ok) throw new Error('Error al cargar servicios');
       const data = await res.json();
-      setServices(data.data || []);
+      setServices(data.services || data.data || []);
     } catch (error) {
       console.error('Error loading services:', error);
       toast.error('Error al cargar servicios');
@@ -100,14 +100,16 @@ export default function ServicesPage() {
     setFormBaseUnitId(null);
   };
 
-  // Cargar unidades de servicio
+  // Cargar unidades de servicio, más kilogramo y unidad para cobrar por kilo
+  // o por prenda (lavandería)
   useEffect(() => {
-    fetch('/api/units?kind=SERVICES')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.units) {
-          setUnits(data.units);
-        }
+    Promise.all([
+      fetch('/api/units?kind=SERVICES').then((r) => r.json()),
+      fetch('/api/units?kind=GOODS').then((r) => r.json()),
+    ])
+      .then(([services, goods]) => {
+        const extra = (goods.units ?? []).filter((unit: { sunatCode: string }) => unit.sunatCode === 'KGM' || unit.sunatCode === 'NIU');
+        setUnits([...extra, ...(services.units ?? [])]);
       })
       .catch(() => {
         console.error('Error cargando unidades');

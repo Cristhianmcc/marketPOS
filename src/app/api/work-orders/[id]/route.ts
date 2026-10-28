@@ -46,6 +46,7 @@ export async function GET(
             createdAt: true,
           },
         },
+        payments: { orderBy: { createdAt: 'asc' } },
       },
     });
 

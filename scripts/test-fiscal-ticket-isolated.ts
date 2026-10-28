@@ -208,6 +208,17 @@ check('ticket sin comprobante muestra el ICBPER de bolsas', () => {
   assert.match(text, /ICBPER BOLSAS:\s+S\/0\.50/);
 });
 
+check('venta de orden con adelanto muestra adelanto y saldo pagado', () => {
+  const formatter = () => new TicketFormatter({ ...DEFAULT_ESCPOS_CONFIG, charsPerLine: 42 });
+  const cash = printable(formatter().formatSale({ ...sale(undefined), total: 71.25, payment: { method: 'CASH', amountPaid: 60, change: 8.75, advanceApplied: 20 } }));
+  assert.match(cash, /ADELANTO\s+-S\/20\.00/);
+  assert.match(cash, /SALDO PAGADO\s+S\/51\.25/);
+  assert.match(cash, /VUELTO:\s+S\/8\.75/);
+  const withFiscal = { ...sale({ ...boleta, total: 71.25 }), total: 71.25 };
+  const yape = printable(formatter().formatSale({ ...withFiscal, payment: { method: 'YAPE', advanceApplied: 20 } }), boleta.qrText);
+  assert.match(yape, /YAPE\s+S\/51\.25/, 'lo pagado por Yape es el saldo, no el total');
+});
+
 // ── Total del POS (debe coincidir con el cobro del servidor) ────────────────
 check('POS: total con ICBPER igual al servidor', () => {
   const product = (price: number, icbper = false) => ({ id: `p${price}`, price, stock: null, active: true, icbper, product: { id: 'x', name: 'x', brand: null, content: null, category: 'x', unitType: 'UNIT', barcode: null } });

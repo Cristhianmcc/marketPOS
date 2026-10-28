@@ -89,7 +89,11 @@ export async function GET(
       change?: number;
       customerName?: string;
       customerBalance?: number;
+      advanceApplied?: number;
     } = { method: sale.paymentMethod };
+
+    // Venta de una orden de trabajo con adelanto: el ticket muestra adelanto y saldo
+    if (Number(sale.advanceApplied) > 0) payment.advanceApplied = Number(sale.advanceApplied);
 
     if (sale.paymentMethod === 'CASH') {
       payment.amountPaid = Number(sale.amountPaid ?? sale.total);

@@ -64,7 +64,7 @@ export async function POST(
                 },
               },
             },
-            service: true,
+            service: { include: { baseUnit: true } },
           },
         },
         customer: true,
@@ -214,7 +214,8 @@ export async function POST(
         
         if (isService) {
           unitSunatCode = 'ZZ';
-          unitSymbol = 'serv';
+          // Se muestra la unidad del servicio (kg, und) si la tiene
+          unitSymbol = woItem.service?.baseUnit?.symbol || 'serv';
         } else if (product?.baseUnit?.sunatCode) {
           unitSunatCode = product.baseUnit.sunatCode;
           unitSymbol = product.baseUnit.symbol;

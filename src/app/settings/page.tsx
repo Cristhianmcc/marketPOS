@@ -22,6 +22,8 @@ interface SettingsData {
   fefoEnabled?: boolean;
   expiredBatchPolicy?: string;
   showExpiredWarnings?: boolean;
+  // Lavandería
+  expressSurchargePercent?: number;
 }
 
 export default function SettingsPage() {
@@ -47,6 +49,8 @@ export default function SettingsPage() {
     fefoEnabled: false,
     expiredBatchPolicy: 'BLOCK_EXPIRED',
     showExpiredWarnings: true,
+    // Lavandería
+    expressSurchargePercent: 50,
   });
 
   const [logoUploading, setLogoUploading] = useState(false);
@@ -80,6 +84,7 @@ export default function SettingsPage() {
         taxRate: data.settings?.taxRate || 0,
         // Farmacéuticos
         expiryAlertDays: data.settings?.expiryAlertDays ?? 60,
+        expressSurchargePercent: data.settings?.expressSurchargePercent ?? 50,
         fefoEnabled: data.settings?.fefoEnabled ?? false,
         expiredBatchPolicy: data.settings?.expiredBatchPolicy ?? 'BLOCK_EXPIRED',
         showExpiredWarnings: data.settings?.showExpiredWarnings ?? true,
@@ -310,6 +315,25 @@ export default function SettingsPage() {
                     </label>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Lavandería: recargo de las órdenes express */}
+            {store?.businessProfile === 'LAVANDERIA' && (
+              <div className="border-t pt-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Lavandería</h2>
+                <p className="text-gray-500 text-sm mb-4">Recargo que se suma a las órdenes marcadas como express.</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="expressSurchargePercent">Recargo express (%)</label>
+                <input
+                  id="expressSurchargePercent"
+                  type="number"
+                  min="0"
+                  max="200"
+                  value={formData.expressSurchargePercent}
+                  onChange={(e) => setFormData({ ...formData, expressSurchargePercent: Math.min(200, Math.max(0, parseInt(e.target.value) || 0)) })}
+                  className="w-full md:w-48 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
+                />
+                <p className="text-xs text-gray-500 mt-1">Ejemplo: con {formData.expressSurchargePercent} %, una orden de S/ 20.00 express queda en S/ {(20 * (1 + formData.expressSurchargePercent / 100)).toFixed(2)}.</p>
               </div>
             )}
 
