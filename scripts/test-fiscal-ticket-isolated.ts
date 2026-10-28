@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { amountToWordsPEN, buildFiscalTicket, type FiscalTicketSource } from '../src/lib/sunat/printedTicket';
 import { TicketFormatter } from '../desktop/src/printing/escpos/formatTicket';
 import { DEFAULT_ESCPOS_CONFIG, type PrintSaleData } from '../desktop/src/printing/escpos/types';
-import { getCartIcbper, getCartTotal } from '../src/modules/pos/lib/posMath';
+import { getCartIcbper, getCartTotal, nextBaseQuantityForDelta } from '../src/modules/pos/lib/posMath';
 
 let passed = 0;
 function check(name: string, fn: () => void) {
@@ -222,6 +222,17 @@ check('POS: total con ICBPER igual al servidor', () => {
   const twoBags = [{ storeProduct: product(0.1, true), quantity: 2 }] as unknown as Parameters<typeof getCartTotal>[0];
   assert.equal(getCartIcbper(twoBags, saleDate), 1);
   assert.equal(getCartIcbper(twoBags, new Date('2022-06-01T15:00:00Z')), 0.8, 'tarifa 2022: S/0.40');
+});
+
+// ── Botones +/− del carrito con unidad de venta ─────────────────────────────
+check('POS: +/− suman una caja, un rollo o un centímetro', () => {
+  // 1 rollo (100 m) + 1 = 2 rollos = 200 m (antes: 101 m = 1.01 rollos)
+  assert.equal(nextBaseQuantityForDelta({ quantity: 100, unitIdUsed: 'BX', quantityOriginal: 1, conversionFactorUsed: 100 }, 1), 200);
+  assert.equal(nextBaseQuantityForDelta({ quantity: 200, unitIdUsed: 'BX', quantityOriginal: 2, conversionFactorUsed: 100 }, -1), 100);
+  // 150 cm (1.5 m) + 1 = 151 cm = 1.51 m
+  assert.equal(nextBaseQuantityForDelta({ quantity: 1.5, unitIdUsed: 'CMT', quantityOriginal: 150, conversionFactorUsed: 0.01 }, 1), 1.51);
+  // Sin unidad de venta: una unidad base
+  assert.equal(nextBaseQuantityForDelta({ quantity: 3 }, 1), 4);
 });
 
 console.log(`\nTicket fiscal PASS: ${passed} comprobaciones.`);

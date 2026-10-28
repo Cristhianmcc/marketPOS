@@ -111,6 +111,20 @@ export function getTotalItemDiscounts(cart: CartItem[]): number {
 }
 
 /**
+ * Cantidad base tras pulsar +/− en el carrito. Con unidad de venta (caja,
+ * rollo, centímetro) el paso es una unidad de venta; sin ella, una unidad base.
+ */
+export function nextBaseQuantityForDelta(
+  item: Pick<CartItem, 'quantity'> & { unitIdUsed?: string; quantityOriginal?: number; conversionFactorUsed?: number },
+  delta: number,
+): number {
+  if (item.unitIdUsed && item.conversionFactorUsed && item.conversionFactorUsed !== 1) {
+    return Math.round(((item.quantityOriginal ?? 1) + delta) * item.conversionFactorUsed * 1e6) / 1e6;
+  }
+  return item.quantity + delta;
+}
+
+/**
  * ICBPER de las bolsas del carrito: tarifa por unidad, igual que el servidor.
  * No se descuenta con cupones ni descuento global.
  */

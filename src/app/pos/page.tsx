@@ -32,7 +32,8 @@ import {
   getTotalItemDiscounts,
   getCartTotal,
   getCartIcbper,
-  getTotalBeforeCoupon
+  getTotalBeforeCoupon,
+  nextBaseQuantityForDelta,
 } from '@/modules/pos';
 
 interface StoreProduct {
@@ -1146,19 +1147,23 @@ export default function POSPage() {
   // ✅ MÓDULO 18.2: Ref para debounce de promociones en updateQuantity
   const promoDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Botones +/− del carrito: con unidad de venta suman o restan una caja, un
+  // rollo o un centímetro; sin ella, una unidad base.
+  const changeQuantityByDelta = (storeProductId: string, delta: number) => {
+    const item = cart.find((i) => i.storeProduct.id === storeProductId);
+    if (item) updateQuantity(storeProductId, nextBaseQuantityForDelta(item, delta));
+  };
+
   const updateQuantity = async (storeProductId: string, newQuantity: number) => {
     const item = cart.find((i) => i.storeProduct.id === storeProductId);
     if (!item) return;
 
-    // ✅ F2.2: Si el item tiene conversión activa (+/-) opera en unidades de presentación
-    // El delta viene en unidad base, pero si hay sellUnit activo, actualizar en sellUnit
-    if (item.unitIdUsed && item.conversionFactorUsed && item.conversionFactorUsed > 1) {
-      // Calcular nueva cantidad en sellUnit (quantityOriginal) proporcional
-      const currentOriginal = item.quantityOriginal ?? 1;
-      const currentBase = item.quantityBase ?? item.quantity;
-      // Si newQuantity viene en base, convertir a original
-      const newOriginal = (newQuantity / currentBase) * currentOriginal;
-      const newBase = newOriginal * item.conversionFactorUsed;
+    // ✅ F2.2: Con unidad de venta (caja, rollo, centímetro) newQuantity llega en
+    // unidad base y la cantidad se conserva también en la unidad de venta.
+    if (item.unitIdUsed && item.conversionFactorUsed && item.conversionFactorUsed !== 1) {
+      // Cantidad en unidad de venta = cantidad base / factor (redondeo de flotantes)
+      const newOriginal = Math.round((newQuantity / item.conversionFactorUsed) * 1e6) / 1e6;
+      const newBase = Math.round(newQuantity * 1e6) / 1e6;
       if (newOriginal <= 0) { removeFromCart(storeProductId); return; }
       setCart(prev => prev.map(i =>
         i.storeProduct.id === storeProductId
@@ -2323,12 +2328,7 @@ export default function POSPage() {
             <div className="lg:col-span-1 h-full overflow-hidden flex flex-col">
               <CartPanel
                 cart={cart}
-                onUpdateQuantity={(id, delta) => {
-                  const item = cart.find(i => i.storeProduct.id === id);
-                  if (item) {
-                    updateQuantity(id, item.quantity + delta);
-                  }
-                }}
+                onUpdateQuantity={changeQuantityByDelta}
                 onRemoveItem={removeFromCart}
                 onClearCart={clearCart}
                 onApplyDiscount={handleOpenDiscountModal}
@@ -2359,12 +2359,7 @@ export default function POSPage() {
             isOpen={mobileCartOpen}
             onClose={() => setMobileCartOpen(false)}
             cart={cart}
-            onUpdateQuantity={(id, delta) => {
-              const item = cart.find(i => i.storeProduct.id === id);
-              if (item) {
-                updateQuantity(id, item.quantity + delta);
-              }
-            }}
+            onUpdateQuantity={changeQuantityByDelta}
             onRemoveItem={removeFromCart}
             onClearCart={() => {
               clearCart();

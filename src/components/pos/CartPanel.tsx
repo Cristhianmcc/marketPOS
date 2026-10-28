@@ -177,8 +177,10 @@ function UnitDropdown({
   
   const handleSelectUnit = (unit: UnitOption) => {
     setIsOpen(false);
-    const quantityBase = currentQuantity * unit.factor;
-    onUnitChange(storeProductId, currentQuantity, unit.id, quantityBase, unit.factor, unit.code);
+    // Una caja o un rollo no se fraccionan: la cantidad pasa a entero (mínimo 1).
+    const quantity = unit.allowsDecimals ? currentQuantity : Math.max(1, Math.round(currentQuantity));
+    const quantityBase = quantity * unit.factor;
+    onUnitChange(storeProductId, quantity, unit.id, quantityBase, unit.factor, unit.code);
   };
 
   return (
