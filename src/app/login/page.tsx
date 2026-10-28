@@ -160,7 +160,7 @@ export default function LoginPage() {
               {/* Action Button */}
               <div className="pt-2">
                 <button
-                  className="w-full flex items-center justify-center rounded-lg h-12 px-6 bg-primary hover:bg-primary-hover text-background-dark text-base font-bold leading-normal tracking-[0.015em] transition-all duration-200 shadow-sm hover:shadow-md transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="w-full flex items-center justify-center rounded-lg h-12 px-6 bg-primary hover:bg-primary-hover text-white text-base font-bold leading-normal tracking-[0.015em] transition-all duration-200 shadow-sm hover:shadow-md transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                   type="submit"
                   disabled={loading}
                 >

@@ -10,20 +10,29 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ✅ Stitch Design System Colors
-        primary: "#2bee79",
-        "primary-hover": "#25d068",
-        "primary-dark": "#25c765",
-        "background-light": "#f6f8f7",
-        "background-dark": "#111827",  // gray-900 - oscuro real
+        // ✅ Paleta Monterrial (logo): verde bosque, crema y dorado.
+        // primary cambia en modo oscuro vía variables CSS (globals.css).
+        primary: "rgb(var(--color-primary) / <alpha-value>)",
+        "primary-hover": "rgb(var(--color-primary-hover) / <alpha-value>)",
+        "primary-dark": "rgb(var(--color-primary-hover) / <alpha-value>)",
+        "background-light": "#f6f5f1",
+        "background-dark": "#0b1512",
         "surface-light": "#ffffff",
-        "surface-dark": "#1f2937",     // gray-800 - oscuro real
-        "text-main": "#0d1b13",
-        "text-light": "#f8fcfa",
-        "text-secondary": "#4c9a6b",
-        "border-light": "#e7f3ec",
-        "border-dark": "#374151",      // gray-700 - bordes oscuros
-        "border-subtle": "#cfe7d9",
+        "surface-dark": "#13211d",
+        "text-main": "#0e2a24",
+        "text-light": "#f3f1ec",
+        "text-secondary": "#5b6f68",
+        "border-light": "#e8e5dc",
+        "border-dark": "#26372f",
+        "border-subtle": "#d9d4c7",
+        monterrial: {
+          forest: "#0e2a24",
+          "forest-light": "#163a32",
+          sage: "#3c524c",
+          cream: "#f3f1ec",
+          gold: "#bfa463",
+          "gold-light": "#d4bf8a",
+        },
         // Legacy colors for backward compatibility
         brand: {
           blue: '#1F2A37',

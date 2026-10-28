@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
-  Store, 
   ShoppingCart, 
   DollarSign, 
   FileText, 
@@ -54,23 +53,28 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
   ];
 
   const allPromoItems = [
-    { label: 'Promociones', href: '/promotions', color: 'text-green-600 dark:text-green-400', flag: 'ENABLE_PROMOTIONS' },
-    { label: 'Cupones', href: '/coupons', color: 'text-green-600 dark:text-green-400', flag: 'ALLOW_COUPONS' },
-    { label: 'Promos Categoría', href: '/category-promotions', color: 'text-purple-600 dark:text-purple-400', flag: 'ENABLE_CATEGORY_PROMOS' },
-    { label: 'Promos Pack', href: '/volume-promotions', color: 'text-orange-600 dark:text-orange-400', flag: 'ENABLE_VOLUME_PROMOS' },
-    { label: 'Promos N-ésimo', href: '/nth-promotions', color: 'text-yellow-600 dark:text-yellow-400', flag: 'ENABLE_NTH_PROMOS' },
+    { label: 'Promociones', href: '/promotions', flag: 'ENABLE_PROMOTIONS' },
+    { label: 'Cupones', href: '/coupons', flag: 'ALLOW_COUPONS' },
+    { label: 'Promos Categoría', href: '/category-promotions', flag: 'ENABLE_CATEGORY_PROMOS' },
+    { label: 'Promos Pack', href: '/volume-promotions', flag: 'ENABLE_VOLUME_PROMOS' },
+    { label: 'Promos N-ésimo', href: '/nth-promotions', flag: 'ENABLE_NTH_PROMOS' },
   ];
   // Filtrar por flags del plan activo
   const promoItems = allPromoItems.filter(item => isOn(item.flag));
 
   const allPharmaItems = [
-    { label: 'Proveedores', href: '/suppliers', color: 'text-teal-600 dark:text-teal-400', flag: 'ENABLE_SUPPLIERS' },
-    { label: 'Órdenes de Compra', href: '/purchase-orders', color: 'text-teal-600 dark:text-teal-400', flag: 'ENABLE_SUPPLIERS' },
-    { label: 'Pacientes', href: '/patients', color: 'text-purple-600 dark:text-purple-400', flag: 'ENABLE_PATIENTS' },
-    { label: 'Libro Controlados', href: '/controlled-book', color: 'text-red-600 dark:text-red-400', flag: 'ENABLE_CONTROLLED_BOOK' },
-    { label: 'Interacciones', href: '/drug-interactions', color: 'text-amber-600 dark:text-amber-400', flag: 'ENABLE_PATIENTS' },
+    { label: 'Proveedores', href: '/suppliers', flag: 'ENABLE_SUPPLIERS' },
+    { label: 'Órdenes de Compra', href: '/purchase-orders', flag: 'ENABLE_SUPPLIERS' },
+    { label: 'Pacientes', href: '/patients', flag: 'ENABLE_PATIENTS' },
+    { label: 'Libro Controlados', href: '/controlled-book', flag: 'ENABLE_CONTROLLED_BOOK' },
+    { label: 'Interacciones', href: '/drug-interactions', flag: 'ENABLE_PATIENTS' },
   ];
   const pharmaItems = allPharmaItems.filter(item => isOn(item.flag));
+
+  // ThemeToggle/ShortcutsButton traen estilos para fondo claro; se adaptan al sidebar oscuro
+  const footerTools = '[&_button]:!bg-transparent [&_button:hover]:!bg-white/10 [&_svg]:!text-monterrial-cream/80';
+  const navIdle = 'text-monterrial-cream/70 hover:bg-white/10 hover:text-monterrial-cream';
+  const navActive = 'bg-monterrial-gold text-monterrial-forest font-semibold shadow-md shadow-black/20';
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -84,30 +88,34 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
   return (
     <aside className={`
-      flex flex-col min-h-screen bg-surface-light dark:bg-surface-dark border-r border-border-light dark:border-border-dark
+      flex flex-col my-3 ml-3 rounded-3xl bg-monterrial-forest text-monterrial-cream shadow-strong
+      dark:ring-1 dark:ring-white/5 overflow-hidden
       transition-all duration-300 ease-in-out flex-shrink-0
-      ${collapsed ? 'w-16' : 'w-64'}
+      ${collapsed ? 'w-[72px]' : 'w-64'}
     `}>
       {/* Logo + Toggle */}
-      <div className="flex items-center border-b border-border-light dark:border-border-dark h-[73px]">
-        {!collapsed && (
-          <div className="flex items-center gap-3 px-6 py-6 flex-1 min-w-0">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 dark:bg-primary/20 flex-shrink-0">
-              <Store className="w-6 h-6 text-primary" />
-            </div>
+      <div className={`flex items-center ${collapsed ? 'flex-col justify-center gap-2 py-4' : 'h-[84px]'}`}>
+        <div className={`flex items-center gap-3 min-w-0 ${collapsed ? '' : 'pl-5 flex-1'}`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/monterrial-logo.png"
+            alt="Monterrial"
+            className="w-11 h-11 rounded-xl ring-1 ring-white/10 flex-shrink-0"
+          />
+          {!collapsed && (
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-text-main dark:text-white">Monterrial</h1>
-              <p className="text-xs text-text-secondary dark:text-gray-400">Sistema de ventas</p>
+              <h1 className="text-xl font-bold tracking-tight text-monterrial-cream">Monterrial</h1>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-monterrial-gold">Punto de venta</p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         <button
           onClick={onToggle}
           title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           className={`
-            flex items-center justify-center w-10 h-10 rounded-lg text-text-secondary dark:text-gray-400
-            hover:bg-background-light dark:hover:bg-background-dark hover:text-primary transition-colors flex-shrink-0
-            ${collapsed ? 'mx-auto' : 'mr-2'}
+            flex items-center justify-center w-9 h-9 rounded-lg text-monterrial-cream/60
+            hover:bg-white/10 hover:text-monterrial-cream transition-colors flex-shrink-0
+            ${collapsed ? 'mx-auto' : 'mr-3'}
           `}
         >
           {collapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
@@ -116,25 +124,25 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
       {/* User Profile */}
       {user && !collapsed && (
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-border-light dark:border-border-dark bg-background-light/50 dark:bg-background-dark/50">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/20 dark:bg-primary/30 text-primary font-semibold flex-shrink-0">
+        <div className="flex items-center gap-3 mx-3 mb-2 px-3 py-3 rounded-2xl bg-white/5">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-monterrial-gold text-monterrial-forest font-bold flex-shrink-0">
             {user.name?.charAt(0).toUpperCase() || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-text-main dark:text-white truncate">
+            <p className="text-sm font-semibold text-monterrial-cream truncate">
               {user.name || 'Usuario'}
             </p>
-            <p className="text-xs text-text-secondary dark:text-gray-400 truncate">
+            <p className="text-xs text-monterrial-cream/60 truncate">
               {user.role?.toUpperCase() === 'OWNER' ? 'Propietario' : user.role?.toUpperCase() === 'ADMIN' ? 'Administrador' : 'Cajero'}
             </p>
           </div>
         </div>
       )}
       {user && collapsed && (
-        <div className="flex justify-center py-3 border-b border-border-light dark:border-border-dark">
+        <div className="flex justify-center pb-3">
           <div
             title={user.name || 'Usuario'}
-            className="flex items-center justify-center w-9 h-9 rounded-full bg-primary/20 dark:bg-primary/30 text-primary font-semibold text-sm"
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-monterrial-gold text-monterrial-forest font-bold text-sm"
           >
             {user.name?.charAt(0).toUpperCase() || 'U'}
           </div>
@@ -142,7 +150,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto scrollbar-hide px-3 py-3 space-y-1.5">
         {mainNavItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -153,12 +161,9 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={`
-                flex items-center gap-3 rounded-lg font-medium text-sm transition-all duration-200
-                ${collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-3 py-2.5'}
-                ${active
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white'
-                }
+                flex items-center gap-3 rounded-xl font-medium text-sm transition-all duration-200
+                ${collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'}
+                ${active ? navActive : navIdle}
               `}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
@@ -169,7 +174,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
         {/* Promociones Section - Only for Owner with at least one promo flag active */}
         {isOwner && promoItems.length > 0 && (
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               onClick={() => {
                 if (collapsed && onToggle) { onToggle(); setPromosExpanded(true); }
@@ -177,9 +182,9 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
               }}
               title={collapsed ? 'Promociones' : undefined}
               className={`
-                flex items-center rounded-lg font-medium text-sm transition-all duration-200 w-full
-                ${collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'justify-between px-3 py-2.5'}
-                text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white
+                flex items-center rounded-xl font-medium text-sm transition-all duration-200 w-full
+                ${collapsed ? 'justify-center px-0 py-3' : 'justify-between px-4 py-3'}
+                ${navIdle}
               `}
             >
               <div className={`flex items-center ${collapsed ? '' : 'gap-3'}`}>
@@ -194,7 +199,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
             </button>
 
             {promosExpanded && !collapsed && (
-              <div className="ml-4 mt-1 space-y-1 border-l-2 border-border-light dark:border-border-dark pl-2">
+              <div className="ml-6 mt-1 space-y-1 border-l border-white/15 pl-2">
                 {promoItems.map((item) => {
                   const active = isActive(item.href);
                   return (
@@ -204,8 +209,8 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
                       className={`
                         flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200
                         ${active
-                          ? 'bg-primary/10 dark:bg-primary/20 font-semibold ' + item.color
-                          : 'text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white'
+                          ? 'bg-white/10 font-semibold text-monterrial-gold'
+                          : 'text-monterrial-cream/60 hover:bg-white/10 hover:text-monterrial-cream'
                         }
                       `}
                     >
@@ -221,7 +226,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
         {/* Farmacia Section - Only for Owner with at least one pharma flag active */}
         {isOwner && pharmaItems.length > 0 && (
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               onClick={() => {
                 if (collapsed && onToggle) { onToggle(); setPharmaExpanded(true); }
@@ -229,9 +234,9 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
               }}
               title={collapsed ? 'Farmacia' : undefined}
               className={`
-                flex items-center rounded-lg font-medium text-sm transition-all duration-200 w-full
-                ${collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'justify-between px-3 py-2.5'}
-                text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white
+                flex items-center rounded-xl font-medium text-sm transition-all duration-200 w-full
+                ${collapsed ? 'justify-center px-0 py-3' : 'justify-between px-4 py-3'}
+                ${navIdle}
               `}
             >
               <div className={`flex items-center ${collapsed ? '' : 'gap-3'}`}>
@@ -246,7 +251,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
             </button>
 
             {pharmaExpanded && !collapsed && (
-              <div className="ml-4 mt-1 space-y-1 border-l-2 border-border-light dark:border-border-dark pl-2">
+              <div className="ml-6 mt-1 space-y-1 border-l border-white/15 pl-2">
                 {pharmaItems.map((item) => {
                   const active = isActive(item.href);
                   return (
@@ -256,8 +261,8 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
                       className={`
                         flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200
                         ${active
-                          ? 'bg-primary/10 dark:bg-primary/20 font-semibold ' + item.color
-                          : 'text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white'
+                          ? 'bg-white/10 font-semibold text-monterrial-gold'
+                          : 'text-monterrial-cream/60 hover:bg-white/10 hover:text-monterrial-cream'
                         }
                       `}
                     >
@@ -273,16 +278,16 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
       </nav>
 
       {/* Footer Actions */}
-      <div className={`py-4 space-y-1 border-t border-border-light dark:border-border-dark ${collapsed ? 'px-2' : 'px-3'}`}>
+      <div className="py-4 px-3 space-y-1.5 border-t border-white/10">
         {/* Theme & Shortcuts */}
         {!collapsed && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-2">
+          <div className={`flex items-center gap-2 px-2 py-1.5 mb-2 rounded-xl bg-white/5 ${footerTools}`}>
             <ThemeToggle />
             <ShortcutsButton />
           </div>
         )}
         {collapsed && (
-          <div className="flex flex-col items-center gap-1 mb-2">
+          <div className={`flex flex-col items-center gap-1 mb-2 ${footerTools}`}>
             <ThemeToggle />
           </div>
         )}
@@ -291,12 +296,9 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
           href="/settings"
           title={collapsed ? 'Configuración' : undefined}
           className={`
-            flex items-center gap-3 rounded-lg font-medium text-sm transition-all duration-200
-            ${collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-3 py-2.5'}
-            ${isActive('/settings')
-              ? 'bg-primary text-white shadow-sm'
-              : 'text-text-secondary dark:text-gray-400 hover:bg-background-light dark:hover:bg-background-dark hover:text-text-main dark:hover:text-white'
-            }
+            flex items-center gap-3 rounded-xl font-medium text-sm transition-all duration-200
+            ${collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'}
+            ${isActive('/settings') ? navActive : navIdle}
           `}
         >
           <Settings className="w-5 h-5 flex-shrink-0" />
@@ -306,9 +308,9 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
           onClick={handleLogout}
           title={collapsed ? 'Cerrar sesión' : undefined}
           className={`
-            flex items-center gap-3 rounded-lg font-medium text-sm transition-all duration-200 w-full
-            ${collapsed ? 'justify-center px-0 py-2.5 mx-1' : 'px-3 py-2.5'}
-            text-text-secondary dark:text-gray-400 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400
+            flex items-center gap-3 rounded-xl font-medium text-sm transition-all duration-200 w-full
+            ${collapsed ? 'justify-center px-0 py-3' : 'px-4 py-3'}
+            text-monterrial-cream/70 hover:bg-red-500/15 hover:text-red-300
           `}
         >
           <LogOut className="w-5 h-5 flex-shrink-0" />

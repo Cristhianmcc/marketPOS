@@ -3,6 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+  /* Verde de acción Monterrial; en oscuro se aclara para mantener contraste */
+  :root {
+    --color-primary: 31 92 74;       /* #1f5c4a */
+    --color-primary-hover: 23 74 59; /* #174a3b */
+  }
+
+  .dark {
+    --color-primary: 46 138 106;     /* #2e8a6a */
+    --color-primary-hover: 38 117 90; /* #26755a */
+  }
+
   /* ✅ Stitch Design System Base Styles */
   body {
     @apply bg-background-light dark:bg-background-dark text-text-main dark:text-text-light antialiased;
