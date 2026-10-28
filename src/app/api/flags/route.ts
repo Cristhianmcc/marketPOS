@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server';
 import { getStoreSessionOrThrow } from '@/lib/session';
-import { getAllFeatureFlags } from '@/lib/featureFlags';
+import { ensureProfileFlags, getAllFeatureFlags } from '@/lib/featureFlags';
 import { requireStoreActive, guardErrorToResponse } from '@/lib/guards/requireFlag';
 
 export async function GET() {
@@ -23,7 +23,8 @@ export async function GET() {
     }
     await requireStoreActive(session.storeId);
 
-    // 3. Obtener todos los flags
+    // 3. Completar módulos del rubro que falten y obtener todos los flags
+    await ensureProfileFlags(session.storeId);
     const flags = await getAllFeatureFlags(session.storeId);
 
     // 4. Retornar flags

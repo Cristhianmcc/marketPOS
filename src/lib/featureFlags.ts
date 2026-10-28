@@ -5,6 +5,7 @@
 
 import { prisma } from '@/infra/db/prisma';
 import { FeatureFlagKey } from '@prisma/client';
+import { getProfileFlags } from '@/lib/businessProfiles';
 
 // ════════════════════════════════════════════════════════════════════════════
 // MÓDULO S3: CACHE CON TTL POR TIENDA
@@ -226,6 +227,21 @@ export async function setFeatureFlag(
  * Esto fuerza a que la siguiente verificación consulte la DB
  * @param storeId - ID de la tienda a invalidar
  */
+/**
+ * Crea activados los módulos del rubro que la tienda aún no tiene registrados.
+ * Cubre tiendas creadas antes de que su rubro sumara un módulo (por ejemplo
+ * órdenes en lavandería). No reactiva un módulo que se apagó a propósito.
+ */
+export async function ensureProfileFlags(storeId: string): Promise<void> {
+  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { businessProfile: true } });
+  if (!store) return;
+  const created = await prisma.featureFlag.createMany({
+    data: getProfileFlags(store.businessProfile).map((key) => ({ storeId, key, enabled: true })),
+    skipDuplicates: true,
+  });
+  if (created.count > 0) invalidateStoreFlags(storeId);
+}
+
 export function invalidateStoreFlags(storeId: string): void {
   // Eliminar todas las entradas de flagCache que pertenezcan a esta tienda
   for (const key of flagCache.keys()) {

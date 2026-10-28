@@ -142,6 +142,14 @@ es `docs/audits/2026-09-26-pos.md`.
   atrasadas. Ticket de recepción en `src/lib/workOrders/ticket.ts` (HTML
   térmico por `window.desktop.printer.printHtml` o el navegador). El ticket de
   venta y el ESC/POS muestran adelanto y saldo (`Sale.advanceApplied`).
+- Lavandería: el POS (`/pos`) muestra la recepción de ropa (`LaundryPos` +
+  `ReceptionForm`); "Venta directa" abre el POS normal. La recepción admite
+  trabajo libre: ítem SERVICE sin `serviceId`, con `itemName`, detalle en
+  `itemContent` (ej. "5 kg"), cantidad 1 y el total escrito por quien recibe
+  (`freeWorkLine`).
+- Módulos por rubro: `getRubroFlagChanges` activa los del rubro y apaga los
+  propios de otros rubros al cambiar de perfil; `ensureProfileFlags` (en
+  `/api/flags`) crea los módulos del rubro que falten sin reactivar los apagados.
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

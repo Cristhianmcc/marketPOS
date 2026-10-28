@@ -95,6 +95,8 @@ async function flowWorker(contextPath: string) {
   const { PrismaShiftRepository } = require('../src/infra/db/repositories/PrismaShiftRepository');
   const { buildPayloadFromSale } = require('../src/lib/sunat/buildPayloadFromSale');
   const { recordAdvance } = require('../src/lib/workOrders/payments');
+  const { ensureProfileFlags, invalidateStoreFlags } = require('../src/lib/featureFlags');
+  const { getRubroFlagChanges } = require('../src/lib/businessProfiles');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
   const json = (url: string, method: string, body?: unknown) =>
@@ -256,6 +258,42 @@ async function flowWorker(contextPath: string) {
     shift: await cashOfShift(),
   };
 
+  // L17 Trabajo libre (lo que se pesa al recibir): el cajero escribe trabajo, kilos y total
+  session.role = 'CASHIER';
+  const free = await create([{ type: 'SERVICE', itemName: 'Lavado de ropa', itemContent: '5 kg', quantityBase: 1, unitPrice: 25 }]);
+  const noPrice = await create([{ type: 'SERVICE', itemName: 'Lavado de ropa', quantityBase: 1 }]);
+  const noName = await create([{ type: 'SERVICE', itemName: ' ', quantityBase: 1, unitPrice: 10 }]);
+  session.role = 'OWNER';
+  const freeId = free.body?.data?.id;
+  const freeItem = freeId ? (await prisma.workOrderItem.findFirst({ where: { workOrderId: freeId } })) : null;
+  await setStatus(freeId, 'APPROVED');
+  const freePaid = await charge(freeId, { paymentMethod: 'CASH', amountPaid: 25 });
+  const freeSaleItem = freePaid.body?.data?.saleId ? await prisma.saleItem.findFirst({ where: { saleId: freePaid.body.data.saleId } }) : null;
+  const freeBoleta = freePaid.body?.data?.saleId ? await buildPayloadFromSale(prisma, { saleId: freePaid.body.data.saleId, docType: 'BOLETA' }) : null;
+  steps.L17 = {
+    created: free.status,
+    item: freeItem && { name: freeItem.itemName, content: freeItem.itemContent, qty: Number(freeItem.quantityBase), subtotal: Number(freeItem.subtotal) },
+    rejected: [noPrice.status, noName.status],
+    sale: freeSaleItem && { status: freePaid.status, name: freeSaleItem.productName, content: freeSaleItem.productContent, total: Number(freeSaleItem.totalLine) },
+    boletaTotal: freeBoleta?.totals?.total ?? null,
+  };
+
+  // L18 Módulos por rubro: lavandería apaga los de farmacia y completa los que falten
+  const changes = getRubroFlagChanges('LAVANDERIA');
+  await prisma.featureFlag.deleteMany({ where: { storeId: ctx.storeId, key: 'ENABLE_WORK_ORDERS' } });
+  await prisma.featureFlag.upsert({ where: { storeId_key: { storeId: ctx.storeId, key: 'ENABLE_SERVICES' } }, update: { enabled: false }, create: { storeId: ctx.storeId, key: 'ENABLE_SERVICES', enabled: false } });
+  invalidateStoreFlags(ctx.storeId);
+  await ensureProfileFlags(ctx.storeId);
+  const flagRows = await prisma.featureFlag.findMany({ where: { storeId: ctx.storeId, key: { in: ['ENABLE_WORK_ORDERS', 'ENABLE_SERVICES'] } } });
+  await prisma.featureFlag.update({ where: { storeId_key: { storeId: ctx.storeId, key: 'ENABLE_SERVICES' } }, data: { enabled: true } });
+  invalidateStoreFlags(ctx.storeId);
+  steps.L18 = {
+    enable: changes.enable,
+    disablesPharma: ['ENABLE_PATIENTS', 'ENABLE_BATCH_EXPIRY', 'ENABLE_CONTROLLED_BOOK'].every((f: string) => changes.disable.includes(f)),
+    keepsOwn: !changes.disable.includes('ENABLE_WORK_ORDERS') && !changes.disable.includes('ENABLE_SERVICES'),
+    flags: Object.fromEntries(flagRows.map((f: any) => [f.key, f.enabled])),
+  };
+
   // L8 Express: 2 kg (10) + 1 terno (15) = 25 con recargo 50 % = 37,50 y fecha prometida
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
   const yesterday = new Date(Date.now() - 2 * 86_400_000).toISOString();
@@ -387,6 +425,19 @@ const EXPECTATIONS: Expectation[] = [
   { id: 'L16', title: 'No deja el total por debajo del adelanto', check: (s) => [
     ...eq('respuesta', s.L16?.status, 409),
     ...eq('total', s.L16?.order?.total, 30),
+  ] },
+  { id: 'L17', title: 'Trabajo libre: el cajero escribe trabajo, kilos y total; boleta cuadra', check: (s) => [
+    ...eq('creada', s.L17?.created, 201),
+    ...eq('línea', s.L17?.item, { name: 'Lavado de ropa', content: '5 kg', qty: 1, subtotal: 25 }),
+    ...eq('sin precio / sin descripción', s.L17?.rejected, [400, 400]),
+    ...eq('venta', s.L17?.sale, { status: 200, name: 'Lavado de ropa', content: '5 kg', total: 25 }),
+    ...eq('boleta', s.L17?.boletaTotal, 25),
+  ] },
+  { id: 'L18', title: 'Módulos por rubro: sin farmacia, completa órdenes y respeta lo apagado', check: (s) => [
+    ...eq('módulos de lavandería', s.L18?.enable, ['ENABLE_SERVICES', 'ENABLE_WORK_ORDERS']),
+    ...eq('apaga farmacia', s.L18?.disablesPharma, true),
+    ...eq('no apaga los suyos', s.L18?.keepsOwn, true),
+    ...eq('completa órdenes y no reactiva lo apagado', s.L18?.flags, { ENABLE_SERVICES: false, ENABLE_WORK_ORDERS: true }),
   ] },
   { id: 'L14', title: 'Producto de la orden descuenta stock con movimiento', check: (s) => [
     ...(ok(s.L14) ? [] : [`respondió ${s.L14?.result?.status}: ${s.L14?.result?.error}`]),

@@ -14,7 +14,7 @@ import { FeatureFlagKey, WorkOrderStatus, WorkOrderItemType, Prisma } from '@pri
 import { prisma } from '@/infra/db/prisma';
 import { getCurrentStoreUser } from '@/lib/session';
 import { requireFeature, isFeatureEnabled } from '@/lib/featureFlags';
-import { canEditTransition, expressSurchargeFor, parsePromisedAt, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
+import { canEditTransition, expressSurchargeFor, freeWorkLine, parsePromisedAt, resolveItemPrice, WorkOrderRuleError } from '@/lib/workOrders/rules';
 import { lockWorkOrder, refundAdvances } from '@/lib/workOrders/payments';
 import { PrismaShiftRepository } from '@/infra/db/repositories/PrismaShiftRepository';
 
@@ -110,6 +110,9 @@ interface CreateItemInput {
   type: 'PRODUCT' | 'SERVICE';
   storeProductId?: string;
   serviceId?: string;
+  /** Trabajo libre (sin serviceId): descripción, detalle (ej. "5 kg") y precio */
+  itemName?: string;
+  itemContent?: string;
   unitIdUsed?: string;
   quantityOriginal?: number;
   quantityBase: number;
@@ -186,6 +189,7 @@ export async function POST(request: NextRequest) {
       let itemContent: string | null = null;
       let catalogPrice = 0;
       let allowDecimals = true;
+      let freeLine = false; // trabajo libre: el precio lo escribe quien recibe
 
       if (item.type === 'PRODUCT') {
         if (!item.storeProductId) {
@@ -207,26 +211,35 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Módulo de servicios no habilitado' }, { status: 403 });
         }
         if (!item.serviceId) {
-          return NextResponse.json({ error: 'serviceId requerido para servicios' }, { status: 400 });
+          try {
+            ({ itemName, itemContent } = freeWorkLine(item));
+          } catch (error) {
+            if (error instanceof WorkOrderRuleError) return NextResponse.json({ error: error.message }, { status: error.status });
+            throw error;
+          }
+          freeLine = true;
+          catalogPrice = Number(item.unitPrice);
+          allowDecimals = false;
+        } else {
+          const service = await prisma.service.findFirst({
+            where: { id: item.serviceId, storeId: session.storeId, active: true },
+            include: { baseUnit: { select: { allowDecimals: true } } },
+          });
+          if (!service) {
+            return NextResponse.json({ error: `Servicio ${item.serviceId} no encontrado` }, { status: 400 });
+          }
+          itemName = service.name;
+          itemContent = '(Servicio)';
+          catalogPrice = service.price.toNumber();
+          allowDecimals = service.baseUnit ? service.baseUnit.allowDecimals : true;
         }
-        const service = await prisma.service.findFirst({
-          where: { id: item.serviceId, storeId: session.storeId, active: true },
-          include: { baseUnit: { select: { allowDecimals: true } } },
-        });
-        if (!service) {
-          return NextResponse.json({ error: `Servicio ${item.serviceId} no encontrado` }, { status: 400 });
-        }
-        itemName = service.name;
-        itemContent = '(Servicio)';
-        catalogPrice = service.price.toNumber();
-        allowDecimals = service.baseUnit ? service.baseUnit.allowDecimals : true;
       }
 
       let unitPrice: number;
       try {
         unitPrice = resolveItemPrice({
           itemName, quantityBase: item.quantityBase, allowDecimals, catalogPrice,
-          requestedPrice: item.unitPrice, isOwner: session.role === 'OWNER',
+          requestedPrice: item.unitPrice, isOwner: session.role === 'OWNER' || freeLine,
         });
       } catch (error) {
         if (error instanceof WorkOrderRuleError) return NextResponse.json({ error: error.message }, { status: error.status });
@@ -394,6 +407,7 @@ export async function PATCH(request: NextRequest) {
           let itemContent: string | null = null;
           let catalogPrice = 0;
           let allowDecimals = true;
+          let freeLine = false; // trabajo libre: el precio lo escribe quien recibe
 
           if (item.type === 'PRODUCT') {
             if (!item.storeProductId) {
@@ -415,24 +429,28 @@ export async function PATCH(request: NextRequest) {
               throw new WorkOrderRuleError('Módulo de servicios no habilitado');
             }
             if (!item.serviceId) {
-              throw new WorkOrderRuleError('serviceId requerido para servicios');
+              ({ itemName, itemContent } = freeWorkLine(item));
+              freeLine = true;
+              catalogPrice = Number(item.unitPrice);
+              allowDecimals = false;
+            } else {
+              const service = await tx.service.findFirst({
+                where: { id: item.serviceId, storeId: session.storeId, active: true },
+                include: { baseUnit: { select: { allowDecimals: true } } },
+              });
+              if (!service) {
+                throw new WorkOrderRuleError(`Servicio ${item.serviceId} no encontrado`);
+              }
+              itemName = service.name;
+              itemContent = '(Servicio)';
+              catalogPrice = service.price.toNumber();
+              allowDecimals = service.baseUnit ? service.baseUnit.allowDecimals : true;
             }
-            const service = await tx.service.findFirst({
-              where: { id: item.serviceId, storeId: session.storeId, active: true },
-              include: { baseUnit: { select: { allowDecimals: true } } },
-            });
-            if (!service) {
-              throw new WorkOrderRuleError(`Servicio ${item.serviceId} no encontrado`);
-            }
-            itemName = service.name;
-            itemContent = '(Servicio)';
-            catalogPrice = service.price.toNumber();
-            allowDecimals = service.baseUnit ? service.baseUnit.allowDecimals : true;
           }
 
           const unitPrice = resolveItemPrice({
             itemName, quantityBase: item.quantityBase, allowDecimals, catalogPrice,
-            requestedPrice: item.unitPrice, isOwner: session.role === 'OWNER',
+            requestedPrice: item.unitPrice, isOwner: session.role === 'OWNER' || freeLine,
           });
           const itemSubtotal = item.quantityBase * unitPrice;
           newSubtotal += itemSubtotal;

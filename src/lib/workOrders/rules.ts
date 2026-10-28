@@ -94,3 +94,21 @@ export function parsePromisedAt(value: unknown): Date | null | undefined {
   }
   return date;
 }
+
+/**
+ * Trabajo libre (lavandería): descripción y total escritos al recibir, sin
+ * servicio de catálogo. Los kilos o el detalle van en `itemContent` y la
+ * cantidad es 1, para que el comprobante cuadre sin redondeos por kilo.
+ */
+export function freeWorkLine(input: { itemName?: unknown; itemContent?: unknown; unitPrice?: unknown }) {
+  const itemName = typeof input.itemName === 'string' ? input.itemName.trim() : '';
+  if (itemName.length < 2 || itemName.length > 120) {
+    throw new WorkOrderRuleError('Describe el trabajo (por ejemplo "Lavado de ropa")');
+  }
+  const price = Number(input.unitPrice);
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new WorkOrderRuleError(`${itemName}: escribe el precio a cobrar`);
+  }
+  const content = typeof input.itemContent === 'string' ? input.itemContent.trim().slice(0, 60) : '';
+  return { itemName, itemContent: content || null };
+}

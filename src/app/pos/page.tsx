@@ -11,6 +11,7 @@ import { CategoryChips } from '@/components/pos/CategoryChips';
 import { PosBanner } from '@/components/pos/PosBanner';
 import { ShiftCard } from '@/components/pos/ShiftCard';
 import { CategoryIcon } from '@/components/pos/categoryIcon';
+import { LaundryPos } from '@/app/work-orders/LaundryPos';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
 import AdvancedUnitSelector from '@/components/pos/AdvancedUnitSelector'; // ✅ MÓDULO F1
@@ -159,7 +160,7 @@ interface MedicationHistoryEntry {
   dispensedAt: string;
 }
 
-export default function POSPage() {
+function SalesPos() {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<StoreProduct[]>([]);
   // Filtro por categoría: resultados aparte para no interferir con búsqueda/escáner
@@ -1988,7 +1989,13 @@ export default function POSPage() {
     return (
       <div
         key={sp.id}
-        className="group flex flex-col rounded-2xl bg-surface-light dark:bg-surface-dark p-3 shadow-soft hover:shadow-medium transition-shadow"
+        // Toda la tarjeta agrega al carrito, no solo el botón "+"
+        role="button"
+        tabIndex={outOfStock ? -1 : 0}
+        aria-disabled={outOfStock}
+        onClick={outOfStock ? undefined : onAdd}
+        onKeyDown={(e) => { if (!outOfStock && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onAdd(); } }}
+        className={`group flex flex-col rounded-2xl bg-surface-light dark:bg-surface-dark p-3 shadow-soft transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${outOfStock ? 'opacity-70 cursor-not-allowed' : 'hover:shadow-medium cursor-pointer active:scale-[0.99]'}`}
       >
         {/* Foto del producto, o el ícono de su categoría si aún no tiene foto */}
         <div className="relative h-28 mb-3 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark overflow-hidden flex items-center justify-center">
@@ -2042,7 +2049,7 @@ export default function POSPage() {
             </p>
           </div>
           <button
-            onClick={onAdd}
+            onClick={(e) => { e.stopPropagation(); onAdd(); }}
             disabled={outOfStock}
             title={outOfStock ? 'Sin stock' : 'Agregar al carrito'}
             aria-label={outOfStock ? 'Sin stock' : `Agregar ${sp.product.name}`}
@@ -3808,4 +3815,46 @@ export default function POSPage() {
 
     </AuthLayout>
   );
+}
+
+const PROFILE_KEY = 'pos-business-profile';
+
+/**
+ * En lavandería el Punto de Venta es la recepción de ropa; "Venta directa"
+ * abre el POS normal. El rubro se recuerda en la sesión para no demorar el POS.
+ */
+export default function POSPage() {
+  const [profile, setProfile] = useState<string | null>(null);
+  const [directSale, setDirectSale] = useState(false);
+
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(PROFILE_KEY);
+      if (cached) setProfile(cached);
+    } catch { /* sin almacenamiento */ }
+    fetch('/api/store')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const value = data?.store?.businessProfile ?? 'BODEGA';
+        setProfile(value);
+        try { sessionStorage.setItem(PROFILE_KEY, value); } catch { /* sin almacenamiento */ }
+      })
+      .catch(() => setProfile((current) => current ?? 'BODEGA'));
+  }, []);
+
+  if (profile === null) {
+    return (
+      <AuthLayout>
+        <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>
+      </AuthLayout>
+    );
+  }
+  if (profile === 'LAVANDERIA' && !directSale) {
+    return (
+      <AuthLayout>
+        <LaundryPos onDirectSale={() => setDirectSale(true)} />
+      </AuthLayout>
+    );
+  }
+  return <SalesPos />;
 }

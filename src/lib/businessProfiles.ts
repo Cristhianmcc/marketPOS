@@ -217,6 +217,17 @@ export function getProfileFlags(profile: BusinessProfile): FeatureFlagKey[] {
 }
 
 /**
+ * Módulos al elegir un rubro: se activan los del rubro y se apagan los que son
+ * propios de otros rubros (por ejemplo Farmacia al pasar de botica a lavandería).
+ * Los flags de plan (promociones, SUNAT, fiado) no se tocan.
+ */
+export function getRubroFlagChanges(profile: BusinessProfile): { enable: FeatureFlagKey[]; disable: FeatureFlagKey[] } {
+  const enable = getProfileFlags(profile);
+  const rubroFlags = new Set(Object.values(BUSINESS_PROFILE_PRESETS).flatMap((preset) => preset.enabledFlags));
+  return { enable, disable: [...rubroFlags].filter((flag) => !enable.includes(flag)) };
+}
+
+/**
  * Verifica si un flag es parte de un perfil
  */
 export function isProfileFlag(profile: BusinessProfile, flag: FeatureFlagKey): boolean {

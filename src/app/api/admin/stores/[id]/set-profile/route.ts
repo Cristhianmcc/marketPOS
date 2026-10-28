@@ -18,7 +18,8 @@ import { prisma } from '@/infra/db/prisma';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
 import { BusinessProfile, FeatureFlagKey } from '@prisma/client';
-import { getProfileFlags } from '@/lib/businessProfiles';
+import { getRubroFlagChanges } from '@/lib/businessProfiles';
+import { invalidateStoreFlags } from '@/lib/featureFlags';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -81,8 +82,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const oldProfile = store.businessProfile;
     const newProfile = businessProfile as BusinessProfile;
 
-    // 6. Obtener flags del nuevo perfil
-    const newProfileFlags = getProfileFlags(newProfile);
+    // 6. Módulos del nuevo rubro y los propios de otros rubros que se apagan
+    const { enable: newProfileFlags, disable: otherRubroFlags } = getRubroFlagChanges(newProfile);
 
     // 7. Aplicar cambios en transacción
     const result = await prisma.$transaction(async (tx) => {
@@ -92,8 +93,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         data: { businessProfile: newProfile },
       });
 
-      // Aplicar preset de flags (upsert)
-      // POLÍTICA: Solo activamos flags del nuevo perfil, no desactivamos los existentes
+      // Aplicar preset de flags: la tienda queda con los módulos de su rubro.
+      // Los de otros rubros se apagan (antes quedaban activos y aparecía, por
+      // ejemplo, Farmacia en una lavandería). Los flags de plan no se tocan.
+      await tx.featureFlag.updateMany({
+        where: { storeId, key: { in: otherRubroFlags }, enabled: true },
+        data: { enabled: false },
+      });
       const flagUpserts = newProfileFlags.map(flagKey => 
         tx.featureFlag.upsert({
           where: {
@@ -126,6 +132,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
         flags: currentFlags,
       };
     });
+
+    // Los módulos cambiaron: la tienda debe verlos sin esperar al vencimiento de la caché
+    invalidateStoreFlags(storeId);
 
     return NextResponse.json({
       success: true,
