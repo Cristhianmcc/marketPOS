@@ -729,15 +729,12 @@ export default function POSPage() {
     }
   };
 
-  // Productos de la categoría seleccionada
+  // Productos de la categoría seleccionada (o todo el inventario activo con "Todo")
   useEffect(() => {
-    if (!selectedCategory) {
-      setCategoryProducts([]);
-      return;
-    }
     let cancelled = false;
     setLoadingCategory(true);
-    fetch(`/api/inventory?category=${encodeURIComponent(selectedCategory)}&active=true&limit=48`)
+    const categoryParam = selectedCategory ? `category=${encodeURIComponent(selectedCategory)}&` : '';
+    fetch(`/api/inventory?${categoryParam}active=true&limit=60`)
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
         if (!cancelled) setCategoryProducts(data?.products || []);
@@ -1995,10 +1992,14 @@ export default function POSPage() {
       >
         {/* Imagen del producto (o emoji de su categoría) */}
         <div className="relative h-28 mb-3 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark overflow-hidden flex items-center justify-center">
-          {sp.product.imageUrl ? (
-            <img src={sp.product.imageUrl} alt={sp.product.name} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-5xl leading-none select-none">{categoryEmoji(sp.product.category)}</span>
+          <span className="text-5xl leading-none select-none">{categoryEmoji(sp.product.category)}</span>
+          {sp.product.imageUrl && (
+            <img
+              src={sp.product.imageUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
           )}
           {(expiryBadge || (medicineSearchEnabled && sp.product.requiresPrescription)) && (
             <div className="absolute top-1.5 left-1.5 flex flex-wrap gap-1">
@@ -2064,62 +2065,16 @@ export default function POSPage() {
           <PosHeader
             shiftOpen={!!currentShift}
             onOpenShift={() => setShowOpenShiftModal(true)}
-            actions={isSuperAdmin ? (
-              <a
-                href="/admin/backups"
-                className="flex items-center gap-1.5 h-11 px-4 rounded-2xl bg-surface-light dark:bg-surface-dark shadow-soft text-sm font-semibold text-text-secondary hover:text-text-main transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                </svg>
-                Backups
-              </a>
-            ) : undefined}
-          />
-
-          {/* ✅ MÓDULO 17.4: Badge DEMO MODE */}
-          {is_demo_store && (
-            <div className="mb-6 bg-yellow-100 border-2 border-yellow-500 rounded-lg p-4 flex items-center justify-center gap-3 shadow-lg">
-              <AlertTriangle className="w-6 h-6 text-yellow-700" />
-              <div className="text-center">
-                <p className="text-xl font-extrabold text-yellow-900 tracking-wider">
-                  DEMO MODE ACTIVO
-                </p>
-                <p className="text-sm text-yellow-700 font-medium mt-1">
-                  Datos ficticios para demostración
-                </p>
-              </div>
-              <AlertTriangle className="w-6 h-6 text-yellow-700" />
-            </div>
-          )}
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
-            {/* Columna Izquierda: Búsqueda y Productos */}
-            <div className="lg:col-span-2 space-y-5 overflow-y-auto scrollbar-hide pb-2 pr-1">
-              {/* Banner Monterrial: fijo arriba para que la búsqueda no salte */}
-              <PosBanner />
-
-              {/* Search - Optimizado para táctil */}
-              <div className="bg-surface-light dark:bg-surface-dark rounded-2xl p-4 shadow-soft">
-                {/* ✅ MÓDULO 17.1: Hints de atajos */}
-                <div className="mb-3 hidden lg:flex items-center gap-3 text-xs text-text-secondary dark:text-gray-400">
-                  <span className="px-2 py-1 bg-background-light dark:bg-background-dark rounded-md border border-border-light dark:border-border-dark font-mono">F2</span>
-                  <span>Buscar</span>
-                  <span className="px-2 py-1 bg-background-light dark:bg-background-dark rounded-md border border-border-light dark:border-border-dark font-mono">Ctrl+Enter</span>
-                  <span>Finalizar</span>
-                </div>
-                
-                {/* Campo de búsqueda + botones */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    <div className="flex-1 relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary w-5 h-5" />
+            search={(
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary w-5 h-5" />
                     <input
                       ref={searchInputRef}
                       id="product-search"
                       type="text"
                       autoFocus
-                      placeholder="Buscar producto por nombre, código..."
+                      placeholder="Buscar producto o escanear código..."
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       onKeyDown={(e) => {
@@ -2174,18 +2129,18 @@ export default function POSPage() {
                           }
                         }
                       }}
-                      className="w-full h-12 md:h-14 pl-12 pr-4 bg-background-light dark:bg-background-dark text-text-main dark:text-text-light border border-transparent rounded-xl placeholder:text-text-secondary/70 focus:outline-none focus:bg-surface-light dark:focus:bg-surface-dark focus:border-primary focus:ring-2 focus:ring-primary/20 text-base md:text-sm"
+                      className="w-full h-12 pl-12 pr-14 bg-surface-light dark:bg-surface-dark text-text-main dark:text-text-light border border-transparent rounded-2xl shadow-soft placeholder:text-text-secondary/70 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base md:text-sm"
                       style={{ fontSize: '16px' }}
                     />
-                  </div>
-                  <button
-                    onClick={handleSearch}
-                    disabled={loading}
-                    className="h-12 md:h-14 px-4 md:px-6 bg-primary text-white rounded-xl font-semibold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
-                  >
-                    {loading ? 'Buscando...' : 'Buscar'}
-                  </button>
+                  <kbd className="hidden lg:block absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded-md bg-background-light dark:bg-background-dark text-[11px] font-mono text-text-secondary" title="F2 buscar · Ctrl+Enter finalizar">F2</kbd>
                 </div>
+                <button
+                  onClick={handleSearch}
+                  disabled={loading}
+                  className="h-12 px-5 bg-primary text-white rounded-2xl font-semibold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation shadow-md shadow-primary/30"
+                >
+                  {loading ? 'Buscando...' : 'Buscar'}
+                </button>
                 {/* Venta libre: producto no registrado en inventario */}
                 <button
                   onClick={() => {
@@ -2195,12 +2150,46 @@ export default function POSPage() {
                     setShowFreeItemModal(true);
                   }}
                   title="Vender producto sin registrar en inventario"
-                  className="w-full h-10 px-4 bg-transparent border border-dashed border-primary/50 text-primary rounded-xl font-medium hover:bg-primary/10 hover:border-primary transition-colors touch-manipulation flex items-center justify-center gap-2 text-sm"
+                  className="h-12 px-4 bg-surface-light dark:bg-surface-dark text-primary rounded-2xl font-semibold shadow-soft hover:bg-primary/10 transition-colors touch-manipulation flex items-center gap-1.5 text-sm whitespace-nowrap"
                 >
-                  <span className="text-lg font-bold">+</span> Venta libre (producto no registrado)
+                  <Plus className="w-4 h-4" /> Venta libre
                 </button>
-                </div>
               </div>
+            )}
+            actions={isSuperAdmin ? (
+              <a
+                href="/admin/backups"
+                className="flex items-center gap-1.5 h-11 px-4 rounded-2xl bg-surface-light dark:bg-surface-dark shadow-soft text-sm font-semibold text-text-secondary hover:text-text-main transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                </svg>
+                Backups
+              </a>
+            ) : undefined}
+          />
+
+          {/* ✅ MÓDULO 17.4: Badge DEMO MODE */}
+          {is_demo_store && (
+            <div className="mb-6 bg-yellow-100 border-2 border-yellow-500 rounded-lg p-4 flex items-center justify-center gap-3 shadow-lg">
+              <AlertTriangle className="w-6 h-6 text-yellow-700" />
+              <div className="text-center">
+                <p className="text-xl font-extrabold text-yellow-900 tracking-wider">
+                  DEMO MODE ACTIVO
+                </p>
+                <p className="text-sm text-yellow-700 font-medium mt-1">
+                  Datos ficticios para demostración
+                </p>
+              </div>
+              <AlertTriangle className="w-6 h-6 text-yellow-700" />
+            </div>
+          )}
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
+            {/* Columna Izquierda: Búsqueda y Productos */}
+            <div className="lg:col-span-2 space-y-4 overflow-y-auto scrollbar-hide pb-2 pr-1">
+              {/* Banner Monterrial: solo en la vista inicial (sin búsqueda ni categoría) */}
+              {!query.trim() && !selectedCategory && <PosBanner />}
 
               {/* Categorías del inventario */}
               {currentShift && !query.trim() && posTab === 'products' && (
@@ -2248,22 +2237,22 @@ export default function POSPage() {
                 />
               )}
 
-              {/* Productos de la categoría seleccionada */}
-              {currentShift && !query.trim() && posTab === 'products' && selectedCategory && (
+              {/* Productos de la categoría seleccionada o de todo el inventario */}
+              {currentShift && !query.trim() && posTab === 'products' && (
                 <div>
                   <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-text-main dark:text-text-light">{selectedCategory}</h3>
-                    <button
+                    <h3 className="text-lg font-bold text-text-main dark:text-text-light">{selectedCategory ?? 'Todos los productos'}</h3>
+                    {selectedCategory && <button
                       onClick={() => setSelectedCategory(null)}
                       className="rounded-full bg-surface-light dark:bg-surface-dark px-3 py-1 text-xs font-semibold text-text-main dark:text-text-light shadow-soft hover:text-primary"
                     >
                       Ver todo
-                    </button>
+                    </button>}
                   </div>
                   {loadingCategory ? (
                     <div className="py-10 text-center text-sm text-text-secondary">Cargando productos...</div>
                   ) : categoryProducts.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-text-secondary">No hay productos activos en esta categoría</div>
+                    <div className="py-10 text-center text-sm text-text-secondary">{selectedCategory ? 'No hay productos activos en esta categoría' : 'No hay productos activos'}</div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
                       {categoryProducts.map((sp) => renderProductCard(sp, () => addToCart(sp)))}

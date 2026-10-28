@@ -8,11 +8,13 @@ import { AlertCircle } from 'lucide-react';
 interface PosHeaderProps {
   shiftOpen: boolean;
   onOpenShift: () => void;
+  /** Buscador de productos (vive en la página para conservar su lógica) */
+  search?: ReactNode;
   /** Acciones extra a la derecha (p. ej. accesos de superadmin) */
   actions?: ReactNode;
 }
 
-export function PosHeader({ shiftOpen, onOpenShift, actions }: PosHeaderProps) {
+export function PosHeader({ shiftOpen, onOpenShift, search, actions }: PosHeaderProps) {
   const [name, setName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,12 +30,14 @@ export function PosHeader({ shiftOpen, onOpenShift, actions }: PosHeaderProps) {
   const firstName = name?.split(/\s+/)[0];
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-3xl font-extrabold tracking-tight text-text-main dark:text-text-light">
+    <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+      <h1 className="text-3xl font-extrabold tracking-tight text-text-main dark:text-text-light whitespace-nowrap">
         Hola{firstName ? `, ${firstName}` : ''}
       </h1>
 
-      <div className="flex items-center gap-3">
+      {search && <div className="order-last w-full xl:order-none xl:w-auto xl:flex-1 min-w-0">{search}</div>}
+
+      <div className="ml-auto flex items-center gap-3">
         {!shiftOpen && (
           <div className="flex items-center gap-3 rounded-2xl bg-surface-light dark:bg-surface-dark shadow-soft pl-3 pr-1.5 py-1.5">
             <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />

@@ -113,17 +113,15 @@ function QuickSellGridComponent({ onAddProduct, disabled = false }: QuickSellGri
               `}
             >
               {/* ✅ Imagen o Inicial - Tamaño táctil */}
-              <div className="w-full h-28 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark flex items-center justify-center overflow-hidden">
-                {product.imageUrl ? (
+              <div className="relative w-full h-28 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark flex items-center justify-center overflow-hidden">
+                <span className="text-5xl leading-none select-none">{categoryEmoji(product.category)}</span>
+                {product.imageUrl && (
                   <img
                     src={product.imageUrl}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
-                ) : (
-                  <span className="text-5xl leading-none select-none">
-                    {categoryEmoji(product.category)}
-                  </span>
                 )}
               </div>
 

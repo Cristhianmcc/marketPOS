@@ -4,7 +4,7 @@
 
 export function PosBanner() {
   return (
-    <div className="relative h-44 md:h-52 overflow-hidden rounded-3xl bg-[#023d25] shadow-medium">
+    <div className="relative h-36 md:h-40 overflow-hidden rounded-3xl bg-[#023d25] shadow-medium">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/images/bg-mercado.jpg"
@@ -17,7 +17,7 @@ export function PosBanner() {
         <span className="self-start -rotate-2 bg-[#ff7a1a] px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-white shadow">
           Monterrial POS
         </span>
-        <h2 className="mt-3 text-3xl md:text-[40px] font-black uppercase leading-[0.95] tracking-tight text-white">
+        <h2 className="mt-3 text-2xl md:text-[34px] font-black uppercase leading-[0.95] tracking-tight text-white">
           Vende más <span className="block text-monterrial-gold">cada día</span>
         </h2>
         <p className="mt-2 text-[11px] md:text-xs font-semibold uppercase tracking-[0.2em] text-white/85">
