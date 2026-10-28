@@ -2414,8 +2414,8 @@ export default function POSPage() {
 
       {/* Modal de Pago */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg w-full max-w-md max-h-[95vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-strong w-full max-w-md max-h-[95vh] flex flex-col">
             {/* Header fijo */}
             <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900">Método de Pago</h3>
@@ -2430,13 +2430,13 @@ export default function POSPage() {
             {/* Contenido con scroll */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Total */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
-                <div className="text-xs text-green-700 mb-0.5">Total a pagar</div>
-                <div className="text-2xl font-bold text-green-800">
+              <div className="rounded-2xl bg-monterrial-forest p-4 text-monterrial-cream">
+                <div className="text-xs font-semibold uppercase tracking-wider text-monterrial-gold mb-0.5">Total a pagar</div>
+                <div className="text-3xl font-bold">
                   {formatMoney(getCartTotal(cart, globalDiscount, appliedCoupon))}
                 </div>
                 {getCartIcbper(cart) > 0 && (
-                  <div className="text-xs text-green-700 mt-0.5">
+                  <div className="text-xs text-monterrial-cream/70 mt-0.5">
                     Incluye ICBPER bolsas {formatMoney(getCartIcbper(cart))}
                   </div>
                 )}
@@ -2478,9 +2478,9 @@ export default function POSPage() {
                         }
                       }}
                       disabled={!currentShift && method.value !== 'FIADO'}
-                      className={`py-2 px-2 rounded-lg border-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`py-2 px-2 rounded-xl border-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                         paymentMethod === method.value
-                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          ? 'border-primary bg-primary/10 text-primary'
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -2493,7 +2493,7 @@ export default function POSPage() {
 
               {/* Input para efectivo - más compacto */}
               {paymentMethod === 'CASH' && (
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-gray-50 rounded-xl p-3">
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Pagó con (S/)
                   </label>
@@ -2502,7 +2502,7 @@ export default function POSPage() {
                     step="0.01"
                     value={amountPaid}
                     onChange={(e) => setAmountPaid(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                     placeholder="0.00"
                     autoFocus
                     onKeyDown={(e) => {
@@ -2515,9 +2515,9 @@ export default function POSPage() {
                   
                   {/* Vuelto */}
                   {amountPaid && parseFloat(amountPaid) >= getCartTotal(cart, globalDiscount, appliedCoupon) && (
-                    <div className="mt-2 p-2 bg-green-100 border border-green-300 rounded-lg flex items-center justify-between">
-                      <span className="text-sm text-green-700">Vuelto:</span>
-                      <span className="text-xl font-bold text-green-700">
+                    <div className="mt-2 p-2 bg-primary/10 border border-primary/30 rounded-xl flex items-center justify-between">
+                      <span className="text-sm text-primary">Vuelto:</span>
+                      <span className="text-xl font-bold text-primary">
                         {formatMoney(parseFloat(amountPaid) - getCartTotal(cart, globalDiscount, appliedCoupon))}
                       </span>
                     </div>
@@ -2537,8 +2537,8 @@ export default function POSPage() {
 
               {/* Mensaje para otros métodos */}
               {paymentMethod !== 'CASH' && paymentMethod !== 'FIADO' && paymentMethod !== 'MIXED' && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
+                <div className="p-3 bg-primary/10 border border-primary/30 rounded-xl">
+                  <p className="text-sm text-primary">
                     ✓ Pago con <strong>{paymentMethod}</strong>
                   </p>
                 </div>
@@ -2546,7 +2546,7 @@ export default function POSPage() {
 
               {/* ✅ Pago Mixto: inputs de splits */}
               {paymentMethod === 'MIXED' && (
-                <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Dividir pago
                   </label>
@@ -2560,7 +2560,7 @@ export default function POSPage() {
                             updated[idx] = { ...updated[idx], method: e.target.value as any };
                             setMixedSplits(updated);
                           }}
-                          className="w-28 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="w-28 px-2 py-1.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary"
                         >
                           <option value="CASH">Efectivo</option>
                           <option value="YAPE">Yape</option>
@@ -2579,7 +2579,7 @@ export default function POSPage() {
                               updated[idx] = { ...updated[idx], amount: e.target.value };
                               setMixedSplits(updated);
                             }}
-                            className="w-full pl-7 pr-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            className="w-full pl-7 pr-2 py-1.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary"
                             placeholder="0.00"
                             autoFocus={idx === 0}
                             onKeyDown={(e) => {
@@ -2635,7 +2635,7 @@ export default function POSPage() {
                       <div className="mt-3 pt-2 border-t border-purple-200 space-y-1">
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Suma de pagos:</span>
-                          <span className={`font-medium ${totalSplitsRounded >= totalVentaRounded ? 'text-green-700' : 'text-red-600'}`}>
+                          <span className={`font-medium ${totalSplitsRounded >= totalVentaRounded ? 'text-primary' : 'text-red-600'}`}>
                             {formatMoney(totalSplitsRounded)}
                           </span>
                         </div>
@@ -2646,8 +2646,8 @@ export default function POSPage() {
                         )}
                         {diff > 0 && (
                           <div className="flex justify-between text-sm">
-                            <span className="text-green-700">Vuelto:</span>
-                            <span className="font-bold text-green-700">{formatMoney(diff)}</span>
+                            <span className="text-primary">Vuelto:</span>
+                            <span className="font-bold text-primary">{formatMoney(diff)}</span>
                           </div>
                         )}
                       </div>
@@ -2658,7 +2658,7 @@ export default function POSPage() {
 
               {/* Selector de cliente para FIADO */}
               {paymentMethod === 'FIADO' && (
-                <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                <div className="bg-orange-50 rounded-xl p-3 border border-orange-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Cliente <span className="text-red-500">*</span>
                   </label>
@@ -2686,7 +2686,7 @@ export default function POSPage() {
                         setCustomers([]);
                         setShowCustomerModal(true);
                       }}
-                      className="w-full py-2 px-3 border-2 border-dashed border-orange-300 rounded-lg text-orange-600 hover:border-orange-400 text-sm"
+                      className="w-full py-2 px-3 border-2 border-dashed border-orange-300 rounded-xl text-orange-600 hover:border-orange-400 text-sm"
                     >
                       + Seleccionar Cliente
                     </button>
@@ -2696,7 +2696,7 @@ export default function POSPage() {
 
               {/* ✅ MÓDULO PH4: Receptor de medicamentos (farmacia/ONG) */}
               {(patientsEnabled || controlledBookEnabled) && (
-                <div className="bg-teal-50 rounded-lg p-3 border border-teal-200">
+                <div className="bg-teal-50 rounded-xl p-3 border border-teal-200">
                   <label className="block text-sm font-medium text-teal-800 mb-2">
                     Receptor / Paciente
                   </label>
@@ -2727,7 +2727,7 @@ export default function POSPage() {
                   ) : (
                     <button
                       onClick={openPatientModal}
-                      className="w-full py-2 px-3 border-2 border-dashed border-teal-300 rounded-lg text-teal-600 hover:border-teal-400 text-sm"
+                      className="w-full py-2 px-3 border-2 border-dashed border-teal-300 rounded-xl text-teal-600 hover:border-teal-400 text-sm"
                     >
                       + Registrar receptor
                     </button>
@@ -2747,14 +2747,14 @@ export default function POSPage() {
             <div className="flex gap-3 p-4 border-t flex-shrink-0 bg-gray-50">
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 text-sm"
+                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-100 text-sm"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmPayment}
                 disabled={processing}
-                className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                className="flex-1 px-4 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-sm"
               >
                 {processing ? 'Procesando...' : '✓ Confirmar'}
               </button>
@@ -2765,8 +2765,8 @@ export default function POSPage() {
 
       {/* Modal abrir turno */}
       {showOpenShiftModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Abrir Turno</h3>
             <div className="space-y-4">
               <div>
@@ -2778,7 +2778,7 @@ export default function POSPage() {
                   step="0.01"
                   value={openingCash}
                   onChange={(e) => setOpeningCash(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary/40 focus:border-primary"
                   placeholder="0.00"
                   autoFocus
                   onKeyDown={(e) => e.key === 'Enter' && handleOpenShift()}
@@ -2791,13 +2791,13 @@ export default function POSPage() {
                     setShowOpenShiftModal(false);
                     setOpeningCash('');
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleOpenShift}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-hover"
                 >
                   Abrir Turno
                 </button>
@@ -2809,7 +2809,7 @@ export default function POSPage() {
 
       {/* Modal Venta Libre */}
       {showFreeItemModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-1">Venta libre</h2>
             <p className="text-sm text-gray-500 mb-4">Producto no registrado en inventario</p>
@@ -2825,7 +2825,7 @@ export default function POSPage() {
                   value={freeItemName}
                   onChange={(e) => setFreeItemName(e.target.value)}
                   placeholder="Ej: Uniforme talla M"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-sm"
                   onKeyDown={(e) => e.key === 'Enter' && document.getElementById('freeItemPrice')?.focus()}
                 />
               </div>
@@ -2843,7 +2843,7 @@ export default function POSPage() {
                     value={freeItemPrice}
                     onChange={(e) => setFreeItemPrice(e.target.value)}
                     placeholder="0.00"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-sm"
                     onKeyDown={(e) => e.key === 'Enter' && document.getElementById('freeItemQty')?.focus()}
                   />
                 </div>
@@ -2858,7 +2858,7 @@ export default function POSPage() {
                     step="1"
                     value={freeItemQty}
                     onChange={(e) => setFreeItemQty(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-sm"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const name = freeItemName.trim();
@@ -2882,7 +2882,7 @@ export default function POSPage() {
                   setShowFreeItemModal(false);
                   setTimeout(() => searchInputRef.current?.focus(), 50);
                 }}
-                className="flex-1 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                className="flex-1 py-2.5 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
@@ -2897,7 +2897,7 @@ export default function POSPage() {
                   setShowFreeItemModal(false);
                   setTimeout(() => searchInputRef.current?.focus(), 50);
                 }}
-                className="flex-1 py-2.5 bg-[#16A34A] text-white rounded-lg font-medium hover:bg-[#15803d] transition-colors"
+                className="flex-1 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-hover transition-colors"
               >
                 Agregar al carrito
               </button>
@@ -2909,7 +2909,7 @@ export default function POSPage() {
       {/* Sale Complete Modal */}
       {showSaleCompleteModal && completedSale && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           tabIndex={-1}
           ref={(el) => el?.focus()}
           onKeyDown={(e) => {
@@ -2921,15 +2921,15 @@ export default function POSPage() {
             }
           }}
         >
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">¡Venta Completada!</h3>
-              <p className="text-3xl font-bold text-green-600">{formatMoney(completedSale.total)}</p>
+              <p className="text-3xl font-bold text-primary">{formatMoney(completedSale.total)}</p>
             </div>
 
             <div className="space-y-3">
@@ -3043,7 +3043,7 @@ export default function POSPage() {
                   // Fallback: Open receipt in browser/new window
                   window.open(`/receipt/${completedSale.id}`, '_blank');
                 }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white rounded-xl hover:bg-primary-hover transition-colors font-medium"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -3057,7 +3057,7 @@ export default function POSPage() {
                   setCompletedSale(null);
                   searchInputRef.current?.focus();
                 }}
-                className="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center gap-2"
+                className="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium flex items-center justify-center gap-2"
               >
                 Nueva Venta
                 <span className="px-1.5 py-0.5 bg-gray-300 rounded text-xs font-mono">Enter</span>
@@ -3069,8 +3069,8 @@ export default function POSPage() {
 
       {/* Modal Buscar Cliente */}
       {showCustomerModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-strong w-full max-w-md max-h-[80vh] flex flex-col">
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold mb-3">Seleccionar Cliente</h3>
               <input
@@ -3081,7 +3081,7 @@ export default function POSPage() {
                   searchCustomers(e.target.value);
                 }}
                 placeholder="Buscar por nombre, teléfono..."
-                className="w-full px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-xl"
                 autoFocus
               />
             </div>
@@ -3112,7 +3112,7 @@ export default function POSPage() {
                         setSelectedCustomer(customer);
                         setShowCustomerModal(false);
                       }}
-                      className="w-full text-left p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                      className="w-full text-left p-3 border rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       <div className="font-medium">{customer.name}</div>
                       {customer.phone && (
@@ -3143,13 +3143,13 @@ export default function POSPage() {
                   setShowCustomerModal(false);
                   setShowCreateCustomerModal(true);
                 }}
-                className="w-full py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="w-full py-2 px-4 bg-primary text-white rounded-xl hover:bg-primary-hover"
               >
                 + Crear Nuevo Cliente
               </button>
               <button
                 onClick={() => setShowCustomerModal(false)}
-                className="w-full py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="w-full py-2 px-4 border border-gray-300 rounded-xl hover:bg-gray-50"
               >
                 Cancelar
               </button>
@@ -3160,8 +3160,8 @@ export default function POSPage() {
 
       {/* Modal Crear Cliente */}
       {showCreateCustomerModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-strong w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-4">Nuevo Cliente</h3>
             
             <div className="space-y-4">
@@ -3173,7 +3173,7 @@ export default function POSPage() {
                   type="text"
                   value={newCustomerName}
                   onChange={(e) => setNewCustomerName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-xl"
                   autoFocus
                 />
               </div>
@@ -3186,7 +3186,7 @@ export default function POSPage() {
                   type="text"
                   value={newCustomerPhone}
                   onChange={(e) => setNewCustomerPhone(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-xl"
                 />
               </div>
             </div>
@@ -3199,14 +3199,14 @@ export default function POSPage() {
                   setNewCustomerName('');
                   setNewCustomerPhone('');
                 }}
-                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-xl hover:bg-gray-50"
                 disabled={creatingCustomer}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreateCustomer}
-                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 py-2 px-4 bg-primary text-white rounded-xl hover:bg-primary-hover disabled:opacity-50"
                 disabled={creatingCustomer}
               >
                 {creatingCustomer ? 'Creando...' : 'Crear'}
@@ -3218,8 +3218,8 @@ export default function POSPage() {
 
       {/* Modal Aplicar Descuento */}
       {showDiscountModal && discountItemId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-strong w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Aplicar Descuento</h3>
               <button
@@ -3242,9 +3242,9 @@ export default function POSPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setDiscountType('PERCENT')}
-                  className={`py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
+                  className={`py-2 px-4 rounded-xl border-2 font-medium transition-colors ${
                     discountType === 'PERCENT'
-                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      ? 'border-primary bg-primary/10 text-primary'
                       : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -3252,9 +3252,9 @@ export default function POSPage() {
                 </button>
                 <button
                   onClick={() => setDiscountType('AMOUNT')}
-                  className={`py-2 px-4 rounded-lg border-2 font-medium transition-colors ${
+                  className={`py-2 px-4 rounded-xl border-2 font-medium transition-colors ${
                     discountType === 'AMOUNT'
-                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      ? 'border-primary bg-primary/10 text-primary'
                       : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -3273,7 +3273,7 @@ export default function POSPage() {
                 step="0.01"
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 placeholder="0.00"
                 autoFocus
                 onKeyDown={(e) => e.key === 'Enter' && handleApplyDiscount()}
@@ -3297,9 +3297,9 @@ export default function POSPage() {
               const previewTotal = subtotal - previewDiscount;
               
               return (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="text-sm text-blue-700 mb-1">Vista previa</div>
-                  <div className="text-xs text-blue-600 space-y-1">
+                <div className="mb-4 p-3 bg-primary/10 border border-primary/30 rounded-xl">
+                  <div className="text-sm text-primary mb-1">Vista previa</div>
+                  <div className="text-xs text-primary space-y-1">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
                       <span>S/ {subtotal.toFixed(2)}</span>
@@ -3308,7 +3308,7 @@ export default function POSPage() {
                       <span>Descuento:</span>
                       <span>-S/ {previewDiscount.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-bold text-blue-700 pt-1 border-t border-blue-300">
+                    <div className="flex justify-between font-bold text-primary pt-1 border-t border-blue-300">
                       <span>Total:</span>
                       <span>S/ {previewTotal.toFixed(2)}</span>
                     </div>
@@ -3325,13 +3325,13 @@ export default function POSPage() {
                   setDiscountItemId(null);
                   setDiscountValue('');
                 }}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleApplyDiscount}
-                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                className="flex-1 px-4 py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary-hover"
               >
                 Aplicar
               </button>
@@ -3389,8 +3389,8 @@ export default function POSPage() {
         };
 
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
               <div className="p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
@@ -3412,7 +3412,7 @@ export default function POSPage() {
 
                 {/* Content */}
                 <div className="space-y-4">
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
                     <p className="text-sm text-orange-800">
                       <span className="font-medium">Máximo disponible:</span> S/ {maxDiscount.toFixed(2)}
                     </p>
@@ -3429,7 +3429,7 @@ export default function POSPage() {
                           setGlobalDiscountType('PERCENT');
                           setGlobalDiscountValue('');
                         }}
-                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                        className={`flex-1 py-2 px-4 rounded-xl font-medium transition-colors ${
                           globalDiscountType === 'PERCENT'
                             ? 'bg-orange-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -3442,7 +3442,7 @@ export default function POSPage() {
                           setGlobalDiscountType('AMOUNT');
                           setGlobalDiscountValue('');
                         }}
-                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                        className={`flex-1 py-2 px-4 rounded-xl font-medium transition-colors ${
                           globalDiscountType === 'AMOUNT'
                             ? 'bg-orange-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -3471,7 +3471,7 @@ export default function POSPage() {
                       step={globalDiscountType === 'PERCENT' ? '1' : '0.01'}
                       min="0"
                       max={globalDiscountType === 'PERCENT' ? 100 : maxDiscount}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg"
                       autoFocus
                     />
                   </div>
@@ -3488,13 +3488,13 @@ export default function POSPage() {
                       setShowGlobalDiscountModal(false);
                       setGlobalDiscountValue('');
                     }}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleApplyGlobalDiscount}
-                    className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
+                    className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700"
                   >
                     Aplicar
                   </button>
@@ -3536,7 +3536,7 @@ export default function POSPage() {
                   value={rxPatientName}
                   onChange={(e) => setRxPatientName(e.target.value)}
                   placeholder="Ej. Juan Pérez"
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                 />
               </div>
               <div>
@@ -3553,7 +3553,7 @@ export default function POSPage() {
                   value={rxPrescriptionNumber}
                   onChange={(e) => setRxPrescriptionNumber(e.target.value)}
                   placeholder="Ej. RX-2026-001"
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                 />
               </div>
               <div>
@@ -3565,7 +3565,7 @@ export default function POSPage() {
                   onChange={(e) => setRxObservation(e.target.value)}
                   placeholder="Ej. Receta presentada en físico"
                   rows={2}
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded-xl border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                 />
               </div>
             </div>
@@ -3577,7 +3577,7 @@ export default function POSPage() {
                   setShowRxModal(false);
                   setRxPendingProduct(null);
                 }}
-                className="flex-1 rounded-lg border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-xl border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancelar
               </button>
@@ -3597,7 +3597,7 @@ export default function POSPage() {
                   setRxPendingProduct(null);
                   executeAddToCart(sp, rx);
                 }}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
               >
                 Confirmar venta Rx
               </button>
@@ -3608,8 +3608,8 @@ export default function POSPage() {
 
       {/* ✅ MÓDULO PH4: Modal Receptor / Paciente */}
       {showPatientModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-strong w-full max-w-md">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">Receptor / Paciente</h3>
               <button
@@ -3639,13 +3639,13 @@ export default function POSPage() {
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchPatientByDni()}
                     placeholder="Ej. 12345678"
                     maxLength={20}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-teal-500"
                     autoFocus
                   />
                   <button
                     onClick={handleSearchPatientByDni}
                     disabled={searchingPatient || !patientDniSearch.trim()}
-                    className="px-3 py-2 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700 disabled:opacity-50"
+                    className="px-3 py-2 bg-teal-600 text-white rounded-xl text-sm hover:bg-teal-700 disabled:opacity-50"
                   >
                     {searchingPatient ? '...' : 'Buscar'}
                   </button>
@@ -3656,7 +3656,7 @@ export default function POSPage() {
               {patientSearchResult && (
                 <div className="space-y-2">
                   {/* Datos del paciente */}
-                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg flex items-start justify-between">
+                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl flex items-start justify-between">
                     <div>
                       <div className="text-sm font-semibold text-teal-900">{patientSearchResult.name}</div>
                       <div className="text-xs text-teal-700 mt-0.5">DNI: {patientSearchResult.dni}</div>
@@ -3676,7 +3676,7 @@ export default function POSPage() {
                     <div className="text-xs text-gray-400 text-center py-2">Cargando historial...</div>
                   )}
                   {!loadingHistory && patientHistory.length > 0 && (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
                       <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-200">
                         <span className="text-xs font-medium text-gray-600">Últimas dispensaciones</span>
                       </div>
@@ -3710,7 +3710,7 @@ export default function POSPage() {
 
               {/* Paciente no encontrado — formulario de registro */}
               {patientNotFound && showNewPatientForm && (
-                <div className="space-y-3 border border-dashed border-gray-300 rounded-lg p-3">
+                <div className="space-y-3 border border-dashed border-gray-300 rounded-xl p-3">
                   <p className="text-xs text-gray-500">
                     No se encontró el DNI. Completa los datos para registrar al paciente.
                   </p>
@@ -3722,7 +3722,7 @@ export default function POSPage() {
                       type="text"
                       value={newPatientName}
                       onChange={(e) => setNewPatientName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
                       placeholder="Apellidos y nombres"
                     />
                   </div>
@@ -3733,7 +3733,7 @@ export default function POSPage() {
                         type="text"
                         value={newPatientPhone}
                         onChange={(e) => setNewPatientPhone(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
                         placeholder="Opcional"
                       />
                     </div>
@@ -3742,7 +3742,7 @@ export default function POSPage() {
                       <select
                         value={newPatientGender}
                         onChange={(e) => setNewPatientGender(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
                       >
                         <option value="">—</option>
                         <option value="M">Masculino</option>
@@ -3757,7 +3757,7 @@ export default function POSPage() {
                         type="text"
                         value={newPatientBirthDate}
                         onChange={(e) => setNewPatientBirthDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
                         placeholder="DD/MM/AAAA"
                         maxLength={10}
                       />
@@ -3772,7 +3772,7 @@ export default function POSPage() {
                       type="text"
                       value={patientConsultReason}
                       onChange={(e) => setPatientConsultReason(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
                       placeholder="Ej: dolor de cabeza, fiebre... (opcional)"
                     />
                   </div>
@@ -3787,7 +3787,7 @@ export default function POSPage() {
                     type="text"
                     value={patientConsultReason}
                     onChange={(e) => setPatientConsultReason(e.target.value)}
-                    className="w-full px-3 py-2 border border-teal-200 rounded-lg text-sm"
+                    className="w-full px-3 py-2 border border-teal-200 rounded-xl text-sm"
                     placeholder="Ej: dolor de cabeza, fiebre... (opcional)"
                   />
                 </div>
@@ -3797,14 +3797,14 @@ export default function POSPage() {
             <div className="flex gap-3 p-4 border-t bg-gray-50">
               <button
                 onClick={() => setShowPatientModal(false)}
-                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-100"
               >
                 Cancelar
               </button>
               {patientSearchResult ? (
                 <button
                   onClick={handleConfirmPatient}
-                  className="flex-1 py-2 px-4 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+                  className="flex-1 py-2 px-4 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700"
                 >
                   Seleccionar
                 </button>
@@ -3812,7 +3812,7 @@ export default function POSPage() {
                 <button
                   onClick={handleCreatePatient}
                   disabled={creatingPatient || !newPatientName.trim()}
-                  className="flex-1 py-2 px-4 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                  className="flex-1 py-2 px-4 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
                 >
                   {creatingPatient ? 'Guardando...' : 'Registrar y seleccionar'}
                 </button>

@@ -157,7 +157,7 @@ export default function MobileCartDrawer({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white rounded-t-2xl">
           <div className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5 text-emerald-600" />
+            <ShoppingCart className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-bold text-gray-900">
               Carrito ({cart.length})
             </h2>
@@ -166,7 +166,7 @@ export default function MobileCartDrawer({
             {cart.length > 0 && (
               <button
                 onClick={onClearCart}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
                 aria-label="Limpiar carrito"
               >
                 <Trash2 className="w-5 h-5" />
@@ -174,7 +174,7 @@ export default function MobileCartDrawer({
             )}
             <button
               onClick={onClose}
-              className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
               aria-label="Cerrar"
             >
               <X className="w-5 h-5" />
@@ -239,13 +239,13 @@ export default function MobileCartDrawer({
                           {item.storeProduct.product.brand}
                         </p>
                       )}
-                      <p className="text-sm text-emerald-600 font-medium mt-1">
+                      <p className="text-sm text-primary font-medium mt-1">
                         {formatMoney(Number(item.storeProduct.price))} × {item.quantity}
                       </p>
                     </div>
                     <button
                       onClick={() => onRemoveItem(item.storeProduct.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       aria-label="Eliminar"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -262,7 +262,7 @@ export default function MobileCartDrawer({
                         </div>
                       )}
                       {item.categoryPromoName && (
-                        <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-2 py-1 rounded">
                           <Tag className="w-3.5 h-3.5" />
                           <span>{item.categoryPromoName}</span>
                         </div>
@@ -297,7 +297,7 @@ export default function MobileCartDrawer({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => onUpdateQuantity(item.storeProduct.id, -1)}
-                        className="w-11 h-11 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        className="w-11 h-11 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
                         aria-label="Disminuir"
                       >
                         <Minus className="w-5 h-5 text-gray-700" />
@@ -312,7 +312,7 @@ export default function MobileCartDrawer({
                       </span>
                       <button
                         onClick={() => onUpdateQuantity(item.storeProduct.id, 1)}
-                        className="w-11 h-11 flex items-center justify-center bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors"
+                        className="w-11 h-11 flex items-center justify-center bg-primary hover:bg-primary text-white rounded-xl transition-colors"
                         aria-label="Aumentar"
                       >
                         <Plus className="w-5 h-5" />
@@ -342,7 +342,7 @@ export default function MobileCartDrawer({
                   {!item.discountType && (
                     <button
                       onClick={() => onApplyDiscount(item.storeProduct.id)}
-                      className="w-full mt-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      className="w-full mt-3 py-2 text-sm text-primary hover:bg-primary/10 rounded-xl transition-colors"
                     >
                       + Aplicar descuento
                     </button>
@@ -358,7 +358,7 @@ export default function MobileCartDrawer({
           <div className="border-t bg-gray-50 p-4 space-y-3">
             {/* Cupón */}
             {appliedCoupon && (
-              <div className="flex items-center justify-between bg-yellow-50 p-3 rounded-lg">
+              <div className="flex items-center justify-between bg-yellow-50 p-3 rounded-xl">
                 <div className="flex items-center gap-2">
                   <Tag className="w-4 h-4 text-yellow-600" />
                   <div>
@@ -401,7 +401,7 @@ export default function MobileCartDrawer({
               )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span className="text-gray-900">Total:</span>
-                <span className="text-emerald-600">{formatMoney(total)}</span>
+                <span className="text-primary">{formatMoney(total)}</span>
               </div>
             </div>
 
@@ -409,7 +409,7 @@ export default function MobileCartDrawer({
             <button
               onClick={onFinalizeSale}
               disabled={processing || cart.length === 0}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-lg shadow-lg"
+              className="w-full py-4 bg-primary hover:bg-primary-hover disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-lg shadow-lg"
             >
               {processing ? 'Procesando...' : 'Finalizar Venta'}
             </button>

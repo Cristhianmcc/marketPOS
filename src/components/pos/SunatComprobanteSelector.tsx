@@ -149,23 +149,23 @@ export default function SunatComprobanteSelector({
   }
 
   return (
-    <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+    <div className="bg-primary/10 rounded-xl p-3 border border-primary/30">
       <div className="flex items-center gap-2">
         <input
           type="checkbox"
           id="wantComprobante"
           checked={wantComprobante}
           onChange={(e) => setWantComprobante(e.target.checked)}
-          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary/40"
         />
-        <label htmlFor="wantComprobante" className="text-sm font-medium text-blue-800 flex items-center gap-1.5">
+        <label htmlFor="wantComprobante" className="text-sm font-medium text-primary flex items-center gap-1.5">
           <Receipt className="w-4 h-4" />
           Comprobante SUNAT
         </label>
       </div>
 
       {wantComprobante && (
-        <div className="mt-3 space-y-2.5 pt-3 border-t border-blue-200">
+        <div className="mt-3 space-y-2.5 pt-3 border-t border-primary/30">
           {/* Tipo de Comprobante */}
           <div className="flex gap-2">
             <button
@@ -173,7 +173,7 @@ export default function SunatComprobanteSelector({
               onClick={() => setDocType('BOLETA')}
               className={`flex-1 px-2 py-1.5 text-xs rounded border font-medium ${
                 docType === 'BOLETA'
-                  ? 'bg-blue-600 text-white border-blue-600'
+                  ? 'bg-primary text-white border-primary'
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -186,7 +186,7 @@ export default function SunatComprobanteSelector({
               disabled={userRole === 'CASHIER'}
               className={`flex-1 px-2 py-1.5 text-xs rounded border font-medium ${
                 docType === 'FACTURA'
-                  ? 'bg-blue-600 text-white border-blue-600'
+                  ? 'bg-primary text-white border-primary'
                   : userRole === 'CASHIER'
                   ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -215,7 +215,7 @@ export default function SunatComprobanteSelector({
                 <select
                   value={customerDocType}
                   onChange={(e) => setCustomerDocType(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
                 >
                   <option value="OTHER">Sin documento</option>
                   <option value="DNI">DNI</option>
@@ -225,7 +225,7 @@ export default function SunatComprobanteSelector({
               )}
             </div>
             {docType === 'BOLETA' && customerDocType === 'OTHER' ? (
-              <div className="flex items-end pb-1 text-[11px] text-blue-700">
+              <div className="flex items-end pb-1 text-[11px] text-primary">
                 Consumidor final (hasta S/ 700)
               </div>
             ) : (
@@ -237,7 +237,7 @@ export default function SunatComprobanteSelector({
                   onChange={(e) => setCustomerDocNumber(e.target.value)}
                   placeholder={customerDocType === 'RUC' ? '20123456789' : '12345678'}
                   maxLength={customerDocType === 'RUC' ? 11 : customerDocType === 'DNI' ? 8 : 20}
-                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
                 />
               </div>
             )}
@@ -253,7 +253,7 @@ export default function SunatComprobanteSelector({
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder={docType === 'FACTURA' ? 'EMPRESA S.A.C.' : 'Juan Pérez'}
-              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
             />
           </div>}
 
@@ -268,7 +268,7 @@ export default function SunatComprobanteSelector({
                 value={customerAddress}
                 onChange={(e) => setCustomerAddress(e.target.value)}
                 placeholder="Av. Principal 123"
-                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
               />
             </div>
           )}
