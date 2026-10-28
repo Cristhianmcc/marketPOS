@@ -150,6 +150,16 @@ es `docs/audits/2026-09-26-pos.md`.
 - Módulos por rubro: `getRubroFlagChanges` activa los del rubro y apaga los
   propios de otros rubros al cambiar de perfil; `ensureProfileFlags` (en
   `/api/flags`) crea los módulos del rubro que falten sin reactivar los apagados.
+- Lavandería: `StoreSettings.laundryKgPrice` (precio del kilo vigente) se
+  cambia solo por `PATCH /api/store/laundry-price` (OWNER); la recepción calcula
+  el total con los kilos y respeta el total corregido a mano. El ticket de
+  recepción se imprime por ESC/POS (`escpos:print-work-order`,
+  `TicketFormatter.formatWorkOrder`) y, sin ESC/POS, por HTML.
+- Catálogo web: el escritorio no lleva claves de Cloudinary ni
+  `CATALOG_API_KEY`. Publica con el token de licencia de la tienda
+  (`catalogCloudHeaders`); la nube lo valida con `isCatalogStoreAuthorized`
+  (una tienda solo publica su catálogo) y sube imágenes a Cloudinary en
+  `/api/catalog/cloud-image`. Banco: `scripts/test-catalog-publish-isolated.ts`.
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

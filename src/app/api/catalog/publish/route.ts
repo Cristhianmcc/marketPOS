@@ -5,7 +5,7 @@ import { logAudit } from '@/lib/auditLog';
 import * as path from 'node:path';
 import { CatalogController } from '@/modules/catalog/backend/controllers/catalog.controller';
 import { CatalogMediaService } from '@/modules/catalog/backend/services/catalog-media.service';
-import { isCatalogApiAuthorized } from '@/modules/catalog/backend/routes/catalog-auth';
+import { isCatalogStoreAuthorized } from '@/modules/catalog/backend/routes/catalog-auth';
 import { CatalogPublishPayloadSchema } from '@/modules/catalog/backend/routes/catalog.schemas';
 import { z } from 'zod';
 
@@ -37,9 +37,10 @@ export async function POST(req: NextRequest) {
     // Modo nuevo: publicar catalogo web completo (desktop -> backend)
     const catalogPayload = CatalogPublishPayloadSchema.safeParse(body);
     if (catalogPayload.success) {
-      if (!isCatalogApiAuthorized(req)) {
+      // La tienda publica solo su propio catálogo (token de licencia o clave del servidor)
+      if (!isCatalogStoreAuthorized(req, catalogPayload.data.storeId)) {
         return NextResponse.json(
-          { success: false, message: 'API key invalida.' },
+          { success: false, message: 'Tienda no autorizada para publicar este catálogo.' },
           { status: 401 },
         );
       }

@@ -961,6 +961,15 @@ function setupEscposIpcHandlers(): void {
     return await manager.printSale(saleId);
   });
 
+  // Ticket de recepción de una orden de trabajo (lavandería / taller)
+  ipcMain.handle('escpos:print-work-order', async (_event, orderId: string, labels: { title: string; footer: string }) => {
+    const manager = getEscposPrintManager();
+    if (!manager) {
+      return { success: false, error: 'EscposPrintManager no inicializado', fallbackToHtml: true };
+    }
+    return await manager.printWorkOrder(orderId, labels);
+  });
+
   // ===== D6.1-NET: Network-specific handlers =====
   
   // Ping impresora de red

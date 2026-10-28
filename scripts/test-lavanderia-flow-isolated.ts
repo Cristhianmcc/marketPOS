@@ -97,6 +97,8 @@ async function flowWorker(contextPath: string) {
   const { recordAdvance } = require('../src/lib/workOrders/payments');
   const { ensureProfileFlags, invalidateStoreFlags } = require('../src/lib/featureFlags');
   const { getRubroFlagChanges } = require('../src/lib/businessProfiles');
+  const laundryPrice = require('../src/app/api/store/laundry-price/route');
+  const storeRoute = require('../src/app/api/store/route');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
   const json = (url: string, method: string, body?: unknown) =>
@@ -294,6 +296,20 @@ async function flowWorker(contextPath: string) {
     flags: Object.fromEntries(flagRows.map((f: any) => [f.key, f.enabled])),
   };
 
+  // L19 Precio del kilo de hoy: solo el dueño; no toca el resto de la configuración
+  const setPrice = async (price: unknown) => read(await laundryPrice.PATCH(json('/api/store/laundry-price', 'PATCH', { price })));
+  session.role = 'CASHIER';
+  const cashierPrice = await setPrice(6);
+  session.role = 'OWNER';
+  const badPrice = await setPrice(-1);
+  const okPrice = await setPrice(5.5);
+  const storeView = await read(await storeRoute.GET(json('/api/store', 'GET')));
+  steps.L19 = {
+    cashier: cashierPrice.status, bad: badPrice.status, ok: [okPrice.status, okPrice.body?.laundryKgPrice],
+    seen: storeView.body?.store?.settings?.laundryKgPrice != null ? Number(storeView.body.store.settings.laundryKgPrice) : null,
+    ruc: storeView.body?.store?.ruc ?? null,
+  };
+
   // L8 Express: 2 kg (10) + 1 terno (15) = 25 con recargo 50 % = 37,50 y fecha prometida
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
   const yesterday = new Date(Date.now() - 2 * 86_400_000).toISOString();
@@ -438,6 +454,12 @@ const EXPECTATIONS: Expectation[] = [
     ...eq('apaga farmacia', s.L18?.disablesPharma, true),
     ...eq('no apaga los suyos', s.L18?.keepsOwn, true),
     ...eq('completa órdenes y no reactiva lo apagado', s.L18?.flags, { ENABLE_SERVICES: false, ENABLE_WORK_ORDERS: true }),
+  ] },
+  { id: 'L19', title: 'Precio del kilo de hoy: solo el dueño y sin borrar la configuración', check: (s) => [
+    ...eq('cajero / inválido', [s.L19?.cashier, s.L19?.bad], [403, 400]),
+    ...eq('dueño', s.L19?.ok, [200, 5.5]),
+    ...eq('visible en la recepción', s.L19?.seen, 5.5),
+    ...eq('RUC intacto', s.L19?.ruc, '20123456789'),
   ] },
   { id: 'L14', title: 'Producto de la orden descuenta stock con movimiento', check: (s) => [
     ...(ok(s.L14) ? [] : [`respondió ${s.L14?.result?.status}: ${s.L14?.result?.error}`]),

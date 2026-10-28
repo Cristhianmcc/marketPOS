@@ -64,13 +64,15 @@ export interface WorkOrderContext {
   isOwner: boolean;
   isLaundry: boolean;
   expressPercent: number;
+  /** Precio del kilo de ropa vigente (lavandería) */
+  laundryKgPrice: number | null;
   store: { name: string; ruc?: string | null; address?: string | null; phone?: string | null };
 }
 
 /** Rubro, rol, tienda y porcentaje express para las pantallas de órdenes. */
 export function useWorkOrderContext(): WorkOrderContext {
   const [ctx, setCtx] = useState<WorkOrderContext>({
-    profile: null, labels: workOrderStatusLabels(), isOwner: false, isLaundry: false, expressPercent: 50, store: { name: 'Mi Tienda' },
+    profile: null, labels: workOrderStatusLabels(), isOwner: false, isLaundry: false, expressPercent: 50, laundryKgPrice: null, store: { name: 'Mi Tienda' },
   });
   useEffect(() => {
     const json = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -83,6 +85,7 @@ export function useWorkOrderContext(): WorkOrderContext {
         isOwner: me?.user?.role === 'OWNER',
         isLaundry: profile === 'LAVANDERIA',
         expressPercent: store?.settings?.expressSurchargePercent ?? 50,
+        laundryKgPrice: store?.settings?.laundryKgPrice != null ? Number(store.settings.laundryKgPrice) : null,
         store: store ? { name: store.name, ruc: store.ruc, address: store.address, phone: store.phone } : { name: 'Mi Tienda' },
       });
     });
@@ -90,10 +93,33 @@ export function useWorkOrderContext(): WorkOrderContext {
   return ctx;
 }
 
+type EscposBridge = {
+  desktop?: {
+    isDesktop?: boolean;
+    escpos?: {
+      getConfig: () => Promise<{ mode: string }>;
+      printWorkOrder?: (orderId: string, labels: { title: string; footer: string }) => Promise<{ success: boolean; error?: string }>;
+    };
+  };
+};
+
 export async function printReceptionTicket(order: ApiWorkOrder, ctx: WorkOrderContext) {
+  const title = ctx.isLaundry ? 'RECEPCIÓN DE PRENDAS' : 'ORDEN DE TRABAJO';
+  const footer = ctx.isLaundry ? 'Presente este ticket para recoger sus prendas' : 'Presente este ticket para retirar su equipo';
+
+  // En el escritorio, la misma impresora térmica (ESC/POS) que imprime las ventas
+  const escpos = (window as unknown as EscposBridge).desktop?.escpos;
+  if (escpos?.printWorkOrder) {
+    const config = await escpos.getConfig().catch(() => null);
+    if (config && ['ESCPOS_USB', 'ESCPOS_NET', 'ESCPOS_BT'].includes(config.mode)) {
+      const result = await escpos.printWorkOrder(order.id, { title, footer });
+      return result.success ? { ok: true } : { ok: false, error: result.error || 'No se pudo imprimir' };
+    }
+  }
+
   const html = buildWorkOrderTicketHtml({
     store: ctx.store,
-    title: ctx.isLaundry ? 'RECEPCIÓN DE PRENDAS' : 'ORDEN DE TRABAJO',
+    title,
     orderNumber: order.orderNumber,
     createdAt: order.createdAt,
     customer: order.customer,
@@ -108,7 +134,7 @@ export async function printReceptionTicket(order: ApiWorkOrder, ctx: WorkOrderCo
     advancePaid: num(order.advancePaid),
     promisedAt: order.promisedAt,
     notes: order.notes,
-    footer: ctx.isLaundry ? 'Presente este ticket para recoger sus prendas' : 'Presente este ticket para retirar su equipo',
+    footer,
   });
   return printWorkOrderTicket(html);
 }

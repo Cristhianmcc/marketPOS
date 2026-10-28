@@ -20,7 +20,7 @@ export async function GET() {
         address: true,
         phone: true,
         businessProfile: true,
-        settings: { select: { expressSurchargePercent: true } },
+        settings: { select: { expressSurchargePercent: true, laundryKgPrice: true } },
       },
     });
 

@@ -16,6 +16,7 @@ import {
   UsbDevice, 
   EscposConfig, 
   PrintSaleData, 
+  PrintWorkOrderData,
   PrintResult,
   PrinterMode,
   DEFAULT_ESCPOS_CONFIG 
@@ -230,6 +231,80 @@ class EscposPrintManager {
     }
   }
   
+  // ============== Print Work Order ==============
+
+  /** Ticket de recepción de una orden, por el mismo medio que las ventas. */
+  async printWorkOrder(orderId: string, labels: { title: string; footer: string }): Promise<PrintResult> {
+    if (this.config.mode !== 'ESCPOS_USB' && this.config.mode !== 'ESCPOS_NET' && this.config.mode !== 'ESCPOS_BT') {
+      return { success: false, error: 'Modo ESC/POS no habilitado', fallbackToHtml: true };
+    }
+    try {
+      const data = await this.fetchWorkOrderData(orderId, labels);
+      if (!data) return { success: false, error: 'No se pudo obtener la orden', fallbackToHtml: true };
+      const formatter = new TicketFormatter(this.config);
+      return await this.sendBuffer(formatter.formatWorkOrder(data));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message, fallbackToHtml: true };
+    }
+  }
+
+  /** Envía un ticket ya formateado a la impresora configurada (USB, red o Bluetooth). */
+  private async sendBuffer(buffer: Buffer): Promise<PrintResult> {
+    if (this.config.mode === 'ESCPOS_USB') {
+      if (this.config.vendorId === null || this.config.productId === null) {
+        return { success: false, error: 'No hay impresora USB configurada', fallbackToHtml: true };
+      }
+      const result = await printAndClose(this.config.vendorId, this.config.productId, buffer);
+      return result.ok ? { success: true } : { success: false, error: `USB: ${result.detail}`, fallbackToHtml: true };
+    }
+    if (this.config.mode === 'ESCPOS_NET') {
+      if (!this.config.netHost) return { success: false, error: 'No hay impresora de red configurada', fallbackToHtml: true };
+      const result = await printToNetworkPrinter(this.config.netHost, this.config.netPort, buffer, this.config.netTimeout);
+      return result.success ? { success: true } : { success: false, error: result.error || 'No se pudo imprimir por red', fallbackToHtml: true };
+    }
+    if (!this.config.btPort) return { success: false, error: 'No hay impresora Bluetooth configurada', fallbackToHtml: true };
+    const result = await printViaBluetooth(this.config.btPort, buffer, this.config.btBaud);
+    return result.success ? { success: true } : { success: false, error: result.error || 'No se pudo conectar con la impresora Bluetooth', fallbackToHtml: true };
+  }
+
+  private async fetchWorkOrderData(orderId: string, labels: { title: string; footer: string }): Promise<PrintWorkOrderData | null> {
+    const headers: Record<string, string> = {};
+    const cookieHeader = await this.getAuthCookieHeader(this.serverUrl);
+    if (cookieHeader) headers['Cookie'] = cookieHeader;
+    const [orderResp, storeResp] = await Promise.all([
+      fetch(`${this.serverUrl}/api/work-orders/${encodeURIComponent(orderId)}`, { headers }),
+      fetch(`${this.serverUrl}/api/store`, { headers }),
+    ]);
+    if (!orderResp.ok) return null;
+    const order: any = ((await orderResp.json()) as any).data;
+    const store: any = storeResp.ok ? ((await storeResp.json()) as any).store : null;
+    if (!order) return null;
+    const when = (value: string) => new Date(value).toLocaleString('es-PE', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima',
+    });
+    return {
+      store: { name: store?.name || 'Mi Tienda', ruc: store?.ruc || undefined, address: store?.address || undefined, phone: store?.phone || undefined },
+      title: labels.title,
+      orderNumber: order.orderNumber,
+      createdAt: when(order.createdAt),
+      customer: order.customer ? { name: order.customer.name, phone: order.customer.phone || undefined } : undefined,
+      items: (order.items || []).map((item: any) => ({
+        name: item.itemName,
+        detail: item.itemContent && item.itemContent !== '(Servicio)' ? item.itemContent : undefined,
+        quantity: Number(item.quantityBase),
+        unit: item.unitUsed?.symbol || undefined,
+        subtotal: Number(item.subtotal),
+      })),
+      expressSurcharge: Number(order.expressSurcharge || 0),
+      total: Number(order.total),
+      advancePaid: Number(order.advancePaid || 0),
+      promisedAt: order.promisedAt ? when(order.promisedAt) : undefined,
+      notes: order.notes || undefined,
+      footer: labels.footer,
+    };
+  }
+
   // ============== Print Sale ==============
   
   async printSale(saleId: string): Promise<PrintResult> {

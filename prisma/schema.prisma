@@ -655,6 +655,8 @@ model StoreSettings {
 
   // Lavandería: recargo de las órdenes express (% sobre el subtotal)
   expressSurchargePercent Int @default(50) @map("express_surcharge_percent")
+  // Lavandería: precio del kilo de ropa vigente (el total se calcula al poner los kilos)
+  laundryKgPrice Decimal? @map("laundry_kg_price") @db.Decimal(10, 2)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")

@@ -219,6 +219,25 @@ check('venta de orden con adelanto muestra adelanto y saldo pagado', () => {
   assert.match(yape, /YAPE\s+S\/51\.25/, 'lo pagado por Yape es el saldo, no el total');
 });
 
+check('ticket de recepción de lavandería por ESC/POS', () => {
+  const text = printable(new TicketFormatter({ ...DEFAULT_ESCPOS_CONFIG, charsPerLine: 42 }).formatWorkOrder({
+    store: { name: 'Lavanderia Prueba', ruc: '20123456789' },
+    title: 'RECEPCION DE PRENDAS', orderNumber: 2, createdAt: '28/10/2026 10:00',
+    customer: { name: 'Rosa Quispe', phone: '977555333' },
+    items: [{ name: 'Lavado de ropa', detail: '5 kg', quantity: 1, subtotal: 25 }, { name: 'Terno al seco', quantity: 2, unit: 'und', subtotal: 30 }],
+    expressSurcharge: 27.5, total: 82.5, advancePaid: 20, promisedAt: '29/10/2026 18:00', notes: 'Camisa con mancha',
+    footer: 'Presente este ticket para recoger sus prendas',
+  }));
+  assert.ok(text.includes('000002'), 'número de orden');
+  assert.match(text, /1 Lavado de ropa 5 kg\s+S\/25\.00/);
+  assert.match(text, /2 und Terno al seco\s+S\/30\.00/);
+  assert.match(text, /RECARGO EXPRESS\s+S\/27\.50/);
+  assert.match(text, /TOTAL:\s+S\/82\.50/);
+  assert.match(text, /ADELANTO:\s+S\/20\.00/);
+  assert.match(text, /SALDO A PAGAR:\s+S\/62\.50/);
+  assert.ok(text.includes('ENTREGA: 29/10/2026 18:00'), 'fecha de entrega');
+});
+
 // ── Total del POS (debe coincidir con el cobro del servidor) ────────────────
 check('POS: total con ICBPER igual al servidor', () => {
   const product = (price: number, icbper = false) => ({ id: `p${price}`, price, stock: null, active: true, icbper, product: { id: 'x', name: 'x', brand: null, content: null, category: 'x', unitType: 'UNIT', barcode: null } });

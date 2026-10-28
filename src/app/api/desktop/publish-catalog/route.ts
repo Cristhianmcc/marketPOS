@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
+import { catalogCloudHeaders } from '@/lib/catalog/catalogImageUpload';
 
 const CLOUD_URL = (process.env.CLOUD_URL || '').replace(/\/+$/, '');
-const CATALOG_API_KEY = process.env.CATALOG_API_KEY || '';
 
 export async function POST(_req: NextRequest) {
   if (process.env.DESKTOP_MODE !== 'true') {
@@ -122,8 +122,8 @@ export async function POST(_req: NextRequest) {
       products,
     };
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (CATALOG_API_KEY) headers['x-api-key'] = CATALOG_API_KEY;
+    // La nube identifica a la tienda por su token de licencia (sin claves en el instalador)
+    const headers = await catalogCloudHeaders(session.storeId);
 
     const cloudRes = await fetch(`${CLOUD_URL}/api/catalog/publish`, {
       method: 'POST',
@@ -136,7 +136,11 @@ export async function POST(_req: NextRequest) {
       const errText = await cloudRes.text();
       console.error('[publish-catalog] Cloud error:', cloudRes.status, errText);
       return NextResponse.json(
-        { error: `Error al publicar: el servidor web respondió ${cloudRes.status}` },
+        {
+          error: cloudRes.status === 401
+            ? 'La tienda no tiene licencia registrada en la nube. Regístrala desde Administración de tiendas y vuelve a publicar.'
+            : `Error al publicar: el servidor web respondió ${cloudRes.status}`,
+        },
         { status: 502 },
       );
     }

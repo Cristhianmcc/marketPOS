@@ -33,6 +33,9 @@ export default function LoginPage() {
         return;
       }
 
+      // Otra tienda puede tener otro rubro: el POS lo vuelve a consultar
+      try { sessionStorage.removeItem('pos-business-profile'); } catch { /* sin almacenamiento */ }
+
       // Si necesita provisioning (autenticó en nube pero no hay usuarios locales)
       // La sesión ya fue creada en el servidor como SUPERADMIN sin tienda
       if (data.needsProvisioning) {

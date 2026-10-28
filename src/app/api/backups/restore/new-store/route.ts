@@ -381,6 +381,7 @@ export async function POST(request: NextRequest) {
             fefoEnabled: backupData.storeSettings.fefoEnabled,
             expiryAlertDays: backupData.storeSettings.expiryAlertDays,
             expressSurchargePercent: backupData.storeSettings.expressSurchargePercent ?? 50,
+            laundryKgPrice: backupData.storeSettings.laundryKgPrice ?? null,
             showExpiredWarnings: backupData.storeSettings.showExpiredWarnings,
           },
         });

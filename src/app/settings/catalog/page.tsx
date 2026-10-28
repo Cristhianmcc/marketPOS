@@ -615,10 +615,10 @@ export default function CatalogSettingsPage() {
               <div>
                 {!cloudinaryOk ? (
                   <>
-                    <h4 className="font-semibold text-red-900 text-sm">Cloudinary no configurado</h4>
+                    <h4 className="font-semibold text-red-900 text-sm">No se pueden subir imágenes todavía</h4>
                     <p className="text-red-700 text-xs mt-1">
-                      Para mostrar imágenes en el catálogo web necesitas configurar las variables
-                      CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET.
+                      Las imágenes se suben a la web a través del servidor en la nube, y para eso la
+                      tienda debe tener su licencia registrada en la nube (Administración de tiendas).
                     </p>
                   </>
                 ) : pendingImages > 0 ? (

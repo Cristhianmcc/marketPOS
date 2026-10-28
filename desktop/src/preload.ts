@@ -119,6 +119,7 @@ interface DesktopAPI {
     updateConfig: (config: Partial<EscposConfig>) => Promise<EscposConfig>;
     testPrint: (full?: boolean) => Promise<EscposPrintResult>;
     printSale: (saleId: string) => Promise<EscposPrintResult>;
+    printWorkOrder: (orderId: string, labels: { title: string; footer: string }) => Promise<EscposPrintResult>;
     // D6.1-NET: Network-specific
     netPing: (host?: string, port?: number) => Promise<PingResult>;
     // Diagnóstico
@@ -666,6 +667,8 @@ const desktopAPI: DesktopAPI = {
       ipcRenderer.invoke('escpos:test-print', full),
     printSale: (saleId: string) => 
       ipcRenderer.invoke('escpos:print-sale', saleId),
+    printWorkOrder: (orderId: string, labels: { title: string; footer: string }) =>
+      ipcRenderer.invoke('escpos:print-work-order', orderId, labels),
     // D6.1-NET: Network-specific
     netPing: (host?: string, port?: number) => 
       ipcRenderer.invoke('escpos:net-ping', host, port),

@@ -173,7 +173,7 @@ async function seedStore(db: PrismaClient) {
   const storeId = store.id;
 
   await db.storeSettings.create({
-    data: { storeId, ticketFooter: 'Gracias', taxRate: 18, fefoEnabled: true, expiryAlertDays: 45, expressSurchargePercent: 40, defaultPaymentMethod: 'CASH' },
+    data: { storeId, ticketFooter: 'Gracias', taxRate: 18, fefoEnabled: true, expiryAlertDays: 45, expressSurchargePercent: 40, laundryKgPrice: 5.5, defaultPaymentMethod: 'CASH' },
   });
   await db.subscription.create({
     data: {

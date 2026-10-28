@@ -11,8 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/session';
+import { canUploadCatalogImages, uploadCatalogImage } from '@/lib/catalog/catalogImageUpload';
 
 export const runtime = 'nodejs';
 
@@ -24,13 +25,6 @@ function isDesktopMode(): boolean {
   return process.env.DESKTOP_MODE === 'true';
 }
 
-function hasCloudinaryConfig(): boolean {
-  return Boolean(
-    process.env.CLOUDINARY_CLOUD_NAME &&
-      process.env.CLOUDINARY_API_KEY &&
-      process.env.CLOUDINARY_API_SECRET,
-  );
-}
 
 function loadIndex(): Record<string, { filename: string; mime: string; createdAt: string }> {
   try {
@@ -53,27 +47,12 @@ function saveIndex(
   fs.writeFileSync(INDEX_PATH, JSON.stringify(index, null, 2), 'utf-8');
 }
 
-async function uploadBufferToCloudinary(
-  buffer: Buffer,
-  folder: string,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder,
-        transformation: [
-          { width: 800, height: 800, crop: 'limit' },
-          { quality: 'auto', fetch_format: 'auto' },
-        ],
-      },
-      (error, result) => {
-        if (error || !result) reject(error ?? new Error('No result from Cloudinary'));
-        else resolve(result.secure_url);
-      },
-    );
-    stream.end(buffer);
-  });
-}
+const mimeOf = (filename: string, mime?: string) =>
+  mime && mime.startsWith('image/') ? mime
+    : filename.toLowerCase().endsWith('.png') ? 'image/png'
+      : filename.toLowerCase().endsWith('.webp') ? 'image/webp'
+        : filename.toLowerCase().endsWith('.gif') ? 'image/gif'
+          : 'image/jpeg';
 
 // ─── GET: contar imágenes pendientes ───────────────────────────────────────
 
@@ -81,6 +60,9 @@ export async function GET(_req: NextRequest) {
   if (!isDesktopMode()) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+
+  const session = await getSession();
+  const uploadsAvailable = session?.storeId ? await canUploadCatalogImages(session.storeId) : false;
 
   try {
     // Contar StoreProducts con catalogImagePath local
@@ -105,7 +87,7 @@ export async function GET(_req: NextRequest) {
       pending: pendingCatalog + pendingProducts,
       pendingCatalogImages: pendingCatalog,
       pendingProductImages: pendingProducts,
-      cloudinaryConfigured: hasCloudinaryConfig(),
+      cloudinaryConfigured: uploadsAvailable,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -125,7 +107,7 @@ export async function GET(_req: NextRequest) {
         pending: 0,
         pendingCatalogImages: 0,
         pendingProductImages: 0,
-        cloudinaryConfigured: hasCloudinaryConfig(),
+        cloudinaryConfigured: uploadsAvailable,
         schemaOutdated: true,
       });
     }
@@ -141,20 +123,17 @@ export async function POST(_req: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  if (!hasCloudinaryConfig()) {
+  const session = await getSession();
+  if (!session?.storeId) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+  const storeId = session.storeId;
+  if (!(await canUploadCatalogImages(storeId))) {
     return NextResponse.json(
-      { error: 'Cloudinary no está configurado. Verifica las variables CLOUDINARY_*.' },
-      { status: 500 },
+      { error: 'No se pueden subir imágenes: la tienda no tiene licencia registrada en la nube.' },
+      { status: 503 },
     );
   }
-
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-  });
-
-  const folder = process.env.CLOUDINARY_FOLDER || 'market-pos-products';
   const index = loadIndex();
 
   let synced = 0;
@@ -189,7 +168,7 @@ export async function POST(_req: NextRequest) {
 
     try {
       const buffer = fs.readFileSync(filePath);
-      const cloudUrl = await uploadBufferToCloudinary(buffer, folder);
+      const cloudUrl = await uploadCatalogImage({ storeId, buffer, fileName: entry.filename, mimeType: mimeOf(entry.filename, entry.mime), kind: 'product' });
 
       await prisma.storeProduct.update({
         where: { id: sp.id },
@@ -247,7 +226,7 @@ export async function POST(_req: NextRequest) {
 
     try {
       const buffer = fs.readFileSync(filePath);
-      const cloudUrl = await uploadBufferToCloudinary(buffer, folder);
+      const cloudUrl = await uploadCatalogImage({ storeId, buffer, fileName: entry.filename, mimeType: mimeOf(entry.filename, entry.mime), kind: 'product' });
 
       // Solo actualizar catalogImagePath, NO productMaster.imageUrl
       await prisma.storeProduct.update({

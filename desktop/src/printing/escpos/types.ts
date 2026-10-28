@@ -138,6 +138,22 @@ export interface PrintFiscalData {
   isBeta: boolean;
 }
 
+/** Ticket de recepción de una orden de trabajo (lavandería / taller). */
+export interface PrintWorkOrderData {
+  store: { name: string; ruc?: string; address?: string; phone?: string };
+  title: string;
+  orderNumber: number;
+  createdAt: string;
+  customer?: { name: string; phone?: string };
+  items: { name: string; detail?: string; quantity: number; unit?: string; subtotal: number }[];
+  expressSurcharge: number;
+  total: number;
+  advancePaid: number;
+  promisedAt?: string;
+  notes?: string;
+  footer: string;
+}
+
 export interface PrintSaleData {
   store: PrintStoreInfo;
   fiscal?: PrintFiscalData;

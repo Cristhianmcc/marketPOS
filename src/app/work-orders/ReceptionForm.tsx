@@ -60,6 +60,11 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
   const [freeName, setFreeName] = useState('');
   const [freeKg, setFreeKg] = useState('');
   const [freeTotal, setFreeTotal] = useState('');
+  // Precio del kilo de hoy: con él, el total se calcula al escribir los kilos
+  const [kgPrice, setKgPrice] = useState<number | null>(null);
+  const [editingKgPrice, setEditingKgPrice] = useState(false);
+  const [kgPriceDraft, setKgPriceDraft] = useState('');
+  const [totalTouched, setTotalTouched] = useState(false);
   const [express, setExpress] = useState(false);
   const [promisedAt, setPromisedAt] = useState('');
   const [notes, setNotes] = useState('');
@@ -67,6 +72,27 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
   const [advanceMethod, setAdvanceMethod] = useState<(typeof ADVANCE_METHODS)[number]>('CASH');
   const [printAfter, setPrintAfter] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setKgPrice(ctx.laundryKgPrice); }, [ctx.laundryKgPrice]);
+
+  const onKgChange = (value: string) => {
+    setFreeKg(value);
+    const kg = Number(value);
+    if (kgPrice && !totalTouched) setFreeTotal(kg > 0 ? (Math.round(kg * kgPrice * 100) / 100).toFixed(2) : '');
+  };
+
+  const saveKgPrice = async () => {
+    const price = kgPriceDraft.trim() === '' ? null : Number(kgPriceDraft);
+    if (price !== null && !(price > 0)) { toast.error('Escribe un precio por kilo mayor a 0'); return; }
+    const res = await fetch('/api/store/laundry-price', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ price }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { toast.error(data.error || 'No se pudo guardar el precio'); return; }
+    setKgPrice(data.laundryKgPrice ?? null);
+    setEditingKgPrice(false);
+    toast.success(data.laundryKgPrice ? `Precio del kilo: ${money(data.laundryKgPrice)}` : 'Precio por kilo quitado');
+  };
 
   const loadCustomers = () =>
     fetch('/api/customers?activeOnly=true').then((r) => (r.ok ? r.json() : null)).then((data) => setCustomers(data?.customers ?? [])).catch(() => undefined);
@@ -123,7 +149,7 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
       detail: kg > 0 ? `${String(Math.round(kg * 100) / 100).replace('.', ',')} kg` : '',
       allowDecimals: false, unitSymbol: null, unitId: null,
     });
-    setFreeName(''); setFreeKg(''); setFreeTotal('');
+    setFreeName(''); setFreeKg(''); setFreeTotal(''); setTotalTouched(false);
     freeNameRef.current?.focus();
   };
 
@@ -243,6 +269,28 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
         {/* Trabajo escrito a mano: lo que se pesa o se recibe en el momento */}
         <section className="bg-white dark:bg-surface-dark rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
           <h2 className="font-medium text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2"><Scale className="w-5 h-5 text-primary" />{ctx.isLaundry ? 'Ropa recibida' : 'Trabajo'}</h2>
+          {ctx.isLaundry && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-primary/5 px-3 py-2 text-sm">
+              {editingKgPrice ? (
+                <>
+                  <span>Precio del kilo hoy S/</span>
+                  <input type="number" min="0" step="0.1" value={kgPriceDraft} onChange={(e) => setKgPriceDraft(e.target.value)}
+                    className={`${inputClass} w-28 py-1`} autoFocus aria-label="Precio del kilo" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveKgPrice(); } }} />
+                  <button type="button" onClick={saveKgPrice} className="px-3 py-1 rounded-lg bg-primary text-white">Guardar</button>
+                  <button type="button" onClick={() => setEditingKgPrice(false)} className="px-2 py-1 text-gray-600">Cancelar</button>
+                </>
+              ) : (
+                <>
+                  <span>{kgPrice ? <>Precio del kilo hoy: <strong>{money(kgPrice)}</strong> · el total se calcula con los kilos</> : 'Sin precio por kilo: escribe el total a mano'}</span>
+                  {ctx.isOwner && (
+                    <button type="button" onClick={() => { setKgPriceDraft(kgPrice ? String(kgPrice) : ''); setEditingKgPrice(true); }} className="text-primary underline">
+                      {kgPrice ? 'Cambiar' : 'Poner precio por kilo'}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           <form onSubmit={(e) => { e.preventDefault(); addFreeWork(); }} className="grid grid-cols-12 gap-2 items-end">
             <label className="col-span-12 sm:col-span-6 text-xs text-gray-500">Trabajo
               <input ref={freeNameRef} value={freeName} onChange={(e) => setFreeName(e.target.value)} list="work-suggestions"
@@ -251,11 +299,11 @@ export function ReceptionForm({ mode, onSaved }: { mode: 'pos' | 'page'; onSaved
             </label>
             {ctx.isLaundry && (
               <label className="col-span-4 sm:col-span-2 text-xs text-gray-500">Kilos
-                <input type="number" min="0" step="0.1" value={freeKg} onChange={(e) => setFreeKg(e.target.value)} placeholder="0" className={`${inputClass} mt-1`} />
+                <input type="number" min="0" step="0.1" value={freeKg} onChange={(e) => onKgChange(e.target.value)} placeholder="0" className={`${inputClass} mt-1`} />
               </label>
             )}
             <label className={`${ctx.isLaundry ? 'col-span-5 sm:col-span-2' : 'col-span-9 sm:col-span-4'} text-xs text-gray-500`}>Total S/
-              <input type="number" min="0" step="0.1" value={freeTotal} onChange={(e) => setFreeTotal(e.target.value)} placeholder="0.00" className={`${inputClass} mt-1`} />
+              <input type="number" min="0" step="0.1" value={freeTotal} onChange={(e) => { setFreeTotal(e.target.value); setTotalTouched(e.target.value !== ''); }} placeholder="0.00" className={`${inputClass} mt-1`} />
             </label>
             <button type="submit" className="col-span-3 sm:col-span-2 h-[42px] bg-primary text-white rounded-lg font-semibold hover:opacity-90" aria-label="Agregar trabajo">
               <Plus className="inline w-4 h-4" /> Agregar

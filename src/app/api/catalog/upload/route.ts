@@ -4,6 +4,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { v2 as cloudinary } from 'cloudinary';
+import { canUploadCatalogImages, uploadCatalogImage } from '@/lib/catalog/catalogImageUpload';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -226,6 +227,16 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(cloud);
         } catch (cloudError) {
           console.error('[catalog/upload] Cloudinary failed en desktop, usando local:', cloudError);
+        }
+      } else if (await canUploadCatalogImages(session.storeId)) {
+        // Sin claves en la PC: la nube sube la imagen con las suyas
+        try {
+          const url = await uploadCatalogImage({
+            storeId: session.storeId, buffer, fileName, mimeType, kind: type as 'logo' | 'banner',
+          });
+          return NextResponse.json({ success: true, url, filename: fileName });
+        } catch (cloudError) {
+          console.error('[catalog/upload] Subida por la nube falló, usando local:', cloudError);
         }
       }
       // Sin Cloudinary o si falló: guardar local con nombre simulado

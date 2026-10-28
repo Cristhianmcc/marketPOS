@@ -4,7 +4,7 @@
  */
 
 import * as iconv from 'iconv-lite';
-import { PrintSaleData, EscposConfig, PrintSaleItem, PrintDiscount } from './types';
+import { PrintSaleData, EscposConfig, PrintSaleItem, PrintDiscount, PrintWorkOrderData } from './types';
 
 // ── Comandos ESC/POS ─────────────────────────────────────────────────────────
 const ESC = 0x1B;
@@ -25,6 +25,8 @@ const CMD = {
   CUT_PARTIAL:  Buffer.from([GS,  0x56, 0x01]),
   CUT_FULL:     Buffer.from([GS,  0x56, 0x00]),
   OPEN_DRAWER:  Buffer.from([ESC, 0x70, 0x00, 0x19, 0xFA]),
+  SIZE_DOUBLE:  Buffer.from([GS,  0x21, 0x11]),
+  SIZE_NORMAL:  Buffer.from([GS,  0x21, 0x00]),
 };
 
 // Precio siempre en los últimos PRICE_W caracteres de cada línea.
@@ -131,6 +133,62 @@ export class TicketFormatter {
     this.push(CMD.FEED_LINES(4));
     if (this.config.autoCut)        this.push(CMD.CUT_PARTIAL);
     if (this.config.openCashDrawer) this.push(CMD.OPEN_DRAWER);
+    return this.getBuffer();
+  }
+
+  // ── Ticket de recepción de una orden ────────────────────────────────────────
+
+  formatWorkOrder(data: PrintWorkOrderData): Buffer {
+    this.buffer = [];
+    this.push(CMD.INIT, CMD.ALIGN_CENTER, CMD.BOLD_ON);
+    this.line(data.store.name.toUpperCase());
+    this.push(CMD.BOLD_OFF);
+    if (data.store.ruc)     this.line(`RUC: ${data.store.ruc}`);
+    if (data.store.address) this.wrap(data.store.address).forEach(l => this.line(l));
+    if (data.store.phone)   this.line(`Tel: ${data.store.phone}`);
+    this.line(this.dash());
+    this.push(CMD.BOLD_ON);
+    this.line(data.title);
+    this.push(CMD.BOLD_OFF, CMD.SIZE_DOUBLE);
+    this.line(`N° ${String(data.orderNumber).padStart(6, '0')}`);
+    this.push(CMD.SIZE_NORMAL, CMD.ALIGN_LEFT);
+    this.line(this.dash());
+    this.line(`Recibido: ${data.createdAt}`);
+    if (data.customer) {
+      this.wrap(`Cliente: ${data.customer.name}`).forEach(l => this.line(l));
+      if (data.customer.phone) this.line(`Celular: ${data.customer.phone}`);
+    }
+    if (data.promisedAt) {
+      this.push(CMD.BOLD_ON);
+      this.line(`ENTREGA: ${data.promisedAt}`);
+      this.push(CMD.BOLD_OFF);
+    }
+    this.line(this.dash());
+    for (const item of data.items) {
+      const qty = Number.isInteger(item.quantity) ? String(item.quantity) : item.quantity.toFixed(2).replace(/0$/, '');
+      const name = `${qty}${item.unit ? ` ${item.unit}` : ''} ${item.name}${item.detail ? ` ${item.detail}` : ''}`;
+      const lines = this.wrap(name);
+      lines.forEach((l, i) => this.line(i === lines.length - 1 ? this.lr(l, this.money(item.subtotal)) : l));
+    }
+    if (data.expressSurcharge > 0) this.line(this.lr('RECARGO EXPRESS', this.money(data.expressSurcharge)));
+    this.line(this.dash());
+    const balance = Math.max(0, Math.round((data.total - data.advancePaid) * 100) / 100);
+    this.push(CMD.BOLD_ON);
+    this.line(this.lr('TOTAL:', this.money(data.total)));
+    this.push(CMD.BOLD_OFF);
+    if (data.advancePaid > 0) this.line(this.lr('ADELANTO:', this.money(data.advancePaid)));
+    this.push(CMD.BOLD_ON);
+    this.line(this.lr('SALDO A PAGAR:', this.money(balance)));
+    this.push(CMD.BOLD_OFF);
+    if (data.notes) {
+      this.line(this.dash());
+      this.wrap(`Obs.: ${data.notes}`).forEach(l => this.line(l));
+    }
+    this.line(this.dash());
+    this.push(CMD.ALIGN_CENTER);
+    this.wrap(data.footer).forEach(l => this.line(l));
+    this.push(CMD.ALIGN_LEFT, CMD.FEED_LINES(4));
+    if (this.config.autoCut) this.push(CMD.CUT_PARTIAL);
     return this.getBuffer();
   }
 
