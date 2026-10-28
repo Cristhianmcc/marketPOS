@@ -56,8 +56,9 @@ export async function POST(
     );
   }
 
+  let cloudResult: Awaited<ReturnType<typeof registerStoreInCloud>>;
   try {
-    const cloudResult = await registerStoreInCloud({
+    cloudResult = await registerStoreInCloud({
       storeId: store.id,
       storeName: store.name,
       ownerEmail: owner.email,
@@ -67,14 +68,6 @@ export async function POST(
       phone: store.phone,
       planCode: store.subscription.planCode,
     }, session.cloudAdminToken);
-    await saveStoreLicenseCredential(store.id, cloudResult.licenseToken);
-    return NextResponse.json({
-      ok: true,
-      already: cloudResult.already,
-      message: cloudResult.already
-        ? 'Vinculo de licencia renovado.'
-        : 'Tienda registrada en Licencias.',
-    });
   } catch (error) {
     console.error('[AdminStoreLicense] Cloud registration failed:', error);
     return NextResponse.json(
@@ -82,4 +75,21 @@ export async function POST(
       { status: 502 },
     );
   }
+
+  try {
+    await saveStoreLicenseCredential(store.id, cloudResult.licenseToken);
+  } catch (error) {
+    console.error('[AdminStoreLicense] Local credential save failed:', error);
+    return NextResponse.json(
+      { error: `La nube registró la tienda, pero esta PC no pudo guardar la licencia (${error instanceof Error ? error.message : String(error)}). Vuelve a pulsar "Registrar licencia".` },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({
+    ok: true,
+    already: cloudResult.already,
+    message: cloudResult.already
+      ? 'Vinculo de licencia renovado.'
+      : 'Tienda registrada en Licencias.',
+  });
 }

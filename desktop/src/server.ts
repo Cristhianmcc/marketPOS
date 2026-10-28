@@ -444,6 +444,15 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
   
   // Directorio de datos de la app
   const monterrialDataDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS-SUNAT-Beta');
+  // Credenciales (licencias de tienda) en la carpeta propia de la app: Windows
+  // puede bloquear escrituras en Documentos (acceso controlado a carpetas).
+  let secretsDir = '';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    secretsDir = require('electron').app.getPath('userData');
+  } catch {
+    secretsDir = path.join(process.env.APPDATA || os.homedir(), 'monterrial-pos-sunat-beta');
+  }
 
   // Configurar entorno
   const env: Record<string, string> = {
@@ -459,6 +468,7 @@ export async function startLocalServer(resourcesPath: string, isPackaged = true)
     SUNAT_SKIP_CHECK_DIGIT: 'true',
     DESKTOP_INTERNAL_TOKEN: internalToken,
     MONTERRIAL_DATA_DIR: monterrialDataDir,
+    MONTERRIAL_SECRETS_DIR: secretsDir,
   };
   
   // Restaurar DATABASE_URL del proceso principal (PostgreSQL embebido)
