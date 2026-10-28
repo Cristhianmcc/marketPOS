@@ -244,7 +244,7 @@ export function ProductConversionsModal({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
-            <Scale className="w-5 h-5 text-indigo-600" />
+            <Scale className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Unidades y Conversiones
             </h2>
@@ -280,7 +280,7 @@ export function ProductConversionsModal({
                   value={baseUnit?.id || ''}
                   onChange={(e) => handleUpdateBaseUnit(e.target.value)}
                   disabled={loading}
-                  className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="">Seleccionar unidad base</option>
                   {units.map((unit) => (
@@ -320,7 +320,7 @@ export function ProductConversionsModal({
                         key={conv.id}
                         className={`flex items-center justify-between p-3 rounded-lg border ${
                           conv.active
-                            ? 'border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950'
+                            ? 'border-primary/20 bg-primary/10 dark:border-primary dark:bg-primary/20'
                             : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900 opacity-60'
                         }`}
                       >
@@ -340,7 +340,7 @@ export function ProductConversionsModal({
                             title={conv.active ? 'Desactivar' : 'Activar'}
                           >
                             {conv.active ? (
-                              <ToggleRight className="w-5 h-5 text-indigo-600" />
+                              <ToggleRight className="w-5 h-5 text-primary" />
                             ) : (
                               <ToggleLeft className="w-5 h-5 text-gray-400" />
                             )}
@@ -405,7 +405,7 @@ export function ProductConversionsModal({
                     <button
                       type="submit"
                       disabled={loading || !newFromUnitId || !newFactor}
-                      className="h-9 px-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="h-9 px-3 bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                     </button>
@@ -413,7 +413,7 @@ export function ProductConversionsModal({
                   
                   {/* Ejemplo visual */}
                   {newFromUnitId && newFactor && (
-                    <div className="mt-2 p-2 bg-indigo-50 dark:bg-indigo-950 rounded-md text-sm text-indigo-700 dark:text-indigo-300">
+                    <div className="mt-2 p-2 bg-primary/10 dark:bg-primary/20 rounded-md text-sm text-primary dark:text-primary">
                       1 {units.find(u => u.id === newFromUnitId)?.code || '?'} = {newFactor} {baseUnit.code}
                     </div>
                   )}

@@ -61,7 +61,7 @@ function StoreArchivedContent() {
             await fetch('/api/auth/logout', { method: 'POST' });
             window.location.href = '/login';
           }}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition"
+          className="w-full bg-primary text-white py-2 px-4 rounded hover:bg-primary-hover transition"
         >
           Cerrar Sesión Ahora
         </button>

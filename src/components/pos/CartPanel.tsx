@@ -187,7 +187,7 @@ function UnitDropdown({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+        className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 dark:bg-primary/30 text-primary dark:text-primary rounded hover:bg-primary/15 dark:hover:bg-primary/40 transition-colors"
       >
         <Scale className="w-3 h-3" />
         <span>{currentUnit?.symbol || 'UN'}</span>
@@ -201,7 +201,7 @@ function UnitDropdown({
               key={unit.id}
               onClick={() => handleSelectUnit(unit)}
               className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                currentUnit?.id === unit.id ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300'
+                currentUnit?.id === unit.id ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary' : 'text-gray-700 dark:text-gray-300'
               }`}
             >
               <span className="font-medium">{unit.symbol}</span>
@@ -395,7 +395,7 @@ function CartPanelComponent({
                           </div>
                         )}
                         {item.categoryPromoName && (
-                          <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-2 py-0.5 rounded">
+                          <div className="flex items-center gap-1 text-xs text-primary dark:text-primary bg-primary/10 dark:bg-primary/30 px-2 py-0.5 rounded">
                             <Tag className="w-3 h-3" />
                             <span className="truncate">{item.categoryPromoName}</span>
                           </div>
@@ -475,7 +475,7 @@ function CartPanelComponent({
 
                     {/* Unit Conversion Info - MÓDULO F2.2 */}
                     {advancedUnitsEnabled && item.conversionFactorUsed && item.conversionFactorUsed !== 1 && (
-                      <div className="mt-1 flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-1 rounded">
+                      <div className="mt-1 flex items-center gap-1 text-xs text-primary dark:text-primary bg-primary/10 dark:bg-primary/30 px-2 py-1 rounded">
                         <Scale className="w-3 h-3" />
                         <span>
                           {item.quantityOriginal} {item.unitCodeUsed || 'UN'} → {item.quantityBase} base

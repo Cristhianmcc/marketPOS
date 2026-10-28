@@ -325,7 +325,7 @@ export default function PrinterSettingsPage() {
               onClick={() => setMode('HTML')}
               className={`p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-colors ${
                 mode === 'HTML' 
-                  ? 'border-blue-500 bg-blue-50' 
+                  ? 'border-primary bg-primary/10' 
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -338,7 +338,7 @@ export default function PrinterSettingsPage() {
               onClick={() => setMode('ESCPOS_NET')}
               className={`p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-colors ${
                 mode === 'ESCPOS_NET' 
-                  ? 'border-blue-500 bg-blue-50' 
+                  ? 'border-primary bg-primary/10' 
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -351,7 +351,7 @@ export default function PrinterSettingsPage() {
               onClick={() => setMode('ESCPOS_USB')}
               className={`p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-colors ${
                 mode === 'ESCPOS_USB' 
-                  ? 'border-blue-500 bg-blue-50' 
+                  ? 'border-primary bg-primary/10' 
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -364,7 +364,7 @@ export default function PrinterSettingsPage() {
               onClick={() => { setMode('ESCPOS_BT'); if (btPorts.length === 0) refreshBtPorts(); }}
               className={`p-4 rounded-lg border-2 flex flex-col items-center gap-2 transition-colors ${
                 mode === 'ESCPOS_BT' 
-                  ? 'border-blue-500 bg-blue-50' 
+                  ? 'border-primary bg-primary/10' 
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -393,7 +393,7 @@ export default function PrinterSettingsPage() {
                   value={netHost}
                   onChange={(e) => setNetHost(e.target.value)}
                   placeholder="127.0.0.1"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 />
               </div>
               <div>
@@ -404,7 +404,7 @@ export default function PrinterSettingsPage() {
                   type="number"
                   value={netPort}
                   onChange={(e) => setNetPort(Number(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 />
               </div>
             </div>
@@ -431,7 +431,7 @@ export default function PrinterSettingsPage() {
               )}
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-sm text-primary">
               <strong>Tip:</strong> Para emuladores como escpos_emulator, usa IP 127.0.0.1 y puerto 9100.
             </div>
           </div>
@@ -454,7 +454,7 @@ export default function PrinterSettingsPage() {
                 className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
                 {loadingUsb ? (
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <Usb className="w-4 h-4" />
                 )}
@@ -469,7 +469,7 @@ export default function PrinterSettingsPage() {
                     key={`${device.vendorId}:${device.productId}`}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${
                       selectedUsb === `${device.vendorId}:${device.productId}`
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-primary bg-primary/10'
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
@@ -479,7 +479,7 @@ export default function PrinterSettingsPage() {
                       value={`${device.vendorId}:${device.productId}`}
                       checked={selectedUsb === `${device.vendorId}:${device.productId}`}
                       onChange={(e) => setSelectedUsb(e.target.value)}
-                      className="text-blue-600"
+                      className="text-primary"
                     />
                     <div>
                       <div className="font-medium">{device.name}</div>
@@ -504,7 +504,7 @@ export default function PrinterSettingsPage() {
             <div className="border-t pt-3">
               <button
                 onClick={() => setShowManual(!showManual)}
-                className="text-sm text-blue-600 hover:underline"
+                className="text-sm text-primary hover:underline"
               >
                 {showManual ? '▲ Ocultar' : '▼ Mi impresora no aparece — ingresar ID manualmente'}
               </button>
@@ -549,7 +549,7 @@ export default function PrinterSettingsPage() {
                             setShowManual(false);
                           }
                         }}
-                        className="px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-40"
+                        className="px-3 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary-hover disabled:opacity-40"
                       >
                         Usar
                       </button>
@@ -565,11 +565,11 @@ export default function PrinterSettingsPage() {
         {mode === 'ESCPOS_BT' && (
           <div className="bg-white rounded-lg shadow p-6 space-y-4">
             <h2 className="font-semibold text-lg flex items-center gap-2">
-              <Bluetooth className="w-5 h-5 text-blue-600" />
+              <Bluetooth className="w-5 h-5 text-primary" />
               Impresora Bluetooth
             </h2>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 space-y-1">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-sm text-primary space-y-1">
               <p><strong>¿Cómo conectar?</strong></p>
               <ol className="list-decimal pl-4 space-y-1">
                 <li>Enciende la impresora y activa Bluetooth en tu PC.</li>
@@ -584,7 +584,7 @@ export default function PrinterSettingsPage() {
               <span className="text-sm text-gray-600">
                 Puertos disponibles: {btPorts.length}
                 {btPorts.filter(p => p.isBluetooth).length > 0 && (
-                  <span className="ml-2 text-blue-600 font-medium">
+                  <span className="ml-2 text-primary font-medium">
                     ({btPorts.filter(p => p.isBluetooth).length} Bluetooth)
                   </span>
                 )}
@@ -595,7 +595,7 @@ export default function PrinterSettingsPage() {
                 className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
                 {loadingBt ? (
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <RefreshCw className="w-4 h-4" />
                 )}
@@ -611,9 +611,9 @@ export default function PrinterSettingsPage() {
                     key={port.path}
                     className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${
                       selectedBt === port.path
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-primary bg-primary/10'
                         : port.isBluetooth
-                          ? 'border-blue-200 hover:bg-blue-50'
+                          ? 'border-primary/20 hover:bg-primary/10'
                           : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
@@ -623,13 +623,13 @@ export default function PrinterSettingsPage() {
                       value={port.path}
                       checked={selectedBt === port.path}
                       onChange={(e) => setSelectedBt(e.target.value)}
-                      className="text-blue-600"
+                      className="text-primary"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-medium">{port.path}</span>
                         {port.isBluetooth && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-full flex items-center gap-1">
                             <Bluetooth className="w-3 h-3" /> Bluetooth
                           </span>
                         )}
@@ -660,7 +660,7 @@ export default function PrinterSettingsPage() {
                 type="checkbox"
                 checked={autoCut}
                 onChange={(e) => setAutoCut(e.target.checked)}
-                className="w-5 h-5 text-blue-600 rounded"
+                className="w-5 h-5 text-primary rounded"
               />
             </label>
 
@@ -670,7 +670,7 @@ export default function PrinterSettingsPage() {
                 type="checkbox"
                 checked={openCashDrawer}
                 onChange={(e) => setOpenCashDrawer(e.target.checked)}
-                className="w-5 h-5 text-blue-600 rounded"
+                className="w-5 h-5 text-primary rounded"
               />
             </label>
 
@@ -735,7 +735,7 @@ export default function PrinterSettingsPage() {
                 type="checkbox"
                 checked={ticketShowQr}
                 onChange={(e) => setTicketShowQr(e.target.checked)}
-                className="w-5 h-5 text-blue-600 rounded"
+                className="w-5 h-5 text-primary rounded"
               />
             </label>
           </div>
@@ -746,7 +746,7 @@ export default function PrinterSettingsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 font-medium"
           >
             {saving ? (
               <span className="animate-spin">⏳</span>

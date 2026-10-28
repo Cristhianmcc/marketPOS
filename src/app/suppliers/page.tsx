@@ -113,7 +113,7 @@ export default function SuppliersPage() {
         </div>
         <button
           onClick={() => { setForm(emptyForm); setEditingId(null); setShowForm(true); }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors"
         >
           <Plus className="w-4 h-4" /> Nuevo Proveedor
         </button>
@@ -127,7 +127,7 @@ export default function SuppliersPage() {
           placeholder="Buscar por nombre, RUC o contacto..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary"
         />
       </div>
 
@@ -175,7 +175,7 @@ export default function SuppliersPage() {
             </div>
             <div className="flex justify-end gap-3 mt-5">
               <button onClick={() => { setShowForm(false); setEditingId(null); }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50 text-sm">
                 <Check className="w-4 h-4" /> {saving ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
@@ -200,7 +200,7 @@ export default function SuppliersPage() {
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-gray-900">{s.name}</h3>
                     {s.ruc && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">RUC: {s.ruc}</span>}
-                    <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{s._count.purchaseOrders} OC</span>
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">{s._count.purchaseOrders} OC</span>
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-sm text-gray-500">
                     {s.contactName && <span className="flex items-center gap-1"><Building2 className="w-3.5 h-3.5" />{s.contactName}</span>}
@@ -210,7 +210,7 @@ export default function SuppliersPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 ml-4">
-                  <button onClick={() => handleEdit(s)} className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50" title="Editar">
+                  <button onClick={() => handleEdit(s)} className="p-2 text-gray-400 hover:text-primary rounded-lg hover:bg-primary/10" title="Editar">
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleDelete(s)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50" title="Eliminar">

@@ -23,7 +23,7 @@ export function Step1Content(props: Step1Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-6">
-        <Store className="w-8 h-8 text-blue-600" />
+        <Store className="w-8 h-8 text-primary" />
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Datos de tu tienda</h2>
           <p className="text-gray-600 text-sm">Información que aparecerá en tus tickets</p>
@@ -43,7 +43,7 @@ export function Step1Content(props: Step1Props) {
               props.setTicketHeader1(e.target.value);
             }
           }}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
           placeholder="Ej: Bodega San Martín"
           required
         />
@@ -58,7 +58,7 @@ export function Step1Content(props: Step1Props) {
             type="text"
             value={props.storeRuc}
             onChange={(e) => props.setStoreRuc(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             placeholder="20123456789"
           />
         </div>
@@ -71,7 +71,7 @@ export function Step1Content(props: Step1Props) {
             type="text"
             value={props.storePhone}
             onChange={(e) => props.setStorePhone(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             placeholder="987654321"
           />
         </div>
@@ -85,7 +85,7 @@ export function Step1Content(props: Step1Props) {
           type="text"
           value={props.storeAddress}
           onChange={(e) => props.setStoreAddress(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
           placeholder="Av. Principal 123, Lima"
         />
       </div>
@@ -100,7 +100,7 @@ export function Step1Content(props: Step1Props) {
               value={props.ticketHeader1}
               onChange={(e) => props.setTicketHeader1(e.target.value)}
               maxLength={100}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent font-mono text-sm"
               placeholder="Nombre de tu tienda"
             />
           </div>
@@ -111,7 +111,7 @@ export function Step1Content(props: Step1Props) {
               value={props.ticketHeader2}
               onChange={(e) => props.setTicketHeader2(e.target.value)}
               maxLength={100}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent font-mono text-sm"
               placeholder="Dirección o RUC"
             />
           </div>
@@ -142,13 +142,13 @@ export function Step2Content(props: Step2Props) {
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
         <div className="flex items-start gap-3">
           <input
             type="checkbox"
             checked={props.useShifts}
             onChange={(e) => props.setUseShifts(e.target.checked)}
-            className="mt-1 w-4 h-4 text-blue-600 rounded"
+            className="mt-1 w-4 h-4 text-primary rounded"
           />
           <div className="flex-1">
             <label className="font-medium text-gray-900">Usar turnos de caja</label>
@@ -170,7 +170,7 @@ export function Step2Content(props: Step2Props) {
             step="0.01"
             value={props.initialCash}
             onChange={(e) => props.setInitialCash(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             placeholder="100.00"
           />
           <p className="text-xs text-gray-500 mt-1">Monto típico para dar vuelto al abrir turno</p>
@@ -184,7 +184,7 @@ export function Step2Content(props: Step2Props) {
         <select
           value={props.defaultPaymentMethod}
           onChange={(e) => props.setDefaultPaymentMethod(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
         >
           <option value="CASH">Efectivo</option>
           <option value="YAPE">Yape</option>
@@ -232,9 +232,9 @@ export function Step3Content(props: Step3Props) {
         <div className="grid grid-cols-2 gap-4">
           <button
             onClick={() => props.setImportMethod('csv')}
-            className="p-6 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+            className="p-6 border-2 border-gray-300 rounded-lg hover:border-primary hover:bg-primary/10 transition-colors"
           >
-            <Upload className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+            <Upload className="w-8 h-8 text-primary mx-auto mb-3" />
             <h3 className="font-medium text-gray-900 mb-1">Importar CSV</h3>
             <p className="text-sm text-gray-600">
               Carga un archivo con todos tus productos (hasta 500)
@@ -243,9 +243,9 @@ export function Step3Content(props: Step3Props) {
 
           <button
             onClick={() => props.setImportMethod('manual')}
-            className="p-6 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+            className="p-6 border-2 border-gray-300 rounded-lg hover:border-primary hover:bg-primary/10 transition-colors"
           >
-            <Package className="w-8 h-8 text-blue-600 mx-auto mb-3" />
+            <Package className="w-8 h-8 text-primary mx-auto mb-3" />
             <h3 className="font-medium text-gray-900 mb-1">Agregar Manual</h3>
             <p className="text-sm text-gray-600">
               Ingresa tus productos uno por uno (para catálogos pequeños)
@@ -274,7 +274,7 @@ export function Step3Content(props: Step3Props) {
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
               <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
               <label className="cursor-pointer">
-                <span className="text-blue-600 hover:text-blue-700 font-medium">
+                <span className="text-primary hover:text-primary font-medium">
                   Seleccionar archivo CSV
                 </span>
                 <input
@@ -354,14 +354,14 @@ export function Step3Content(props: Step3Props) {
       )}
 
       {props.importMethod === 'manual' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <Package className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-6 text-center">
+          <Package className="w-12 h-12 text-primary mx-auto mb-3" />
           <p className="text-gray-700 mb-4">
             Esta opción te redirigirá a Inventario para agregar productos uno por uno.
           </p>
           <button
             onClick={() => window.location.href = '/inventory?addProduct=true'}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover font-medium"
           >
             Ir a Inventario
           </button>
@@ -385,15 +385,15 @@ export function Step4Content(props: Step4Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-6">
-        <Users className="w-8 h-8 text-indigo-600" />
+        <Users className="w-8 h-8 text-primary" />
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Crear cajero</h2>
           <p className="text-gray-600 text-sm">Opcional: Puedes crear usuarios adicionales después</p>
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
+      <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+        <p className="text-sm text-primary">
           💡 Si ahora solo vas a usar tú el sistema, puedes omitir este paso y crear cajeros más tarde desde Configuración → Usuarios
         </p>
       </div>
@@ -406,7 +406,7 @@ export function Step4Content(props: Step4Props) {
           type="text"
           value={props.cashierName}
           onChange={(e) => props.setCashierName(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
           placeholder="Ej: María González"
         />
       </div>
@@ -419,7 +419,7 @@ export function Step4Content(props: Step4Props) {
           type="email"
           value={props.cashierEmail}
           onChange={(e) => props.setCashierEmail(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
           placeholder="cajero@tienda.com"
         />
       </div>
@@ -432,7 +432,7 @@ export function Step4Content(props: Step4Props) {
           type="password"
           value={props.cashierPassword}
           onChange={(e) => props.setCashierPassword(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
           placeholder="Mínimo 6 caracteres"
         />
         <p className="text-xs text-gray-500 mt-1">El cajero podrá cambiarla después</p>

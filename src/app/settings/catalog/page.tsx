@@ -691,13 +691,13 @@ export default function CatalogSettingsPage() {
         )}
 
         {/* Sync Info */}
-        <div className="mt-4 bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3">
-          <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />
+        <div className="mt-4 bg-primary/10 border border-primary/20 p-4 rounded-xl flex gap-3">
+          <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
           <div>
-            <h4 className="font-semibold text-blue-900 text-sm">
+            <h4 className="font-semibold text-primary text-sm">
               Información de Sincronización
             </h4>
-            <p className="text-blue-800 text-xs mt-1">
+            <p className="text-primary text-xs mt-1">
               Recuerda que para que los productos aparezcan en el catálogo, primero
               debes marcarlos como &quot;Mostrar en catálogo&quot; en tu inventario y luego
               pulsar el botón &quot;Publicar&quot; desde la aplicación portable (Desktop).

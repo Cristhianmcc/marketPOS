@@ -332,7 +332,7 @@ export default function MobileCartDrawer({
 
                   {/* Unit Conversion Info - MÓDULO F1 */}
                   {advancedUnitsEnabled && item.unitCodeUsed && item.quantityBase !== item.quantityOriginal && (
-                    <div className="mt-2 flex items-center gap-1 text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                    <div className="mt-2 flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-1 rounded">
                       <Scale className="w-3 h-3" />
                       <span>→ {item.quantityBase} {item.storeProduct.product.unitType}</span>
                     </div>

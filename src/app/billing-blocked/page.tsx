@@ -90,7 +90,7 @@ function BillingBlockedContent() {
         <div className="space-y-3">
           <Link
             href="/settings/billing"
-            className="block w-full bg-blue-600 text-white text-center px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="block w-full bg-primary text-white text-center px-6 py-3 rounded-lg hover:bg-primary-hover transition-colors font-medium"
           >
             Ver Estado de Licencia
           </Link>
@@ -115,7 +115,7 @@ function BillingBlockedContent() {
           <p className="text-sm text-gray-500 mb-2">¿Necesitas ayuda?</p>
           <a
             href="mailto:soporte@marketpos.com"
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            className="text-sm text-primary hover:text-primary font-medium"
           >
             soporte@marketpos.com
           </a>

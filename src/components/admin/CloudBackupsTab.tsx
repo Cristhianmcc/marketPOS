@@ -245,7 +245,7 @@ export default function CloudBackupsTab() {
       case 'AVAILABLE':
         return <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Disponible</span>;
       case 'UPLOADING':
-        return <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Subiendo...</span>;
+        return <span className="px-2 py-1 bg-primary/15 text-primary text-xs rounded-full">Subiendo...</span>;
       case 'FAILED':
         return <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Error</span>;
       case 'DELETED':
@@ -258,7 +258,7 @@ export default function CloudBackupsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
         <span className="text-gray-600">Cargando backups de la nube...</span>
       </div>
     );
@@ -268,11 +268,11 @@ export default function CloudBackupsTab() {
     <div className="space-y-6">
       {/* Sync Stats (Solo Desktop) */}
       {isDesktop && syncStats && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-gradient-to-r from-primary/10 to-primary/10 border border-primary/20 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <HardDrive className="w-5 h-5 text-blue-600" />
+                <HardDrive className="w-5 h-5 text-primary" />
                 <span className="font-medium">Estado Local</span>
               </div>
               <div className="flex gap-3 text-sm">
@@ -303,7 +303,7 @@ export default function CloudBackupsTab() {
               <button
                 onClick={handleSync}
                 disabled={syncing}
-                className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                className="px-4 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-1 disabled:opacity-50"
               >
                 {syncing ? (
                   <>
@@ -395,7 +395,7 @@ export default function CloudBackupsTab() {
                       <button
                         onClick={() => handleDownload(backup)}
                         disabled={downloadingId === backup.id}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
                         title="Descargar"
                       >
                         {downloadingId === backup.id ? (
@@ -426,10 +426,10 @@ export default function CloudBackupsTab() {
       )}
 
       {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+      <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mt-6">
         <div className="flex gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
+          <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-primary">
             <p className="font-medium mb-1">Acerca de Cloud Backups</p>
             <ul className="list-disc list-inside space-y-1">
               <li>Los backups locales se sincronizan automáticamente cuando hay internet</li>

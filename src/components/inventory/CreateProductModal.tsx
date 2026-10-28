@@ -695,15 +695,15 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
 
               {/* ✅ MÓDULO 18.1: Mostrar advertencia de duplicado */}
               {showDuplicateWarning && suggestions.length > 0 && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900 mb-1">
+                      <p className="text-sm font-medium text-primary mb-1">
                         Producto encontrado en el catálogo
                       </p>
                       {suggestions.map((sug) => (
-                        <div key={sug.id} className="text-sm text-blue-800 mb-2">
+                        <div key={sug.id} className="text-sm text-primary mb-2">
                           <p className="font-medium">{sug.name}</p>
                           {sug.brand && <p className="text-xs">{sug.brand}</p>}
                           {sug.alreadyInStore ? (
@@ -859,10 +859,10 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
 
           {/* ✅ MÓDULO PH1: Sección farmacéutica — solo si ENABLE_PHARMA_FIELDS ON */}
           {pharmaFieldsEnabled && (
-            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/40 space-y-4">
+            <div className="border border-primary/20 rounded-lg p-4 bg-primary/10 space-y-4">
               <div className="flex items-center gap-2 mb-1">
-                <FlaskConical className="w-4 h-4 text-blue-600" />
-                <p className="text-sm font-semibold text-blue-800">Datos farmacéuticos</p>
+                <FlaskConical className="w-4 h-4 text-primary" />
+                <p className="text-sm font-semibold text-primary">Datos farmacéuticos</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -872,7 +872,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     type="text"
                     value={formData.commercialName}
                     onChange={(e) => setFormData({ ...formData, commercialName: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                     placeholder="Ej: Amoxidal"
                   />
                 </div>
@@ -882,7 +882,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     type="text"
                     value={formData.genericName}
                     onChange={(e) => setFormData({ ...formData, genericName: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                     placeholder="Ej: Amoxicilina"
                   />
                 </div>
@@ -895,7 +895,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     type="text"
                     value={formData.concentration}
                     onChange={(e) => setFormData({ ...formData, concentration: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                     placeholder="Ej: 500 mg"
                   />
                 </div>
@@ -904,7 +904,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                   <select
                     value={formData.pharmaceuticalForm}
                     onChange={(e) => setFormData({ ...formData, pharmaceuticalForm: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                   >
                     <option value="">Seleccionar...</option>
                     <option value="Tabletas">Tabletas</option>
@@ -932,7 +932,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     type="text"
                     value={formData.presentation}
                     onChange={(e) => setFormData({ ...formData, presentation: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                     placeholder="Ej: Caja x 20"
                   />
                 </div>
@@ -942,7 +942,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     type="text"
                     value={formData.laboratory}
                     onChange={(e) => setFormData({ ...formData, laboratory: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                     placeholder="Ej: Genfar"
                   />
                 </div>
@@ -955,7 +955,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     type="text"
                     value={formData.medicineCategory}
                     onChange={(e) => setFormData({ ...formData, medicineCategory: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                     placeholder="Ej: Antibiótico"
                   />
                 </div>
@@ -965,7 +965,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                     type="text"
                     value={formData.sanitaryRegistry}
                     onChange={(e) => setFormData({ ...formData, sanitaryRegistry: e.target.value })}
-                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                    className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                     placeholder="Opcional"
                   />
                 </div>
@@ -978,7 +978,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                   value={formData.barcodeSecondary}
                   onChange={(e) => setFormData({ ...formData, barcodeSecondary: e.target.value })}
                   pattern="[0-9]{8,14}"
-                  className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                  className="w-full h-9 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
                   placeholder="Código alternativo (8-14 dígitos)"
                 />
               </div>
@@ -988,7 +988,7 @@ export function CreateProductModal({ isOpen, onClose, onSuccess }: CreateProduct
                   type="checkbox"
                   checked={formData.requiresPrescription}
                   onChange={(e) => setFormData({ ...formData, requiresPrescription: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                  className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/40"
                 />
                 <span className="text-sm text-gray-700">Requiere receta médica</span>
               </label>

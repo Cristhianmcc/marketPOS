@@ -259,7 +259,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
         {/* Header */}
         <div className="flex items-center justify-between border-b px-5 py-4">
           <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-blue-600" />
+            <Package className="h-5 w-5 text-primary" />
             <div>
               <h2 className="font-semibold text-gray-900">Gestión de Lotes</h2>
               <p className="text-sm text-gray-500">{storeProduct.product?.name}</p>
@@ -281,7 +281,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
               <p className="text-xs text-gray-500">Total</p>
             </div>
             <div className="py-3">
-              <span className="font-semibold text-blue-600">{summary.active}</span>
+              <span className="font-semibold text-primary">{summary.active}</span>
               <p className="text-xs text-gray-500">Activos</p>
             </div>
             <div className="py-3">
@@ -443,9 +443,9 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
               {showForm && (
                 <form
                   onSubmit={handleCreate}
-                  className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4"
+                  className="mt-5 rounded-xl border border-primary/20 bg-primary/10 p-4"
                 >
-                  <h3 className="mb-3 text-sm font-semibold text-blue-800">Agregar nuevo lote</h3>
+                  <h3 className="mb-3 text-sm font-semibold text-primary">Agregar nuevo lote</h3>
 
                   {formError && (
                     <div className="mb-3 rounded bg-red-100 p-2 text-xs text-red-700">
@@ -465,7 +465,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
                           setFormData((f) => ({ ...f, batchNumber: e.target.value }))
                         }
                         placeholder="Ej: LOT-2025-001"
-                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                       />
                     </div>
 
@@ -483,7 +483,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
                           setFormData((f) => ({ ...f, quantity: e.target.value }))
                         }
                         placeholder="0"
-                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                       />
                     </div>
 
@@ -498,7 +498,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
                         onChange={(e) =>
                           setFormData((f) => ({ ...f, expiryDate: e.target.value }))
                         }
-                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                       />
                     </div>
 
@@ -512,7 +512,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
                         onChange={(e) =>
                           setFormData((f) => ({ ...f, purchaseDate: e.target.value }))
                         }
-                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                       />
                     </div>
 
@@ -529,7 +529,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
                           setFormData((f) => ({ ...f, unitCost: e.target.value }))
                         }
                         placeholder="0.00"
-                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                       />
                     </div>
 
@@ -543,7 +543,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
                           setFormData((f) => ({ ...f, notes: e.target.value }))
                         }
                         placeholder="Observaciones opcionales"
-                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
                       />
                     </div>
                   </div>
@@ -563,7 +563,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
                     <button
                       type="submit"
                       disabled={saving}
-                      className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
                     >
                       {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                       Registrar lote
@@ -580,7 +580,7 @@ export function BatchesModal({ isOpen, onClose, onSuccess, storeProduct }: Batch
           {!showForm ? (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
             >
               <Plus className="h-4 w-4" />
               Agregar lote

@@ -481,7 +481,7 @@ function SalesPageContent() {
                     <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                       Productos
                     </th>
-                    <th className="px-2 py-3 text-right text-xs font-medium text-blue-600 uppercase">
+                    <th className="px-2 py-3 text-right text-xs font-medium text-primary uppercase">
                       2x1
                     </th>
                     <th className="px-2 py-3 text-right text-xs font-medium text-purple-600 uppercase">
@@ -517,7 +517,7 @@ function SalesPageContent() {
                       </th>
                     )}
                     {sunatEnabled && (
-                      <th className="px-2 py-3 text-center text-xs font-medium text-indigo-600 uppercase">
+                      <th className="px-2 py-3 text-center text-xs font-medium text-primary uppercase">
                         SUNAT
                       </th>
                     )}
@@ -586,7 +586,7 @@ function SalesPageContent() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-2 py-3 text-xs text-right text-blue-600">
+                      <td className="px-2 py-3 text-xs text-right text-primary">
                         {sale.promotionsTotal && sale.promotionsTotal > 0 ? (
                           <span>-{formatMoney(sale.promotionsTotal)}</span>
                         ) : (
@@ -690,7 +690,7 @@ function SalesPageContent() {
                                     sunatCode={adjustment.sunatCode}
                                     sunatMessage={adjustment.sunatMessage}
                                   />
-                                  <span className="text-[11px] text-violet-700">
+                                  <span className="text-[11px] text-primary">
                                     {adjustment.docType === 'NOTA_CREDITO' ? 'NC' : 'ND'} {adjustment.fullNumber}
                                   </span>
                                 </div>
@@ -744,7 +744,7 @@ function SalesPageContent() {
                           )}
                           {sunatEnabled && documentsData[sale.id]?.adjustments?.map((adjustment) => (
                             <div key={adjustment.id} className="border-t border-gray-200 pt-1">
-                              <span className="block text-center text-[10px] text-violet-700 mb-1">
+                              <span className="block text-center text-[10px] text-primary mb-1">
                                 {adjustment.docType === 'NOTA_CREDITO' ? 'NC' : 'ND'} {adjustment.fullNumber}
                               </span>
                               <SunatActions

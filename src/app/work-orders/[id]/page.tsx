@@ -46,7 +46,7 @@ interface WorkOrder {
 
 const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; color: string; bgColor: string; textColor: string }> = {
   DRAFT: { label: 'Borrador', color: 'border-gray-400', bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
-  APPROVED: { label: 'Aprobado', color: 'border-blue-400', bgColor: 'bg-blue-100', textColor: 'text-blue-700' },
+  APPROVED: { label: 'Aprobado', color: 'border-primary', bgColor: 'bg-primary/15', textColor: 'text-primary' },
   IN_PROGRESS: { label: 'En Proceso', color: 'border-yellow-400', bgColor: 'bg-yellow-100', textColor: 'text-yellow-700' },
   READY: { label: 'Listo', color: 'border-green-400', bgColor: 'bg-green-100', textColor: 'text-green-700' },
   CLOSED: { label: 'Cerrado', color: 'border-purple-400', bgColor: 'bg-purple-100', textColor: 'text-purple-700' },
@@ -208,7 +208,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
     return (
       <AuthLayout>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </AuthLayout>
     );
@@ -309,7 +309,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
               {/* Customer */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h2 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <User className="w-5 h-5 text-blue-600" />
+                  <User className="w-5 h-5 text-primary" />
                   Cliente
                 </h2>
                 {order.customer ? (
@@ -330,7 +330,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
               {/* Items */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h2 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
-                  <Package className="w-5 h-5 text-blue-600" />
+                  <Package className="w-5 h-5 text-primary" />
                   Items ({order.items.length})
                 </h2>
 
@@ -341,9 +341,9 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {item.type === 'SERVICE' ? (
-                              <Wrench className="w-4 h-4 text-indigo-600" />
+                              <Wrench className="w-4 h-4 text-primary" />
                             ) : (
-                              <Package className="w-4 h-4 text-blue-600" />
+                              <Package className="w-4 h-4 text-primary" />
                             )}
                             <span className="font-medium text-gray-900">{item.itemName}</span>
                             {item.itemContent && (
@@ -380,7 +380,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
               {order.notes && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                   <h2 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-blue-600" />
+                    <FileText className="w-5 h-5 text-primary" />
                     Notas
                   </h2>
                   <p className="text-gray-700 whitespace-pre-wrap">{order.notes}</p>
@@ -422,7 +422,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
                       <button
                         onClick={() => handleUpdateStatus('APPROVED')}
                         disabled={updating}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
                       >
                         <Check className="w-4 h-4" />
                         Aprobar Orden
@@ -471,13 +471,13 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
               {/* Timeline */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h2 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-blue-600" />
+                  <Calendar className="w-5 h-5 text-primary" />
                   Historial
                 </h2>
 
                 <div className="space-y-3 text-sm">
                   <div className="flex gap-3">
-                    <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500"></div>
+                    <div className="w-2 h-2 mt-1.5 rounded-full bg-primary"></div>
                     <div>
                       <p className="text-gray-900">Orden creada</p>
                       <p className="text-gray-500">{formatDate(order.createdAt)}</p>
@@ -538,7 +538,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                   >
                     <option value="CASH">Efectivo</option>
                     <option value="YAPE">Yape</option>
@@ -559,7 +559,7 @@ export default function WorkOrderDetailPage({ params }: { params: Promise<{ id: 
                       min={order.total}
                       value={amountPaid}
                       onChange={(e) => setAmountPaid(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                     />
                     {parseFloat(amountPaid) > order.total && (
                       <p className="text-sm text-green-600 mt-1">

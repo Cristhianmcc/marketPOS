@@ -248,9 +248,9 @@ export function StockMovementModal({
           )}
 
           {type === 'PURCHASE' && batchesEnabled && (
-            <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3">
-              <Package className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-              <p className="text-xs text-blue-700">
+            <div className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/10 p-3">
+              <Package className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <p className="text-xs text-primary">
                 Para registrar esta entrada con trazabilidad de lote (número y vencimiento),
                 usa el botón <strong>Lotes</strong> del producto en la lista de inventario.
               </p>

@@ -200,7 +200,7 @@ export default function PharmaReportsPage() {
                     disabled={disabled}
                     className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                       activeReport === r.id
-                        ? 'bg-indigo-50 text-indigo-700'
+                        ? 'bg-primary/10 text-primary'
                         : disabled
                         ? 'cursor-not-allowed text-gray-300'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -227,7 +227,7 @@ export default function PharmaReportsPage() {
                   type="date"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="rounded-lg border px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                  className="rounded-lg border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
                 />
                 <span className="text-sm font-medium text-gray-700">Hasta</span>
                 <input
@@ -235,7 +235,7 @@ export default function PharmaReportsPage() {
                   value={to}
                   max={today()}
                   onChange={(e) => setTo(e.target.value)}
-                  className="rounded-lg border px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+                  className="rounded-lg border px-3 py-1.5 text-sm focus:border-primary focus:outline-none"
                 />
               </div>
             )}

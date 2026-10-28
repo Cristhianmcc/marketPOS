@@ -207,7 +207,7 @@ export default function NthPromotionsPage() {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors"
           >
             <Plus className="w-5 h-5" />
             Nueva Promoción
@@ -228,7 +228,7 @@ export default function NthPromotionsPage() {
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
             >
               Crear Promoción
             </button>
@@ -322,7 +322,7 @@ export default function NthPromotionsPage() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Ej: 2do al 50%, 3ro gratis"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                     required
                   />
                 </div>
@@ -334,7 +334,7 @@ export default function NthPromotionsPage() {
                   <select
                     value={formData.productId}
                     onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                     required
                   >
                     <option value="">Seleccionar producto</option>
@@ -355,7 +355,7 @@ export default function NthPromotionsPage() {
                     min="2"
                     value={formData.nthQty}
                     onChange={(e) => setFormData({ ...formData, nthQty: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -374,7 +374,7 @@ export default function NthPromotionsPage() {
                     step="0.01"
                     value={formData.percentOff}
                     onChange={(e) => setFormData({ ...formData, percentOff: parseFloat(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -391,7 +391,7 @@ export default function NthPromotionsPage() {
                       type="date"
                       value={formData.startsAt}
                       onChange={(e) => setFormData({ ...formData, startsAt: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
 
@@ -403,7 +403,7 @@ export default function NthPromotionsPage() {
                       type="date"
                       value={formData.endsAt}
                       onChange={(e) => setFormData({ ...formData, endsAt: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
                 </div>
@@ -419,7 +419,7 @@ export default function NthPromotionsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400"
+                    className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:bg-primary"
                     disabled={creating}
                   >
                     {creating ? 'Creando...' : 'Crear'}

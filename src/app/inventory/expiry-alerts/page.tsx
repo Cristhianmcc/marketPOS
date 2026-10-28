@@ -242,13 +242,13 @@ export default function ExpiryAlertsPage() {
               onClick={() => { setStatusFilter('all'); setRangeFilter('all'); }}
               className={`rounded-xl border-2 p-4 text-left transition-colors ${
                 statusFilter === 'all' && rangeFilter === 'all'
-                  ? 'border-blue-400 bg-blue-50'
-                  : 'border-transparent bg-white shadow-sm hover:border-blue-200'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-transparent bg-white shadow-sm hover:border-primary/20'
               }`}
             >
               <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-blue-500" />
-                <span className="text-2xl font-bold text-blue-600">{summary.total}</span>
+                <Package className="h-5 w-5 text-primary" />
+                <span className="text-2xl font-bold text-primary">{summary.total}</span>
               </div>
               <p className="mt-1 text-sm font-medium text-gray-700">Total lotes</p>
               <p className="text-xs text-gray-500">Activos con stock</p>
@@ -266,7 +266,7 @@ export default function ExpiryAlertsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar por producto o lote..."
-              className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
             />
           </div>
 
@@ -274,7 +274,7 @@ export default function ExpiryAlertsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
           >
             <option value="all">Todos los estados</option>
             <option value="EXPIRED">Vencidos</option>
@@ -286,7 +286,7 @@ export default function ExpiryAlertsPage() {
           <select
             value={rangeFilter}
             onChange={(e) => setRangeFilter(e.target.value as typeof rangeFilter)}
-            className="rounded-lg border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="rounded-lg border px-3 py-2 text-sm focus:border-primary focus:outline-none"
           >
             <option value="all">Cualquier fecha</option>
             <option value="30">Vencen en 30 días</option>

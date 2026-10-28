@@ -99,7 +99,7 @@ export default function AdminBillingPage() {
 
   const getStatusBadge = (status: string) => {
     const colors = {
-      TRIAL: 'bg-blue-100 text-blue-800',
+      TRIAL: 'bg-primary/15 text-primary',
       ACTIVE: 'bg-green-100 text-green-800',
       PAST_DUE: 'bg-yellow-100 text-yellow-800',
       SUSPENDED: 'bg-red-100 text-red-800',
@@ -318,8 +318,8 @@ export default function AdminBillingPage() {
                 <p className="text-sm text-gray-600">Total Tiendas</p>
                 <p className="text-2xl font-bold text-gray-900">{stores.length}</p>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-primary" />
               </div>
             </div>
           </div>
@@ -340,12 +340,12 @@ export default function AdminBillingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Trial</p>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-2xl font-bold text-primary">
                   {stores.filter(s => s.subscription?.effectiveStatus === 'TRIAL').length}
                 </p>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <Calendar className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <Calendar className="w-6 h-6 text-primary" />
               </div>
             </div>
           </div>
@@ -423,13 +423,13 @@ export default function AdminBillingPage() {
                       </button>
                       <button
                         onClick={() => handleChangePlan(store.id)}
-                        className="text-blue-600 hover:text-blue-700 font-medium"
+                        className="text-primary hover:text-primary font-medium"
                       >
                         Plan
                       </button>
                       <button
                         onClick={() => handleExtendSubscription(store.id)}
-                        className="text-indigo-600 hover:text-indigo-700 font-medium"
+                        className="text-primary hover:text-primary font-medium"
                       >
                         Extender
                       </button>
@@ -539,8 +539,8 @@ export default function AdminBillingPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <TrendingUp className="w-6 h-6 text-blue-600" />
+                <div className="p-3 bg-primary/15 rounded-lg">
+                  <TrendingUp className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">Cambiar Plan</h3>
@@ -592,17 +592,17 @@ export default function AdminBillingPage() {
                       onClick={() => setSelectedPlan(code)}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         selectedPlan === code
-                          ? 'border-blue-600 bg-blue-50 shadow-md scale-105'
-                          : 'border-gray-300 bg-white hover:border-blue-400 hover:shadow'
+                          ? 'border-primary bg-primary/10 shadow-md scale-105'
+                          : 'border-gray-300 bg-white hover:border-primary hover:shadow'
                       }`}
                     >
                       <div className="text-center mb-2">
                         <p className="font-bold text-gray-900 text-sm mb-1">{plan.name}</p>
-                        <div className="bg-blue-100 py-2 px-3 rounded-lg">
-                          <p className="text-2xl font-black text-blue-600">
+                        <div className="bg-primary/15 py-2 px-3 rounded-lg">
+                          <p className="text-2xl font-black text-primary">
                             PEN {plan.monthlyPrice}
                           </p>
-                          <p className="text-xs text-blue-700 font-medium">/mes · 30 días</p>
+                          <p className="text-xs text-primary font-medium">/mes · 30 días</p>
                         </div>
                       </div>
                       <ul className="space-y-1.5 text-xs text-gray-700 text-left mt-3">
@@ -715,8 +715,8 @@ export default function AdminBillingPage() {
               )}
 
               {/* Info de ayuda */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
-                <p className="text-xs text-blue-800">
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg mb-4">
+                <p className="text-xs text-primary">
                   <strong>💡 Guía:</strong> 
                   {selectedPlan === 'DEMO' ? (
                     <span> DEMO da acceso completo temporal. Usa 1-3h para demos rápidos, 7 días para evaluación seria.</span>
@@ -736,7 +736,7 @@ export default function AdminBillingPage() {
                 </button>
                 <button
                   onClick={submitChangePlan}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover font-medium"
                 >
                   Actualizar Plan
                 </button>
@@ -750,8 +750,8 @@ export default function AdminBillingPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-indigo-100 rounded-lg">
-                  <Calendar className="w-6 h-6 text-indigo-600" />
+                <div className="p-3 bg-primary/15 rounded-lg">
+                  <Calendar className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">Extender Suscripción</h3>
@@ -767,7 +767,7 @@ export default function AdminBillingPage() {
                   type="number"
                   value={extendDays}
                   onChange={(e) => setExtendDays(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                   placeholder="30"
                   min="0.001"
                   step="0.001"
@@ -799,13 +799,13 @@ export default function AdminBillingPage() {
                     </button>
                     <button
                       onClick={() => setExtendDays('1')}
-                      className="flex-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 font-medium"
+                      className="flex-1 px-3 py-2 text-xs bg-primary/10 text-primary rounded-lg hover:bg-primary/15 border border-primary/20 font-medium"
                     >
                       1 día
                     </button>
                     <button
                       onClick={() => setExtendDays('7')}
-                      className="flex-1 px-3 py-2 text-xs bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200 font-medium"
+                      className="flex-1 px-3 py-2 text-xs bg-primary/10 text-primary rounded-lg hover:bg-primary/15 border border-primary/20 font-medium"
                     >
                       7 días
                     </button>
@@ -838,7 +838,7 @@ export default function AdminBillingPage() {
                 <button
                   onClick={submitExtend}
                   disabled={!extendDays}
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Extender
                 </button>

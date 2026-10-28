@@ -62,7 +62,7 @@ export default function BillingPage() {
   const getStatusBadge = (status: string | null) => {
     switch (status) {
       case 'TRIAL':
-        return <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">Prueba</span>;
+        return <span className="px-3 py-1 bg-primary/15 text-primary rounded-full text-sm font-medium">Prueba</span>;
       case 'ACTIVE':
         return <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">Activa</span>;
       case 'PAST_DUE':
@@ -179,7 +179,7 @@ export default function BillingPage() {
       <div className="flex gap-4">
         <button
           onClick={() => window.open('mailto:soporte@marketpos.com?subject=Renovar%20Licencia', '_blank')}
-          className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          className="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-hover transition-colors font-medium"
         >
           Contactar para Renovar
         </button>
@@ -194,7 +194,7 @@ export default function BillingPage() {
       {/* Help text */}
       <p className="text-sm text-gray-500 text-center mt-6">
         ¿Necesitas ayuda? Escríbenos a{' '}
-        <a href="mailto:soporte@marketpos.com" className="text-blue-600 hover:text-blue-700">
+        <a href="mailto:soporte@marketpos.com" className="text-primary hover:text-primary">
           soporte@marketpos.com
         </a>
       </p>

@@ -91,7 +91,7 @@ export default function OperationalLimitsPage() {
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold mb-6">Límites Operativos</h1>
           <div className="text-center py-12">
-            <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             <p className="mt-4 text-gray-600">Cargando límites...</p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function OperationalLimitsPage() {
                   value={limits.maxDiscountPercent ?? ''}
                   onChange={(e) => handleNumberChange('maxDiscountPercent', e.target.value)}
                   placeholder="Sin límite"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Ejemplo: 50 = no permite descuentos mayores al 50%
@@ -167,7 +167,7 @@ export default function OperationalLimitsPage() {
                   value={limits.maxManualDiscountAmount ?? ''}
                   onChange={(e) => handleNumberChange('maxManualDiscountAmount', e.target.value)}
                   placeholder="Sin límite"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Ejemplo: 100 = no permite descuentos manuales mayores a S/ 100
@@ -194,7 +194,7 @@ export default function OperationalLimitsPage() {
                   value={limits.maxSaleTotal ?? ''}
                   onChange={(e) => handleNumberChange('maxSaleTotal', e.target.value)}
                   placeholder="Sin límite"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Ejemplo: 5000 = no permite ventas mayores a S/ 5,000
@@ -212,7 +212,7 @@ export default function OperationalLimitsPage() {
                   value={limits.maxItemsPerSale ?? ''}
                   onChange={(e) => handleNumberChange('maxItemsPerSale', e.target.value)}
                   placeholder="Sin límite"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Ejemplo: 50 = no permite más de 50 ítems en una venta
@@ -238,7 +238,7 @@ export default function OperationalLimitsPage() {
                 value={limits.maxReceivableBalance ?? ''}
                 onChange={(e) => handleNumberChange('maxReceivableBalance', e.target.value)}
                 placeholder="Sin límite"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Ejemplo: 1000 = no permite que un cliente acumule más de S/ 1,000 en deudas
@@ -247,9 +247,9 @@ export default function OperationalLimitsPage() {
           </div>
 
           {/* Información Importante */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">ℹ️ Información Importante</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+            <h3 className="font-semibold text-primary mb-2">ℹ️ Información Importante</h3>
+            <ul className="text-sm text-primary space-y-1">
               <li>• Los límites se aplican en <strong>tiempo real</strong> durante el checkout</li>
               <li>• Dejar un campo vacío significa <strong>sin límite</strong></li>
               <li>• 0 NO significa deshabilitado (usar campo vacío para eso)</li>
@@ -262,7 +262,7 @@ export default function OperationalLimitsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="flex-1 bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {saving ? 'Guardando...' : 'Guardar Cambios'}
             </button>

@@ -157,8 +157,8 @@ export default function QuickSellAdminPage() {
               Configura los productos que aparecerán como botones rápidos en el POS.
               Máximo {maxQuickSell} productos.
             </p>
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
+            <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+              <p className="text-sm text-primary">
                 <span className="font-semibold">Tip:</span> Arrastra los productos marcados para cambiar el orden.
                 Los productos más vendidos se sugieren automáticamente.
               </p>

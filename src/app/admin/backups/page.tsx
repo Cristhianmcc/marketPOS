@@ -187,10 +187,10 @@ export default function AdminBackupsPage() {
             </button>
 
             {/* Info Cards */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
               <div className="flex gap-2">
-                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
+                <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-primary">
                   <p className="font-semibold mb-1">Qué hace esta operación:</p>
                   <ul className="list-disc list-inside space-y-1">
                     <li>Crea una nueva tienda con los datos del backup</li>

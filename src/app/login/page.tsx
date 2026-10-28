@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Store, User, Lock, Eye, EyeOff, ArrowRight, Package, Loader2 } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, ArrowRight, Package, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,16 +68,17 @@ export default function LoginPage() {
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-light dark:bg-background-dark">
       <div className="layout-container flex h-full grow flex-col justify-center items-center p-4 md:p-10">
         {/* Main Card Container */}
-        <div className="w-full max-w-[1100px] bg-white dark:bg-surface-dark rounded-xl shadow-xl overflow-hidden flex flex-col md:flex-row h-auto md:min-h-[600px] border border-border-subtle dark:border-border-dark">
+        <div className="w-full max-w-[1100px] bg-white dark:bg-surface-dark rounded-3xl shadow-xl overflow-hidden flex flex-col md:flex-row h-auto md:min-h-[600px] border border-border-subtle dark:border-border-dark">
           
           {/* Left Side: Login Form */}
           <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center relative z-10">
             {/* Header */}
             <div className="flex flex-col gap-2 mb-10">
               <div className="flex items-center gap-2 mb-2">
-                <div className="flex items-center gap-2 text-primary">
-                  <Store className="w-8 h-8" />
-                  <span className="text-xl font-bold tracking-tight text-text-main dark:text-white">
+                <div className="flex items-center gap-2.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/images/monterrial-logo-dark.png" alt="" className="w-9 h-9 rounded-lg" />
+                  <span className="text-xl font-extrabold italic tracking-tight text-text-main dark:text-white">
                     Monterrial
                   </span>
                 </div>
@@ -189,8 +190,8 @@ export default function LoginPage() {
             className="hidden md:flex md:w-1/2 bg-cover bg-center relative group"
             style={{ backgroundImage: "url('/images/login-bg.jpg')" }}
           >
-            {/* Overlay verde sobre la foto — opacidad ajustada para que se vea la imagen */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-emerald-700/70 to-emerald-900/85" />
+            {/* Overlay índigo de la paleta sobre la foto */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-monterrial-forest/75 to-monterrial-forest-deep/90" />
             
             {/* Content Overlay */}
             <div className="absolute inset-0 flex flex-col justify-end p-12 text-white z-20">

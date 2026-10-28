@@ -53,7 +53,7 @@ const PLAN_INFO = {
   PRO: {
     label: '⭐ Profesional — Con promociones y fiado',
     description: 'Todo del Básico más: fiado, cupones, promociones por volumen y categoría.',
-    color: 'text-blue-700',
+    color: 'text-primary',
     extraFlags: [] as RubroFlagKey[], // Los del rubro + plan activa promos/fiado
   },
   BUSINESS: {
@@ -557,7 +557,7 @@ export default function AdminStoresPage() {
   function renderPlanControls(store: Store) {
     if (store.subscription) {
       return (
-        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+        <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
           {store.subscription.planCode}
         </span>
       );
@@ -614,7 +614,7 @@ export default function AdminStoresPage() {
           type="button"
           onClick={() => handleResetOwnerAccess(store)}
           disabled={resettingOwnerStoreId === store.id}
-          className="rounded bg-blue-100 px-3 py-2 text-sm text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+          className="rounded bg-primary/15 px-3 py-2 text-sm text-primary hover:bg-primary/25 disabled:opacity-50"
         >
           {resettingOwnerStoreId === store.id ? 'Generando...' : 'Acceso OWNER'}
         </button>
@@ -676,7 +676,7 @@ export default function AdminStoresPage() {
                 setShowForm(!showForm);
                 setShowRestoreForm(false);
               }}
-              className="w-full rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 sm:w-auto"
+              className="w-full rounded-lg bg-primary px-6 py-3 font-medium text-white hover:bg-primary-hover sm:w-auto"
             >
               {showForm ? 'Cancelar' : '+ Nueva Tienda'}
             </button>
@@ -698,7 +698,7 @@ export default function AdminStoresPage() {
               type="checkbox"
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-primary rounded focus:ring-primary/40"
             />
             <span className="text-sm text-gray-700">
               Mostrar archivadas {archivedCount > 0 && `(${archivedCount})`}
@@ -844,7 +844,7 @@ export default function AdminStoresPage() {
                     required
                     value={formData.storeName}
                     onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -867,11 +867,11 @@ export default function AdminStoresPage() {
                           }}
                           className={`p-3 rounded-lg border-2 text-left transition-all ${
                             isSelected
-                              ? 'border-blue-500 bg-blue-50'
+                              ? 'border-primary bg-primary/10'
                               : 'border-gray-200 bg-white hover:border-gray-300'
                           }`}
                         >
-                          <div className={`text-sm font-semibold ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                          <div className={`text-sm font-semibold ${isSelected ? 'text-primary' : 'text-gray-700'}`}>
                             {info.label}
                           </div>
                         </button>
@@ -900,7 +900,7 @@ export default function AdminStoresPage() {
                         selectedRubroFlags: newFlags,
                       });
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   >
                     {profiles.map(p => (
                       <option key={p.profile} value={p.profile}>
@@ -923,7 +923,7 @@ export default function AdminStoresPage() {
                     type="text"
                     value={formData.storeRuc}
                     onChange={(e) => setFormData({ ...formData, storeRuc: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -935,7 +935,7 @@ export default function AdminStoresPage() {
                     type="text"
                     value={formData.storeAddress}
                     onChange={(e) => setFormData({ ...formData, storeAddress: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -947,7 +947,7 @@ export default function AdminStoresPage() {
                     type="text"
                     value={formData.storePhone}
                     onChange={(e) => setFormData({ ...formData, storePhone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -960,7 +960,7 @@ export default function AdminStoresPage() {
                     required
                     value={formData.ownerName}
                     onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -973,7 +973,7 @@ export default function AdminStoresPage() {
                     required
                     value={formData.ownerEmail}
                     onChange={(e) => setFormData({ ...formData, ownerEmail: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -988,7 +988,7 @@ export default function AdminStoresPage() {
                       minLength={6}
                       value={formData.ownerPassword}
                       onChange={(e) => setFormData({ ...formData, ownerPassword: e.target.value })}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                       placeholder="Mínimo 6 caracteres"
                     />
                     <button
@@ -1018,7 +1018,7 @@ export default function AdminStoresPage() {
                   <span className="text-xs text-gray-400">Auto-seleccionado según plan + rubro — puedes ajustar</span>
                 </div>
                 <p className="text-xs text-gray-500 mb-3">
-                  Los marcados con <span className="bg-blue-100 text-blue-700 rounded px-1">recomendado</span> son los que
+                  Los marcados con <span className="bg-primary/15 text-primary rounded px-1">recomendado</span> son los que
                   sugiere el plan <strong>{PLAN_INFO[formData.planCode].label.split('—')[0].trim()}</strong> para este rubro.
                   Puedes activar módulos extra si el cliente los contrata por separado.
                 </p>
@@ -1031,7 +1031,7 @@ export default function AdminStoresPage() {
                         key={flag.key}
                         className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
                           isChecked
-                            ? 'bg-blue-50 border-blue-300'
+                            ? 'bg-primary/10 border-primary/40'
                             : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                         }`}
                       >
@@ -1044,12 +1044,12 @@ export default function AdminStoresPage() {
                               : formData.selectedRubroFlags.filter(k => k !== flag.key);
                             setFormData({ ...formData, selectedRubroFlags: updated });
                           }}
-                          className="mt-0.5 accent-blue-600"
+                          className="mt-0.5 accent-primary"
                         />
                         <div className="min-w-0">
                           <span className="text-sm font-medium text-gray-800">{flag.name}</span>
                           {isRecommended && (
-                            <span className="ml-1 text-xs bg-blue-100 text-blue-700 rounded px-1">recomendado</span>
+                            <span className="ml-1 text-xs bg-primary/15 text-primary rounded px-1">recomendado</span>
                           )}
                           {!isRecommended && isChecked && (
                             <span className="ml-1 text-xs bg-amber-100 text-amber-700 rounded px-1">extra</span>
@@ -1066,7 +1066,7 @@ export default function AdminStoresPage() {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  className="px-6 py-2 bg-primary text-white rounded hover:bg-primary-hover disabled:bg-gray-400"
                 >
                   {creating ? 'Creando...' : 'Crear Tienda'}
                 </button>
@@ -1240,7 +1240,7 @@ export default function AdminStoresPage() {
                               value={store.businessProfile}
                               onChange={(e) => handleChangeProfile(store.id, e.target.value as BusinessProfile)}
                               disabled={changingProfileStoreId === store.id}
-                              className="text-xs text-blue-600 bg-transparent border-none cursor-pointer hover:underline p-0 focus:ring-0"
+                              className="text-xs text-primary bg-transparent border-none cursor-pointer hover:underline p-0 focus:ring-0"
                             >
                               {profiles.map(p => (
                                 <option key={p.profile} value={p.profile}>

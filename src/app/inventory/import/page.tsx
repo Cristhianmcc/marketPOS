@@ -319,15 +319,15 @@ export default function ImportPage() {
                       key={template.name}
                       href={template.file}
                       download
-                      className="flex items-start gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all"
+                      className="flex items-start gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-primary hover:shadow-sm transition-all"
                     >
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <Icon className="w-5 h-5 text-blue-600" />
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <Icon className="w-5 h-5 text-primary" />
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">{template.name}</p>
                         <p className="text-xs text-gray-500">{template.description}</p>
-                        <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                        <p className="text-xs text-primary mt-1 flex items-center gap-1">
                           <Download className="w-3 h-3" />
                           Descargar CSV
                         </p>
@@ -373,7 +373,7 @@ export default function ImportPage() {
                   </label>
                 </div>
 
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                   <p className="text-xs font-medium text-gray-900 mb-2">Formato del CSV:</p>
                   <p className="text-xs text-gray-600 font-mono break-all">
                     name,category,barcode,brand,content,baseUnitCode,price,stock,minStock,conversions
@@ -579,8 +579,8 @@ export default function ImportPage() {
 
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <RefreshCw className="w-5 h-5 text-blue-600" />
+                    <div className="p-2 bg-primary/15 rounded-lg">
+                      <RefreshCw className="w-5 h-5 text-primary" />
                     </div>
                     <div className="flex-1">
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -588,7 +588,7 @@ export default function ImportPage() {
                           type="checkbox"
                           checked={updateExisting}
                           onChange={(e) => setUpdateExisting(e.target.checked)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary/40"
                         />
                         <span className="text-sm text-gray-700">Actualizar existentes</span>
                       </label>
@@ -673,7 +673,7 @@ export default function ImportPage() {
                                   {row.conversions.map((conv, i) => (
                                     <span 
                                       key={i}
-                                      className="inline-flex px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs"
+                                      className="inline-flex px-2 py-0.5 bg-primary/15 text-primary rounded text-xs"
                                     >
                                       {conv.unitCode}:{conv.factor}
                                     </span>

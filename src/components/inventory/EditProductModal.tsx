@@ -510,10 +510,10 @@ export function EditProductModal({
 
           {/* ✅ MÓDULO PH1: Sección farmacéutica — solo si ENABLE_PHARMA_FIELDS ON */}
           {pharmaFieldsEnabled && !isGlobal && (
-            <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/40 space-y-3">
+            <div className="border border-primary/20 rounded-lg p-4 bg-primary/10 space-y-3">
               <div className="flex items-center gap-2 mb-1">
-                <FlaskConical className="w-4 h-4 text-blue-600" />
-                <p className="text-sm font-semibold text-blue-800">Datos farmacéuticos</p>
+                <FlaskConical className="w-4 h-4 text-primary" />
+                <p className="text-sm font-semibold text-primary">Datos farmacéuticos</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -631,7 +631,7 @@ export function EditProductModal({
                   type="checkbox"
                   checked={form.requiresPrescription}
                   onChange={e => setForm(prev => ({ ...prev, requiresPrescription: e.target.checked }))}
-                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                  className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/40"
                 />
                 <span className="text-sm text-gray-700">Requiere receta médica</span>
               </label>

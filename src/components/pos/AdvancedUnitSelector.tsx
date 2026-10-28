@@ -213,7 +213,7 @@ export default function AdvancedUnitSelector({
           className={`w-16 px-2 py-1 text-sm text-center border rounded-lg 
             ${validationError ? 'border-red-500 bg-red-50' : 'border-gray-300'}
             ${disabled ? 'bg-gray-100' : 'bg-white'}
-            focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            focus:outline-none focus:ring-2 focus:ring-primary/40`}
         />
 
         {/* Selector de unidad */}
@@ -237,12 +237,12 @@ export default function AdvancedUnitSelector({
                 <button
                   type="button"
                   onClick={() => handleUnitChange(unitsData.baseUnit!)}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between
-                    ${!selectedUnitId || selectedUnitId === unitsData.baseUnit?.id ? 'bg-blue-50 text-blue-700' : ''}`}
+                  className={`w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between
+                    ${!selectedUnitId || selectedUnitId === unitsData.baseUnit?.id ? 'bg-primary/10 text-primary' : ''}`}
                 >
                   <span>{unitsData.baseUnit?.name} ({unitsData.baseUnit?.symbol})</span>
                   {(!selectedUnitId || selectedUnitId === unitsData.baseUnit?.id) && (
-                    <Check className="w-4 h-4 text-blue-600" />
+                    <Check className="w-4 h-4 text-primary" />
                   )}
                 </button>
 
@@ -252,8 +252,8 @@ export default function AdvancedUnitSelector({
                     key={unit.id}
                     type="button"
                     onClick={() => handleUnitChange(unit)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between
-                      ${selectedUnitId === unit.id ? 'bg-blue-50 text-blue-700' : ''}`}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between
+                      ${selectedUnitId === unit.id ? 'bg-primary/10 text-primary' : ''}`}
                   >
                     <div>
                       <span>{unit.name} ({unit.symbol})</span>
@@ -264,7 +264,7 @@ export default function AdvancedUnitSelector({
                       )}
                     </div>
                     {selectedUnitId === unit.id && (
-                      <Check className="w-4 h-4 text-blue-600" />
+                      <Check className="w-4 h-4 text-primary" />
                     )}
                   </button>
                 ))}
@@ -311,7 +311,7 @@ export default function AdvancedUnitSelector({
             className={`w-full px-3 py-2 text-lg font-medium text-center border rounded-lg 
               ${validationError ? 'border-red-500 bg-red-50' : 'border-gray-300'}
               ${disabled ? 'bg-gray-100' : 'bg-white'}
-              focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              focus:outline-none focus:ring-2 focus:ring-primary/40`}
           />
         </div>
 
@@ -339,12 +339,12 @@ export default function AdvancedUnitSelector({
                   <button
                     type="button"
                     onClick={() => handleUnitChange(unitsData.baseUnit!)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between
-                      ${!selectedUnitId || selectedUnitId === unitsData.baseUnit?.id ? 'bg-blue-50 text-blue-700' : ''}`}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-primary/10 flex items-center justify-between
+                      ${!selectedUnitId || selectedUnitId === unitsData.baseUnit?.id ? 'bg-primary/10 text-primary' : ''}`}
                   >
                     <span>{unitsData.baseUnit?.name}</span>
                     {(!selectedUnitId || selectedUnitId === unitsData.baseUnit?.id) && (
-                      <Check className="w-4 h-4 text-blue-600" />
+                      <Check className="w-4 h-4 text-primary" />
                     )}
                   </button>
 
@@ -354,13 +354,13 @@ export default function AdvancedUnitSelector({
                       key={unit.id}
                       type="button"
                       onClick={() => handleUnitChange(unit)}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50
-                        ${selectedUnitId === unit.id ? 'bg-blue-50 text-blue-700' : ''}`}
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-primary/10
+                        ${selectedUnitId === unit.id ? 'bg-primary/10 text-primary' : ''}`}
                     >
                       <div className="flex items-center justify-between">
                         <span>{unit.name}</span>
                         {selectedUnitId === unit.id && (
-                          <Check className="w-4 h-4 text-blue-600" />
+                          <Check className="w-4 h-4 text-primary" />
                         )}
                       </div>
                       {unit.factor && (
@@ -384,7 +384,7 @@ export default function AdvancedUnitSelector({
       {/* Equivalencia y errores */}
       <div className="flex items-center justify-between text-sm">
         {showEquivalence ? (
-          <div className="flex items-center gap-1 text-blue-600">
+          <div className="flex items-center gap-1 text-primary">
             <Scale className="w-4 h-4" />
             <span>Equivale a: <strong>{quantityBase.toFixed(3)}</strong> {unitsData.baseUnit?.name}</span>
           </div>

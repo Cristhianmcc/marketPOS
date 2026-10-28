@@ -160,7 +160,7 @@ export function ImportProductModal({
                 <select
                   value={selectedStoreId}
                   onChange={(e) => setSelectedStoreId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                   required
                 >
                   <option value="">Selecciona una tienda</option>
@@ -214,7 +214,7 @@ export function ImportProductModal({
               min="0.01"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
               placeholder="10.50"
               required
             />
@@ -233,7 +233,7 @@ export function ImportProductModal({
                   min="0"
                   value={stock}
                   onChange={(e) => setStock(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -251,7 +251,7 @@ export function ImportProductModal({
                   min="0"
                   value={minStock}
                   onChange={(e) => setMinStock(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
                   placeholder="5"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -262,8 +262,8 @@ export function ImportProductModal({
           )}
 
           {product.unitType === 'KG' && (
-            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
+            <div className="mb-4 p-3 bg-primary/10 rounded-lg">
+              <p className="text-sm text-primary">
                 ℹ️ Este producto se vende por kilogramo. No requiere control de
                 stock.
               </p>
@@ -277,7 +277,7 @@ export function ImportProductModal({
                 type="checkbox"
                 checked={active}
                 onChange={(e) => setActive(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary/40"
               />
               <span className="text-sm font-medium text-gray-700">
                 Producto activo (visible en POS)
@@ -297,7 +297,7 @@ export function ImportProductModal({
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition disabled:opacity-50"
               disabled={loading}
             >
               {loading ? 'Importando...' : 'Importar Producto'}

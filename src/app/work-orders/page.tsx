@@ -45,7 +45,7 @@ interface WorkOrder {
 
 const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; color: string; bgColor: string }> = {
   DRAFT: { label: 'Borrador', color: 'text-gray-700', bgColor: 'bg-gray-100' },
-  APPROVED: { label: 'Aprobado', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+  APPROVED: { label: 'Aprobado', color: 'text-primary', bgColor: 'bg-primary/15' },
   IN_PROGRESS: { label: 'En Proceso', color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
   READY: { label: 'Listo', color: 'text-green-700', bgColor: 'bg-green-100' },
   CLOSED: { label: 'Cerrado', color: 'text-purple-700', bgColor: 'bg-purple-100' },
@@ -226,7 +226,7 @@ export default function WorkOrdersPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <ClipboardList className="w-7 h-7 text-blue-600" />
+                <ClipboardList className="w-7 h-7 text-primary" />
                 Órdenes de Trabajo
               </h1>
               <p className="text-gray-500 mt-1">
@@ -236,7 +236,7 @@ export default function WorkOrdersPage() {
 
             <button
               onClick={() => router.push('/work-orders/new')}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors"
             >
               <Plus className="w-5 h-5" />
               Nueva Orden
@@ -253,13 +253,13 @@ export default function WorkOrdersPage() {
                   placeholder="Buscar por número, cliente..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
               </div>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as WorkOrderStatus | '')}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
               >
                 <option value="">Todos los estados</option>
                 {Object.keys(STATUS_CONFIG).map((key) => (
@@ -279,7 +279,7 @@ export default function WorkOrdersPage() {
                   onClick={() => setStatusFilter(status as WorkOrderStatus)}
                   className={`p-4 rounded-lg border ${
                     statusFilter === status 
-                      ? 'border-blue-500 ring-2 ring-blue-200' 
+                      ? 'border-primary ring-2 ring-primary/40' 
                       : 'border-gray-200 hover:border-gray-300'
                   } bg-white transition-all`}
                 >
@@ -294,7 +294,7 @@ export default function WorkOrdersPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             {loading ? (
               <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                 <p className="text-gray-500 mt-3">Cargando órdenes...</p>
               </div>
             ) : workOrders.length === 0 ? (
@@ -360,7 +360,7 @@ export default function WorkOrdersPage() {
                                 key={item.id} 
                                 className={`text-xs px-2 py-1 rounded ${
                                   item.type === 'SERVICE' 
-                                    ? 'bg-indigo-50 text-indigo-700' 
+                                    ? 'bg-primary/10 text-primary' 
                                     : 'bg-gray-100 text-gray-700'
                                 }`}
                               >
@@ -393,7 +393,7 @@ export default function WorkOrdersPage() {
                             {order.status === 'DRAFT' && (
                               <button
                                 onClick={() => handleUpdateStatus(order.id, 'APPROVED')}
-                                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary/15 text-primary rounded-lg hover:bg-primary/25"
                               >
                                 <Check className="w-4 h-4" />
                                 Aprobar
@@ -479,7 +479,7 @@ export default function WorkOrdersPage() {
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                   >
                     <option value="CASH">Efectivo</option>
                     <option value="YAPE">Yape</option>
@@ -500,7 +500,7 @@ export default function WorkOrdersPage() {
                       min={selectedOrder.total}
                       value={amountPaid}
                       onChange={(e) => setAmountPaid(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                     />
                     {parseFloat(amountPaid) > selectedOrder.total && (
                       <p className="text-sm text-green-600 mt-1">

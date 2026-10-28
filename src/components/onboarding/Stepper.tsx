@@ -30,7 +30,7 @@ export default function Stepper({ steps, currentStep }: StepperProps) {
                     isCompleted
                       ? 'bg-green-600 text-white'
                       : isActive
-                      ? 'bg-blue-600 text-white ring-4 ring-blue-200'
+                      ? 'bg-primary text-white ring-4 ring-primary/40'
                       : 'bg-gray-200 text-gray-600'
                   }`}
                 >
@@ -39,7 +39,7 @@ export default function Stepper({ steps, currentStep }: StepperProps) {
                 <div className="mt-2 text-center">
                   <p
                     className={`text-sm font-medium ${
-                      isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-500'
+                      isActive ? 'text-primary' : isCompleted ? 'text-green-600' : 'text-gray-500'
                     }`}
                   >
                     {step.title}

@@ -143,7 +143,7 @@ export default function CustomersPage() {
         <h1 className="text-3xl font-bold">Clientes</h1>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover"
         >
           + Nuevo Cliente
         </button>
@@ -251,7 +251,7 @@ export default function CustomersPage() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <button
                     onClick={() => router.push(`/customers/${customer.id}`)}
-                    className="text-blue-600 hover:text-blue-800 mr-3"
+                    className="text-primary hover:text-primary mr-3"
                   >
                     Ver
                   </button>
@@ -343,7 +343,7 @@ export default function CustomersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50"
                   disabled={creating}
                 >
                   {creating ? 'Creando...' : 'Crear Cliente'}

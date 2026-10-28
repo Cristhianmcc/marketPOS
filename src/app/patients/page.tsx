@@ -261,9 +261,9 @@ export default function PatientsPage() {
                       </div>
                     )}
                     {selectedPatient.conditions && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <h4 className="text-xs font-semibold text-blue-700 flex items-center gap-1 mb-1"><Heart className="w-3.5 h-3.5" /> CONDICIONES CRÓNICAS</h4>
-                        <p className="text-sm text-blue-800">{selectedPatient.conditions}</p>
+                      <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                        <h4 className="text-xs font-semibold text-primary flex items-center gap-1 mb-1"><Heart className="w-3.5 h-3.5" /> CONDICIONES CRÓNICAS</h4>
+                        <p className="text-sm text-primary">{selectedPatient.conditions}</p>
                       </div>
                     )}
                   </div>
@@ -414,9 +414,9 @@ export default function PatientsPage() {
                 <label className="block text-sm font-semibold text-red-700 mb-1">⚠️ Alergias conocidas</label>
                 <textarea value={form.allergies} onChange={(e) => setForm({ ...form, allergies: e.target.value })} className="w-full border border-red-200 rounded px-3 py-2 text-sm bg-white" rows={2} placeholder="Ej: Penicilina, Sulfonamidas, Ibuprofeno" />
               </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <label className="block text-sm font-semibold text-blue-700 mb-1">💊 Condiciones crónicas</label>
-                <textarea value={form.conditions} onChange={(e) => setForm({ ...form, conditions: e.target.value })} className="w-full border border-blue-200 rounded px-3 py-2 text-sm bg-white" rows={2} placeholder="Ej: Diabetes tipo 2, Hipertensión, Asma" />
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3">
+                <label className="block text-sm font-semibold text-primary mb-1">💊 Condiciones crónicas</label>
+                <textarea value={form.conditions} onChange={(e) => setForm({ ...form, conditions: e.target.value })} className="w-full border border-primary/20 rounded px-3 py-2 text-sm bg-white" rows={2} placeholder="Ej: Diabetes tipo 2, Hipertensión, Asma" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>

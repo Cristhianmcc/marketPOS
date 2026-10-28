@@ -201,7 +201,7 @@ export default function DatabaseSettingsPage() {
       <div className="p-8 max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">Base de Datos Local</h1>
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <span className="ml-3 text-gray-600">Cargando estado...</span>
         </div>
       </div>
@@ -218,7 +218,7 @@ export default function DatabaseSettingsPage() {
       {/* Estado Actual */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
         <div className="flex items-start gap-4 mb-4">
-          <Database className="w-6 h-6 text-blue-600 mt-1" />
+          <Database className="w-6 h-6 text-primary mt-1" />
           <div className="flex-1">
             <h2 className="text-xl font-semibold mb-4">Estado de PostgreSQL</h2>
             
@@ -246,7 +246,7 @@ export default function DatabaseSettingsPage() {
               {/* Modo Actual */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Server className="w-5 h-5 text-blue-600" />
+                  <Server className="w-5 h-5 text-primary" />
                   <span className="font-medium">Modo de Ejecución</span>
                 </div>
                 <p className="text-sm text-gray-600">
@@ -348,8 +348,8 @@ export default function DatabaseSettingsPage() {
                   key={mode}
                   className={`block p-4 border rounded-lg cursor-pointer transition-all ${
                     status?.runMode === mode 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                      ? 'border-primary bg-primary/10' 
+                      : 'border-gray-200 hover:border-primary/40 hover:bg-gray-50'
                   } ${mode === 'WINDOWS_SERVICE' && !isAdmin ? 'opacity-60' : ''}`}
                 >
                   <div className="flex items-start gap-3">
@@ -386,7 +386,7 @@ export default function DatabaseSettingsPage() {
             </div>
 
             {changingMode && (
-              <div className="mt-4 flex items-center gap-2 text-blue-600">
+              <div className="mt-4 flex items-center gap-2 text-primary">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Cambiando modo de ejecución...</span>
               </div>
@@ -423,10 +423,10 @@ export default function DatabaseSettingsPage() {
       )}
 
       {/* Nota informativa */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="mt-6 bg-primary/10 border border-primary/20 rounded-lg p-4">
         <div className="flex gap-3">
-          <Database className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
+          <Database className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-primary">
             <p className="font-medium mb-1">Acerca del modo offline</p>
             <p>
               PostgreSQL embebido permite que Monterrial POS funcione completamente sin conexión a internet.

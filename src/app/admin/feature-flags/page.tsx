@@ -217,7 +217,7 @@ export default function FeatureFlagsPage() {
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl font-bold mb-6">Configuración de Funcionalidades</h1>
           <div className="text-center py-12">
-            <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="inline-block w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             <p className="mt-4 text-gray-600">Cargando configuración...</p>
           </div>
         </div>
@@ -313,8 +313,8 @@ export default function FeatureFlagsPage() {
                         <button
                           onClick={() => handleToggle(flag.key, !flag.enabled)}
                           disabled={isSaving}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                            flag.enabled ? 'bg-blue-600' : 'bg-gray-200'
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 ${
+                            flag.enabled ? 'bg-primary' : 'bg-gray-200'
                           } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <span
@@ -332,9 +332,9 @@ export default function FeatureFlagsPage() {
           </table>
         </div>
 
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="text-sm font-semibold text-blue-900 mb-2">ℹ️ Información Importante</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
+        <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+          <h3 className="text-sm font-semibold text-primary mb-2">ℹ️ Información Importante</h3>
+          <ul className="text-sm text-primary space-y-1">
             <li>• Las funcionalidades críticas (con punto naranja) requieren confirmación antes de desactivarse</li>
             <li>• Los cambios son inmediatos y afectan todas las operaciones en curso</li>
             <li>• Al desactivar una funcionalidad, las operaciones relacionadas serán rechazadas</li>

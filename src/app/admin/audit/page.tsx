@@ -139,7 +139,7 @@ export default function AuditLogsPage() {
 
   const getSeverityBadge = (severity: string) => {
     const classes = {
-      INFO: 'bg-blue-100 text-blue-800',
+      INFO: 'bg-primary/15 text-primary',
       WARN: 'bg-yellow-100 text-yellow-800',
       ERROR: 'bg-red-100 text-red-800',
     };
@@ -288,7 +288,7 @@ export default function AuditLogsPage() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={handleApplyFilters}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover"
               >
                 <Search size={16} />
                 Aplicar Filtros

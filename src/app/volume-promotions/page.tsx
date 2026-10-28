@@ -202,7 +202,7 @@ export default function VolumePromotionsPage() {
     
     const now = new Date();
     if (promo.startsAt && now < new Date(promo.startsAt)) {
-      return { text: 'Programada', color: 'text-blue-600' };
+      return { text: 'Programada', color: 'text-primary' };
     }
     if (promo.endsAt && now > new Date(promo.endsAt)) {
       return { text: 'Expirada', color: 'text-red-600' };

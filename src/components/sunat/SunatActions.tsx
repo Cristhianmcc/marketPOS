@@ -199,7 +199,7 @@ export default function SunatActions({
       {!documentId && (
         <button
           onClick={() => setShowEmitModal(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded hover:bg-primary-hover transition-colors"
         >
           <Send className="w-3.5 h-3.5" />
           Emitir
@@ -237,7 +237,7 @@ export default function SunatActions({
       {documentId && hasXml && (
         <button
           onClick={() => handleDownload('pdf')}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary bg-primary/15 rounded hover:bg-primary/25 transition-colors"
         >
           <FileText className="w-3.5 h-3.5" />
           PDF
@@ -261,7 +261,7 @@ export default function SunatActions({
             setNoteAmount(String(safeDocumentTotal));
             setShowNoteModal(true);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 rounded hover:bg-violet-700"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary rounded hover:bg-primary-hover"
         >
           <FileText className="w-3.5 h-3.5" />
           Nota / Anular
@@ -278,11 +278,11 @@ export default function SunatActions({
                 <button type="button" onClick={() => {
                   setNoteType('NOTA_CREDITO'); setNoteReasonCode('01');
                   setNoteReason('ANULACIÓN DE LA OPERACIÓN'); setCancelSale(true); setNoteAmount(String(safeDocumentTotal));
-                }} className={`flex-1 px-3 py-2 rounded border text-sm ${noteType === 'NOTA_CREDITO' ? 'bg-violet-600 text-white' : 'bg-white'}`}>Nota de crédito</button>
+                }} className={`flex-1 px-3 py-2 rounded border text-sm ${noteType === 'NOTA_CREDITO' ? 'bg-primary text-white' : 'bg-white'}`}>Nota de crédito</button>
                 <button type="button" onClick={() => {
                   setNoteType('NOTA_DEBITO'); setNoteReasonCode('02');
                   setNoteReason('AUMENTO EN EL VALOR'); setCancelSale(false); setNoteAmount('');
-                }} className={`flex-1 px-3 py-2 rounded border text-sm ${noteType === 'NOTA_DEBITO' ? 'bg-violet-600 text-white' : 'bg-white'}`}>Nota de débito</button>
+                }} className={`flex-1 px-3 py-2 rounded border text-sm ${noteType === 'NOTA_DEBITO' ? 'bg-primary text-white' : 'bg-white'}`}>Nota de débito</button>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Motivo SUNAT</label>
@@ -325,7 +325,7 @@ export default function SunatActions({
               )}
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={handleCreateNote} disabled={creatingNote} className="flex-1 px-4 py-2 bg-violet-600 text-white rounded disabled:opacity-50">
+              <button onClick={handleCreateNote} disabled={creatingNote} className="flex-1 px-4 py-2 bg-primary text-white rounded disabled:opacity-50">
                 {creatingNote ? 'Creando...' : 'Firmar y encolar nota'}
               </button>
               <button onClick={() => setShowNoteModal(false)} disabled={creatingNote} className="px-4 py-2 bg-gray-200 rounded">Cerrar</button>
@@ -355,7 +355,7 @@ export default function SunatActions({
                     }}
                     className={`flex-1 px-3 py-2 text-sm rounded border ${
                       docType === 'BOLETA'
-                        ? 'bg-blue-600 text-white border-blue-600'
+                        ? 'bg-primary text-white border-primary'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -372,7 +372,7 @@ export default function SunatActions({
                     disabled={userRole === 'CASHIER'}
                     className={`flex-1 px-3 py-2 text-sm rounded border ${
                       docType === 'FACTURA'
-                        ? 'bg-blue-600 text-white border-blue-600'
+                        ? 'bg-primary text-white border-primary'
                         : userRole === 'CASHIER'
                         ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -390,7 +390,7 @@ export default function SunatActions({
                   value={effectiveCustomerDocType}
                   onChange={(e) => setCustomerDocType(e.target.value)}
                   disabled={docType === 'FACTURA'}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-primary/40 focus:border-primary disabled:bg-gray-100"
                 >
                   {docType === 'FACTURA' ? (
                     <option value="RUC">RUC</option>
@@ -406,7 +406,7 @@ export default function SunatActions({
               </div>
 
               {docType === 'BOLETA' && effectiveCustomerDocType === 'OTHER' && (
-                <div className="rounded bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                <div className="rounded bg-primary/10 px-3 py-2 text-sm text-primary">
                   Se emitirá a CLIENTES VARIOS. Si el total supera S/ 700, debes identificar al cliente.
                 </div>
               )}
@@ -422,7 +422,7 @@ export default function SunatActions({
                   onChange={(e) => setCustomerDocNumber(e.target.value)}
                   placeholder={effectiveCustomerDocType === 'RUC' ? '20123456789' : '12345678'}
                   maxLength={effectiveCustomerDocType === 'RUC' ? 11 : 20}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
                 />
               </div>}
 
@@ -436,7 +436,7 @@ export default function SunatActions({
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder={docType === 'FACTURA' ? 'MI EMPRESA S.A.C.' : 'Juan Pérez'}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
                 />
               </div>}
 
@@ -451,7 +451,7 @@ export default function SunatActions({
                     value={customerAddress}
                     onChange={(e) => setCustomerAddress(e.target.value)}
                     placeholder="Av. Principal 123, Lima"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
                   />
                 </div>
               )}
@@ -466,7 +466,7 @@ export default function SunatActions({
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
                   placeholder="cliente@ejemplo.com"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-primary/40 focus:border-primary"
                 />
               </div>
             </div>
@@ -475,7 +475,7 @@ export default function SunatActions({
               <button
                 onClick={handleEmit}
                 disabled={emitting}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {emitting ? (
                   <>

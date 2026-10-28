@@ -35,7 +35,7 @@ interface PurchaseOrder {
 
 const STATUS_LABELS: Record<string, { label: string; color: string; icon: any }> = {
   DRAFT: { label: 'Borrador', color: 'bg-gray-100 text-gray-700', icon: ClipboardList },
-  SENT: { label: 'Enviada', color: 'bg-blue-100 text-blue-700', icon: Truck },
+  SENT: { label: 'Enviada', color: 'bg-primary/15 text-primary', icon: Truck },
   PARTIAL: { label: 'Parcial', color: 'bg-amber-100 text-amber-700', icon: Clock },
   RECEIVED: { label: 'Recibida', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },
   CANCELLED: { label: 'Cancelada', color: 'bg-red-100 text-red-700', icon: XCircle },
@@ -204,7 +204,7 @@ export default function PurchaseOrdersPage() {
             <p className="text-sm text-gray-500">Gestiona pedidos a proveedores y recepción de mercadería</p>
           </div>
         </div>
-        <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+        <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-colors">
           <Plus className="w-4 h-4" /> Nueva OC
         </button>
       </div>
@@ -283,7 +283,7 @@ export default function PurchaseOrdersPage() {
                     <div className="flex gap-2 mt-3">
                       {o.status === 'DRAFT' && (
                         <>
-                          <button onClick={() => changeStatus(o.id, 'SENT')} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Marcar como Enviada</button>
+                          <button onClick={() => changeStatus(o.id, 'SENT')} className="px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover">Marcar como Enviada</button>
                           <button onClick={() => changeStatus(o.id, 'CANCELLED')} className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100">Cancelar</button>
                         </>
                       )}
@@ -335,7 +335,7 @@ export default function PurchaseOrdersPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">Productos</label>
-                  <button onClick={() => setNewItems([...newItems, { storeProductId: '', quantityOrdered: '', unitCost: '' }])} className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                  <button onClick={() => setNewItems([...newItems, { storeProductId: '', quantityOrdered: '', unitCost: '' }])} className="text-sm text-primary hover:text-primary flex items-center gap-1">
                     <Plus className="w-3.5 h-3.5" /> Agregar producto
                   </button>
                 </div>
@@ -362,7 +362,7 @@ export default function PurchaseOrdersPage() {
             </div>
             <div className="flex justify-end gap-3 mt-5">
               <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
-              <button onClick={handleCreateOC} disabled={saving} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm">
+              <button onClick={handleCreateOC} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50 text-sm">
                 <Check className="w-4 h-4" /> {saving ? 'Creando...' : 'Crear OC'}
               </button>
             </div>

@@ -186,7 +186,7 @@ export default function AdminUsersPage() {
                     type={showModalPassword ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                     placeholder="Mínimo 6 caracteres"
                     autoFocus
                   />
@@ -211,7 +211,7 @@ export default function AdminUsersPage() {
               <div className="flex gap-3">
                 <button
                   onClick={submitPasswordReset}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded hover:bg-primary-hover"
                 >
                   Cambiar
                 </button>
@@ -229,7 +229,7 @@ export default function AdminUsersPage() {
         <div className="mb-6">
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-6 py-2 bg-primary text-white rounded hover:bg-primary-hover"
           >
             {showForm ? 'Cancelar' : 'Nuevo Cajero'}
           </button>
@@ -256,7 +256,7 @@ export default function AdminUsersPage() {
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -269,7 +269,7 @@ export default function AdminUsersPage() {
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
               </div>
@@ -285,7 +285,7 @@ export default function AdminUsersPage() {
                     minLength={6}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                     placeholder="Mínimo 6 caracteres"
                   />
                   <button
@@ -311,7 +311,7 @@ export default function AdminUsersPage() {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  className="px-6 py-2 bg-primary text-white rounded hover:bg-primary-hover disabled:bg-gray-400"
                 >
                   {creating ? 'Creando...' : 'Crear Cajero'}
                 </button>
@@ -358,7 +358,7 @@ export default function AdminUsersPage() {
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         user.role === 'OWNER' 
                           ? 'bg-purple-100 text-purple-800' 
-                          : 'bg-blue-100 text-blue-800'
+                          : 'bg-primary/15 text-primary'
                       }`}>
                         {user.role}
                       </span>

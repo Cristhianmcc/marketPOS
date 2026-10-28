@@ -333,7 +333,7 @@ export default function SunatOnboardingPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -352,7 +352,7 @@ export default function SunatOnboardingPage() {
           </p>
           <button
             onClick={() => router.push('/pos')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
           >
             Volver al POS
           </button>
@@ -379,7 +379,7 @@ export default function SunatOnboardingPage() {
               router.replace('/login');
               router.refresh();
             }}
-            className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="mt-6 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
           >
             Cerrar sesión
           </button>
@@ -443,7 +443,7 @@ export default function SunatOnboardingPage() {
                   disabled={index > currentStep}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                     isCurrent
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'bg-primary/15 text-primary'
                       : isCompleted
                       ? 'bg-green-100 text-green-700'
                       : 'bg-gray-100 text-gray-500'
@@ -467,7 +467,7 @@ export default function SunatOnboardingPage() {
         <div className="bg-white rounded-lg shadow-sm border p-6">
           {/* Step Header */}
           <div className="flex items-center gap-3 mb-6">
-            {StepIcon && <StepIcon className="w-6 h-6 text-blue-600" />}
+            {StepIcon && <StepIcon className="w-6 h-6 text-primary" />}
             <h2 className="text-lg font-semibold text-gray-900">
               {currentStepData?.title}
             </h2>
@@ -486,7 +486,7 @@ export default function SunatOnboardingPage() {
                   onChange={(e) => setRuc(e.target.value.replace(/\D/g, '').slice(0, 11))}
                   placeholder="20123456789"
                   maxLength={11}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="text-xs text-gray-500 mt-1">11 dígitos</p>
               </div>
@@ -500,7 +500,7 @@ export default function SunatOnboardingPage() {
                   value={razonSocial}
                   onChange={(e) => setRazonSocial(e.target.value.toUpperCase())}
                   placeholder="MI BODEGA S.A.C."
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
@@ -513,7 +513,7 @@ export default function SunatOnboardingPage() {
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Av. Principal 123, Lima"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
@@ -527,14 +527,14 @@ export default function SunatOnboardingPage() {
                   onChange={(e) => setUbigeo(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="150101"
                   maxLength={6}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
               <button
                 onClick={saveFiscalData}
                 disabled={saving || !ruc || !razonSocial || !address}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
                 Guardar y Continuar
@@ -545,7 +545,7 @@ export default function SunatOnboardingPage() {
           {/* Step 1: Credenciales SOL */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+              <div className="p-3 bg-primary/10 rounded-lg text-sm text-primary">
                 <Info className="w-4 h-4 inline mr-1" />
                 Las credenciales SOL son las que usas para ingresar a SUNAT Operaciones en Línea.
               </div>
@@ -559,7 +559,7 @@ export default function SunatOnboardingPage() {
                   value={solUser}
                   onChange={(e) => setSolUser(e.target.value.toUpperCase())}
                   placeholder="MIUSUARIO"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 />
               </div>
 
@@ -573,7 +573,7 @@ export default function SunatOnboardingPage() {
                     value={solPass}
                     onChange={(e) => setSolPass(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 pr-10"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40 pr-10"
                   />
                   <button
                     type="button"
@@ -595,7 +595,7 @@ export default function SunatOnboardingPage() {
               <button
                 onClick={saveCredentials}
                 disabled={saving || !solUser || !solPass}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
                 Guardar y Continuar
@@ -621,7 +621,7 @@ export default function SunatOnboardingPage() {
                   </button>
                 </div>
               )}
-              <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+              <div className="p-3 bg-primary/10 rounded-lg text-sm text-primary">
                 <Info className="w-4 h-4 inline mr-1" />
                 El certificado digital (.pfx) es necesario para firmar los comprobantes electrónicos.
               </div>
@@ -659,7 +659,7 @@ export default function SunatOnboardingPage() {
                     value={certPassword}
                     onChange={(e) => setCertPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 pr-10"
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40 pr-10"
                   />
                   <button
                     type="button"
@@ -681,7 +681,7 @@ export default function SunatOnboardingPage() {
               <button
                 onClick={saveCertificate}
                 disabled={saving || !certFile || !certPassword}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
                 Guardar y Continuar
@@ -711,7 +711,7 @@ export default function SunatOnboardingPage() {
               <button
                 onClick={testSign}
                 disabled={saving}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <TestTube className="w-4 h-4" />}
                 {status?.steps?.testSignedXml ? 'Probar de Nuevo' : 'Probar Firma'}
@@ -727,7 +727,7 @@ export default function SunatOnboardingPage() {
               {status?.steps?.testSignedXml && (
                 <button
                   onClick={() => setCurrentStep(4)}
-                  className="w-full py-2.5 border border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 flex items-center justify-center gap-2"
+                  className="w-full py-2.5 border border-primary text-primary rounded-lg font-medium hover:bg-primary/10 flex items-center justify-center gap-2"
                 >
                   <ChevronRight className="w-4 h-4" />
                   Continuar
@@ -751,7 +751,7 @@ export default function SunatOnboardingPage() {
                 <button
                   onClick={() => setAutoEmitBoleta(!autoEmitBoleta)}
                   className={`w-12 h-6 rounded-full transition-colors ${
-                    autoEmitBoleta ? 'bg-blue-600' : 'bg-gray-300'
+                    autoEmitBoleta ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full shadow transform transition-transform ${
@@ -768,7 +768,7 @@ export default function SunatOnboardingPage() {
                 <button
                   onClick={() => setAllowFactura(!allowFactura)}
                   className={`w-12 h-6 rounded-full transition-colors ${
-                    allowFactura ? 'bg-blue-600' : 'bg-gray-300'
+                    allowFactura ? 'bg-primary' : 'bg-gray-300'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full shadow transform transition-transform ${
@@ -784,7 +784,7 @@ export default function SunatOnboardingPage() {
                 <select
                   value={defaultDocType}
                   onChange={(e) => setDefaultDocType(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40"
                 >
                   <option value="NONE">Ninguno (preguntar siempre)</option>
                   <option value="BOLETA">BOLETA</option>
@@ -795,7 +795,7 @@ export default function SunatOnboardingPage() {
               <button
                 onClick={savePreferences}
                 disabled={saving}
-                className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
                 Guardar y Continuar
@@ -832,7 +832,7 @@ export default function SunatOnboardingPage() {
                     onClick={() => setActivateEnv('BETA')}
                     className={`p-3 rounded-lg border-2 text-center ${
                       activateEnv === 'BETA'
-                        ? 'border-blue-600 bg-blue-50'
+                        ? 'border-primary bg-primary/10'
                         : 'border-gray-200'
                     }`}
                   >

@@ -280,7 +280,7 @@ export function UnitConversionsManager({
                 <div className="text-sm text-gray-500">
                   Factor: <span className="font-mono">{conv.factorToBase}</span>
                   {conv.roundingMode !== 'NONE' && (
-                    <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1 rounded">
+                    <span className="ml-2 text-xs bg-primary/15 text-primary px-1 rounded">
                       {conv.roundingMode}
                     </span>
                   )}
@@ -300,7 +300,7 @@ export function UnitConversionsManager({
 
       {/* Form para añadir */}
       {showAddForm ? (
-        <div className="border rounded-lg p-4 bg-blue-50">
+        <div className="border rounded-lg p-4 bg-primary/10">
           <h4 className="font-medium mb-3">Nueva Conversión</h4>
           
           <div className="grid grid-cols-2 gap-3 mb-3">

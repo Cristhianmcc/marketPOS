@@ -114,7 +114,7 @@ export default function CatalogPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <Package className="w-8 h-8 text-blue-600" />
+                <Package className="w-8 h-8 text-primary" />
                 Catálogo Global
               </h1>
               <p className="text-gray-600 mt-1">
@@ -141,7 +141,7 @@ export default function CatalogPage() {
                 placeholder="Buscar producto..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
               />
             </div>
 
@@ -149,7 +149,7 @@ export default function CatalogPage() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             >
               <option value="">Todas las categorías</option>
               {categories.map((cat) => (
@@ -163,7 +163,7 @@ export default function CatalogPage() {
             <select
               value={unitTypeFilter}
               onChange={(e) => setUnitTypeFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             >
               <option value="">Todos los tipos</option>
               <option value="UNIT">Unidad</option>
@@ -174,7 +174,7 @@ export default function CatalogPage() {
             <select
               value={hasBarcodeFilter}
               onChange={(e) => setHasBarcodeFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-transparent"
             >
               <option value="">Con o sin código</option>
               <option value="true">Solo con código de barras</option>
@@ -186,7 +186,7 @@ export default function CatalogPage() {
         {/* Tabla de productos */}
         {loading ? (
           <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             <p className="mt-4 text-gray-600">Cargando catálogo...</p>
           </div>
         ) : products.length === 0 ? (
@@ -271,7 +271,7 @@ export default function CatalogPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-primary/15 text-primary">
                         {product.category}
                       </span>
                     </td>
@@ -291,7 +291,7 @@ export default function CatalogPage() {
                           onClick={() =>
                             setImportModal({ open: true, product })
                           }
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-primary text-white rounded-lg hover:bg-primary-hover transition"
                         >
                           <ShoppingCart className="w-4 h-4" />
                           Importar

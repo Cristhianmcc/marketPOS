@@ -263,7 +263,7 @@ export default function NewWorkOrderPage() {
     return (
       <AuthLayout>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </AuthLayout>
     );
@@ -295,13 +295,13 @@ export default function NewWorkOrderPage() {
               {/* Customer */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 <h2 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                  <User className="w-5 h-5 text-blue-600" />
+                  <User className="w-5 h-5 text-primary" />
                   Cliente (Opcional)
                 </h2>
                 <select
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 >
                   <option value="">Sin cliente asignado</option>
                   {customers.map(c => (
@@ -324,7 +324,7 @@ export default function NewWorkOrderPage() {
                         setShowProductSearch(!showProductSearch);
                         setShowServiceSearch(false);
                       }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/15"
                     >
                       <Package className="w-4 h-4" />
                       Agregar Producto
@@ -341,7 +341,7 @@ export default function NewWorkOrderPage() {
                               value={productSearch}
                               onChange={(e) => setProductSearch(e.target.value)}
                               autoFocus
-                              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/40"
                             />
                           </div>
                         </div>
@@ -361,7 +361,7 @@ export default function NewWorkOrderPage() {
                                       <div className="text-xs text-gray-500">{product.content}</div>
                                     )}
                                   </div>
-                                  <span className="text-sm font-medium text-blue-600">{formatMoney(product.price)}</span>
+                                  <span className="text-sm font-medium text-primary">{formatMoney(product.price)}</span>
                                 </button>
                                 {product.units.length > 0 && (
                                   <div className="px-4 pb-2 flex gap-1 flex-wrap">
@@ -390,7 +390,7 @@ export default function NewWorkOrderPage() {
                         setShowServiceSearch(!showServiceSearch);
                         setShowProductSearch(false);
                       }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/15"
                     >
                       <Wrench className="w-4 h-4" />
                       Agregar Servicio
@@ -407,7 +407,7 @@ export default function NewWorkOrderPage() {
                               value={serviceSearch}
                               onChange={(e) => setServiceSearch(e.target.value)}
                               autoFocus
-                              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/40"
                             />
                           </div>
                         </div>
@@ -428,7 +428,7 @@ export default function NewWorkOrderPage() {
                                       <div className="text-xs text-gray-500">{service.description}</div>
                                     )}
                                   </div>
-                                  <span className="text-sm font-medium text-indigo-600">{formatMoney(service.basePrice)}</span>
+                                  <span className="text-sm font-medium text-primary">{formatMoney(service.basePrice)}</span>
                                 </div>
                               </button>
                             ))
@@ -453,7 +453,7 @@ export default function NewWorkOrderPage() {
                         key={item.tempId} 
                         className={`p-3 rounded-lg border ${
                           item.type === 'SERVICE' 
-                            ? 'bg-indigo-50 border-indigo-200' 
+                            ? 'bg-primary/10 border-primary/20' 
                             : 'bg-gray-50 border-gray-200'
                         }`}
                       >
@@ -461,9 +461,9 @@ export default function NewWorkOrderPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               {item.type === 'SERVICE' ? (
-                                <Wrench className="w-4 h-4 text-indigo-600" />
+                                <Wrench className="w-4 h-4 text-primary" />
                               ) : (
-                                <Package className="w-4 h-4 text-blue-600" />
+                                <Package className="w-4 h-4 text-primary" />
                               )}
                               <span className="font-medium text-gray-900">{item.itemName}</span>
                               {item.itemContent && (
@@ -480,7 +480,7 @@ export default function NewWorkOrderPage() {
                                   step="0.01"
                                   value={item.quantityOriginal}
                                   onChange={(e) => updateItemQuantity(item.tempId, parseFloat(e.target.value) || 0)}
-                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                  className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                                 />
                               </div>
                               <div className="flex items-center gap-2">
@@ -491,7 +491,7 @@ export default function NewWorkOrderPage() {
                                   step="0.01"
                                   value={item.unitPrice}
                                   onChange={(e) => updateItemPrice(item.tempId, parseFloat(e.target.value) || 0)}
-                                  className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                  className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                                 />
                               </div>
                             </div>
@@ -502,7 +502,7 @@ export default function NewWorkOrderPage() {
                                 placeholder="Notas (medidas, especificaciones...)"
                                 value={item.notes}
                                 onChange={(e) => updateItemNotes(item.tempId, e.target.value)}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                               />
                             </div>
                           </div>
@@ -531,7 +531,7 @@ export default function NewWorkOrderPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   placeholder="Instrucciones especiales, detalles del trabajo, fecha de entrega..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
                 />
               </div>
             </div>
@@ -558,7 +558,7 @@ export default function NewWorkOrderPage() {
                       step="0.01"
                       value={discount}
                       onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                      className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      className="w-24 px-2 py-1 text-sm text-right border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
                   <div className="pt-3 border-t border-gray-200 flex justify-between">
@@ -586,7 +586,7 @@ export default function NewWorkOrderPage() {
                   <button
                     onClick={() => handleSave(false)}
                     disabled={saving || items.length === 0}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {saving ? (
                       <>

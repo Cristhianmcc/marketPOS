@@ -175,13 +175,13 @@ export default function DemoModePage() {
             {/* Información de Demo Mode */}
             <div className="bg-white rounded-lg shadow-lg p-6 mb-8 border border-gray-200">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <CheckCircle className="w-6 h-6 text-blue-600" />
+                <CheckCircle className="w-6 h-6 text-primary" />
                 ¿Qué incluye Demo Mode?
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-900 mb-2">Productos</h3>
-                  <p className="text-sm text-blue-800">
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                  <h3 className="font-semibold text-primary mb-2">Productos</h3>
+                  <p className="text-sm text-primary">
                     15 productos variados con precios reales, stock y quick-sell configurado
                   </p>
                 </div>
@@ -358,44 +358,44 @@ export default function DemoModePage() {
             </div>
 
             {/* Guía de uso */}
-            <div className="mt-8 bg-blue-50 border-2 border-blue-300 rounded-lg p-6">
-              <h2 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+            <div className="mt-8 bg-primary/10 border-2 border-primary/40 rounded-lg p-6">
+              <h2 className="text-lg font-bold text-primary mb-4 flex items-center gap-2">
                 <CheckCircle className="w-6 h-6" />
                 Guía de Uso - Demo Mode
               </h2>
-              <ol className="space-y-3 text-sm text-blue-800">
+              <ol className="space-y-3 text-sm text-primary">
                 <li className="flex items-start gap-2">
-                  <span className="font-bold text-blue-600">1.</span>
+                  <span className="font-bold text-primary">1.</span>
                   <span>
                     <strong>Activar Demo Mode:</strong> Click en &quot;Activar Demo&quot; para cargar datos ficticios
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="font-bold text-blue-600">2.</span>
+                  <span className="font-bold text-primary">2.</span>
                   <span>
                     <strong>Demostrar el sistema:</strong> Ve al POS y realiza ventas con los productos demo
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="font-bold text-blue-600">3.</span>
+                  <span className="font-bold text-primary">3.</span>
                   <span>
                     <strong>Probar funciones:</strong> Aplica promociones, cupones, fiado, etc.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="font-bold text-blue-600">4.</span>
+                  <span className="font-bold text-primary">4.</span>
                   <span>
                     <strong>Ver reportes:</strong> Muestra reportes con datos demo
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="font-bold text-blue-600">5.</span>
+                  <span className="font-bold text-primary">5.</span>
                   <span>
                     <strong>Resetear:</strong> Cuando termines, resetea para limpiar todo
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="font-bold text-blue-600">6.</span>
+                  <span className="font-bold text-primary">6.</span>
                   <span>
                     <strong>Repetir:</strong> Puedes activar demo nuevamente para otra demostración
                   </span>

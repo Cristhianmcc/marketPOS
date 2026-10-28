@@ -138,20 +138,20 @@ export default function DrugInteractionsPage() {
       </div>
 
       {/* Verificador rápido */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6">
-        <h3 className="text-sm font-semibold text-blue-800 flex items-center gap-2 mb-2">
+      <div className="bg-gradient-to-r from-primary/10 to-primary/10 border border-primary/20 rounded-xl p-4 mb-6">
+        <h3 className="text-sm font-semibold text-primary flex items-center gap-2 mb-2">
           <Zap className="w-4 h-4" /> Verificador Rápido de Interacciones
         </h3>
         <div className="flex gap-2">
           <input type="text" value={checkDrugs} onChange={(e) => setCheckDrugs(e.target.value)}
             placeholder="Ej: warfarina, ibuprofeno, omeprazol" onKeyDown={(e) => e.key === 'Enter' && handleCheck()}
-            className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-sm bg-white" />
+            className="flex-1 border border-primary/20 rounded-lg px-3 py-2 text-sm bg-white" />
           <button onClick={handleCheck} disabled={checking}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm whitespace-nowrap">
+            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover disabled:opacity-50 text-sm whitespace-nowrap">
             {checking ? 'Verificando...' : 'Verificar'}
           </button>
         </div>
-        <p className="text-xs text-blue-600 mt-1">Ingresa principios activos separados por comas</p>
+        <p className="text-xs text-primary mt-1">Ingresa principios activos separados por comas</p>
 
         {/* Resultado del verificador */}
         {checkResults !== null && (

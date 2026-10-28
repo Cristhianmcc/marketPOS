@@ -41,7 +41,7 @@ export default function SunatStatusBadge({ status, sunatCode, sunatMessage }: Su
         return {
           label: 'Enviado',
           icon: Send,
-          className: 'bg-blue-100 text-blue-700 border-blue-300',
+          className: 'bg-primary/15 text-primary border-primary/40',
         };
       case 'ACCEPTED':
         return {

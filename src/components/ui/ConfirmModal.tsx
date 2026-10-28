@@ -24,7 +24,7 @@ export function ConfirmModal({
   if (!isOpen) return null;
 
   const colorClasses = {
-    blue: 'bg-blue-600 hover:bg-blue-700',
+    blue: 'bg-primary hover:bg-primary-hover',
     green: 'bg-green-600 hover:bg-green-700',
     red: 'bg-red-600 hover:bg-red-700',
   };

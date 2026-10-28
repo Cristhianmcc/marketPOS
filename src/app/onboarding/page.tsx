@@ -375,7 +375,7 @@ export default function OnboardingPage() {
                 
                 <button
                   onClick={handleNextStep}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover font-medium flex items-center gap-2"
                   disabled={loading}
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}

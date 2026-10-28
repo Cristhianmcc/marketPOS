@@ -310,7 +310,7 @@ export default function CategoriesPage() {
                     </button>
                     <button
                       onClick={() => openEditModal(group)}
-                      className="p-2 hover:bg-gray-200 rounded text-gray-500 hover:text-blue-600"
+                      className="p-2 hover:bg-gray-200 rounded text-gray-500 hover:text-primary"
                       title="Editar"
                     >
                       <Edit2 size={18} />
@@ -355,7 +355,7 @@ export default function CategoriesPage() {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => openEditModal(child)}
-                            className="p-1.5 hover:bg-gray-200 rounded text-gray-400 hover:text-blue-600"
+                            className="p-1.5 hover:bg-gray-200 rounded text-gray-400 hover:text-primary"
                           >
                             <Edit2 size={16} />
                           </button>

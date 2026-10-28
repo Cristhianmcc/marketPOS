@@ -286,7 +286,7 @@ export default function InventoryPage() {
                 {servicesEnabled && (
                   <button
                     onClick={() => router.push('/inventory/services')}
-                    className="h-10 px-4 border border-indigo-300 bg-indigo-50 rounded-md text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                    className="h-10 px-4 border border-primary/40 bg-primary/10 rounded-md text-sm font-medium text-primary hover:bg-primary/15 transition-colors flex items-center gap-2"
                   >
                     <Wrench className="w-4 h-4" />
                     Servicios
@@ -314,7 +314,7 @@ export default function InventoryPage() {
                 )}
                 <button
                   onClick={() => router.push('/admin/catalog')}
-                  className="h-10 px-4 border border-blue-300 bg-blue-50 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-2"
+                  className="h-10 px-4 border border-primary/40 bg-primary/10 rounded-md text-sm font-medium text-primary hover:bg-primary/15 transition-colors flex items-center gap-2"
                 >
                   <Globe className="w-4 h-4" />
                   Catálogo Global
@@ -336,7 +336,7 @@ export default function InventoryPage() {
                 <a
                   href={isDesktop ? '/api/reports/export/inventory/zip' : '/api/reports/export/inventory'}
                   download
-                  className="h-10 px-4 border border-blue-300 bg-blue-50 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-2"
+                  className="h-10 px-4 border border-primary/40 bg-primary/10 rounded-md text-sm font-medium text-primary hover:bg-primary/15 transition-colors flex items-center gap-2"
                 >
                   {isDesktop ? <FileArchive className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                   {isDesktop ? 'Exportar ZIP' : 'Exportar CSV'}
@@ -409,17 +409,17 @@ export default function InventoryPage() {
 
           {/* Bulk Actions Bar */}
           {selectedIds.length > 0 && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex items-center gap-4">
-                <span className="text-sm font-semibold text-indigo-700">
+                <span className="text-sm font-semibold text-primary">
                   {selectedIds.length} productos seleccionados
                 </span>
-                <div className="h-4 w-px bg-indigo-200"></div>
+                <div className="h-4 w-px bg-primary/25"></div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleBulkCatalogAction('publish')}
                     disabled={bulkLoading}
-                    className="h-8 px-3 bg-indigo-600 text-white rounded-md text-xs font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    className="h-8 px-3 bg-primary text-white rounded-md text-xs font-medium hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-50"
                     title="Añadir seleccionados al catálogo web"
                   >
                     {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
@@ -428,7 +428,7 @@ export default function InventoryPage() {
                   <button
                     onClick={() => handleBulkCatalogAction('unpublish')}
                     disabled={bulkLoading}
-                    className="h-8 px-3 border border-indigo-200 bg-white text-indigo-700 rounded-md text-xs font-medium hover:bg-indigo-50 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    className="h-8 px-3 border border-primary/20 bg-white text-primary rounded-md text-xs font-medium hover:bg-primary/10 transition-colors flex items-center gap-2 disabled:opacity-50"
                     title="Quitar seleccionados del catálogo web"
                   >
                     {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <EyeOff className="w-3 h-3" />}
@@ -438,7 +438,7 @@ export default function InventoryPage() {
               </div>
               <button
                 onClick={() => setSelectedIds([])}
-                className="text-xs text-indigo-500 hover:text-indigo-700 font-medium"
+                className="text-xs text-primary hover:text-primary font-medium"
               >
                 Descartar selección
               </button>
@@ -613,15 +613,15 @@ export default function InventoryPage() {
                                 {!sp.product.isGlobal && (
                                   <button
                                     onClick={() => handleShareToGlobal(sp.product.id, sp.product.name)}
-                                    className="p-1 hover:bg-blue-50 rounded-md transition-colors"
+                                    className="p-1 hover:bg-primary/10 rounded-md transition-colors"
                                     title="Compartir al catálogo global"
                                   >
-                                    <Share2 className="w-4 h-4 text-blue-600" />
+                                    <Share2 className="w-4 h-4 text-primary" />
                                   </button>
                                 )}
                                 {sp.product.isGlobal && (
-                                  <div className="px-2 py-1 bg-blue-50 rounded-md" title="Ya compartido globalmente">
-                                    <Globe className="w-4 h-4 text-blue-600" />
+                                  <div className="px-2 py-1 bg-primary/10 rounded-md" title="Ya compartido globalmente">
+                                    <Globe className="w-4 h-4 text-primary" />
                                   </div>
                                 )}
                                 <button
@@ -639,10 +639,10 @@ export default function InventoryPage() {
                                       productId: sp.product.id, 
                                       productName: sp.product.name 
                                     })}
-                                    className="p-1 hover:bg-indigo-50 rounded-md transition-colors"
+                                    className="p-1 hover:bg-primary/10 rounded-md transition-colors"
                                     title="Unidades y conversiones"
                                   >
-                                    <Scale className="w-4 h-4 text-indigo-600" />
+                                    <Scale className="w-4 h-4 text-primary" />
                                   </button>
                                 )}
                                 {/* ✅ MÓDULO F2.3: Botón de precios por presentación */}
@@ -664,10 +664,10 @@ export default function InventoryPage() {
                                 {batchesEnabled && (
                                   <button
                                     onClick={() => setBatchesModal({ open: true, storeProduct: sp })}
-                                    className="p-1 hover:bg-blue-50 rounded-md transition-colors"
+                                    className="p-1 hover:bg-primary/10 rounded-md transition-colors"
                                     title="Gestión de lotes"
                                   >
-                                    <Package className="w-4 h-4 text-blue-600" />
+                                    <Package className="w-4 h-4 text-primary" />
                                   </button>
                                 )}
                                 <button

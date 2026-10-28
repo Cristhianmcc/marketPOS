@@ -164,16 +164,16 @@ export default function BackupsPage() {
       {/* Export Backup */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
         <div className="flex items-start gap-4 mb-4">
-          <Download className="w-6 h-6 text-blue-600 mt-1" />
+          <Download className="w-6 h-6 text-primary mt-1" />
           <div className="flex-1">
             <h2 className="text-xl font-semibold mb-2">Descargar Backup</h2>
             <p className="text-gray-600 mb-4">
               Exporta todos los datos de tu tienda en un archivo ZIP seguro.
             </p>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <h3 className="font-medium text-blue-900 mb-2">¿Qué incluye el backup?</h3>
-              <ul className="text-sm text-blue-800 space-y-1">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-4">
+              <h3 className="font-medium text-primary mb-2">¿Qué incluye el backup?</h3>
+              <ul className="text-sm text-primary space-y-1">
                 <li>✓ Inventario (productos y stock)</li>
                 <li>✓ Historial de ventas y tickets</li>
                 <li>✓ Turnos y caja</li>
@@ -197,7 +197,7 @@ export default function BackupsPage() {
             <button
               onClick={handleExport}
               disabled={exporting}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               <Download className="w-5 h-5" />
               {exporting ? 'Generando backup...' : 'Exportar Backup (ZIP)'}
@@ -297,10 +297,10 @@ export default function BackupsPage() {
                   {restoring ? 'Restaurando...' : 'Restaurar como Nueva Tienda'}
                 </button>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
                   <div className="flex gap-2">
-                    <AlertTriangle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-blue-800">
+                    <AlertTriangle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-primary">
                       <p className="font-semibold mb-1">Qué hace esta operación:</p>
                       <ul className="list-disc list-inside space-y-1">
                         <li>Crea una nueva tienda con los datos del backup</li>

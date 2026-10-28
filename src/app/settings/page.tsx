@@ -173,7 +173,7 @@ export default function SettingsPage() {
                     required
                     value={formData.storeName}
                     onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -185,7 +185,7 @@ export default function SettingsPage() {
                     type="text"
                     value={formData.storeRuc}
                     onChange={(e) => setFormData({ ...formData, storeRuc: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -197,7 +197,7 @@ export default function SettingsPage() {
                     type="text"
                     value={formData.storeAddress}
                     onChange={(e) => setFormData({ ...formData, storeAddress: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
@@ -209,7 +209,7 @@ export default function SettingsPage() {
                     type="text"
                     value={formData.storePhone}
                     onChange={(e) => setFormData({ ...formData, storePhone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
               </div>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
                   max="100"
                   value={formData.taxRate}
                   onChange={(e) => setFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   IGV u otro impuesto aplicable (0 para sin impuesto)
@@ -257,7 +257,7 @@ export default function SettingsPage() {
                         max="365"
                         value={formData.expiryAlertDays}
                         onChange={(e) => setFormData({ ...formData, expiryAlertDays: parseInt(e.target.value) || 60 })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                       />
                       <p className="text-xs text-gray-500 mt-1">
                         Producto aparece como &quot;Por vencer&quot; cuando queden menos de estos días.
@@ -271,7 +271,7 @@ export default function SettingsPage() {
                       <select
                         value={formData.expiredBatchPolicy}
                         onChange={(e) => setFormData({ ...formData, expiredBatchPolicy: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40"
                       >
                         <option value="BLOCK_EXPIRED">Bloquear venta de lotes vencidos</option>
                         <option value="ALLOW_EXPIRED">Permitir venta de lotes vencidos</option>
@@ -288,7 +288,7 @@ export default function SettingsPage() {
                         type="checkbox"
                         checked={formData.fefoEnabled}
                         onChange={(e) => setFormData({ ...formData, fefoEnabled: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                        className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/40"
                       />
                       <div>
                         <p className="text-sm font-medium text-gray-800">Activar FEFO en ventas</p>
@@ -318,7 +318,7 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                className="px-6 py-2 bg-primary text-white rounded hover:bg-primary-hover disabled:bg-gray-400 font-medium"
               >
                 {saving ? 'Guardando...' : 'Guardar Cambios'}
               </button>
@@ -433,7 +433,7 @@ export default function SettingsPage() {
                 value={formData.ticketFooter}
                 onChange={(e) => setFormData({ ...formData, ticketFooter: e.target.value })}
                 placeholder="Ej: Gracias por su compra!"
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary/40 font-mono text-sm"
               />
               <p className="text-xs text-gray-400 mt-1">
                 Aparece al final del recibo web y del ticket de la impresora térmica.
@@ -443,7 +443,7 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 font-medium text-sm"
+                className="px-5 py-2 bg-primary text-white rounded hover:bg-primary-hover disabled:bg-gray-400 font-medium text-sm"
               >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>
@@ -521,13 +521,13 @@ export default function SettingsPage() {
             <div className="flex gap-4">
               <button
                 onClick={() => router.push('/onboarding/sunat')}
-                className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+                className="px-6 py-2 bg-primary text-white rounded hover:bg-primary-hover font-medium"
               >
                 Configurar SUNAT
               </button>
               <button
                 onClick={() => router.push('/sunat/documents')}
-                className="px-6 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 font-medium"
+                className="px-6 py-2 bg-primary text-white rounded hover:bg-primary-hover font-medium"
               >
                 📋 Ver Documentos Electrónicos
               </button>

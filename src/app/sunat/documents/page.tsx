@@ -100,7 +100,7 @@ const localDateInputValue = () => {
 const StatusBadge = ({ status }: { status: string }) => {
   const config: Record<string, { bg: string; text: string; icon: React.ReactNode }> = {
     DRAFT: { bg: 'bg-gray-100', text: 'text-gray-600', icon: <Clock className="w-3 h-3" /> },
-    SIGNED: { bg: 'bg-blue-100', text: 'text-blue-600', icon: <FileCheck className="w-3 h-3" /> },
+    SIGNED: { bg: 'bg-primary/15', text: 'text-primary', icon: <FileCheck className="w-3 h-3" /> },
     SENT: { bg: 'bg-yellow-100', text: 'text-yellow-600', icon: <Clock className="w-3 h-3" /> },
     ACCEPTED: { bg: 'bg-green-100', text: 'text-green-600', icon: <CheckCircle className="w-3 h-3" /> },
     REJECTED: { bg: 'bg-red-100', text: 'text-red-600', icon: <XCircle className="w-3 h-3" /> },
@@ -122,7 +122,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 // Badge de tipo de documento
 const DocTypeBadge = ({ type }: { type: string }) => {
   const colors: Record<string, string> = {
-    FACTURA: 'bg-indigo-100 text-indigo-700',
+    FACTURA: 'bg-primary/15 text-primary',
     BOLETA: 'bg-purple-100 text-purple-700',
     NOTA_CREDITO: 'bg-amber-100 text-amber-700',
     NOTA_DEBITO: 'bg-pink-100 text-pink-700',
@@ -368,7 +368,7 @@ export default function SunatDocumentsPage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/" className="hover:text-blue-600 flex items-center gap-1">
+          <Link href="/" className="hover:text-primary flex items-center gap-1">
             <Home className="w-4 h-4" />
             Inicio
           </Link>
@@ -391,7 +391,7 @@ export default function SunatDocumentsPage() {
             <button
               onClick={handleDailySummary}
               disabled={summarizing || !summaryDate}
-              className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
             >
               {summarizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Resumen de boletas
@@ -399,7 +399,7 @@ export default function SunatDocumentsPage() {
             <button
               onClick={fetchDocuments}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Actualizar
@@ -444,14 +444,14 @@ export default function SunatDocumentsPage() {
               placeholder="Buscar por número, cliente..."
               value={query}
               onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary"
             />
           </div>
           
           {/* Botón filtros */}
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg ${showFilters ? 'bg-blue-50 border-blue-300' : ''}`}
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg ${showFilters ? 'bg-primary/10 border-primary/40' : ''}`}
           >
             <Filter className="w-4 h-4" />
             Filtros
@@ -515,7 +515,7 @@ export default function SunatDocumentsPage() {
             <div className="col-span-2 md:col-span-4 flex justify-end">
               <button
                 onClick={resetFilters}
-                className="text-sm text-blue-600 hover:underline"
+                className="text-sm text-primary hover:underline"
               >
                 Limpiar filtros
               </button>
@@ -612,13 +612,13 @@ export default function SunatDocumentsPage() {
                             <button
                               onClick={() => handleDownload(doc.id, 'xml')}
                               disabled={downloading === `${doc.id}-xml`}
-                              className="p-1.5 hover:bg-blue-50 rounded"
+                              className="p-1.5 hover:bg-primary/10 rounded"
                               title="Descargar XML"
                             >
                               {downloading === `${doc.id}-xml` ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
                               ) : (
-                                <Download className="w-4 h-4 text-blue-600" />
+                                <Download className="w-4 h-4 text-primary" />
                               )}
                             </button>
                           )}
@@ -627,13 +627,13 @@ export default function SunatDocumentsPage() {
                             <button
                               onClick={() => handleDownload(doc.id, 'pdf')}
                               disabled={downloading === `${doc.id}-pdf`}
-                              className="p-1.5 hover:bg-violet-50 rounded"
+                              className="p-1.5 hover:bg-primary/10 rounded"
                               title="Descargar representación impresa PDF con QR"
                             >
                               {downloading === `${doc.id}-pdf` ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-violet-600" />
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
                               ) : (
-                                <FileCheck className="w-4 h-4 text-violet-600" />
+                                <FileCheck className="w-4 h-4 text-primary" />
                               )}
                             </button>
                           )}
@@ -816,7 +816,7 @@ export default function SunatDocumentsPage() {
                   <span className="text-gray-600">Venta</span>
                   <Link
                     href={`/receipt/${selectedDoc.saleId}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-primary hover:underline"
                   >
                     #{selectedDoc.saleNumber}
                   </Link>
@@ -830,7 +830,7 @@ export default function SunatDocumentsPage() {
                 <button
                   onClick={() => handleDownload(selectedDoc.id, 'xml')}
                   disabled={downloading === `${selectedDoc.id}-xml`}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover"
                 >
                   <Download className="w-4 h-4" />
                   XML

@@ -275,7 +275,7 @@ export function SellUnitPriceManager({
       </div>
 
       {/* Info */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+      <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg text-sm text-primary">
         <strong>Precio especial:</strong> Define un precio fijo por presentación en lugar del precio calculado.
         El precio especial aplica ANTES de promociones y descuentos.
       </div>
@@ -403,7 +403,7 @@ export function SellUnitPriceManager({
                         hasOverride ? Number(existingPrice.price) : undefined,
                         existingPrice?.notes
                       )}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                      className="p-2 text-primary hover:bg-primary/10 rounded"
                       title={hasOverride ? 'Editar precio' : 'Agregar precio especial'}
                     >
                       <DollarSign className="w-4 h-4" />

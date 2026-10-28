@@ -281,7 +281,7 @@ export default function ReceivablesPage() {
                   {receivable.status === 'OPEN' && (
                     <button
                       onClick={() => handleOpenPaymentModal(receivable)}
-                      className="text-blue-600 hover:text-blue-800 mr-3 font-medium"
+                      className="text-primary hover:text-primary mr-3 font-medium"
                     >
                       Cobrar
                     </button>
@@ -348,7 +348,7 @@ export default function ReceivablesPage() {
                   </button>
                   <button
                     onClick={() => setPaymentAmount(selectedReceivable.balance.toString())}
-                    className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                    className="text-xs px-2 py-1 bg-primary/15 text-primary rounded hover:bg-primary/25"
                   >
                     Total
                   </button>
@@ -366,7 +366,7 @@ export default function ReceivablesPage() {
                       onClick={() => setPaymentMethod(method as any)}
                       className={`py-2 px-3 rounded-lg border font-medium text-sm ${
                         paymentMethod === method
-                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          ? 'border-primary bg-primary/10 text-primary'
                           : 'border-gray-200 text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -435,7 +435,7 @@ export default function ReceivablesPage() {
                         <div className="text-sm text-gray-500 mt-1 italic">{payment.notes}</div>
                       )}
                     </div>
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                    <span className="px-2 py-1 bg-primary/15 text-primary text-xs rounded">
                       {payment.method}
                     </span>
                   </div>

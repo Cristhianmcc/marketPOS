@@ -2096,6 +2096,9 @@ export default function POSPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
             {/* Columna Izquierda: Búsqueda y Productos */}
             <div className="lg:col-span-2 space-y-5 overflow-y-auto scrollbar-hide pb-2 pr-1">
+              {/* Banner Monterrial: fijo arriba para que la búsqueda no salte */}
+              <PosBanner />
+
               {/* Search - Optimizado para táctil */}
               <div className="bg-surface-light dark:bg-surface-dark rounded-2xl p-4 shadow-soft">
                 {/* ✅ MÓDULO 17.1: Hints de atajos */}
@@ -2199,9 +2202,6 @@ export default function POSPage() {
                 </div>
               </div>
 
-              {/* Banner (se oculta durante una búsqueda) */}
-              {!query.trim() && <PosBanner />}
-
               {/* Categorías del inventario */}
               {currentShift && !query.trim() && posTab === 'products' && (
                 <CategoryChips selected={selectedCategory} onSelect={setSelectedCategory} />
@@ -2275,16 +2275,16 @@ export default function POSPage() {
               {/* ✅ MÓDULO F3: Services Grid */}
               {servicesEnabled && currentShift && !query.trim() && posTab === 'services' && (
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="px-4 py-3 bg-indigo-50 border-b border-indigo-200">
+                  <div className="px-4 py-3 bg-primary/10 border-b border-primary/20">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-indigo-900 flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-primary flex items-center gap-2">
                         <Wrench className="w-4 h-4" />
                         Servicios disponibles ({services.length})
                       </h3>
                       <button
                         onClick={loadServices}
                         disabled={loadingServices}
-                        className="text-xs text-indigo-600 hover:text-indigo-800"
+                        className="text-xs text-primary hover:text-primary"
                       >
                         {loadingServices ? 'Cargando...' : 'Actualizar'}
                       </button>
@@ -2302,13 +2302,13 @@ export default function POSPage() {
                         <button
                           key={service.id}
                           onClick={() => addServiceToCart(service)}
-                          className="flex flex-col items-center justify-center p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors group"
+                          className="flex flex-col items-center justify-center p-4 bg-primary/10 hover:bg-primary/15 border border-primary/20 rounded-lg transition-colors group"
                         >
-                          <Wrench className="w-8 h-8 text-indigo-600 mb-2 group-hover:scale-110 transition-transform" />
-                          <span className="text-sm font-medium text-indigo-900 text-center line-clamp-2">
+                          <Wrench className="w-8 h-8 text-primary mb-2 group-hover:scale-110 transition-transform" />
+                          <span className="text-sm font-medium text-primary text-center line-clamp-2">
                             {service.name}
                           </span>
-                          <span className="text-lg font-bold text-indigo-700 mt-1">
+                          <span className="text-lg font-bold text-primary mt-1">
                             {formatMoney(Number(service.price))}
                           </span>
                         </button>
@@ -3303,7 +3303,7 @@ export default function POSPage() {
                       <span>Descuento:</span>
                       <span>-S/ {previewDiscount.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-bold text-primary pt-1 border-t border-blue-300">
+                    <div className="flex justify-between font-bold text-primary pt-1 border-t border-primary/40">
                       <span>Total:</span>
                       <span>S/ {previewTotal.toFixed(2)}</span>
                     </div>
