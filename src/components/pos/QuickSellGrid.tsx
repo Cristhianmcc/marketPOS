@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Loader2, Plus } from 'lucide-react';
-import { categoryEmoji } from './categoryEmoji';
+import { categoryImage } from './categoryImage';
 
 interface QuickSellProduct {
   id: string;
@@ -114,7 +114,8 @@ function QuickSellGridComponent({ onAddProduct, disabled = false }: QuickSellGri
             >
               {/* ✅ Imagen o Inicial - Tamaño táctil */}
               <div className="relative w-full h-28 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark flex items-center justify-center overflow-hidden">
-                <span className="text-5xl leading-none select-none">{categoryEmoji(product.category)}</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={categoryImage(product.category)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                 {product.imageUrl && (
                   <img
                     src={product.imageUrl}

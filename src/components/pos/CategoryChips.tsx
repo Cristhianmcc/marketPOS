@@ -3,8 +3,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { categoryEmoji } from './categoryEmoji';
+import { ChevronLeftIcon as ChevronLeft, ChevronRightIcon as ChevronRight, Squares2X2Icon } from '@heroicons/react/24/outline';
+import { categoryImage } from './categoryImage';
 
 interface Category {
   id: string;
@@ -66,11 +66,11 @@ export function CategoryChips({ selected, onSelect }: CategoryChipsProps) {
 
   if (categories.length === 0) return null;
 
-  const chip = (active: boolean) =>
-    `flex flex-col items-center justify-center gap-1.5 w-[84px] h-[84px] px-1.5 rounded-2xl text-xs font-semibold transition-all flex-shrink-0 snap-start ${
+  const tile = (active: boolean) =>
+    `relative w-[104px] h-[104px] rounded-2xl overflow-hidden flex-shrink-0 snap-start transition-all ${
       active
-        ? 'bg-primary text-white shadow-lg shadow-primary/30'
-        : 'bg-surface-light dark:bg-surface-dark text-text-secondary dark:text-gray-300 shadow-soft hover:shadow-medium hover:text-text-main'
+        ? 'ring-[3px] ring-primary ring-offset-2 ring-offset-background-light dark:ring-offset-background-dark shadow-lg shadow-primary/30'
+        : 'shadow-soft hover:shadow-medium hover:-translate-y-0.5'
     }`;
   const arrow =
     'w-8 h-8 rounded-full bg-surface-light dark:bg-surface-dark shadow-soft flex items-center justify-center text-text-main dark:text-text-light hover:text-primary disabled:opacity-30 disabled:cursor-default transition';
@@ -92,19 +92,28 @@ export function CategoryChips({ selected, onSelect }: CategoryChipsProps) {
       </div>
       <div className="relative">
         <div ref={rowRef} onScroll={updateArrows} className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 snap-x">
-          <button onClick={() => onSelect(null)} className={chip(selected === null)}>
-            <span className="text-2xl leading-none">🏪</span>
+          <button
+            onClick={() => onSelect(null)}
+            className={`${tile(selected === null)} flex flex-col items-center justify-center gap-2 text-xs font-bold ${
+              selected === null ? 'bg-primary text-white' : 'bg-surface-light dark:bg-surface-dark text-text-main dark:text-text-light'
+            }`}
+          >
+            <Squares2X2Icon className="w-7 h-7" />
             <span>Todo</span>
           </button>
           {categories.map(cat => (
             <button
               key={cat.id}
               onClick={() => onSelect(selected === cat.name ? null : cat.name)}
-              className={chip(selected === cat.name)}
+              className={tile(selected === cat.name)}
               title={cat.name}
             >
-              <span className="text-2xl leading-none">{categoryEmoji(cat.name, cat.icon)}</span>
-              <span className="w-full line-clamp-2 text-center text-[11px] leading-tight">{cat.name}</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={categoryImage(cat.name)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+              <span className={`absolute inset-0 ${selected === cat.name ? 'bg-primary/35' : ''} bg-gradient-to-t from-black/75 via-black/20 to-transparent`} />
+              <span className="absolute inset-x-1.5 bottom-1.5 text-left text-[11px] font-bold leading-tight text-white line-clamp-2 drop-shadow">
+                {cat.name}
+              </span>
             </button>
           ))}
         </div>

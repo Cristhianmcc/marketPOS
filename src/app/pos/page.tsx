@@ -10,7 +10,7 @@ import { PosHeader } from '@/components/pos/PosHeader';
 import { CategoryChips } from '@/components/pos/CategoryChips';
 import { PosBanner } from '@/components/pos/PosBanner';
 import { ShiftCard } from '@/components/pos/ShiftCard';
-import { categoryEmoji } from '@/components/pos/categoryEmoji';
+import { categoryImage } from '@/components/pos/categoryImage';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
 import AdvancedUnitSelector from '@/components/pos/AdvancedUnitSelector'; // ✅ MÓDULO F1
@@ -1992,7 +1992,8 @@ export default function POSPage() {
       >
         {/* Imagen del producto (o emoji de su categoría) */}
         <div className="relative h-28 mb-3 rounded-xl bg-monterrial-lavender/60 dark:bg-background-dark overflow-hidden flex items-center justify-center">
-          <span className="text-5xl leading-none select-none">{categoryEmoji(sp.product.category)}</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={categoryImage(sp.product.category)} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
           {sp.product.imageUrl && (
             <img
               src={sp.product.imageUrl}
