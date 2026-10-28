@@ -11,27 +11,28 @@ export default {
     extend: {
       colors: {
         // ✅ Paleta Monterrial (logo): verde bosque, crema y dorado.
-        // primary cambia en modo oscuro vía variables CSS (globals.css).
+        // primary vive en variables CSS (globals.css) para admitir opacidades.
         primary: "rgb(var(--color-primary) / <alpha-value>)",
         "primary-hover": "rgb(var(--color-primary-hover) / <alpha-value>)",
         "primary-dark": "rgb(var(--color-primary-hover) / <alpha-value>)",
-        "background-light": "#f6f5f1",
+        "background-light": "#F4F7F6",
         "background-dark": "#0b1512",
-        "surface-light": "#ffffff",
+        "surface-light": "#FFFFFF",
         "surface-dark": "#13211d",
-        "text-main": "#0e2a24",
+        "text-main": "#24332F",
         "text-light": "#f3f1ec",
-        "text-secondary": "#5b6f68",
-        "border-light": "#e8e5dc",
+        "text-secondary": "#5f716b",
+        "border-light": "#DCE5E1",
         "border-dark": "#26372f",
-        "border-subtle": "#d9d4c7",
+        "border-subtle": "#c9d6d0",
         monterrial: {
-          forest: "#0e2a24",
+          forest: "#0E2A24",
           "forest-light": "#163a32",
           sage: "#3c524c",
           cream: "#f3f1ec",
-          gold: "#bfa463",
-          "gold-light": "#d4bf8a",
+          emerald: "#16856B",
+          gold: "#D9B66F",
+          "gold-light": "#e8cf9a",
         },
         // Legacy colors for backward compatibility
         brand: {

@@ -284,11 +284,11 @@ function CartPanelComponent({
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="hidden md:flex md:flex-col h-full w-full bg-surface-light dark:bg-surface-dark border-l border-border-light dark:border-border-dark overflow-hidden">
+    <div className="hidden md:flex md:flex-col h-full w-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-3xl shadow-soft overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-border-light dark:border-border-dark shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-bold text-text-main dark:text-white">Carrito</h2>
+      <div className="px-5 pt-5 pb-4 border-b border-border-light dark:border-border-dark shrink-0">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-xl font-bold text-text-main dark:text-white">Pedido actual</h2>
           {cart.length > 0 && (
             <button
               onClick={onClearCart}
@@ -305,11 +305,11 @@ function CartPanelComponent({
       </div>
 
       {/* Cart Items */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-20 h-20 rounded-full bg-background-light dark:bg-background-dark border-2 border-dashed border-border-light dark:border-border-dark flex items-center justify-center mb-4">
-              <ShoppingCart className="w-10 h-10 text-text-secondary dark:text-gray-500" />
+            <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mb-4">
+              <ShoppingCart className="w-10 h-10 text-primary" />
             </div>
             <p className="text-sm font-semibold text-text-main dark:text-white mb-1">
               Carrito vacío
@@ -356,10 +356,10 @@ function CartPanelComponent({
               return (
                 <div
                   key={item.storeProduct.id}
-                  className="flex gap-3 p-3 rounded-lg bg-background-light dark:bg-background-dark border border-border-light dark:border-border-dark"
+                  className="flex gap-3 p-3 rounded-2xl bg-background-light/70 dark:bg-background-dark border border-border-light dark:border-border-dark"
                 >
                   {/* Product Image */}
-                  <div className="relative w-16 h-16 rounded-lg bg-surface-light dark:bg-surface-dark overflow-hidden flex-shrink-0">
+                  <div className="relative w-14 h-14 rounded-xl bg-surface-light dark:bg-surface-dark overflow-hidden flex-shrink-0">
                     {item.storeProduct.product.imageUrl ? (
                       <Image
                         src={item.storeProduct.product.imageUrl}
@@ -436,7 +436,7 @@ function CartPanelComponent({
                     
                     {/* Quantity Controls */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 bg-surface-light dark:bg-surface-dark rounded-lg border border-border-light dark:border-border-dark">
+                      <div className="flex items-center gap-1 bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark">
                         <button
                           onClick={() => onUpdateQuantity(item.storeProduct.id, -1)}
                           className="p-1.5 hover:bg-background-light dark:hover:bg-background-dark rounded-l-lg transition-colors"
@@ -484,13 +484,13 @@ function CartPanelComponent({
                     )}
 
                     {/* Price */}
-                    <div className="mt-2 text-right">
+                    <div className="mt-2 flex items-baseline justify-end gap-2">
                       {hasDiscount && (
                         <p className="text-xs text-text-secondary dark:text-gray-400 line-through">
                           {formatMoney(basePrice)}
                         </p>
                       )}
-                      <p className="text-sm font-bold text-primary">
+                      <p className="text-base font-bold text-primary">
                         {formatMoney(itemTotal)}
                       </p>
                     </div>
@@ -514,10 +514,10 @@ function CartPanelComponent({
 
       {/* Footer - Totals & Checkout */}
       {cart.length > 0 && (
-        <div className="px-4 py-3 border-t border-border-light dark:border-border-dark space-y-3 shrink-0">
+        <div className="px-5 py-4 border-t border-border-light dark:border-border-dark space-y-3 shrink-0">
           {/* Cupón */}
           {appliedCoupon && (
-            <div className="flex items-center justify-between bg-yellow-50 dark:bg-yellow-950/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-900/50">
+            <div className="flex items-center justify-between bg-monterrial-gold/15 p-3 rounded-xl border border-monterrial-gold/40">
               <div className="flex items-center gap-2">
                 <Tag className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                 <div>
@@ -574,7 +574,7 @@ function CartPanelComponent({
             <button
               onClick={onFinalizeSale}
               disabled={processing || cart.length === 0}
-              className="w-full h-12 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-14 bg-primary hover:bg-primary-hover text-white text-base font-bold rounded-2xl shadow-medium hover:shadow-strong transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {processing ? (
                 <>
@@ -584,7 +584,7 @@ function CartPanelComponent({
               ) : (
                 <>
                   <CreditCard className="w-5 h-5" />
-                  <span>Cobrar</span>
+                  <span>Cobrar {formatMoney(total)}</span>
                 </>
               )}
             </button>

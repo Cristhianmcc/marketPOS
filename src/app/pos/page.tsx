@@ -6,6 +6,9 @@ import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import QuickSellGrid from '@/components/pos/QuickSellGrid';
 import CartPanel from '@/components/pos/CartPanel';
+import { PosHeader } from '@/components/pos/PosHeader';
+import { PosBanner } from '@/components/pos/PosBanner';
+import { CategoryChips } from '@/components/pos/CategoryChips';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
 import AdvancedUnitSelector from '@/components/pos/AdvancedUnitSelector'; // ✅ MÓDULO F1
@@ -157,6 +160,10 @@ interface MedicationHistoryEntry {
 export default function POSPage() {
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<StoreProduct[]>([]);
+  // Filtro por categoría: resultados aparte para no interferir con búsqueda/escáner
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [categoryProducts, setCategoryProducts] = useState<StoreProduct[]>([]);
+  const [loadingCategory, setLoadingCategory] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -719,6 +726,30 @@ export default function POSPage() {
       toast.error('Error al abrir turno');
     }
   };
+
+  // Productos de la categoría seleccionada
+  useEffect(() => {
+    if (!selectedCategory) {
+      setCategoryProducts([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCategory(true);
+    fetch(`/api/inventory?category=${encodeURIComponent(selectedCategory)}&active=true&limit=48`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!cancelled) setCategoryProducts(data?.products || []);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Error al cargar la categoría');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCategory(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategory]);
 
   // Búsqueda automática con debounce
   useEffect(() => {
@@ -1933,6 +1964,104 @@ export default function POSPage() {
     }
   };
 
+  const renderProductCard = (sp: StoreProduct, onAdd: () => void) => {
+    const outOfStock = sp.stock !== null && sp.stock <= 0;
+    const lowStock = sp.stock !== null && sp.stock > 0 && sp.stock <= 5;
+    let expiryBadge: React.ReactNode = null;
+    if (batchExpiryEnabled && sp.batchInfo) {
+      const expiry = new Date(sp.batchInfo.nearestExpiry);
+      const daysUntil = Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      if (sp.batchInfo.hasExpired || daysUntil <= 0) {
+        expiryBadge = (
+          <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">
+            <AlertTriangle className="w-3 h-3" /> Vencido
+          </span>
+        );
+      } else if (daysUntil <= 60) {
+        expiryBadge = (
+          <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700">
+            <AlertTriangle className="w-3 h-3" /> Vence en {daysUntil}d
+          </span>
+        );
+      }
+    }
+
+    return (
+      <div
+        key={sp.id}
+        className={`group flex flex-col rounded-2xl bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark p-3 shadow-soft transition-all ${
+          outOfStock ? 'opacity-60' : 'hover:shadow-medium hover:-translate-y-0.5'
+        }`}
+      >
+        {/* Imagen del producto */}
+        <div className="relative aspect-[4/3] mb-3 rounded-xl bg-background-light dark:bg-background-dark overflow-hidden">
+          {sp.product.imageUrl ? (
+            <img src={sp.product.imageUrl} alt={sp.product.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-4xl font-bold text-primary/30">{sp.product.name.charAt(0).toUpperCase()}</span>
+            </div>
+          )}
+          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+            {/* ✅ MÓDULO PH5: Badge Rx */}
+            {medicineSearchEnabled && sp.product.requiresPrescription && (
+              <span className="inline-flex items-center rounded-md bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">Rx</span>
+            )}
+            {/* ✅ MÓDULO PH3: Badge de vencimiento */}
+            {expiryBadge}
+          </div>
+          {sp.stock !== null && (outOfStock || lowStock) && (
+            <span className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-xs font-semibold text-white ${outOfStock ? 'bg-red-500' : 'bg-orange-500'}`}>
+              {outOfStock ? 'Sin stock' : `Stock ${sp.stock}`}
+            </span>
+          )}
+        </div>
+
+        <p className="font-semibold text-sm leading-tight text-text-main dark:text-text-light line-clamp-2">{sp.product.name}</p>
+        {(sp.product.brand || sp.product.content) && (
+          <p className="mt-0.5 text-xs text-text-secondary dark:text-gray-400 truncate">
+            {[sp.product.brand, sp.product.content].filter(Boolean).join(' • ')}
+          </p>
+        )}
+        {/* ✅ MÓDULO PH5: Info farmacéutica */}
+        {medicineSearchEnabled && (sp.product.commercialName || sp.product.genericName || sp.product.concentration || sp.product.presentation) && (
+          <div className="mt-1 space-y-0.5 text-xs text-text-secondary dark:text-gray-400">
+            {sp.product.commercialName && <p className="truncate">Comercial: <span className="font-medium text-text-main dark:text-text-light">{sp.product.commercialName}</span></p>}
+            {sp.product.genericName && <p className="truncate">Genérico: <span className="font-medium text-text-main dark:text-text-light">{sp.product.genericName}</span></p>}
+            {(sp.product.concentration || sp.product.presentation) && (
+              <p className="truncate">
+                {sp.product.concentration && <span className="font-medium text-primary">{sp.product.concentration} </span>}
+                {sp.product.presentation}
+              </p>
+            )}
+          </div>
+        )}
+        <p className="mt-1 text-xs text-text-secondary/80 dark:text-gray-500 truncate">
+          {sp.product.barcode || sp.product.internalSku}
+          {sp.stock !== null && !outOfStock && !lowStock && ` · Stock: ${sp.stock}`}
+        </p>
+
+        <div className="mt-auto pt-3 flex items-end justify-between gap-2">
+          <div>
+            <p className="text-lg font-bold text-primary leading-none">S/ {sp.price.toFixed(2)}</p>
+            <p className="mt-1 text-[11px] text-text-secondary dark:text-gray-400">
+              {sp.product.unitType === 'UNIT' ? 'por unidad' : 'por kg'}
+            </p>
+          </div>
+          <button
+            onClick={onAdd}
+            disabled={outOfStock}
+            title={outOfStock ? 'Sin stock' : 'Agregar al carrito'}
+            aria-label={outOfStock ? 'Sin stock' : `Agregar ${sp.product.name}`}
+            className="w-10 h-10 flex-shrink-0 rounded-xl bg-primary hover:bg-primary-hover text-white flex items-center justify-center shadow-sm transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <AuthLayout storeName="Punto de Venta">
       <OnboardingBanner />
@@ -1941,7 +2070,7 @@ export default function POSPage() {
       {isSuperAdmin && (
         <a
           href="/admin/backups"
-          className="fixed bottom-6 right-6 z-50 bg-purple-600 text-white px-4 py-3 rounded-full shadow-lg hover:bg-purple-700 transition-colors flex items-center gap-2 font-medium"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-monterrial-forest text-monterrial-cream px-4 py-3 rounded-full shadow-lg ring-1 ring-monterrial-gold/40 hover:bg-monterrial-forest-light transition-colors flex items-center gap-2 font-medium"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
@@ -1950,36 +2079,13 @@ export default function POSPage() {
         </a>
       )}
       <main className="h-full flex flex-col overflow-hidden px-4 py-4">
-        <div className="w-full max-w-7xl mx-auto flex-1 min-h-0 flex flex-col">          {/* Banner de turno */}
-          {!currentShift && (
-            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-yellow-600" />
-                <div>
-                  <p className="font-medium text-yellow-800">Debes abrir turno para vender</p>
-                  <p className="text-sm text-yellow-700">Las ventas requieren un turno activo</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowOpenShiftModal(true)}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium"
-              >
-                Abrir Turno
-              </button>
-            </div>
-          )}
-
-          {/* Mini estado de turno */}
-          {currentShift && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3">
-              <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
-              <p className="text-sm text-green-800">
-                <span className="font-medium">Turno abierto</span>
-                {' • '}
-                Caja inicial {formatMoney(currentShift.openingCash)}
-              </p>
-            </div>
-          )}
+        <div className="w-full max-w-7xl mx-auto flex-1 min-h-0 flex flex-col">
+          {/* Saludo + estado de turno */}
+          <PosHeader
+            shiftOpen={!!currentShift}
+            openingCashLabel={currentShift ? formatMoney(currentShift.openingCash) : undefined}
+            onOpenShift={() => setShowOpenShiftModal(true)}
+          />
 
           {/* ✅ MÓDULO 17.4: Badge DEMO MODE */}
           {is_demo_store && (
@@ -1999,14 +2105,14 @@ export default function POSPage() {
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0 auto-rows-fr">
             {/* Columna Izquierda: Búsqueda y Productos */}
-            <div className="lg:col-span-2 space-y-4 overflow-y-auto pb-2">
+            <div className="lg:col-span-2 space-y-5 overflow-y-auto scrollbar-hide pb-2 pr-1">
               {/* Search - Optimizado para táctil */}
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl p-4 shadow-soft">
                 {/* ✅ MÓDULO 17.1: Hints de atajos */}
-                <div className="mb-3 hidden lg:flex items-center gap-3 text-xs text-gray-500">
-                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">F2</span>
+                <div className="mb-3 hidden lg:flex items-center gap-3 text-xs text-text-secondary dark:text-gray-400">
+                  <span className="px-2 py-1 bg-background-light dark:bg-background-dark rounded-md border border-border-light dark:border-border-dark font-mono">F2</span>
                   <span>Buscar</span>
-                  <span className="px-2 py-1 bg-gray-100 rounded border border-gray-200 font-mono">Ctrl+Enter</span>
+                  <span className="px-2 py-1 bg-background-light dark:bg-background-dark rounded-md border border-border-light dark:border-border-dark font-mono">Ctrl+Enter</span>
                   <span>Finalizar</span>
                 </div>
                 
@@ -2014,7 +2120,7 @@ export default function POSPage() {
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-2">
                     <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary w-5 h-5" />
                     <input
                       ref={searchInputRef}
                       id="product-search"
@@ -2075,14 +2181,14 @@ export default function POSPage() {
                           }
                         }
                       }}
-                      className="w-full h-12 md:h-14 pl-10 pr-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#16A34A] text-base md:text-sm"
+                      className="w-full h-12 md:h-14 pl-12 pr-4 bg-background-light dark:bg-background-dark text-text-main dark:text-text-light border border-transparent rounded-xl placeholder:text-text-secondary/70 focus:outline-none focus:bg-surface-light dark:focus:bg-surface-dark focus:border-primary focus:ring-2 focus:ring-primary/20 text-base md:text-sm"
                       style={{ fontSize: '16px' }}
                     />
                   </div>
                   <button
                     onClick={handleSearch}
                     disabled={loading}
-                    className="h-12 md:h-14 px-4 md:px-6 bg-[#16A34A] text-white rounded-md font-medium hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
+                    className="h-12 md:h-14 px-4 md:px-6 bg-primary text-white rounded-xl font-semibold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors touch-manipulation"
                   >
                     {loading ? 'Buscando...' : 'Buscar'}
                   </button>
@@ -2096,22 +2202,30 @@ export default function POSPage() {
                     setShowFreeItemModal(true);
                   }}
                   title="Vender producto sin registrar en inventario"
-                  className="w-full h-10 px-4 bg-white border border-[#16A34A] text-[#16A34A] rounded-md font-medium hover:bg-[#16A34A] hover:text-white transition-colors touch-manipulation flex items-center justify-center gap-2 text-sm"
+                  className="w-full h-10 px-4 bg-transparent border border-dashed border-primary/50 text-primary rounded-xl font-medium hover:bg-primary/10 hover:border-primary transition-colors touch-manipulation flex items-center justify-center gap-2 text-sm"
                 >
                   <span className="text-lg font-bold">+</span> Venta libre (producto no registrado)
                 </button>
                 </div>
               </div>
 
+              {/* Banner (se oculta durante una búsqueda) */}
+              {!query.trim() && <PosBanner />}
+
+              {/* Categorías del inventario */}
+              {currentShift && !query.trim() && posTab === 'products' && (
+                <CategoryChips selected={selectedCategory} onSelect={setSelectedCategory} />
+              )}
+
               {/* ✅ MÓDULO F3: Tabs Productos/Servicios */}
               {servicesEnabled && currentShift && !query.trim() && (
-                <div className="flex gap-2 bg-white border border-gray-200 rounded-lg p-2">
+                <div className="flex gap-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-2xl p-1.5 shadow-soft">
                   <button
                     onClick={() => setPosTab('products')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md font-medium transition-colors ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl font-medium transition-colors ${
                       posTab === 'products'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-primary text-white'
+                        : 'text-text-secondary hover:bg-background-light dark:hover:bg-background-dark'
                     }`}
                   >
                     <ShoppingCart className="w-4 h-4" />
@@ -2119,16 +2233,16 @@ export default function POSPage() {
                   </button>
                   <button
                     onClick={() => setPosTab('services')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-md font-medium transition-colors ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl font-medium transition-colors ${
                       posTab === 'services'
-                        ? 'bg-indigo-100 text-indigo-700'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-primary text-white'
+                        : 'text-text-secondary hover:bg-background-light dark:hover:bg-background-dark'
                     }`}
                   >
                     <Wrench className="w-4 h-4" />
                     Servicios
                     {services.length > 0 && (
-                      <span className="text-xs bg-indigo-600 text-white px-1.5 py-0.5 rounded-full">
+                      <span className="text-xs bg-monterrial-gold text-monterrial-forest font-semibold px-1.5 py-0.5 rounded-full">
                         {services.length}
                       </span>
                     )}
@@ -2137,11 +2251,35 @@ export default function POSPage() {
               )}
 
               {/* ✅ MÓDULO 17.2: Quick Sell Grid - Oculto cuando hay búsqueda activa */}
-              {currentShift && !query.trim() && posTab === 'products' && (
+              {currentShift && !query.trim() && posTab === 'products' && !selectedCategory && (
                 <QuickSellGrid 
                   onAddProduct={handleAddFromQuickSell}
                   disabled={!currentShift}
                 />
+              )}
+
+              {/* Productos de la categoría seleccionada */}
+              {currentShift && !query.trim() && posTab === 'products' && selectedCategory && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-text-main dark:text-text-light">{selectedCategory}</h3>
+                    <button
+                      onClick={() => setSelectedCategory(null)}
+                      className="rounded-full bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                    >
+                      Ver todo
+                    </button>
+                  </div>
+                  {loadingCategory ? (
+                    <div className="py-10 text-center text-sm text-text-secondary">Cargando productos...</div>
+                  ) : categoryProducts.length === 0 ? (
+                    <div className="py-10 text-center text-sm text-text-secondary">No hay productos activos en esta categoría</div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                      {categoryProducts.map((sp) => renderProductCard(sp, () => addToCart(sp)))}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* ✅ MÓDULO F3: Services Grid */}
@@ -2192,140 +2330,30 @@ export default function POSPage() {
 
               {/* Results */}
               {products.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                    <h3 className="text-sm font-medium text-[#1F2A37]">
-                      Resultados de búsqueda ({products.length})
-                    </h3>
-                  </div>
-                  <div className="divide-y divide-gray-200">
-                    {products.map((sp) => (
-                      <div
-                        key={sp.id}
-                        className="p-4 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      >
-                        {/* Imagen del producto */}
-                        {sp.product.imageUrl ? (
-                          <img
-                            src={sp.product.imageUrl}
-                            alt={sp.product.name}
-                            className="w-16 h-16 object-cover rounded border border-gray-200 flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 bg-gray-100 rounded border border-gray-200 flex items-center justify-center flex-shrink-0">
-                            <ShoppingCart className="w-6 h-6 text-gray-400" />
-                          </div>
-                        )}
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-medium text-[#1F2A37]">{sp.product.name}</span>
-                            {/* ✅ MÓDULO PH5: Badge Rx */}
-                            {medicineSearchEnabled && sp.product.requiresPrescription && (
-                              <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">
-                                Rx
-                              </span>
-                            )}
-                            {sp.product.brand && (
-                              <span className="text-sm text-gray-500">• {sp.product.brand}</span>
-                            )}
-                            {sp.product.content && (
-                              <span className="text-sm text-gray-500">• {sp.product.content}</span>
-                            )}
-                          </div>
-                          {/* ✅ MÓDULO PH5: Info farmacéutica */}
-                          {medicineSearchEnabled && (sp.product.commercialName || sp.product.genericName || sp.product.concentration || sp.product.presentation) && (
-                            <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gray-500">
-                              {sp.product.commercialName && (
-                                <span>Comercial: <span className="font-medium text-gray-700">{sp.product.commercialName}</span></span>
-                              )}
-                              {sp.product.genericName && (
-                                <span>Genérico: <span className="font-medium text-gray-700">{sp.product.genericName}</span></span>
-                              )}
-                              {sp.product.concentration && (
-                                <span className="font-medium text-indigo-600">{sp.product.concentration}</span>
-                              )}
-                              {sp.product.presentation && (
-                                <span>{sp.product.presentation}</span>
-                              )}
-                            </div>
-                          )}
-                          <div className="mt-1 text-sm text-gray-500">
-                            {sp.product.barcode || sp.product.internalSku}
-                            {sp.stock !== null && (
-                              <span className={`ml-3 font-medium ${
-                                sp.stock <= 0 
-                                  ? 'text-red-600' 
-                                  : sp.stock <= 5 
-                                  ? 'text-orange-600' 
-                                  : ''
-                              }`}>
-                                Stock: {sp.stock}
-                                {sp.stock <= 0 && ' (Sin stock)'}
-                                {sp.stock > 0 && sp.stock <= 5 && ' (Bajo)'}
-                              </span>
-                            )}
-                            {/* ✅ MÓDULO PH3: Badge de vencimiento */}
-                            {batchExpiryEnabled && sp.batchInfo && (() => {
-                              const expiry = new Date(sp.batchInfo.nearestExpiry);
-                              const now = new Date();
-                              const daysUntil = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                              if (sp.batchInfo.hasExpired || daysUntil <= 0) {
-                                return (
-                                  <span className="ml-2 inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">
-                                    <AlertTriangle className="w-3 h-3" /> Vencido
-                                  </span>
-                                );
-                              }
-                              if (daysUntil <= 60) {
-                                return (
-                                  <span className="ml-2 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700">
-                                    <AlertTriangle className="w-3 h-3" /> Vence en {daysUntil}d
-                                  </span>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-lg font-semibold text-[#16A34A]">
-                              S/ {sp.price.toFixed(2)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {sp.product.unitType === 'UNIT' ? 'por unidad' : 'por kg'}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => {
-                              addToCart(sp);
-                              setQuery('');
-                              setProducts([]);
-                              searchInputRef.current?.focus();
-                            }}
-                            disabled={sp.stock !== null && sp.stock <= 0}
-                            className="h-10 px-4 bg-[#16A34A] text-white rounded-md text-sm font-medium hover:bg-[#15803d] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                          >
-                            <Plus className="w-4 h-4" />
-                            {sp.stock !== null && sp.stock <= 0 ? 'Sin stock' : 'Agregar'}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                <div>
+                  <h3 className="mb-3 text-lg font-bold text-text-main dark:text-text-light">
+                    Resultados de búsqueda <span className="text-sm font-medium text-text-secondary">({products.length})</span>
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {products.map((sp) => renderProductCard(sp, () => {
+                      addToCart(sp);
+                      setQuery('');
+                      setProducts([]);
+                      searchInputRef.current?.focus();
+                    }))}
                   </div>
                 </div>
               )}
 
               {!loading && query && products.length === 0 && (
-                <div className="text-center py-12 text-[#6B7280]">
+                <div className="text-center py-12 text-text-secondary">
                   No se encontraron productos
                 </div>
               )}
             </div>
 
             {/* Columna Derecha: Carrito Desktop/Tablet */}
-            <div className="lg:col-span-1 h-full overflow-hidden flex flex-col">
+            <div className="lg:col-span-1 h-full overflow-hidden flex flex-col pb-1">
               <CartPanel
                 cart={cart}
                 onUpdateQuantity={changeQuantityByDelta}
@@ -2346,11 +2374,11 @@ export default function POSPage() {
           {cart.length > 0 && (
             <button
               onClick={() => setMobileCartOpen(true)}
-              className="md:hidden fixed bottom-6 right-6 z-30 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-semibold transition-all active:scale-95"
+              className="md:hidden fixed bottom-6 right-6 z-30 bg-primary hover:bg-primary-hover text-white px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 font-semibold transition-all active:scale-95"
             >
               <ShoppingCart className="w-6 h-6" />
               <span>Carrito ({cart.length})</span>
-              <span className="text-emerald-100">• {formatMoney(getCartTotal(cart, globalDiscount, appliedCoupon))}</span>
+              <span className="text-white/80">• {formatMoney(getCartTotal(cart, globalDiscount, appliedCoupon))}</span>
             </button>
           )}
 
