@@ -2,7 +2,12 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 import { isSuperAdmin } from '@/lib/superadmin';
 import Link from 'next/link';
-import AuthLayout from '@/components/AuthLayout';
+import { LogoutButton } from '@/components/LogoutButton';
+import {
+  ShoppingCart, Package, BarChart3, Wallet, Receipt, Users, Gift, Ticket, Tags, PackageOpen, Repeat, Zap,
+  Settings, SlidersHorizontal, ShieldCheck, ClipboardList, Activity, Building2, CreditCard, PlayCircle,
+  type LucideIcon,
+} from 'lucide-react';
 import { getAllFeatureFlags } from '@/lib/featureFlags';
 import { FeatureFlagKey } from '@prisma/client';
 import { prisma } from '@/infra/db/prisma';
@@ -70,31 +75,31 @@ export default async function HomePage() {
   const currentDate = new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   // Módulos visibles según rol, plan y funcionalidades activas
-  type ModuleCard = { href: string; title: string; subtitle: string; emoji: string; tint: string };
+  type ModuleCard = { href: string; title: string; subtitle: string; icon: LucideIcon; tint: string };
   const modules: ModuleCard[] = [
-    { href: '/sales', title: 'Ventas', subtitle: 'Historial de ventas', emoji: '🧾', tint: 'bg-[#E4DAFD]' },
+    { href: '/sales', title: 'Ventas', subtitle: 'Historial de ventas', icon: Receipt, tint: 'bg-[#EEE8FE] text-[#6544E6]' },
   ];
   if (isOwner) {
-    modules.push({ href: '/admin/users', title: 'Usuarios', subtitle: 'Gestionar cajeros', emoji: '👥', tint: 'bg-[#DCEBFF]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_PROMOTIONS)) modules.push({ href: '/promotions', title: 'Promociones', subtitle: 'Gestionar promociones', emoji: '🎁', tint: 'bg-[#FFE1EC]' });
-    if (hasFlag(FeatureFlagKey.ALLOW_COUPONS)) modules.push({ href: '/coupons', title: 'Cupones', subtitle: 'Códigos de descuento', emoji: '🎟️', tint: 'bg-[#E3F6D8]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_CATEGORY_PROMOS)) modules.push({ href: '/category-promotions', title: 'Promos Categoría', subtitle: 'Descuentos por categoría', emoji: '🏷️', tint: 'bg-[#FFF6C2]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_VOLUME_PROMOS)) modules.push({ href: '/volume-promotions', title: 'Promos Pack', subtitle: 'Por volumen (3x S/5)', emoji: '📦', tint: 'bg-[#FFE7D1]' });
-    if (hasFlag(FeatureFlagKey.ENABLE_NTH_PROMOS)) modules.push({ href: '/nth-promotions', title: 'Promos N-ésimo', subtitle: '2do al 50%, 3ro gratis', emoji: '🔁', tint: 'bg-[#E4DAFD]' });
-    modules.push({ href: '/admin/quick-sell', title: 'Productos Rápidos', subtitle: 'Botones rápidos POS', emoji: '⚡', tint: 'bg-[#FFF6C2]' });
-    modules.push({ href: '/settings', title: 'Configuración', subtitle: 'Ajustes de la tienda', emoji: '⚙️', tint: 'bg-[#ECEAF4]' });
+    modules.push({ href: '/admin/users', title: 'Usuarios', subtitle: 'Gestionar cajeros', icon: Users, tint: 'bg-[#E3EEFF] text-[#2F6FE4]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_PROMOTIONS)) modules.push({ href: '/promotions', title: 'Promociones', subtitle: 'Gestionar promociones', icon: Gift, tint: 'bg-[#FFE8EF] text-[#E0457B]' });
+    if (hasFlag(FeatureFlagKey.ALLOW_COUPONS)) modules.push({ href: '/coupons', title: 'Cupones', subtitle: 'Códigos de descuento', icon: Ticket, tint: 'bg-[#E6F6DD] text-[#3E9B2F]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_CATEGORY_PROMOS)) modules.push({ href: '/category-promotions', title: 'Promos Categoría', subtitle: 'Descuentos por categoría', icon: Tags, tint: 'bg-[#FFF5CC] text-[#B98900]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_VOLUME_PROMOS)) modules.push({ href: '/volume-promotions', title: 'Promos Pack', subtitle: 'Por volumen (3x S/5)', icon: PackageOpen, tint: 'bg-[#FFEBD9] text-[#E06A12]' });
+    if (hasFlag(FeatureFlagKey.ENABLE_NTH_PROMOS)) modules.push({ href: '/nth-promotions', title: 'Promos N-ésimo', subtitle: '2do al 50%, 3ro gratis', icon: Repeat, tint: 'bg-[#EEE8FE] text-[#6544E6]' });
+    modules.push({ href: '/admin/quick-sell', title: 'Productos Rápidos', subtitle: 'Botones rápidos POS', icon: Zap, tint: 'bg-[#FFF5CC] text-[#B98900]' });
+    modules.push({ href: '/settings', title: 'Configuración', subtitle: 'Ajustes de la tienda', icon: Settings, tint: 'bg-[#EEEDF5] text-[#5B5873]' });
     if (!isStarterPlan) {
-      modules.push({ href: '/admin/feature-flags', title: 'Funcionalidades', subtitle: 'Activar/desactivar', emoji: '🎛️', tint: 'bg-[#DCEBFF]' });
-      modules.push({ href: '/settings/limits', title: 'Límites Operativos', subtitle: 'Configurar límites', emoji: '🛡️', tint: 'bg-[#FFE1EC]' });
-      modules.push({ href: '/admin/audit', title: 'Auditoría', subtitle: 'Historial de operaciones', emoji: '📋', tint: 'bg-[#ECEAF4]' });
-      modules.push({ href: '/admin/system', title: 'Observabilidad', subtitle: 'Estado del sistema', emoji: '📡', tint: 'bg-[#E3F6D8]' });
+      modules.push({ href: '/admin/feature-flags', title: 'Funcionalidades', subtitle: 'Activar/desactivar', icon: SlidersHorizontal, tint: 'bg-[#E3EEFF] text-[#2F6FE4]' });
+      modules.push({ href: '/settings/limits', title: 'Límites Operativos', subtitle: 'Configurar límites', icon: ShieldCheck, tint: 'bg-[#FFE8EF] text-[#E0457B]' });
+      modules.push({ href: '/admin/audit', title: 'Auditoría', subtitle: 'Historial de operaciones', icon: ClipboardList, tint: 'bg-[#EEEDF5] text-[#5B5873]' });
+      modules.push({ href: '/admin/system', title: 'Observabilidad', subtitle: 'Estado del sistema', icon: Activity, tint: 'bg-[#E6F6DD] text-[#3E9B2F]' });
     }
   }
   const platformModules: ModuleCard[] = isSuperAdminUser
     ? [
-        { href: '/admin/stores', title: 'Tiendas', subtitle: 'Administrar todas las tiendas', emoji: '🏬', tint: 'bg-[#E4DAFD]' },
-        { href: '/admin/billing', title: 'Licencias SaaS', subtitle: 'Suscripciones y pagos', emoji: '💳', tint: 'bg-[#E3F6D8]' },
-        { href: '/admin/demo', title: 'Demo Mode', subtitle: 'Activar/resetear demos', emoji: '🎬', tint: 'bg-[#FFF6C2]' },
+        { href: '/admin/stores', title: 'Tiendas', subtitle: 'Administrar todas las tiendas', icon: Building2, tint: 'bg-[#EEE8FE] text-[#6544E6]' },
+        { href: '/admin/billing', title: 'Licencias SaaS', subtitle: 'Suscripciones y pagos', icon: CreditCard, tint: 'bg-[#E6F6DD] text-[#3E9B2F]' },
+        { href: '/admin/demo', title: 'Demo Mode', subtitle: 'Activar/resetear demos', icon: PlayCircle, tint: 'bg-[#FFF5CC] text-[#B98900]' },
       ]
     : [];
 
@@ -104,7 +109,9 @@ export default async function HomePage() {
       href={m.href}
       className="group flex flex-col items-center text-center gap-3 rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium hover:-translate-y-0.5 transition-all"
     >
-      <span className={`w-14 h-14 rounded-2xl ${m.tint} flex items-center justify-center text-3xl leading-none`}>{m.emoji}</span>
+      <span className={`w-14 h-14 rounded-2xl ${m.tint} flex items-center justify-center`}>
+        <m.icon className="w-7 h-7" strokeWidth={1.8} />
+      </span>
       <span>
         <span className="block text-sm font-bold text-text-main dark:text-text-light">{m.title}</span>
         <span className="block text-xs text-text-secondary dark:text-gray-400 mt-0.5">{m.subtitle}</span>
@@ -115,19 +122,26 @@ export default async function HomePage() {
   const firstName = session.name?.trim().split(/\s+/)[0] ?? '';
 
   return (
-    <AuthLayout storeName="Inicio">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
+    <div className="min-h-screen bg-background-light dark:bg-background-dark">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Cabecera */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div>
+          <div className="flex items-center gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/monterrial-logo-dark.png" alt="Monterrial" className="w-12 h-12 rounded-2xl shadow-soft" />
+            <div>
             <h1 className="text-3xl font-extrabold tracking-tight text-text-main dark:text-text-light">Hola, {firstName}</h1>
             <p className="text-sm text-text-secondary dark:text-gray-400 first-letter:uppercase" suppressHydrationWarning>
               {currentDate} · {currentTime} · {roleDisplay}
             </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl bg-surface-light dark:bg-surface-dark shadow-soft px-4 h-11 text-sm font-semibold text-text-main dark:text-text-light">
-            <span className="w-2 h-2 rounded-full bg-[#A6E182]" />
-            Sistema operativo
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-2xl bg-surface-light dark:bg-surface-dark shadow-soft px-4 h-11 text-sm font-semibold text-text-main dark:text-text-light">
+              <span className="w-2 h-2 rounded-full bg-[#A6E182]" />
+              Sistema operativo
+            </div>
+            <LogoutButton className="h-11 px-4 rounded-2xl bg-surface-light dark:bg-surface-dark shadow-soft text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors" />
           </div>
         </div>
 
@@ -189,22 +203,22 @@ export default async function HomePage() {
         {/* Acciones rápidas */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Link href="/pos" className="group relative overflow-hidden rounded-2xl bg-primary p-5 text-white shadow-lg shadow-primary/30 hover:bg-primary-hover transition">
-            <span className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl">🛒</span>
+            <span className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center"><ShoppingCart className="w-6 h-6" strokeWidth={2} /></span>
             <p className="mt-4 text-lg font-bold">Punto de Venta</p>
             <p className="text-sm text-white/80">Iniciar nueva venta</p>
           </Link>
           <Link href="/inventory" className="group rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium transition">
-            <span className="w-12 h-12 rounded-xl bg-monterrial-gold flex items-center justify-center text-2xl">📦</span>
+            <span className="w-12 h-12 rounded-xl bg-monterrial-gold text-monterrial-forest flex items-center justify-center"><Package className="w-6 h-6" strokeWidth={2} /></span>
             <p className="mt-4 text-lg font-bold text-text-main dark:text-text-light">Inventario</p>
             <p className="text-sm text-text-secondary dark:text-gray-400">Gestionar productos</p>
           </Link>
           <Link href="/reports" className="group rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium transition">
-            <span className="w-12 h-12 rounded-xl bg-monterrial-lime flex items-center justify-center text-2xl">📊</span>
+            <span className="w-12 h-12 rounded-xl bg-monterrial-lime text-monterrial-forest flex items-center justify-center"><BarChart3 className="w-6 h-6" strokeWidth={2} /></span>
             <p className="mt-4 text-lg font-bold text-text-main dark:text-text-light">Reportes</p>
             <p className="text-sm text-text-secondary dark:text-gray-400">Ver estadísticas</p>
           </Link>
           <Link href="/shifts" className="group rounded-2xl bg-surface-light dark:bg-surface-dark p-5 shadow-soft hover:shadow-medium transition">
-            <span className="w-12 h-12 rounded-xl bg-monterrial-lavender flex items-center justify-center text-2xl">💰</span>
+            <span className="w-12 h-12 rounded-xl bg-monterrial-lavender text-primary flex items-center justify-center"><Wallet className="w-6 h-6" strokeWidth={2} /></span>
             <p className="mt-4 text-lg font-bold text-text-main dark:text-text-light">Turnos</p>
             <p className="text-sm text-text-secondary dark:text-gray-400">Gestionar caja</p>
           </Link>
@@ -228,6 +242,6 @@ export default async function HomePage() {
           </>
         )}
       </div>
-    </AuthLayout>
+    </div>
   );
 }
