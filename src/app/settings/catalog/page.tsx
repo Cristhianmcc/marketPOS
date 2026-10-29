@@ -99,7 +99,7 @@ export default function CatalogSettingsPage() {
     const toastId = toast.loading('Subiendo imágenes a Cloudinary...');
     try {
       const res = await fetch('/api/desktop/sync-catalog-images', { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: `El sistema respondió ${res.status} al sincronizar` }));
       if (!res.ok) {
         toast.error(data.error || 'Error al sincronizar imágenes', { id: toastId });
         return;

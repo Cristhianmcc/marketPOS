@@ -38,15 +38,6 @@ function loadIndex(): Record<string, { filename: string; mime: string; createdAt
   return {};
 }
 
-function saveIndex(
-  index: Record<string, { filename: string; mime: string; createdAt: string }>,
-): void {
-  if (!fs.existsSync(LOCAL_IMAGES_DIR)) {
-    fs.mkdirSync(LOCAL_IMAGES_DIR, { recursive: true });
-  }
-  fs.writeFileSync(INDEX_PATH, JSON.stringify(index, null, 2), 'utf-8');
-}
-
 const mimeOf = (filename: string, mime?: string) =>
   mime && mime.startsWith('image/') ? mime
     : filename.toLowerCase().endsWith('.png') ? 'image/png'
@@ -134,6 +125,18 @@ export async function POST(_req: NextRequest) {
       { status: 503 },
     );
   }
+  try {
+    return await syncImages(storeId);
+  } catch (error) {
+    console.error('[sync-catalog-images POST] Error:', error);
+    return NextResponse.json(
+      { error: `No se pudieron sincronizar las imágenes: ${error instanceof Error ? error.message : String(error)}` },
+      { status: 500 },
+    );
+  }
+}
+
+async function syncImages(storeId: string) {
   const index = loadIndex();
 
   let synced = 0;
@@ -241,8 +244,7 @@ export async function POST(_req: NextRequest) {
     }
   }
 
-  saveIndex(index);
-
+  // El índice no cambia: no se reescribe (Windows puede bloquear Documentos)
   return NextResponse.json({
     ok: true,
     synced,

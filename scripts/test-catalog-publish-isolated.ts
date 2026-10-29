@@ -57,6 +57,8 @@ async function seed(db: PrismaClient) {
   };
   await product('CT-1', 'Inca Kola 500 ml', 2.5, 'https://res.cloudinary.com/demo/image/upload/inca.jpg', true);
   await product('CT-2', 'Agua 625 ml', 1.5, null, true);
+  // Foto subida en el escritorio (local) que aún no está en la nube
+  await product('CT-4', 'Galletas con foto local', 2, '/api/desktop/local-image/img-1', true);
   await product('CT-3', 'Producto oculto', 9, null, false);
   return { storeId: store.id, otherStoreId: other.id, ownerId: owner.id };
 }
@@ -83,13 +85,18 @@ async function flowWorker(contextPath: string) {
 
   // La "red" del escritorio llega a los handlers de la nube de este mismo proceso
   const calls: { path: string; auth: boolean; apiKey: boolean }[] = [];
+  let stubCloudinary = false;
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const headers = new Headers(init?.headers);
     calls.push({ path: url.pathname, auth: headers.has('authorization'), apiKey: headers.has('x-api-key') });
     const req = new NextRequest(url.toString(), { method: init?.method, headers, body: init?.body as BodyInit });
     if (url.pathname === '/api/catalog/publish') return cloudPublish.POST(req);
-    if (url.pathname === '/api/catalog/cloud-image') return cloudImage.POST(req);
+    if (url.pathname === '/api/catalog/cloud-image') {
+      // Con nube simulada se responde como lo haría Render con Cloudinary
+      if (stubCloudinary) return Response.json({ url: 'https://res.cloudinary.com/demo/image/upload/galletas.png' });
+      return cloudImage.POST(req);
+    }
     return new Response('not found', { status: 404 });
   }) as typeof fetch;
 
@@ -137,6 +144,25 @@ async function flowWorker(contextPath: string) {
   const pending = await read(await desktopSync.GET(new NextRequest('http://localhost/api/desktop/sync-catalog-images')));
   steps.P6 = { status: pending.status, uploadsAvailable: pending.body?.cloudinaryConfigured };
 
+  // P7 Sincronizar la foto local: se sube por la nube y no se reescribe el índice
+  const imagesDir = path.join(os.homedir(), 'Documents', 'MonterrialPOS', 'local-images');
+  fs.mkdirSync(imagesDir, { recursive: true });
+  fs.writeFileSync(path.join(imagesDir, 'img-1.png'), Buffer.from('89504e470d0a1a0a', 'hex'));
+  const indexPath = path.join(imagesDir, 'index.json');
+  fs.writeFileSync(indexPath, JSON.stringify({ 'img-1': { filename: 'img-1.png', mime: 'image/png', createdAt: '2026-10-28' } }));
+  const indexBefore = fs.statSync(indexPath).mtimeMs;
+  stubCloudinary = true;
+  calls.length = 0;
+  const synced = await read(await desktopSync.POST(new NextRequest('http://localhost/api/desktop/sync-catalog-images', { method: 'POST' })));
+  stubCloudinary = false;
+  const galletas = await prisma.storeProduct.findFirst({ where: { product: { internalSku: 'CT-4' } } });
+  steps.P7 = {
+    status: synced.status, synced: synced.body?.synced, failed: synced.body?.failed, errors: synced.body?.errors ?? null,
+    catalogImage: galletas?.catalogImagePath ?? null,
+    viaCloud: calls.some((c) => c.path === '/api/catalog/cloud-image' && c.auth),
+    indexUntouched: fs.statSync(indexPath).mtimeMs === indexBefore,
+  };
+
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
 
@@ -155,11 +181,17 @@ const EXPECTATIONS: { id: string; title: string; check: (s: Steps) => string[] }
     ...eq('publicación', [s.P4?.status, s.P4?.error ?? null], [200, null]),
     ...eq('usa el token de la tienda', s.P4?.usedToken, true),
     ...eq('catálogo público', s.P4?.publicStatus, 200),
-    ...eq('productos visibles', s.P4?.products, ['Agua 625 ml:sin foto', 'Inca Kola 500 ml:foto']),
+    ...eq('productos visibles', s.P4?.products, ['Agua 625 ml:sin foto', 'Galletas con foto local:sin foto', 'Inca Kola 500 ml:foto']),
     ...eq('estado local', s.P4?.localStatus, 'PUBLISHED'),
   ] },
   { id: 'P5', title: 'Subida de imágenes por la nube: token obligatorio y formatos válidos', check: (s) =>
     eq('respuestas', s.P5, { unauthorized: 401, authorizedNoCloudinary: 503, badType: 400 }) },
+  { id: 'P7', title: 'Sincroniza la foto local por la nube sin reescribir el índice', check: (s) => [
+    ...eq('respuesta', [s.P7?.status, s.P7?.synced, s.P7?.failed], [200, 1, 0]),
+    ...eq('foto en el catálogo', s.P7?.catalogImage, 'https://res.cloudinary.com/demo/image/upload/galletas.png'),
+    ...eq('subida por la nube con licencia', s.P7?.viaCloud, true),
+    ...eq('índice intacto', s.P7?.indexUntouched, true),
+  ] },
   { id: 'P6', title: 'El escritorio sin claves de Cloudinary puede subir imágenes vía nube', check: (s) =>
     eq('disponible', [s.P6?.status, s.P6?.uploadsAvailable], [200, true]) },
 ];
@@ -186,7 +218,8 @@ async function main() {
 
     console.log('Catálogo: publicando con los handlers reales...\n');
     // Entorno del instalador: sin claves de Cloudinary ni clave compartida del catálogo
-    const env: NodeJS.ProcessEnv = { ...process.env, DATABASE_URL: url, DIRECT_URL: url, NODE_ENV: 'test', DESKTOP_MODE: 'true', CLOUD_URL: CLOUD,
+    const fakeHome = path.join(tempRoot, 'home');
+    const env: NodeJS.ProcessEnv = { ...process.env, USERPROFILE: fakeHome, HOME: fakeHome, DATABASE_URL: url, DIRECT_URL: url, NODE_ENV: 'test', DESKTOP_MODE: 'true', CLOUD_URL: CLOUD,
       MONTERRIAL_DATA_DIR: path.join(tempRoot, 'runtime'), SESSION_SECRET: crypto.randomBytes(32).toString('hex') };
     // Vacías (no borradas) para que ningún .env las rellene
     for (const key of ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET', 'CATALOG_API_KEY']) env[key] = '';

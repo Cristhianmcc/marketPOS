@@ -228,11 +228,74 @@ async function openExternalUrl(url: string): Promise<{ ok: boolean; error?: stri
   }
 }
 
+// ============================================================================
+// VENTANA WEB PROPIA (catálogo web, WhatsApp)
+// ============================================================================
+//
+// En algunas PCs el navegador predeterminado no responde a la app. Estos enlaces
+// se abren en una ventana propia, con su propio perfil (separado de la sesión de
+// la app y de su CSP), que sí puede navegar por sitios https.
+
+const externalWebContentsIds = new Set<number>();
+const externalWebWindows = new Map<string, BrowserWindow>();
+
+const isWebUrl = (value: string) => /^https?:\/\//i.test(value);
+
+/** wa.me pide abrir la app de WhatsApp; en la ventana propia se usa WhatsApp Web. */
+function toWebWhatsapp(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'wa.me' || parsed.hostname === 'api.whatsapp.com') {
+      const phone = parsed.pathname.replace(/\D/g, '') || parsed.searchParams.get('phone') || '';
+      const text = parsed.searchParams.get('text') || '';
+      return `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}`;
+    }
+  } catch {
+    // URL inválida: se usa tal cual
+  }
+  return url;
+}
+
+function openWebWindow(rawUrl: string): { ok: boolean; error?: string } {
+  if (!isWebUrl(rawUrl)) return { ok: false, error: 'Enlace no permitido' };
+  const url = toWebWhatsapp(rawUrl);
+  const kind = url.startsWith('https://web.whatsapp.com/') ? 'whatsapp' : 'web';
+  const existing = externalWebWindows.get(kind);
+  if (existing && !existing.isDestroyed()) {
+    void existing.loadURL(url);
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
+    return { ok: true };
+  }
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 820,
+    title: kind === 'whatsapp' ? 'WhatsApp' : 'Monterrial',
+    autoHideMenuBar: true,
+    webPreferences: {
+      partition: 'persist:external-web',
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  externalWebContentsIds.add(win.webContents.id);
+  externalWebWindows.set(kind, win);
+  win.on('closed', () => externalWebWindows.delete(kind));
+  // WhatsApp Web exige un navegador compatible: se quita la marca de Electron
+  win.webContents.setUserAgent(app.userAgentFallback.replace(/\s(Electron|monterrial[^\s]*)\/[^\s]+/gi, ''));
+  void win.loadURL(url);
+  return { ok: true };
+}
+
 function setupSecurityPolicies(): void {
   // Limitar la navegación al origen exacto del servidor iniciado. El origen se
   // consulta en cada evento porque el puerto puede cambiar tras un reinicio.
   app.on('web-contents-created', (_, contents) => {
     contents.on('will-navigate', (event, navigationUrl) => {
+      // La ventana web propia navega libremente por sitios https
+      if (externalWebContentsIds.has(contents.id) && isWebUrl(navigationUrl)) return;
       if (!isAppServerUrl(navigationUrl, serverUrl)) {
         event.preventDefault();
         console.warn(`[Security] Blocked navigation to: ${navigationUrl}`);
@@ -242,6 +305,11 @@ function setupSecurityPolicies(): void {
     // Los comprobantes internos pueden abrir una ventana Electron. Los enlaces
     // externos se entregan al navegador del sistema y los demás se bloquean.
     contents.setWindowOpenHandler(({ url }) => {
+      // Dentro de la ventana web propia, los enlaces nuevos se abren en ella misma
+      if (externalWebContentsIds.has(contents.id)) {
+        if (isWebUrl(url)) void contents.loadURL(url);
+        return { action: 'deny' };
+      }
       const disposition = classifyWindowOpenUrl(url, serverUrl);
 
       if (disposition === 'app') {
@@ -249,7 +317,8 @@ function setupSecurityPolicies(): void {
       }
 
       if (disposition === 'external') {
-        void openExternalUrl(url);
+        if (isWebUrl(url)) openWebWindow(url);
+        else void openExternalUrl(url);
       }
 
       return { action: 'deny' };
@@ -986,7 +1055,8 @@ function setupEscposIpcHandlers(): void {
     if (classifyWindowOpenUrl(String(url), serverUrl) !== 'external') {
       return { ok: false, error: 'Enlace no permitido' };
     }
-    return openExternalUrl(String(url));
+    // Las páginas web (catálogo, WhatsApp) se abren en la ventana propia
+    return isWebUrl(String(url)) ? openWebWindow(String(url)) : openExternalUrl(String(url));
   });
 
   // Ticket de recepción de una orden de trabajo (lavandería / taller)
