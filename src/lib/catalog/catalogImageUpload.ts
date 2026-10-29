@@ -13,8 +13,13 @@ export type CatalogImageKind = 'product' | 'logo' | 'banner';
 
 const cloudUrl = () => (process.env.CLOUD_URL || '').replace(/\/+$/, '');
 
+/** Valor de entorno sin espacios ni comillas sobrantes (errores comunes al pegar en Render). */
+export function cleanEnv(name: string): string {
+  return (process.env[name] ?? '').trim().replace(/^["']|["']$/g, '').trim();
+}
+
 export function hasLocalCloudinary(): boolean {
-  return Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
+  return Boolean(cleanEnv('CLOUDINARY_CLOUD_NAME') && cleanEnv('CLOUDINARY_API_KEY') && cleanEnv('CLOUDINARY_API_SECRET'));
 }
 
 /** Cabeceras para llamar a la nube en nombre de la tienda. */
@@ -45,9 +50,9 @@ export function catalogImageTransformation(kind: CatalogImageKind, mimeType: str
 /** Sube a Cloudinary con las claves de este servidor y devuelve la URL segura. */
 export async function uploadToCloudinary(input: { buffer: Buffer; folder: string; kind: CatalogImageKind; mimeType: string; publicId?: string }): Promise<string> {
   cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
+    cloud_name: cleanEnv('CLOUDINARY_CLOUD_NAME'),
+    api_key: cleanEnv('CLOUDINARY_API_KEY'),
+    api_secret: cleanEnv('CLOUDINARY_API_SECRET'),
   });
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
@@ -74,10 +79,10 @@ export async function uploadCatalogImage(input: {
   kind: CatalogImageKind;
 }): Promise<string> {
   if (hasLocalCloudinary()) {
-    const base = process.env.CLOUDINARY_FOLDER || 'market-pos';
+    const base = cleanEnv('CLOUDINARY_FOLDER') || 'market-pos';
     return uploadToCloudinary({
       buffer: input.buffer,
-      folder: input.kind === 'product' ? (process.env.CLOUDINARY_FOLDER || 'market-pos-products') : `${base}-catalog`,
+      folder: input.kind === 'product' ? (cleanEnv('CLOUDINARY_FOLDER') || 'market-pos-products') : `${base}-catalog`,
       kind: input.kind,
       mimeType: input.mimeType,
       publicId: input.kind === 'product' ? undefined : `${input.kind}-${input.storeId}-${Date.now()}`,

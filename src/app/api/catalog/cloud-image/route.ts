@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { isCatalogStoreAuthorized } from '@/modules/catalog/backend/routes/catalog-auth';
-import { hasLocalCloudinary, uploadToCloudinary, type CatalogImageKind } from '@/lib/catalog/catalogImageUpload';
+import { cleanEnv, hasLocalCloudinary, uploadToCloudinary, type CatalogImageKind } from '@/lib/catalog/catalogImageUpload';
 
 export const runtime = 'nodejs';
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `La imagen supera ${MAX_BYTES[kind] / 1024 / 1024} MB` }, { status: 400 });
     }
 
-    const base = process.env.CLOUDINARY_FOLDER || 'market-pos';
+    const base = cleanEnv('CLOUDINARY_FOLDER') || 'market-pos';
     const url = await uploadToCloudinary({
       buffer,
       folder: `${base}-catalog/${storeId}`,
@@ -51,6 +51,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url });
   } catch (error) {
     console.error('[catalog/cloud-image] Error:', error);
-    return NextResponse.json({ error: 'No se pudo subir la imagen' }, { status: 500 });
+    // El mensaje de Cloudinary (p. ej. "Invalid Signature", "Invalid api_key") no incluye claves
+    const detail = (error as { message?: string; error?: { message?: string } })?.message
+      ?? (error as { error?: { message?: string } })?.error?.message;
+    return NextResponse.json(
+      { error: detail ? `Cloudinary rechazó la imagen: ${String(detail).slice(0, 200)}` : 'No se pudo subir la imagen' },
+      { status: 500 },
+    );
   }
 }
