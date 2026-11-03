@@ -17,14 +17,14 @@ export function CatalogFooter({ store }: { store: PublicCatalogStore }) {
   const hasContact = Boolean(whatsapp || facebookUrl || instagramUrl || tiktokUrl);
 
   return (
-    <footer className="mt-6 border-t border-neutral-200 bg-white">
+    <footer className="mt-4 rounded-t-3xl bg-white">
       <div className="max-w-6xl mx-auto px-4 py-8 grid gap-8 md:grid-cols-2">
         <div>
-          <h2 className="mb-3 text-sm font-semibold">Cómo pedir</h2>
+          <h2 className="mb-3 text-sm font-bold text-[var(--cat-ink)]">Cómo pedir</h2>
           <ol className="space-y-2 text-sm text-neutral-700">
             {STEPS.map((step, index) => (
               <li key={step} className="flex gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#e7f4ea] text-xs font-semibold text-[#15803d]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--cat-soft)] text-xs font-bold text-[var(--cat-primary)]">
                   {index + 1}
                 </span>
                 {step}
@@ -35,7 +35,7 @@ export function CatalogFooter({ store }: { store: PublicCatalogStore }) {
 
         {hasContact && (
           <div>
-            <h2 className="mb-3 text-sm font-semibold">Contáctanos</h2>
+            <h2 className="mb-3 text-sm font-bold text-[var(--cat-ink)]">Contáctanos</h2>
             <div className="flex flex-wrap gap-2">
               {whatsapp && (
                 <a

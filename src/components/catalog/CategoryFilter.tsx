@@ -1,38 +1,31 @@
-import { CategoryIcon } from '@/components/pos/categoryIcon';
+import { CategoryCard } from './CategoryCard';
+import { DEFAULT_TINT, type CategorySummary } from './categoryTheme';
 
 interface CategoryFilterProps {
-  categories: string[];
+  categories: CategorySummary[];
+  productCount: number;
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
 }
 
 export function CategoryFilter({
   categories,
+  productCount,
   selectedCategory,
   onSelectCategory,
 }: CategoryFilterProps) {
-  return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-      {categories.map((category) => {
-        const active = category === selectedCategory;
+  const all: CategorySummary = { name: 'Todos', tint: DEFAULT_TINT, count: productCount, imageUrl: null };
 
-        return (
-          <button
-            key={category}
-            type="button"
-            onClick={() => onSelectCategory(category)}
-            aria-pressed={active}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm transition-colors ${
-              active
-                ? 'bg-[#15803d] font-semibold text-white'
-                : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
-            }`}
-          >
-            {category !== 'Todos' && <CategoryIcon name={category} className="h-4 w-4" />}
-            {category}
-          </button>
-        );
-      })}
+  return (
+    <div className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 pt-1 scrollbar-hide sm:flex-wrap sm:gap-2">
+      {[all, ...categories].map((category) => (
+        <CategoryCard
+          key={category.name}
+          category={category}
+          isActive={category.name === selectedCategory}
+          onClick={() => onSelectCategory(category.name)}
+        />
+      ))}
     </div>
   );
 }

@@ -1,4 +1,15 @@
+import type { CSSProperties } from 'react';
 import type { PublicCatalogProduct } from '@/types/catalog';
+
+export const CATALOG_THEME = {
+  '--cat-bg': '#fdf4ea',
+  '--cat-soft': '#fbeedd',
+  '--cat-ink': '#2a1538',
+  '--cat-primary': '#4b1d73',
+  '--cat-accent': '#f59e4b',
+  '--cat-accent-text': '#b4540a',
+  '--cat-shadow': '0 6px 20px rgba(120, 80, 40, 0.1)',
+} as CSSProperties;
 
 export interface CategoryTint {
   bg: string;

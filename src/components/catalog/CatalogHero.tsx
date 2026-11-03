@@ -1,7 +1,7 @@
+import { ArrowRight } from 'lucide-react';
 import type { PublicCatalogStore } from '@/types/catalog';
 import { CategoryIcon } from '@/components/pos/categoryIcon';
 import type { CategorySummary } from './categoryTheme';
-import { WhatsAppIcon } from './catalogIcons';
 
 interface CatalogHeroProps {
   store: PublicCatalogStore;
@@ -14,12 +14,12 @@ function HeroVisual({ store, categories }: Pick<CatalogHeroProps, 'store' | 'cat
   if (store.bannerUrl) {
     // El banner puede tener cualquier proporción: se muestra completo sobre su propio fondo
     return (
-      <div className="relative aspect-[16/10] overflow-hidden rounded-[2rem] bg-white shadow-sm">
+      <div className="relative aspect-[2/1] sm:aspect-[16/10] overflow-hidden rounded-2xl">
         <img
           src={store.bannerUrl}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-2xl"
+          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-80 blur-2xl"
         />
         <img
           src={store.bannerUrl}
@@ -34,17 +34,17 @@ function HeroVisual({ store, categories }: Pick<CatalogHeroProps, 'store' | 'cat
   if (tiles.length === 0) return null;
 
   return (
-    <div className={`grid gap-3 ${tiles.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`} aria-hidden="true">
+    <div className="mx-auto grid max-w-xs grid-cols-2 gap-3" aria-hidden="true">
       {tiles.map((category) => (
         <div
           key={category.name}
-          className="flex aspect-[4/3] items-center justify-center rounded-3xl p-4"
-          style={{ backgroundColor: category.tint.bg, color: category.tint.ink }}
+          className="flex aspect-square items-center justify-center rounded-full bg-white p-5"
+          style={{ color: category.tint.ink }}
         >
           {category.imageUrl ? (
-            <img src={category.imageUrl} alt="" className="h-full w-full object-contain mix-blend-multiply" />
+            <img src={category.imageUrl} alt="" className="h-full w-full object-contain" />
           ) : (
-            <CategoryIcon name={category.name} className="h-1/2 w-1/2" />
+            <CategoryIcon name={category.name} className="h-3/5 w-3/5" />
           )}
         </div>
       ))}
@@ -53,7 +53,6 @@ function HeroVisual({ store, categories }: Pick<CatalogHeroProps, 'store' | 'cat
 }
 
 export function CatalogHero({ store, productCount, categories, onBrowse }: CatalogHeroProps) {
-  const whatsapp = store.whatsappNumber;
   const updatedLabel = (() => {
     try {
       return new Intl.DateTimeFormat('es-PE', {
@@ -66,44 +65,37 @@ export function CatalogHero({ store, productCount, categories, onBrowse }: Catal
   })();
 
   return (
-    <section className="bg-[#e7f4ea]">
-      <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
-        <div className="min-w-0">
-          <h1 className="text-4xl sm:text-5xl font-bold leading-[1.08] tracking-tight text-[#12261b] [overflow-wrap:anywhere]">
-            Haz tu pedido en {store.name || 'nuestra tienda'}
-          </h1>
-          <p className="mt-4 max-w-md text-base text-neutral-700">
-            Elige tus productos, arma tu carrito y envíanos el pedido por WhatsApp.
+    <section className="max-w-6xl mx-auto px-4 pt-4">
+      <div className="grid items-center overflow-hidden rounded-3xl bg-gradient-to-br from-[#5b2488] to-[#2f0f4d] text-white sm:grid-cols-2">
+        <div className="min-w-0 p-6 sm:p-10">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-[1.05] tracking-tight">
+            Todo lo que necesitas,
+            <span className="mt-1 block font-bold normal-case italic text-[#fbb36b]">a un mensaje</span>
+          </h2>
+          <p className="mt-3 max-w-sm text-sm sm:text-base text-white/85">
+            Arma tu pedido y envíalo por WhatsApp.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={onBrowse}
-              className="rounded-full bg-[#15803d] px-7 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-[#166534] transition-colors"
-            >
-              Ver productos
-            </button>
-            {whatsapp ? (
-              <a
-                href={`https://wa.me/${whatsapp.replace(/[^\d]/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-full border border-[#15803d]/30 bg-white px-6 py-3.5 text-base font-semibold text-[#15803d] hover:bg-[#f6faf6] transition-colors"
-              >
-                <WhatsAppIcon />
-                Escríbenos
-              </a>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={onBrowse}
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--cat-accent)] py-2.5 pl-6 pr-2.5 text-base font-bold text-[#2f0f4d] hover:bg-[#fbb36b] transition-colors"
+          >
+            Pedir ahora
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          </button>
 
-          <p className="mt-5 text-xs text-neutral-600">
+          <p className="mt-4 text-xs text-white/70">
             {productCount} {productCount === 1 ? 'producto' : 'productos'}
             {updatedLabel ? ` · Actualizado ${updatedLabel}` : ''}
           </p>
         </div>
 
-        <HeroVisual store={store} categories={categories} />
+        <div className="min-w-0 px-5 pb-5 sm:py-6 sm:pl-0 sm:pr-6">
+          <HeroVisual store={store} categories={categories} />
+        </div>
       </div>
     </section>
   );

@@ -19,43 +19,44 @@ export function ProductCard({
   onRemove,
 }: ProductCardProps) {
   return (
-    <div className="group flex h-full flex-col overflow-hidden rounded-3xl border border-neutral-200/80 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-      <div
-        className="relative aspect-square overflow-hidden"
-        style={{ backgroundColor: product.imageUrl ? '#ffffff' : tint.bg, color: tint.ink }}
-      >
+    <div className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--cat-shadow)] transition-all duration-300 hover:-translate-y-0.5">
+      <div className="relative aspect-[5/4] overflow-hidden">
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
             alt={product.name}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="h-full w-full object-contain p-2 transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <CategoryIcon name={product.category} className="h-1/3 w-1/3 opacity-80" />
+            <span
+              className="flex h-20 w-20 items-center justify-center rounded-full"
+              style={{ backgroundColor: tint.bg, color: tint.ink }}
+            >
+              <CategoryIcon name={product.category} className="h-10 w-10" />
+            </span>
           </div>
         )}
         {product.category && (
-          <div
-            className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
-            style={{ color: tint.ink }}
-          >
+          <div className="absolute left-2.5 top-2.5 max-w-[calc(100%-1.25rem)] truncate rounded-full bg-[var(--cat-primary)] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
             {product.category}
           </div>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col p-3">
-        <h3 className="mb-1 line-clamp-2 text-sm leading-snug">{product.name}</h3>
+      <div className="flex flex-1 flex-col px-3 pb-3 pt-1">
+        <h3 className="mb-0.5 line-clamp-2 text-sm font-bold leading-snug text-[var(--cat-ink)]">
+          {product.name}
+        </h3>
         {product.description ? (
-          <p className="mb-2 line-clamp-2 text-xs text-neutral-500">
+          <p className="mb-1 line-clamp-2 text-xs text-neutral-500">
             {product.description}
           </p>
         ) : null}
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
-          <p className="text-lg font-bold tracking-tight text-[#12261b]">
+          <p className="text-lg font-black tracking-tight text-[var(--cat-ink)]">
             S/ {product.price.toFixed(2)}
           </p>
 
@@ -63,29 +64,29 @@ export function ProductCard({
             <button
               type="button"
               onClick={onAdd}
-              className="rounded-full bg-[#15803d] p-2.5 text-white transition-all hover:scale-110 hover:bg-[#166534] active:scale-95"
+              className="rounded-full bg-[var(--cat-accent)] p-2 text-[#2f0f4d] transition-all hover:scale-110 hover:bg-[#fbb36b] active:scale-95"
               aria-label="Agregar al carrito"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" strokeWidth={2.5} />
             </button>
           ) : (
-            <div className="flex items-center gap-1 rounded-full bg-[#15803d] p-1 text-white">
+            <div className="flex items-center gap-1 rounded-full bg-[var(--cat-accent)] p-1 text-[#2f0f4d]">
               <button
                 type="button"
                 onClick={onRemove}
-                className="rounded-full p-1.5 transition-colors hover:bg-[#166534]"
+                className="rounded-full p-1.5 transition-colors hover:bg-[#fbb36b]"
                 aria-label="Quitar del carrito"
               >
-                <Minus className="h-3.5 w-3.5" />
+                <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
               </button>
-              <span className="min-w-[20px] text-center text-sm font-semibold">{quantity}</span>
+              <span className="min-w-[20px] text-center text-sm font-bold">{quantity}</span>
               <button
                 type="button"
                 onClick={onAdd}
-                className="rounded-full p-1.5 transition-colors hover:bg-[#166534]"
+                className="rounded-full p-1.5 transition-colors hover:bg-[#fbb36b]"
                 aria-label="Agregar al carrito"
               >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
               </button>
             </div>
           )}

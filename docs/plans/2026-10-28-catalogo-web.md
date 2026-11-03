@@ -2,7 +2,8 @@
 
 Fecha: 2026-10-28. Estado: fases 1 y 2 implementadas el 2026-11-02, sin cambios
 de esquema ni de API. Fases 3 y 4 pendientes. El pie de página aún no muestra
-dirección ni horario: dependen de la fase 3.
+dirección ni horario: dependen de la fase 3. El 2026-11-02 se cambió el estilo
+a crema, morado y naranja con barra inferior en celular, a pedido del usuario.
 
 Referencia: diseño de tienda de abarrotes con portada (título, botón y foto del
 producto), menú de categorías arriba, mosaico de categorías en colores pastel con

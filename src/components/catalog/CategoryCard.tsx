@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import { CategoryIcon } from '@/components/pos/categoryIcon';
 import type { CategorySummary } from './categoryTheme';
 
@@ -16,27 +15,30 @@ export function CategoryCard({ category, isActive, onClick }: CategoryCardProps)
       type="button"
       onClick={onClick}
       aria-pressed={isActive}
-      className={`group relative aspect-[4/3] w-full overflow-hidden rounded-3xl text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
-        isActive ? 'ring-2 ring-offset-2 ring-offset-[#f6faf6]' : ''
-      }`}
-      style={{ backgroundColor: tint.bg, color: tint.ink, '--tw-ring-color': tint.ink } as CSSProperties}
+      className="group flex w-[4.75rem] sm:w-24 shrink-0 flex-col items-center gap-1.5"
     >
-      <span className="absolute inset-x-4 top-3 bottom-11 flex items-center justify-center">
+      <span
+        className={`flex h-[4.25rem] w-[4.25rem] items-center justify-center overflow-hidden rounded-full p-3 shadow-[var(--cat-shadow)] transition-all group-hover:-translate-y-0.5 ${
+          isActive ? 'bg-[#fbd9b5]' : 'bg-white'
+        }`}
+        style={{ color: tint.ink }}
+      >
         {imageUrl ? (
           <img
             src={imageUrl}
             alt=""
             loading="lazy"
-            className="h-full w-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
+            className={`h-full w-full object-contain ${isActive ? 'mix-blend-multiply' : ''}`}
           />
         ) : (
-          <CategoryIcon
-            name={name}
-            className="h-16 w-16 sm:h-20 sm:w-20 transition-transform duration-500 group-hover:scale-105"
-          />
+          <CategoryIcon name={name} className="h-7 w-7" />
         )}
       </span>
-      <span className="absolute inset-x-4 bottom-3 truncate text-sm sm:text-base font-semibold">
+      <span
+        className={`w-full truncate text-center text-xs ${
+          isActive ? 'font-bold text-[var(--cat-accent-text)]' : 'text-[var(--cat-ink)]'
+        }`}
+      >
         {name}
       </span>
     </button>

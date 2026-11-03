@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { PublicCatalogProduct, PublicCatalogStore } from '@/types/catalog';
 import { CartDrawer } from '@/components/catalog/CartDrawer';
+import { CatalogBottomNav } from './CatalogBottomNav';
 import { CatalogFooter } from './CatalogFooter';
 import { CatalogHero } from './CatalogHero';
+import { WhatsAppIcon } from './catalogIcons';
 import { CategoryFilter } from './CategoryFilter';
-import { CategoryGrid } from './CategoryGrid';
-import { categoryOf, DEFAULT_TINT, summarizeCategories } from './categoryTheme';
+import { CATALOG_THEME, categoryOf, DEFAULT_TINT, summarizeCategories } from './categoryTheme';
+import { FeaturedProducts } from './FeaturedProducts';
 import { ProductGrid } from './ProductGrid';
 import { StoreHeader } from './StoreHeader';
 
@@ -22,6 +24,7 @@ export interface CartItem extends PublicCatalogProduct {
 }
 
 const PRODUCTS_PER_PAGE = 20;
+const FEATURED_PRODUCTS = 8;
 
 export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
   const [search, setSearch] = useState('');
@@ -31,13 +34,10 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const productsRef = useRef<HTMLElement>(null);
+  const categoriesRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const categorySummaries = useMemo(() => summarizeCategories(products), [products]);
-  const categories = useMemo(
-    () => ['Todos', ...categorySummaries.map((category) => category.name)],
-    [categorySummaries],
-  );
   const navCategories = useMemo(
     () =>
       [...categorySummaries]
@@ -45,6 +45,16 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
         .slice(0, 4)
         .map((category) => category.name),
     [categorySummaries],
+  );
+  // Primero los que tienen foto; con pocos productos repetirían la lista completa
+  const featuredProducts = useMemo(
+    () =>
+      products.length > FEATURED_PRODUCTS
+        ? [...products]
+            .sort((a, b) => Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl)))
+            .slice(0, FEATURED_PRODUCTS)
+        : [],
+    [products],
   );
 
   const filteredProducts = useMemo(() => {
@@ -134,13 +144,21 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
     scrollToProducts();
   };
 
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
   const focusSearch = () => {
-    scrollToProducts();
+    scrollToTop();
     searchRef.current?.focus({ preventScroll: true });
   };
 
+  const searching = search.trim() !== '';
+  const showHome = selectedCategory === 'Todos' && !searching;
+  const whatsappLink = store.whatsappNumber
+    ? `https://wa.me/${store.whatsappNumber.replace(/[^\d]/g, '')}`
+    : '';
+
   return (
-    <main className="min-h-screen bg-[#f6faf6] text-neutral-900">
+    <main className="min-h-screen bg-[var(--cat-bg)] pb-24 text-neutral-900 sm:pb-0" style={CATALOG_THEME}>
       <StoreHeader
         store={store}
         navCategories={navCategories}
@@ -151,52 +169,82 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
         onCategoryClick={goToCategory}
       />
 
-      <CatalogHero
-        store={store}
-        productCount={products.length}
-        categories={categorySummaries}
-        onBrowse={scrollToProducts}
-      />
-
-      <CategoryGrid
-        categories={categorySummaries}
-        selectedCategory={selectedCategory}
-        onSelectCategory={goToCategory}
-      />
-
-      <section ref={productsRef} className="scroll-mt-16 pt-6">
-        <div className="sticky top-16 z-40 bg-[#f6faf6]/95 backdrop-blur border-b border-neutral-200/70 px-4 py-2.5">
-          <div className="max-w-6xl mx-auto">
-            <CategoryFilter
-              categories={categories}
-              selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
-            />
-          </div>
+      <div className="max-w-6xl mx-auto px-4 pt-1">
+        <div className="relative">
+          <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--cat-ink)]" />
+          <input
+            ref={searchRef}
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar productos..."
+            className="w-full h-12 pl-12 pr-4 bg-white rounded-full text-sm outline-none shadow-[var(--cat-shadow)] focus:ring-2 focus:ring-[var(--cat-accent)]"
+          />
         </div>
+      </div>
 
+      {!searching && (
+        <CatalogHero
+          store={store}
+          productCount={products.length}
+          categories={categorySummaries}
+          onBrowse={scrollToProducts}
+        />
+      )}
+
+      <div ref={categoriesRef} className="max-w-6xl mx-auto px-4 pt-5 scroll-mt-20">
+        <CategoryFilter
+          categories={categorySummaries}
+          productCount={products.length}
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+        />
+      </div>
+
+      {showHome && featuredProducts.length > 0 && (
+        <FeaturedProducts
+          products={featuredProducts}
+          getTint={getTint}
+          getQuantity={getQuantity}
+          onAdd={addToCart}
+          onRemove={(product) => decreaseQty(product.id)}
+          onViewAll={scrollToProducts}
+        />
+      )}
+
+      {showHome && whatsappLink && (
+        <section className="max-w-6xl mx-auto px-4 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-[#efe3f5] p-5 sm:px-8">
+            <div className="min-w-0">
+              <p className="text-lg font-black leading-tight text-[var(--cat-ink)]">
+                ¿No encuentras lo que buscas?
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--cat-ink)]">
+                Escríbenos y te ayudamos con tu pedido.
+              </p>
+            </div>
+            <a
+              href={whatsappLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-full bg-[var(--cat-primary)] px-5 py-2.5 text-sm font-bold text-white"
+            >
+              <WhatsAppIcon />
+              Escríbenos
+            </a>
+          </div>
+        </section>
+      )}
+
+      <section ref={productsRef} className="scroll-mt-20">
         <div className="px-4 py-6 max-w-6xl mx-auto">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-bold tracking-tight">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="text-lg font-black tracking-tight text-[var(--cat-ink)]">
             {selectedCategory === 'Todos' ? 'Todos los productos' : selectedCategory}
           </h2>
-
-          <div className="flex items-center gap-3">
-            <span className="shrink-0 text-sm text-neutral-600">
-              {filteredProducts.length} productos
-            </span>
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
-                ref={searchRef}
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar productos..."
-                className="w-full pl-9 pr-3 py-2 bg-white/90 border border-neutral-200 rounded-full text-sm outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]/40 shadow-sm"
-              />
-            </div>
-          </div>
+          <span className="shrink-0 text-sm text-neutral-600">
+            {filteredProducts.length} productos
+          </span>
         </div>
 
         <ProductGrid
@@ -241,7 +289,7 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
                     onClick={() => setCurrentPage(page)}
                     className={`w-9 h-9 rounded-lg font-medium text-sm transition-colors ${
                       currentPage === page
-                        ? 'bg-[#15803d] text-white'
+                        ? 'bg-[var(--cat-primary)] text-white'
                         : 'border border-neutral-300 text-neutral-700 hover:bg-neutral-100'
                     }`}
                   >
@@ -266,6 +314,17 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
       </section>
 
       <CatalogFooter store={store} />
+
+      <CatalogBottomNav
+        whatsappNumber={store.whatsappNumber}
+        cartItemsCount={cartItemsCount}
+        onHomeClick={scrollToTop}
+        onCategoriesClick={() =>
+          categoriesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+        onCartClick={() => setIsCartOpen(true)}
+        onSearchClick={focusSearch}
+      />
 
       <CartDrawer
         store={store}
