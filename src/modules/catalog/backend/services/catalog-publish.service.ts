@@ -22,6 +22,7 @@ export class CatalogPublishService {
         whatsappNumber: input.whatsappNumber,
         logoUrl: input.logoUrl,
         bannerUrl: input.bannerUrl,
+        palette: input.palette,
         catalogUrl,
       });
     });

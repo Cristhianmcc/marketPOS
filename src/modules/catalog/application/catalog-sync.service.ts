@@ -43,6 +43,7 @@ export class CatalogSyncService {
       whatsappNumber: settings.whatsappNumber,
       logoUrl: settings.storeLogoPath ?? null,
       bannerUrl: settings.storeBannerPath ?? null,
+      palette: settings.catalogPalette,
       products: products.map((p) => this._projectionToPayload(p)),
     };
 

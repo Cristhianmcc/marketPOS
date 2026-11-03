@@ -18,6 +18,8 @@ import {
 import { toast, Toaster } from 'sonner';
 import { openExternalLink } from '@/lib/openExternalLink';
 import { useRouter } from 'next/navigation';
+import { CatalogPalettePicker } from '@/components/catalog/CatalogPalettePicker';
+import { DEFAULT_CATALOG_PALETTE } from '@/lib/catalog/palettes';
 
 interface CatalogSettings {
   id: string;
@@ -30,6 +32,7 @@ interface CatalogSettings {
   tiktokUrl?: string | null;
   storeLogoPath?: string;
   storeBannerPath?: string;
+  catalogPalette?: string;
 }
 
 const TikTokIcon = () => (
@@ -54,6 +57,7 @@ export default function CatalogSettingsPage() {
     tiktokUrl: '',
     storeLogoPath: '',
     storeBannerPath: '',
+    catalogPalette: DEFAULT_CATALOG_PALETTE,
   });
 
   // ── Estado sincronización de imágenes (solo desktop) ──────────────────
@@ -171,6 +175,7 @@ export default function CatalogSettingsPage() {
             tiktokUrl: data.tiktokUrl || '',
             storeLogoPath: data.storeLogoPath || '',
             storeBannerPath: data.storeBannerPath || '',
+            catalogPalette: data.catalogPalette || DEFAULT_CATALOG_PALETTE,
           });
         }
       }
@@ -587,6 +592,11 @@ export default function CatalogSettingsPage() {
               </div>
             </div>
           </div>
+
+          <CatalogPalettePicker
+            value={formData.catalogPalette}
+            onChange={(catalogPalette) => setFormData((prev) => ({ ...prev, catalogPalette }))}
+          />
 
           <div className="flex justify-end pt-4 border-t">
             <button

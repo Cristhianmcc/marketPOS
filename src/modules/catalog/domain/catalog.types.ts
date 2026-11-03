@@ -93,6 +93,7 @@ export interface CatalogPublishPayload {
   whatsappNumber: string;
   logoUrl: string | null;
   bannerUrl: string | null;
+  palette?: string;
   products: CatalogPublishProductPayload[];
 }
 

@@ -189,7 +189,7 @@ async function seedStore(db: PrismaClient) {
     data: { storeId, maxDiscountPercent: 15, maxManualDiscountAmount: 20, maxSaleTotal: 5000, maxItemsPerSale: 80, maxReceivableBalance: 500 },
   });
   await db.catalogSettings.create({
-    data: { storeId, enabled: true, storeName: 'Botica Roundtrip', storeSlug: 'botica-roundtrip', whatsappNumber: '51999111222', catalogStatus: 'PUBLISHED', catalogUrl: 'https://example.invalid/c/botica-roundtrip' },
+    data: { storeId, enabled: true, storeName: 'Botica Roundtrip', storeSlug: 'botica-roundtrip', whatsappNumber: '51999111222', catalogPalette: 'rose-blush', catalogStatus: 'PUBLISHED', catalogUrl: 'https://example.invalid/c/botica-roundtrip' },
   });
 
   const owner = await db.user.create({ data: { storeId, email: 'owner@roundtrip.test', name: 'Dueña Prueba', password: 'hash-no-exportable', role: 'OWNER' } });
@@ -572,6 +572,7 @@ async function inspectExport(zipPath: string, source: PrismaClient, storeId: str
   check('adelantos de órdenes de trabajo', nested('workOrders', 'payments') === 1 && metadata.counts?.workOrderPayments === 1, `zip=${nested('workOrders', 'payments')}`);
   check('límites operativos', !!data.operationalLimit && metadata.counts?.operationalLimits === 1, 'objeto único');
   check('catálogo público', !!data.catalogSettings && metadata.counts?.catalogSettings === 1, 'objeto único');
+  check('paleta del catálogo en el respaldo', (data.catalogSettings as Row | undefined)?.catalogPalette === 'rose-blush', 'rose-blush');
 
   const unitCodes = ((data.units as Row[] | undefined) || []).map((u) => String(u.code)).sort();
   check('unidades usadas', JSON.stringify(unitCodes) === JSON.stringify(UNITS.map((u) => u.code).sort()), `zip=${unitCodes.join(',')}`);

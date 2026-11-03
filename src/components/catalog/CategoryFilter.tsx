@@ -1,5 +1,5 @@
 import { CategoryCard } from './CategoryCard';
-import { DEFAULT_TINT, type CategorySummary } from './categoryTheme';
+import type { CategorySummary } from './categoryTheme';
 
 interface CategoryFilterProps {
   categories: CategorySummary[];
@@ -14,7 +14,7 @@ export function CategoryFilter({
   selectedCategory,
   onSelectCategory,
 }: CategoryFilterProps) {
-  const all: CategorySummary = { name: 'Todos', tint: DEFAULT_TINT, count: productCount, imageUrl: null };
+  const all: CategorySummary = { name: 'Todos', count: productCount, imageUrl: null };
 
   return (
     <div className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 pt-1 scrollbar-hide sm:flex-wrap sm:gap-2">

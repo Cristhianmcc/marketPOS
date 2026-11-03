@@ -160,6 +160,12 @@ es `docs/audits/2026-09-26-pos.md`.
   (`catalogCloudHeaders`); la nube lo valida con `isCatalogStoreAuthorized`
   (una tienda solo publica su catálogo) y sube imágenes a Cloudinary en
   `/api/catalog/cloud-image`. Banco: `scripts/test-catalog-publish-isolated.ts`.
+- Paletas del catálogo: `src/lib/catalog/palettes.ts` define las 10 paletas y
+  deriva los colores de contraste. `CatalogSettings.catalogPalette` se elige en
+  Configuración → Catálogo Web y viaja como `palette` al publicar; si un
+  instalador antiguo no la envía, la nube conserva la que tenía. Los componentes
+  de `src/components/catalog` usan solo variables `--cat-*`. Banco:
+  `scripts/test-catalog-palettes.ts`.
 - Lavandería: `WorkOrder.garments` (JSON `[{ name, qty }]`, `parseGarments`)
   guarda las prendas recibidas; salen en ambos tickets y en el detalle. El aviso
   de orden lista abre `wa.me` con el mensaje (`readyWhatsappLink`, celular

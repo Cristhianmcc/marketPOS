@@ -8,7 +8,7 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category, isActive, onClick }: CategoryCardProps) {
-  const { name, tint, imageUrl } = category;
+  const { name, imageUrl } = category;
 
   return (
     <button
@@ -18,10 +18,9 @@ export function CategoryCard({ category, isActive, onClick }: CategoryCardProps)
       className="group flex w-[4.75rem] sm:w-24 shrink-0 flex-col items-center gap-1.5"
     >
       <span
-        className={`flex h-[4.25rem] w-[4.25rem] items-center justify-center overflow-hidden rounded-full p-3 shadow-[var(--cat-shadow)] transition-all group-hover:-translate-y-0.5 ${
-          isActive ? 'bg-[#fbd9b5]' : 'bg-white'
+        className={`flex h-[4.25rem] w-[4.25rem] items-center justify-center overflow-hidden rounded-full p-3 text-[var(--cat-primary)] shadow-[var(--cat-shadow)] transition-all group-hover:-translate-y-0.5 ${
+          isActive ? 'bg-[var(--cat-active)]' : 'bg-white'
         }`}
-        style={{ color: tint.ink }}
       >
         {imageUrl ? (
           <img

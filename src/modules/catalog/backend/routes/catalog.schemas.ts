@@ -7,6 +7,8 @@ export const CatalogPublishPayloadSchema = z.object({
   whatsappNumber: z.string(),
   logoUrl: z.string().url().nullable(),
   bannerUrl: z.string().url().nullable(),
+  // Opcional: un instalador antiguo no la envía y se conserva la de la tienda
+  palette: z.string().max(40).optional(),
   products: z.array(
     z.object({
       localProductId: z.string().min(1),

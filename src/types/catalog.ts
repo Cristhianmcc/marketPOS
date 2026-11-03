@@ -9,6 +9,7 @@ export interface PublicCatalogStore {
   facebookUrl?: string | null;
   instagramUrl?: string | null;
   tiktokUrl?: string | null;
+  palette?: string | null;
   updatedAt: string;
 }
 

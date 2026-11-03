@@ -1,11 +1,9 @@
 import { ArrowRight } from 'lucide-react';
 import type { PublicCatalogProduct } from '@/types/catalog';
-import type { CategoryTint } from './categoryTheme';
 import { ProductCard } from './ProductCard';
 
 interface FeaturedProductsProps {
   products: PublicCatalogProduct[];
-  getTint: (product: PublicCatalogProduct) => CategoryTint;
   getQuantity: (productId: string) => number;
   onAdd: (product: PublicCatalogProduct) => void;
   onRemove: (product: PublicCatalogProduct) => void;
@@ -14,7 +12,6 @@ interface FeaturedProductsProps {
 
 export function FeaturedProducts({
   products,
-  getTint,
   getQuantity,
   onAdd,
   onRemove,
@@ -39,7 +36,6 @@ export function FeaturedProducts({
           <div key={product.id} className="w-40 shrink-0 sm:w-48">
             <ProductCard
               product={product}
-              tint={getTint(product)}
               quantity={getQuantity(product.id)}
               onAdd={() => onAdd(product)}
               onRemove={() => onRemove(product)}

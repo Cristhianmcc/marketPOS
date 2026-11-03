@@ -163,6 +163,17 @@ async function flowWorker(contextPath: string) {
     indexUntouched: fs.statSync(indexPath).mtimeMs === indexBefore,
   };
 
+  // P8 La paleta elegida llega al catálogo público; un instalador antiguo no la borra
+  await prisma.catalogSettings.update({ where: { storeId: ctx.storeId }, data: { catalogPalette: 'ocean-teal' } });
+  await desktopPublish.POST(new NextRequest('http://localhost/api/desktop/publish-catalog', { method: 'POST' }));
+  const publicPalette = async () => (await read(await publicCatalog.GET(new NextRequest(`${CLOUD}/api/catalog/public/bodega-catalogo`), { params: Promise.resolve({ slug: 'bodega-catalogo' }) }))).body?.store?.palette;
+  const token = createStoreLicenseToken(ctx.storeId);
+  const chosen = await publicPalette();
+  await cloudPublish.POST(jsonReq(`${CLOUD}/api/catalog/publish`, payload, { authorization: `Bearer ${token}` }));
+  const afterOldInstaller = await publicPalette();
+  await cloudPublish.POST(jsonReq(`${CLOUD}/api/catalog/publish`, { ...payload, palette: 'inventada' }, { authorization: `Bearer ${token}` }));
+  steps.P8 = { chosen, afterOldInstaller, afterUnknown: await publicPalette() };
+
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
 
@@ -183,6 +194,11 @@ const EXPECTATIONS: { id: string; title: string; check: (s: Steps) => string[] }
     ...eq('catálogo público', s.P4?.publicStatus, 200),
     ...eq('productos visibles', s.P4?.products, ['Agua 625 ml:sin foto', 'Galletas con foto local:sin foto', 'Inca Kola 500 ml:foto']),
     ...eq('estado local', s.P4?.localStatus, 'PUBLISHED'),
+  ] },
+  { id: 'P8', title: 'La paleta llega al catálogo público y un instalador antiguo no la borra', check: (s) => [
+    ...eq('paleta publicada', s.P8?.chosen, 'ocean-teal'),
+    ...eq('tras publicar sin paleta', s.P8?.afterOldInstaller, 'ocean-teal'),
+    ...eq('una paleta desconocida se ignora', s.P8?.afterUnknown, 'ocean-teal'),
   ] },
   { id: 'P5', title: 'Subida de imágenes por la nube: token obligatorio y formatos válidos', check: (s) =>
     eq('respuestas', s.P5, { unauthorized: 401, authorizedNoCloudinary: 503, badType: 400 }) },

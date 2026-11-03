@@ -9,7 +9,8 @@ import { CatalogFooter } from './CatalogFooter';
 import { CatalogHero } from './CatalogHero';
 import { WhatsAppIcon } from './catalogIcons';
 import { CategoryFilter } from './CategoryFilter';
-import { CATALOG_THEME, categoryOf, DEFAULT_TINT, summarizeCategories } from './categoryTheme';
+import { catalogThemeStyle } from '@/lib/catalog/palettes';
+import { categoryOf, summarizeCategories } from './categoryTheme';
 import { FeaturedProducts } from './FeaturedProducts';
 import { ProductGrid } from './ProductGrid';
 import { StoreHeader } from './StoreHeader';
@@ -131,9 +132,6 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
   const getQuantity = (productId: string) =>
     cart.find((item) => item.id === productId)?.quantity ?? 0;
 
-  const getTint = (product: PublicCatalogProduct) =>
-    categorySummaries.find((category) => category.name === categoryOf(product))?.tint ?? DEFAULT_TINT;
-
   const scrollToProducts = () => {
     productsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -158,7 +156,7 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
     : '';
 
   return (
-    <main className="min-h-screen bg-[var(--cat-bg)] pb-24 text-neutral-900 sm:pb-0" style={CATALOG_THEME}>
+    <main className="min-h-screen bg-[var(--cat-bg)] pb-24 text-neutral-900 sm:pb-0" style={catalogThemeStyle(store.palette)}>
       <StoreHeader
         store={store}
         navCategories={navCategories}
@@ -204,7 +202,6 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
       {showHome && featuredProducts.length > 0 && (
         <FeaturedProducts
           products={featuredProducts}
-          getTint={getTint}
           getQuantity={getQuantity}
           onAdd={addToCart}
           onRemove={(product) => decreaseQty(product.id)}
@@ -214,7 +211,7 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
 
       {showHome && whatsappLink && (
         <section className="max-w-6xl mx-auto px-4 pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-[#efe3f5] p-5 sm:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-[var(--cat-soft)] p-5 sm:px-8">
             <div className="min-w-0">
               <p className="text-lg font-black leading-tight text-[var(--cat-ink)]">
                 ¿No encuentras lo que buscas?
@@ -249,7 +246,6 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
 
         <ProductGrid
           products={paginatedProducts}
-          getTint={getTint}
           getQuantity={getQuantity}
           onAdd={addToCart}
           onRemove={(product) => decreaseQty(product.id)}

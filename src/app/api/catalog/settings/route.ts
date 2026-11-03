@@ -1,3 +1,4 @@
+import { isCatalogPalette } from '@/lib/catalog/palettes';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentStoreUser } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
@@ -116,7 +117,12 @@ export async function POST(req: NextRequest) {
       facebookUrl,
       instagramUrl,
       tiktokUrl,
+      catalogPalette,
     } = body;
+
+    if (catalogPalette !== undefined && !isCatalogPalette(catalogPalette)) {
+      return NextResponse.json({ error: 'Paleta de colores no válida' }, { status: 400 });
+    }
 
     if (slug && !/^[a-z0-9-]+$/.test(slug)) {
       return NextResponse.json(
@@ -169,6 +175,7 @@ export async function POST(req: NextRequest) {
       facebookUrl: facebookUrl || null,
       instagramUrl: instagramUrl || null,
       tiktokUrl: tiktokUrl || null,
+      catalogPalette,
     };
 
     // Respuesta que devolvemos si nada funciona (BD sin tabla)

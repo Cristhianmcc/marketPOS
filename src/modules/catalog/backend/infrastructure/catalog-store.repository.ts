@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { isCatalogPalette } from '@/lib/catalog/palettes';
 
 type DBClient = PrismaClient | Prisma.TransactionClient;
 
@@ -23,6 +24,7 @@ export class CatalogStoreRepository {
           facebookUrl: true,
           instagramUrl: true,
           tiktokUrl: true,
+          catalogPalette: true,
           catalogUrl: true,
           updatedAt: true,
         },
@@ -35,7 +37,9 @@ export class CatalogStoreRepository {
         msg.includes('Unknown field') ||
         msg.includes('facebookUrl') ||
         msg.includes('instagramUrl') ||
-        msg.includes('tiktokUrl')
+        msg.includes('tiktokUrl') ||
+        msg.includes('catalogPalette') ||
+        msg.includes('catalog_palette')
       ) {
         return this.db.catalogSettings.findFirst({
           where: {
@@ -67,9 +71,11 @@ export class CatalogStoreRepository {
     whatsappNumber: string;
     logoUrl: string | null;
     bannerUrl: string | null;
+    palette?: string;
     catalogUrl: string;
   }): Promise<void> {
     const now = new Date();
+    const palette = isCatalogPalette(input.palette) ? { catalogPalette: input.palette } : {};
 
     await this.db.catalogSettings.upsert({
       where: { storeId: input.storeId },
@@ -80,6 +86,7 @@ export class CatalogStoreRepository {
         storeSlug: input.slug,
         storeLogoPath: input.logoUrl,
         storeBannerPath: input.bannerUrl,
+        ...palette,
         whatsappNumber: input.whatsappNumber,
         catalogStatus: 'PUBLISHED',
         catalogUrl: input.catalogUrl,
@@ -93,6 +100,7 @@ export class CatalogStoreRepository {
         storeSlug: input.slug,
         storeLogoPath: input.logoUrl,
         storeBannerPath: input.bannerUrl,
+        ...palette,
         whatsappNumber: input.whatsappNumber,
         catalogStatus: 'PUBLISHED',
         catalogUrl: input.catalogUrl,

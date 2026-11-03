@@ -38,8 +38,7 @@ function HeroVisual({ store, categories }: Pick<CatalogHeroProps, 'store' | 'cat
       {tiles.map((category) => (
         <div
           key={category.name}
-          className="flex aspect-square items-center justify-center rounded-full bg-white p-5"
-          style={{ color: category.tint.ink }}
+          className="flex aspect-square items-center justify-center rounded-full bg-white p-5 text-[var(--cat-primary)]"
         >
           {category.imageUrl ? (
             <img src={category.imageUrl} alt="" className="h-full w-full object-contain" />
@@ -66,11 +65,11 @@ export function CatalogHero({ store, productCount, categories, onBrowse }: Catal
 
   return (
     <section className="max-w-6xl mx-auto px-4 pt-4">
-      <div className="grid items-center overflow-hidden rounded-3xl bg-gradient-to-br from-[#5b2488] to-[#2f0f4d] text-white sm:grid-cols-2">
+      <div className="grid items-center overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--cat-hero-from)] to-[var(--cat-hero-to)] text-white sm:grid-cols-2">
         <div className="min-w-0 p-6 sm:p-10">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-[1.05] tracking-tight">
             Todo lo que necesitas,
-            <span className="mt-1 block font-bold normal-case italic text-[#fbb36b]">a un mensaje</span>
+            <span className="mt-1 block font-bold normal-case italic text-[var(--cat-hero-highlight)]">a un mensaje</span>
           </h2>
           <p className="mt-3 max-w-sm text-sm sm:text-base text-white/85">
             Arma tu pedido y envíalo por WhatsApp.
@@ -79,10 +78,10 @@ export function CatalogHero({ store, productCount, categories, onBrowse }: Catal
           <button
             type="button"
             onClick={onBrowse}
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--cat-accent)] py-2.5 pl-6 pr-2.5 text-base font-bold text-[#2f0f4d] hover:bg-[#fbb36b] transition-colors"
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-[var(--cat-accent)] py-2.5 pl-6 pr-2.5 text-base font-bold text-[var(--cat-on-accent)] hover:bg-[var(--cat-accent-hover)] transition-colors"
           >
             Pedir ahora
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[var(--cat-ink)]">
               <ArrowRight className="h-4 w-4" />
             </span>
           </button>

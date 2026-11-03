@@ -22,7 +22,7 @@ export function CatalogBottomNav({
 }: CatalogBottomNavProps) {
   return (
     <nav
-      className="fixed inset-x-3 bottom-3 z-40 flex h-16 items-center justify-around rounded-full bg-white px-2 shadow-[0_8px_30px_rgba(74,40,100,0.18)] sm:hidden"
+      className="fixed inset-x-3 bottom-3 z-40 flex h-16 items-center justify-around rounded-full bg-white px-2 shadow-[0_8px_30px_rgba(0,0,0,0.16)] sm:hidden"
       aria-label="Navegación"
     >
       <button type="button" onClick={onHomeClick} className={navItem}>
@@ -43,7 +43,7 @@ export function CatalogBottomNav({
         <ShoppingBag className="h-5 w-5" />
         Pedido
         {cartItemsCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--cat-accent)] px-1 text-xs font-bold text-[#2f0f4d]">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--cat-accent)] px-1 text-xs font-bold text-[var(--cat-on-accent)]">
             {cartItemsCount}
           </span>
         )}

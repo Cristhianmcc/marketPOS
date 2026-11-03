@@ -34,11 +34,11 @@ export function CartDrawer({
         onClick={onClose}
       />
 
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 shadow-2xl flex flex-col animate-slide-in">
+      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-[var(--cat-bg)] text-[var(--cat-ink)] z-50 shadow-2xl flex flex-col animate-slide-in">
         <div className="px-4 py-4 border-b border-neutral-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5" />
-            <h2 className="text-lg">Mi Carrito</h2>
+            <ShoppingBag className="w-5 h-5 text-[var(--cat-primary)]" />
+            <h2 className="text-lg font-bold">Mi Carrito</h2>
           </div>
           <button
             onClick={onClose}
@@ -61,9 +61,9 @@ export function CartDrawer({
               {cart.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-neutral-50 rounded-2xl p-3 flex gap-3 relative"
+                  className="bg-white rounded-2xl p-3 flex gap-3 relative shadow-[var(--cat-shadow)]"
                 >
-                  <div className="w-20 h-20 bg-white rounded-xl overflow-hidden flex-shrink-0">
+                  <div className="w-20 h-20 bg-[var(--cat-soft)] rounded-xl overflow-hidden flex-shrink-0">
                     {item.imageUrl ? (
                       <img
                         src={item.imageUrl}
@@ -71,7 +71,7 @@ export function CartDrawer({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-neutral-400">
+                      <div className="w-full h-full flex items-center justify-center text-[var(--cat-primary)]">
                         <CategoryIcon name={item.category} className="w-8 h-8" />
                       </div>
                     )}
@@ -82,7 +82,7 @@ export function CartDrawer({
                     <p className="text-xs text-neutral-500 mb-2">
                       {item.description || item.category}
                     </p>
-                    <p className="text-sm">S/ {item.price.toFixed(2)}</p>
+                    <p className="text-sm font-bold">S/ {item.price.toFixed(2)}</p>
                   </div>
 
                   <button
@@ -126,7 +126,7 @@ export function CartDrawer({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-base">Total</span>
-              <span className="text-xl">S/ {total.toFixed(2)}</span>
+              <span className="text-xl font-black">S/ {total.toFixed(2)}</span>
             </div>
             <WhatsappCheckoutButton
               whatsappNumber={store.whatsappNumber}

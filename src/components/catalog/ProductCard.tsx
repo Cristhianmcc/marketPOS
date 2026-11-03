@@ -1,11 +1,9 @@
 import { Minus, Plus } from 'lucide-react';
 import { CategoryIcon } from '@/components/pos/categoryIcon';
 import type { PublicCatalogProduct } from '@/types/catalog';
-import type { CategoryTint } from './categoryTheme';
 
 interface ProductCardProps {
   product: PublicCatalogProduct;
-  tint: CategoryTint;
   quantity: number;
   onAdd: () => void;
   onRemove: () => void;
@@ -13,7 +11,6 @@ interface ProductCardProps {
 
 export function ProductCard({
   product,
-  tint,
   quantity,
   onAdd,
   onRemove,
@@ -30,10 +27,7 @@ export function ProductCard({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <span
-              className="flex h-20 w-20 items-center justify-center rounded-full"
-              style={{ backgroundColor: tint.bg, color: tint.ink }}
-            >
+            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-[var(--cat-soft)] text-[var(--cat-primary)]">
               <CategoryIcon name={product.category} className="h-10 w-10" />
             </span>
           </div>
@@ -64,17 +58,17 @@ export function ProductCard({
             <button
               type="button"
               onClick={onAdd}
-              className="rounded-full bg-[var(--cat-accent)] p-2 text-[#2f0f4d] transition-all hover:scale-110 hover:bg-[#fbb36b] active:scale-95"
+              className="rounded-full bg-[var(--cat-accent)] p-2 text-[var(--cat-on-accent)] transition-all hover:scale-110 hover:bg-[var(--cat-accent-hover)] active:scale-95"
               aria-label="Agregar al carrito"
             >
               <Plus className="h-5 w-5" strokeWidth={2.5} />
             </button>
           ) : (
-            <div className="flex items-center gap-1 rounded-full bg-[var(--cat-accent)] p-1 text-[#2f0f4d]">
+            <div className="flex items-center gap-1 rounded-full bg-[var(--cat-accent)] p-1 text-[var(--cat-on-accent)]">
               <button
                 type="button"
                 onClick={onRemove}
-                className="rounded-full p-1.5 transition-colors hover:bg-[#fbb36b]"
+                className="rounded-full p-1.5 transition-colors hover:bg-[var(--cat-accent-hover)]"
                 aria-label="Quitar del carrito"
               >
                 <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
@@ -83,7 +77,7 @@ export function ProductCard({
               <button
                 type="button"
                 onClick={onAdd}
-                className="rounded-full p-1.5 transition-colors hover:bg-[#fbb36b]"
+                className="rounded-full p-1.5 transition-colors hover:bg-[var(--cat-accent-hover)]"
                 aria-label="Agregar al carrito"
               >
                 <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />

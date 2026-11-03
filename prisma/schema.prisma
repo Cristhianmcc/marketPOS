@@ -1586,6 +1586,7 @@ model CatalogSettings {
   facebookUrl     String?    @map("facebook_url")
   instagramUrl    String?    @map("instagram_url")
   tiktokUrl       String?    @map("tiktok_url")
+  catalogPalette  String     @default("crema") @map("catalog_palette")
   catalogStatus   CatalogStatus @default(DRAFT) @map("catalog_status")
   catalogUrl      String?    @map("catalog_url")
   lastPublishedAt DateTime?  @map("last_published_at")

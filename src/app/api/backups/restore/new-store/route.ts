@@ -548,6 +548,7 @@ export async function POST(request: NextRequest) {
             facebookUrl: catalog.facebookUrl,
             instagramUrl: catalog.instagramUrl,
             tiktokUrl: catalog.tiktokUrl,
+            ...(catalog.catalogPalette ? { catalogPalette: catalog.catalogPalette } : {}),
             catalogStatus: 'DISABLED',
             syncMode: catalog.syncMode,
           },

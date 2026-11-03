@@ -2,18 +2,16 @@
 
 import { useEffect, useRef } from 'react';
 import type { PublicCatalogProduct } from '@/types/catalog';
-import type { CategoryTint } from './categoryTheme';
 import { ProductCard } from './ProductCard';
 
 interface ProductGridProps {
   products: PublicCatalogProduct[];
-  getTint: (product: PublicCatalogProduct) => CategoryTint;
   getQuantity: (productId: string) => number;
   onAdd: (product: PublicCatalogProduct) => void;
   onRemove: (product: PublicCatalogProduct) => void;
 }
 
-export function ProductGrid({ products, getTint, getQuantity, onAdd, onRemove }: ProductGridProps) {
+export function ProductGrid({ products, getQuantity, onAdd, onRemove }: ProductGridProps) {
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
@@ -62,7 +60,6 @@ export function ProductGrid({ products, getTint, getQuantity, onAdd, onRemove }:
         >
           <ProductCard
             product={product}
-            tint={getTint(product)}
             quantity={getQuantity(product.id)}
             onAdd={() => onAdd(product)}
             onRemove={() => onRemove(product)}

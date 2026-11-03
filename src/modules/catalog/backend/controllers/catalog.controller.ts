@@ -90,6 +90,8 @@ export class CatalogController {
           'instagramUrl' in store ? ((store as unknown as { instagramUrl?: string | null }).instagramUrl ?? null) : null,
         tiktokUrl:
           'tiktokUrl' in store ? ((store as unknown as { tiktokUrl?: string | null }).tiktokUrl ?? null) : null,
+        palette:
+          'catalogPalette' in store ? ((store as unknown as { catalogPalette?: string | null }).catalogPalette ?? null) : null,
         updatedAt: store.updatedAt.toISOString(),
       },
       products: products.map((product) => ({

@@ -119,6 +119,7 @@ export async function POST(_req: NextRequest) {
       whatsappNumber: settings?.whatsappNumber || '',
       logoUrl,
       bannerUrl,
+      palette: settings?.catalogPalette,
       products,
     };
 
