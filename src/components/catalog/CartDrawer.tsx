@@ -1,4 +1,5 @@
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
+import { CategoryIcon } from '@/components/pos/categoryIcon';
 import type { PublicCatalogStore } from '@/types/catalog';
 import type { CartItem } from './CatalogPageClient';
 import { WhatsappCheckoutButton } from './WhatsappCheckoutButton';
@@ -70,8 +71,8 @@ export function CartDrawer({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xs text-neutral-400">
-                        Sin imagen
+                      <div className="w-full h-full flex items-center justify-center text-neutral-400">
+                        <CategoryIcon name={item.category} className="w-8 h-8" />
                       </div>
                     )}
                   </div>

@@ -1,101 +1,43 @@
-import {
-  Cookie,
-  Dog,
-  Hammer,
-  Milk,
-  Package,
-  ShoppingBasket,
-  SprayCan,
-  Sparkles,
-  Wine,
-  Carrot,
-  CupSoda,
-  Boxes,
-  Droplet,
-  Wheat,
-  Candy,
-} from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { CategoryIcon } from '@/components/pos/categoryIcon';
+import type { CategorySummary } from './categoryTheme';
 
 interface CategoryCardProps {
-  category: string;
+  category: CategorySummary;
   isActive: boolean;
   onClick: () => void;
 }
 
-const iconMap: Record<string, typeof Package> = {
-  bebidas: Wine,
-  'bebidas-alcoholicas': Wine,
-  alcoholicas: Wine,
-  licores: Wine,
-  snacks: Cookie,
-  golosinas: Candy,
-  abarrotes: ShoppingBasket,
-  conservas: Boxes,
-  limpieza: SprayCan,
-  ferreteria: Hammer,
-  lacteos: Milk,
-  'cuidado-personal': Sparkles,
-  mascotas: Dog,
-  verduras: Carrot,
-  menestras: CupSoda,
-  arroz: Wheat,
-  'arroz-menestras': Wheat,
-  'arroz-y-menestras': Wheat,
-  'aceites-mantecas': Droplet,
-  panaderia: Wheat,
-};
-
-const colorPool = [
-  '#111827',
-  '#0f766e',
-  '#1d4ed8',
-  '#b91c1c',
-  '#7c2d12',
-  '#166534',
-  '#155e75',
-  '#6d28d9',
-];
-
-function pickColor(label: string): string {
-  let hash = 0;
-  for (let i = 0; i < label.length; i += 1) {
-    hash = (hash * 31 + label.charCodeAt(i)) % colorPool.length;
-  }
-  return colorPool[Math.abs(hash)];
-}
-
-function toCategoryKey(label: string): string {
-  return label
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-');
-}
-
 export function CategoryCard({ category, isActive, onClick }: CategoryCardProps) {
-  const key = toCategoryKey(category);
-  const Icon = iconMap[key] ?? Package;
-  const accent = pickColor(category);
+  const { name, tint, imageUrl } = category;
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`group flex flex-col items-center gap-2 px-3 py-2 rounded-2xl transition-all duration-300 ${
-        isActive
-          ? 'bg-black text-white shadow-lg'
-          : 'bg-white text-neutral-900 border border-neutral-200 hover:shadow-md'
+      aria-pressed={isActive}
+      className={`group relative aspect-[4/3] w-full overflow-hidden rounded-3xl text-left transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
+        isActive ? 'ring-2 ring-offset-2 ring-offset-[#f6faf6]' : ''
       }`}
+      style={{ backgroundColor: tint.bg, color: tint.ink, '--tw-ring-color': tint.ink } as CSSProperties}
     >
-      <div
-        className={`h-12 w-12 rounded-full flex items-center justify-center transition-all ${
-          isActive ? 'bg-white text-black' : 'bg-white text-neutral-700 shadow-md'
-        }`}
-        style={!isActive ? { boxShadow: `0 6px 16px ${accent}1f` } : undefined}
-      >
-        <Icon className="w-6 h-6" style={!isActive ? { color: accent } : undefined} />
-      </div>
-      <span className={`text-[11px] text-center leading-tight ${isActive ? 'font-semibold' : ''}`}>
-        {category}
+      <span className="absolute inset-x-4 top-3 bottom-11 flex items-center justify-center">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-contain mix-blend-multiply transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <CategoryIcon
+            name={name}
+            className="h-16 w-16 sm:h-20 sm:w-20 transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
+      </span>
+      <span className="absolute inset-x-4 bottom-3 truncate text-sm sm:text-base font-semibold">
+        {name}
       </span>
     </button>
   );

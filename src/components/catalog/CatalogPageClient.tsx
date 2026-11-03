@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { PublicCatalogProduct, PublicCatalogStore } from '@/types/catalog';
 import { CartDrawer } from '@/components/catalog/CartDrawer';
+import { CatalogFooter } from './CatalogFooter';
+import { CatalogHero } from './CatalogHero';
 import { CategoryFilter } from './CategoryFilter';
+import { CategoryGrid } from './CategoryGrid';
+import { categoryOf, DEFAULT_TINT, summarizeCategories } from './categoryTheme';
 import { ProductGrid } from './ProductGrid';
 import { StoreHeader } from './StoreHeader';
-import { SocialLinks } from './SocialLinks';
 
 interface CatalogPageClientProps {
   store: PublicCatalogStore;
@@ -27,18 +30,27 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    for (const product of products) {
-      set.add(product.category || 'General');
-    }
-    return ['Todos', ...Array.from(set).sort()];
-  }, [products]);
+  const productsRef = useRef<HTMLElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const categorySummaries = useMemo(() => summarizeCategories(products), [products]);
+  const categories = useMemo(
+    () => ['Todos', ...categorySummaries.map((category) => category.name)],
+    [categorySummaries],
+  );
+  const navCategories = useMemo(
+    () =>
+      [...categorySummaries]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 4)
+        .map((category) => category.name),
+    [categorySummaries],
+  );
 
   const filteredProducts = useMemo(() => {
     const filtered = products.filter((product) => {
       const matchesCategory =
-        selectedCategory === 'Todos' || product.category === selectedCategory;
+        selectedCategory === 'Todos' || categoryOf(product) === selectedCategory;
 
       const term = search.trim().toLowerCase();
 
@@ -109,42 +121,79 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
   const getQuantity = (productId: string) =>
     cart.find((item) => item.id === productId)?.quantity ?? 0;
 
+  const getTint = (product: PublicCatalogProduct) =>
+    categorySummaries.find((category) => category.name === categoryOf(product))?.tint ?? DEFAULT_TINT;
+
+  const scrollToProducts = () => {
+    productsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const goToCategory = (category: string) => {
+    setSearch('');
+    setSelectedCategory(category);
+    scrollToProducts();
+  };
+
+  const focusSearch = () => {
+    scrollToProducts();
+    searchRef.current?.focus({ preventScroll: true });
+  };
+
   return (
-    <main className="min-h-screen bg-[#f7f6f2]">
+    <main className="min-h-screen bg-[#f6faf6] text-neutral-900">
       <StoreHeader
         store={store}
+        navCategories={navCategories}
+        selectedCategory={selectedCategory}
         cartItemsCount={cartItemsCount}
         onCartClick={() => setIsCartOpen(true)}
+        onSearchClick={focusSearch}
+        onCategoryClick={goToCategory}
       />
 
-      <div className="sticky top-[57px] z-40 bg-neutral-50 border-b border-neutral-200 px-4 py-3">
-        <div className="max-w-6xl mx-auto">
-          <CategoryFilter
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-          />
-        </div>
-      </div>
+      <CatalogHero
+        store={store}
+        productCount={products.length}
+        categories={categorySummaries}
+        onBrowse={scrollToProducts}
+      />
 
-      <section className="px-4 py-6 max-w-6xl mx-auto">
+      <CategoryGrid
+        categories={categorySummaries}
+        selectedCategory={selectedCategory}
+        onSelectCategory={goToCategory}
+      />
+
+      <section ref={productsRef} className="scroll-mt-16 pt-6">
+        <div className="sticky top-16 z-40 bg-[#f6faf6]/95 backdrop-blur border-b border-neutral-200/70 px-4 py-2.5">
+          <div className="max-w-6xl mx-auto">
+            <CategoryFilter
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+            />
+          </div>
+        </div>
+
+        <div className="px-4 py-6 max-w-6xl mx-auto">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-lg">
+          <h2 className="text-xl font-bold tracking-tight">
             {selectedCategory === 'Todos' ? 'Todos los productos' : selectedCategory}
-          </h3>
+          </h2>
 
           <div className="flex items-center gap-3">
-            <span className="text-sm text-neutral-600">
+            <span className="shrink-0 text-sm text-neutral-600">
               {filteredProducts.length} productos
             </span>
             <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
+                ref={searchRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar productos..."
-                className="w-full pl-9 pr-3 py-2 bg-white/90 border border-neutral-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-black/10 focus:border-neutral-300 shadow-sm"
+                className="w-full pl-9 pr-3 py-2 bg-white/90 border border-neutral-200 rounded-full text-sm outline-none focus:ring-2 focus:ring-[#15803d]/20 focus:border-[#15803d]/40 shadow-sm"
               />
             </div>
           </div>
@@ -152,6 +201,7 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
 
         <ProductGrid
           products={paginatedProducts}
+          getTint={getTint}
           getQuantity={getQuantity}
           onAdd={addToCart}
           onRemove={(product) => decreaseQty(product.id)}
@@ -191,7 +241,7 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
                     onClick={() => setCurrentPage(page)}
                     className={`w-9 h-9 rounded-lg font-medium text-sm transition-colors ${
                       currentPage === page
-                        ? 'bg-black text-white'
+                        ? 'bg-[#15803d] text-white'
                         : 'border border-neutral-300 text-neutral-700 hover:bg-neutral-100'
                     }`}
                   >
@@ -212,14 +262,10 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
             </div>
           </div>
         )}
+        </div>
       </section>
 
-      <SocialLinks
-        whatsapp={store.whatsappNumber}
-        facebook={store.facebookUrl ?? undefined}
-        instagram={store.instagramUrl ?? undefined}
-        tiktok={store.tiktokUrl ?? undefined}
-      />
+      <CatalogFooter store={store} />
 
       <CartDrawer
         store={store}
