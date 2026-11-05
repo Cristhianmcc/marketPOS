@@ -57,9 +57,15 @@ export async function POST(request: Request) {
     const isDesktopRuntime = Boolean(
       process.env.DESKTOP_INTERNAL_TOKEN || process.env.MONTERRIAL_DATA_DIR
     );
-    // ✅ MÓDULO S8: Rate limit por IP
+    // ✅ MÓDULO S8: Rate limit por cuenta (IP + correo) y, más holgado, por IP.
+    // Solo por IP bloqueaba a todos los que comparten red (Wi-Fi de la tienda,
+    // datos móviles con IP compartida, el desktop y el celular juntos).
     const clientIP = getClientIP(request);
-    const rateLimitResult = checkRateLimit('login', clientIP);
+    const body = await request.json().catch(() => ({}));
+    const { email, password } = (body ?? {}) as { email?: string; password?: string };
+    const loginKey = `${clientIP}:${String(email ?? '').trim().toLowerCase()}`;
+    const accountLimit = checkRateLimit('login', loginKey);
+    const rateLimitResult = accountLimit.allowed ? checkRateLimit('login-ip', clientIP) : accountLimit;
     
     if (!rateLimitResult.allowed) {
       const waitSeconds = Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000);
@@ -79,7 +85,10 @@ export async function POST(request: Request) {
       
       return NextResponse.json(
         { 
-          error: 'Demasiados intentos de login. Intenta de nuevo en ' + waitSeconds + ' segundos.',
+          error:
+            'Demasiados intentos fallidos. Espera ' +
+            (waitSeconds >= 60 ? Math.ceil(waitSeconds / 60) + ' min' : waitSeconds + ' segundos') +
+            ' y vuelve a intentar.',
           code: 'TOO_MANY_ATTEMPTS',
           retryAfter: waitSeconds
         },
@@ -94,8 +103,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
-    const { email, password } = body;
 
     // Validate input
     if (!email || !password) {
@@ -165,7 +172,7 @@ export async function POST(request: Request) {
       }
 
       // ✅ Login LOCAL exitoso
-      resetRateLimit('login', clientIP);
+      resetRateLimit('login', loginKey);
 
       const isAdmin = localUser.role === 'SUPERADMIN' || isSuperAdmin(localUser.email);
       let cloudAdminToken: string | undefined;
@@ -223,7 +230,7 @@ export async function POST(request: Request) {
     if (superadminEmailsEarly.includes(email.toLowerCase()) && superadminHashEarly) {
       const isValidSuperAdmin = await bcrypt.compare(password, superadminHashEarly);
       if (isValidSuperAdmin) {
-        resetRateLimit('login', clientIP);
+        resetRateLimit('login', loginKey);
         const displayName = email.split('@')[0];
         await setSession({ userId: email, storeId: null, email, name: displayName, role: 'SUPERADMIN' });
         return NextResponse.json({
@@ -239,7 +246,13 @@ export async function POST(request: Request) {
     const cloudPrisma = getCloudPrisma();
     if (!cloudPrisma) {
       try {
-        const cloudAuth = await authenticateThroughCloudApi(email, password);
+        // Solo el desktop pregunta a la nube por cuentas que no tiene. La nube
+        // misma (Render) no debe llamarse a sí misma: entraba en un bucle que
+        // terminaba en "Demasiados intentos" en vez de "Usuario no encontrado".
+        const cloudAuth =
+          isDesktopRuntime && !requestsDesktopCloudToken
+            ? await authenticateThroughCloudApi(email, password)
+            : null;
         if (cloudAuth) {
           const { response, payload } = cloudAuth;
           if (!response.ok) {
@@ -257,7 +270,7 @@ export async function POST(request: Request) {
             );
           }
 
-          resetRateLimit('login', clientIP);
+          resetRateLimit('login', loginKey);
           await setSession({
             userId: cloudUser.id,
             storeId: null,
@@ -345,7 +358,7 @@ export async function POST(request: Request) {
         });
         
         // Reset rate limit después de éxito
-        resetRateLimit('login', clientIP);
+        resetRateLimit('login', loginKey);
         
         return NextResponse.json({
           success: true,
