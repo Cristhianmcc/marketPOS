@@ -246,7 +246,13 @@ export async function POST(request: Request) {
     const cloudPrisma = getCloudPrisma();
     if (!cloudPrisma) {
       try {
-        const cloudAuth = await authenticateThroughCloudApi(email, password);
+        // Solo el desktop pregunta a la nube por cuentas que no tiene. La nube
+        // misma (Render) no debe llamarse a sí misma: entraba en un bucle que
+        // terminaba en "Demasiados intentos" en vez de "Usuario no encontrado".
+        const cloudAuth =
+          isDesktopRuntime && !requestsDesktopCloudToken
+            ? await authenticateThroughCloudApi(email, password)
+            : null;
         if (cloudAuth) {
           const { response, payload } = cloudAuth;
           if (!response.ok) {
