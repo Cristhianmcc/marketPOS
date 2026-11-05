@@ -5,7 +5,8 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: npm install && npx prisma generate && npx prisma db push && npm run build
+    # El esquema se actualiza al arrancar (scripts/cloud-migrate.cjs, solo aditivo).
+    buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:

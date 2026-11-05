@@ -800,6 +800,14 @@ una base real como comprobación rutinaria.
   ICBPER).
 - `npm run build` ahora delega a `build:only`; compilar no despliega ni cambia el
   esquema de la base configurada.
+- Nube (Render, `render.yaml`): `npm start` ejecuta primero
+  `scripts/cloud-migrate.cjs`, que compara la base con `prisma/schema.prisma` y
+  aplica solo lo aditivo (tablas, índices, columnas, claves, valores de enum);
+  omite y registra DROP/RENAME/cambios de tipo. Si la base tiene
+  `_prisma_migrations`, registra las migraciones locales faltantes. Nunca impide
+  arrancar la web. El build de Render ya no ejecuta `prisma db push`. Banco:
+  `npm run test:cloud-migrate:isolated` (base con historial, sin historial, al
+  día y con columnas de más).
 - `npm run test:migrations:isolated` inicia el PostgreSQL incluido en una carpeta
   temporal y verificó: instalación limpia de 45 tablas, adopción exacta de una
   base legada y rechazo de una base con deriva. La prueba elimina su entorno al

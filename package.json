@@ -1,13 +1,13 @@
 {
   "name": "monterrial-pos",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "npm run build:only",
     "build:only": "prisma generate && next build",
-    "start": "next start",
+    "start": "node scripts/cloud-migrate.cjs && next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
@@ -23,6 +23,7 @@
     "test:botica:isolated": "tsx scripts/test-botica-flow-isolated.ts",
     "test:lavanderia:isolated": "tsx scripts/test-lavanderia-flow-isolated.ts",
     "test:perfumeria:isolated": "tsx scripts/test-perfumeria-flow-isolated.ts",
+    "test:cloud-migrate:isolated": "node scripts/test-cloud-migrate-isolated.cjs",
     "test:catalog:isolated": "tsx scripts/test-catalog-publish-isolated.ts",
     "test:license-credentials:isolated": "tsx scripts/test-license-credentials-isolated.ts",
     "test:desktop-env:isolated": "node scripts/test-desktop-package-env-isolated.cjs",
