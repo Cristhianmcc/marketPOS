@@ -160,6 +160,8 @@ es `docs/audits/2026-09-26-pos.md`.
   (`catalogCloudHeaders`); la nube lo valida con `isCatalogStoreAuthorized`
   (una tienda solo publica su catálogo) y sube imágenes a Cloudinary en
   `/api/catalog/cloud-image`. Banco: `scripts/test-catalog-publish-isolated.ts`.
+  La acción masiva `/api/inventory/bulk-catalog` es solo de `OWNER` y opera
+  únicamente sobre productos de `session.storeId` (404 si algún id es ajeno; H21).
 - Paletas del catálogo: `src/lib/catalog/palettes.ts` define las 10 paletas y
   deriva los colores de contraste. `CatalogSettings.catalogPalette` se elige en
   Configuración → Catálogo Web y viaja como `palette` al publicar; si un

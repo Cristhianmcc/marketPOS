@@ -59,8 +59,12 @@ async function seed(db: PrismaClient) {
   await product('CT-2', 'Agua 625 ml', 1.5, null, true);
   // Foto subida en el escritorio (local) que aún no está en la nube
   await product('CT-4', 'Galletas con foto local', 2, '/api/desktop/local-image/img-1', true);
-  await product('CT-3', 'Producto oculto', 9, null, false);
-  return { storeId: store.id, otherStoreId: other.id, ownerId: owner.id };
+  const hidden = await product('CT-3', 'Producto oculto', 9, null, false);
+  // Producto de otra tienda: la acción masiva nunca debe tocarlo
+  const foreignMaster = await db.productMaster.create({ data: { internalSku: 'CT-X', name: 'Producto ajeno', category: 'Bebidas', unitType: 'UNIT', baseUnitId: niu } });
+  const foreign = (await db.storeProduct.create({ data: { storeId: other.id, productId: foreignMaster.id, price: 3, stock: 5, publishInCatalog: false } })).id;
+  const foreignPublished = (await db.storeProduct.create({ data: { storeId: other.id, productId: (await db.productMaster.create({ data: { internalSku: 'CT-Y', name: 'Ajeno publicado', category: 'Bebidas', unitType: 'UNIT', baseUnitId: niu } })).id, price: 3, stock: 5, publishInCatalog: true } })).id;
+  return { storeId: store.id, otherStoreId: other.id, ownerId: owner.id, hiddenId: hidden, foreignId: foreign, foreignPublishedId: foreignPublished };
 }
 
 async function flowWorker(contextPath: string) {
@@ -81,6 +85,7 @@ async function flowWorker(contextPath: string) {
   const publicCatalog = require('../src/app/api/catalog/public/[slug]/route');
   const desktopPublish = require('../src/app/api/desktop/publish-catalog/route');
   const desktopSync = require('../src/app/api/desktop/sync-catalog-images/route');
+  const bulkCatalog = require('../src/app/api/inventory/bulk-catalog/route');
   /* eslint-enable @typescript-eslint/no-require-imports */
 
   // La "red" del escritorio llega a los handlers de la nube de este mismo proceso
@@ -174,6 +179,32 @@ async function flowWorker(contextPath: string) {
   await cloudPublish.POST(jsonReq(`${CLOUD}/api/catalog/publish`, { ...payload, palette: 'inventada' }, { authorization: `Bearer ${token}` }));
   steps.P8 = { chosen, afterOldInstaller, afterUnknown: await publicPalette() };
 
+  // P9 La acción masiva del inventario solo toca productos de la tienda de la sesión
+  const bulk = async (body: unknown) => (await read(await bulkCatalog.POST(jsonReq('http://localhost/api/inventory/bulk-catalog', body)))).status;
+  const flags = async () => {
+    const rows = await prisma.storeProduct.findMany({
+      where: { id: { in: [ctx.hiddenId, ctx.foreignId, ctx.foreignPublishedId] } }, select: { id: true, publishInCatalog: true },
+    });
+    const of = (id: string) => rows.find((p: { id: string }) => p.id === id)?.publishInCatalog;
+    return { own: of(ctx.hiddenId), foreign: of(ctx.foreignId), foreignPublished: of(ctx.foreignPublishedId) };
+  };
+  const p9: Record<string, unknown> = {};
+  p9.publishForeign = await bulk({ action: 'publish', productIds: [ctx.hiddenId, ctx.foreignId] });
+  p9.unpublishForeign = await bulk({ action: 'unpublish', productIds: [ctx.foreignPublishedId] });
+  p9.afterForeign = await flags();
+  p9.badAction = await bulk({ action: 'borrar', productIds: [ctx.hiddenId] });
+  p9.badIds = await bulk({ action: 'publish', productIds: [{ id: ctx.hiddenId }] });
+  session.role = 'CASHIER';
+  p9.cashier = await bulk({ action: 'publish', productIds: [ctx.hiddenId] });
+  session.role = 'OWNER';
+  p9.afterRejected = await flags();
+  p9.publishOwn = await bulk({ action: 'publish', productIds: [ctx.hiddenId, ctx.hiddenId] });
+  const own = await prisma.storeProduct.findUnique({ where: { id: ctx.hiddenId }, select: { publishInCatalog: true, catalogVisible: true, catalogTitle: true } });
+  p9.ownPublished = own;
+  p9.unpublishOwn = await bulk({ action: 'unpublish', productIds: [ctx.hiddenId] });
+  p9.final = await flags();
+  steps.P9 = p9;
+
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
 
@@ -199,6 +230,15 @@ const EXPECTATIONS: { id: string; title: string; check: (s: Steps) => string[] }
     ...eq('paleta publicada', s.P8?.chosen, 'ocean-teal'),
     ...eq('tras publicar sin paleta', s.P8?.afterOldInstaller, 'ocean-teal'),
     ...eq('una paleta desconocida se ignora', s.P8?.afterUnknown, 'ocean-teal'),
+  ] },
+  { id: 'P9', title: 'La acción masiva del inventario solo afecta a la tienda propia y al propietario', check: (s) => [
+    ...eq('rechaza ids ajenos', [s.P9?.publishForeign, s.P9?.unpublishForeign], [404, 404]),
+    ...eq('nada cambia tras ids ajenos', s.P9?.afterForeign, { own: false, foreign: false, foreignPublished: true }),
+    ...eq('valida acción e ids', [s.P9?.badAction, s.P9?.badIds], [400, 400]),
+    ...eq('cajero rechazado', s.P9?.cashier, 403),
+    ...eq('nada cambia tras rechazos', s.P9?.afterRejected, { own: false, foreign: false, foreignPublished: true }),
+    ...eq('publica lo propio', [s.P9?.publishOwn, s.P9?.ownPublished], [200, { publishInCatalog: true, catalogVisible: true, catalogTitle: 'Producto oculto' }]),
+    ...eq('retira lo propio sin tocar lo ajeno', [s.P9?.unpublishOwn, s.P9?.final], [200, { own: false, foreign: false, foreignPublished: true }]),
   ] },
   { id: 'P5', title: 'Subida de imágenes por la nube: token obligatorio y formatos válidos', check: (s) =>
     eq('respuestas', s.P5, { unauthorized: 401, authorizedNoCloudinary: 503, badType: 400 }) },
