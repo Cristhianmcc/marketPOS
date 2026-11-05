@@ -39,7 +39,8 @@ export interface RateLimitResult {
  */
 export const RATE_LIMITS: Record<string, RateLimitConfig> = {
   // ✅ MÓDULO S8 - Login protection
-  'login': { maxRequests: 5, windowSeconds: 300 }, // 5 intentos / 5 min
+  'login': { maxRequests: 5, windowSeconds: 300 }, // 5 intentos fallidos por cuenta / 5 min
+  'login-ip': { maxRequests: 30, windowSeconds: 300 }, // tope por red, contra ataques a muchas cuentas
   
   // ✅ MÓDULO S8 - Admin sensitive endpoints
   'backup-export': { maxRequests: 3, windowSeconds: 60 },
