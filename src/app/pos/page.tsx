@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, AlertTriangle, Tag, Package as PackageIcon, Clock, Milk, Scale, Wrench } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, X, AlertCircle, AlertTriangle, Tag, Package as PackageIcon, Clock, Milk, Scale, Wrench, Droplets } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import QuickSellGrid from '@/components/pos/QuickSellGrid';
@@ -12,6 +12,15 @@ import { PosBanner } from '@/components/pos/PosBanner';
 import { ShiftCard } from '@/components/pos/ShiftCard';
 import { CategoryIcon } from '@/components/pos/categoryIcon';
 import { LaundryPos } from '@/app/work-orders/LaundryPos';
+import {
+  PerfumeryPanel,
+  type PerfumeExtraOption,
+  type PerfumeFragrance,
+  type PerfumePackOption,
+  type PerfumePackSlot,
+  type PerfumePresentationOption,
+} from '@/components/pos/PerfumeryPanel';
+import { computePresentationPromos, promoLabel, type PresentationPromo } from '@/lib/perfumery/promo';
 import MobileCartDrawer from '@/components/pos/MobileCartDrawer';
 import SunatComprobanteSelector from '@/components/pos/SunatComprobanteSelector'; // ✅ MÓDULO 18.5
 import AdvancedUnitSelector from '@/components/pos/AdvancedUnitSelector'; // ✅ MÓDULO F1
@@ -123,6 +132,35 @@ interface CartItem {
   rxObservation?: string | null;
   rxPatientName?: string | null;
   rxPrescriptionNumber?: string | null;
+  // Perfumería: fragancia (esencia en ml) + presentación (+ extras), o un pack.
+  // storeProduct es sintético (id perfume:...), el servidor recalcula el precio.
+  perfume?: {
+    essenceStoreProductId: string;
+    presentationId: string;
+    essenceMlPerUnit: number;
+    extraIds?: string[];
+    presentationPrice?: number;
+    promo?: PresentationPromo | null;
+    requiresPriorPurchase?: boolean;
+    pack?: { packId: string; items: Array<{ essenceStoreProductId: string; presentationId: string; essenceMl: number }> };
+  };
+}
+
+/** ml de esencia que ocupa el carrito, por esencia (frascos y packs). */
+function perfumeMlByEssence(items: CartItem[]): Record<string, number> {
+  const acc: Record<string, number> = {};
+  for (const item of items) {
+    const perfume = item.perfume;
+    if (!perfume) continue;
+    if (perfume.pack) {
+      for (const slot of perfume.pack.items) {
+        acc[slot.essenceStoreProductId] = (acc[slot.essenceStoreProductId] ?? 0) + item.quantity * slot.essenceMl;
+      }
+    } else {
+      acc[perfume.essenceStoreProductId] = (acc[perfume.essenceStoreProductId] ?? 0) + item.quantity * perfume.essenceMlPerUnit;
+    }
+  }
+  return acc;
 }
 
 interface Customer {
@@ -160,7 +198,8 @@ interface MedicationHistoryEntry {
   dispensedAt: string;
 }
 
-function SalesPos() {
+function SalesPos({ profile }: { profile?: string }) {
+  const isPerfumery = profile === 'PERFUMERIA';
   const [query, setQuery] = useState('');
   const [products, setProducts] = useState<StoreProduct[]>([]);
   // Filtro por categoría: resultados aparte para no interferir con búsqueda/escáner
@@ -342,7 +381,58 @@ function SalesPos() {
   const controlledBookEnabled = isFlagOn('ENABLE_CONTROLLED_BOOK');
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
-  const [posTab, setPosTab] = useState<'products' | 'services'>('products');
+  const [posTab, setPosTab] = useState<'products' | 'services' | 'perfumes'>(isPerfumery ? 'perfumes' : 'products');
+  // Perfumería: rellenos (cliente con compra previa o autorización del dueño).
+  const [refillOverride, setRefillOverride] = useState(false);
+  const [perfumeHistory, setPerfumeHistory] = useState<{
+    refillEligible: boolean;
+    purchases: Array<{ fragranceCode: string; presentationName: string }>;
+  } | null>(null);
+  const cartHasPerfume = isPerfumery && cart.some((item) => item.perfume);
+  const cartHasRefill = isPerfumery && cart.some((item) => item.perfume?.requiresPriorPurchase);
+
+  useEffect(() => {
+    if (!isPerfumery || !selectedCustomer) {
+      setPerfumeHistory(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/perfumery/customer-history?customerId=${encodeURIComponent(selectedCustomer.id)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled) setPerfumeHistory(data); })
+      .catch(() => { if (!cancelled) setPerfumeHistory(null); });
+    return () => { cancelled = true; };
+  }, [isPerfumery, selectedCustomer]);
+
+  // Perfumería: vista previa del 2x1/3x2 por presentación (el servidor lo recalcula).
+  useEffect(() => {
+    if (!isPerfumery) return;
+    const promos = new Map<string, PresentationPromo | null>();
+    for (const item of cart) {
+      if (item.perfume && !item.perfume.pack) promos.set(item.perfume.presentationId, item.perfume.promo ?? null);
+    }
+    const discounts = computePresentationPromos(
+      cart.filter((item) => item.perfume).map((item) => ({
+        key: item.storeProduct.id,
+        presentationId: item.perfume!.presentationId,
+        bottles: item.quantity,
+        presentationPrice: item.perfume!.presentationPrice ?? 0,
+        inPack: Boolean(item.perfume!.pack),
+      })),
+      promos
+    );
+    const changed = cart.some((item) => item.perfume && (item.nthPromoDiscount ?? 0) !== (discounts.get(item.storeProduct.id) ?? 0));
+    if (!changed) return;
+    setCart((prev) => prev.map((item) => {
+      if (!item.perfume) return item;
+      const discount = discounts.get(item.storeProduct.id) ?? 0;
+      return {
+        ...item,
+        nthPromoDiscount: discount,
+        nthPromoName: discount > 0 && item.perfume.promo ? promoLabel(item.perfume.promo) : null,
+      };
+    }));
+  }, [cart, isPerfumery]);
 
   // ✅ MÓDULO F3: Cargar servicios
   const loadServices = useCallback(async () => {
@@ -1024,6 +1114,8 @@ function SalesPos() {
   // ✅ MÓDULO 18.2: Función optimizada que usa endpoint unificado (4 verificaciones en 1 llamada)
   // Reduce latencia de ~400ms a ~100ms
   const checkAllPromotionsUnified = async (item: CartItem): Promise<CartItem> => {
+    // Perfumería: el servidor no aplica promociones automáticas a estas líneas.
+    if (item.perfume) return item;
     try {
       const res = await fetch('/api/promotions/check-all', {
         method: 'POST',
@@ -1262,6 +1354,114 @@ function SalesPos() {
     }, 300);
   };
 
+  // Perfumería: agrega (o suma un frasco a) la línea fragancia + presentación (+ extras).
+  const addPerfumeToCart = (fragrance: PerfumeFragrance, presentation: PerfumePresentationOption, extras: PerfumeExtraOption[]) => {
+    const extraIds = extras.map((extra) => extra.id).sort();
+    const lineId = `perfume:${fragrance.storeProductId}:${presentation.id}${extraIds.length ? `:${extraIds.join(',')}` : ''}`;
+    const mlPerUnit = presentation.essenceMl + extras.reduce((sum, extra) => sum + (extra.extraEssenceMl ?? 0), 0);
+    const price = Math.round((presentation.price + extras.reduce((sum, extra) => sum + extra.price, 0)) * 100) / 100;
+    const label = `${presentation.name}${extras.length ? ` + ${extras.map((extra) => extra.name).join(' + ')}` : ''}`;
+    const reserved = perfumeMlByEssence(cart)[fragrance.storeProductId] ?? 0;
+    if (fragrance.stockMl !== null && reserved + mlPerUnit > fragrance.stockMl) {
+      toast.error(`${fragrance.code}: quedan ${Math.max(0, fragrance.stockMl - reserved)} ml de esencia`);
+      return;
+    }
+    const existing = cart.find((item) => item.storeProduct.id === lineId);
+    if (existing) {
+      setCart((prev) => prev.map((item) => item.storeProduct.id === lineId ? { ...item, quantity: item.quantity + 1 } : item));
+    } else {
+      setCart((prev) => [...prev, {
+        storeProduct: {
+          id: lineId,
+          price,
+          costPrice: null,
+          stock: null,
+          active: true,
+          product: {
+            id: `perfume-${fragrance.id}`,
+            name: `${fragrance.name} - ${label}`,
+            brand: null,
+            content: label,
+            category: 'Perfumería',
+            unitType: 'UNIT',
+            barcode: null,
+            internalSku: '',
+            imageUrl: fragrance.imageUrl,
+          },
+        },
+        quantity: 1,
+        perfume: {
+          essenceStoreProductId: fragrance.storeProductId,
+          presentationId: presentation.id,
+          essenceMlPerUnit: mlPerUnit,
+          extraIds,
+          presentationPrice: presentation.price,
+          promo: presentation.promoBuy && presentation.promoPay ? { buy: presentation.promoBuy, pay: presentation.promoPay } : null,
+          requiresPriorPurchase: presentation.requiresPriorPurchase,
+        },
+      }]);
+    }
+    toast.success(`${fragrance.code} ${label} agregado`);
+  };
+
+  // Perfumería: pack a precio cerrado con N fragancias elegidas.
+  const addPerfumePackToCart = (pack: PerfumePackOption, slots: PerfumePackSlot[]) => {
+    const lineId = `perfume-pack:${pack.id}:${slots.map((slot) => `${slot.fragrance.storeProductId}/${slot.presentation.id}`).join(',')}`;
+    const reserved = perfumeMlByEssence(cart);
+    const needed: Record<string, number> = {};
+    for (const slot of slots) {
+      needed[slot.fragrance.storeProductId] = (needed[slot.fragrance.storeProductId] ?? 0) + slot.presentation.essenceMl;
+    }
+    for (const slot of slots) {
+      const id = slot.fragrance.storeProductId;
+      if (slot.fragrance.stockMl !== null && (reserved[id] ?? 0) + needed[id] > slot.fragrance.stockMl) {
+        toast.error(`${slot.fragrance.code}: no alcanza la esencia para el pack`);
+        return;
+      }
+    }
+    const label = `${pack.name}: ${slots.map((slot) => slot.fragrance.code).join(', ')}`;
+    const existing = cart.find((item) => item.storeProduct.id === lineId);
+    if (existing) {
+      setCart((prev) => prev.map((item) => item.storeProduct.id === lineId ? { ...item, quantity: item.quantity + 1 } : item));
+    } else {
+      setCart((prev) => [...prev, {
+        storeProduct: {
+          id: lineId,
+          price: pack.price,
+          costPrice: null,
+          stock: null,
+          active: true,
+          product: {
+            id: `perfume-pack-${pack.id}`,
+            name: label,
+            brand: null,
+            content: slots.map((slot) => slot.presentation.name).join(', '),
+            category: 'Perfumería',
+            unitType: 'UNIT',
+            barcode: null,
+            internalSku: '',
+            imageUrl: slots[0]?.fragrance.imageUrl ?? null,
+          },
+        },
+        quantity: 1,
+        perfume: {
+          essenceStoreProductId: '',
+          presentationId: '',
+          essenceMlPerUnit: 0,
+          pack: {
+            packId: pack.id,
+            items: slots.map((slot) => ({
+              essenceStoreProductId: slot.fragrance.storeProductId,
+              presentationId: slot.presentation.id,
+              essenceMl: slot.presentation.essenceMl,
+            })),
+          },
+        },
+      }]);
+    }
+    toast.success(`${pack.name} agregado`);
+  };
+
   const removeFromCart = (storeProductId: string) => {
     setCart(cart.filter((i) => i.storeProduct.id !== storeProductId));
   };
@@ -1271,6 +1471,7 @@ function SalesPos() {
     setGlobalDiscount(0);
     setAppliedCoupon(null); // ✅ Limpiar cupón
     setCouponCode('');
+    setRefillOverride(false);
     setProcessing(false); // ✅ MÓDULO 16.1: Reactivar botón después de venta exitosa
   };
 
@@ -1636,6 +1837,12 @@ function SalesPos() {
 
     const total = getCartTotal(cart, globalDiscount, appliedCoupon);
 
+    // Perfumería: el relleno es solo para clientes con compra previa de frasco.
+    if (cartHasRefill && !selectedCustomer && !(refillOverride && userRole === 'OWNER')) {
+      toast.error('El relleno es solo para clientes que ya compraron un frasco: selecciona el cliente');
+      return;
+    }
+
     // Validaciones según método de pago
     if (paymentMethod === 'CASH') {
       // Campo opcional: si está vacío se asume pago exacto (sin vuelto)
@@ -1738,6 +1945,31 @@ function SalesPos() {
               isFreeItem: true,
             };
           }
+          // Perfumería: pack (precio cerrado) o esencia + presentación (+ extras).
+          // El servidor fija los precios.
+          if (item.perfume?.pack) {
+            return {
+              perfumePackId: item.perfume.pack.packId,
+              packItems: item.perfume.pack.items.map((slot) => ({
+                storeProductId: slot.essenceStoreProductId,
+                perfumePresentationId: slot.presentationId,
+              })),
+              quantity: item.quantity,
+              unitPrice: item.storeProduct.price,
+            };
+          }
+          if (item.perfume) {
+            return {
+              storeProductId: item.perfume.essenceStoreProductId,
+              perfumePresentationId: item.perfume.presentationId,
+              perfumeExtraIds: item.perfume.extraIds?.length ? item.perfume.extraIds : undefined,
+              refillOverride: item.perfume.requiresPriorPurchase && refillOverride && userRole === 'OWNER' ? true : undefined,
+              quantity: item.quantity,
+              unitPrice: item.storeProduct.price,
+              discountType: item.discountType,
+              discountValue: item.discountValue,
+            };
+          }
           // Producto normal
           return {
             storeProductId: item.storeProduct.id,
@@ -1776,6 +2008,9 @@ function SalesPos() {
       // Para FIADO, enviar customerId
       if (paymentMethod === 'FIADO') {
         checkoutData.customerId = selectedCustomer!.id;
+      } else if (selectedCustomer && cartHasPerfume) {
+        // Perfumería: el cliente queda en la venta (rellenos e historial).
+        checkoutData.customerId = selectedCustomer.id;
       }
 
       // ✅ MÓDULO PH4: Enviar paciente/receptor si está seleccionado
@@ -2203,9 +2438,22 @@ function SalesPos() {
                 <CategoryChips selected={selectedCategory} onSelect={setSelectedCategory} />
               )}
 
-              {/* ✅ MÓDULO F3: Tabs Productos/Servicios */}
-              {servicesEnabled && currentShift && !query.trim() && (
+              {/* ✅ MÓDULO F3: Tabs Productos/Servicios (y Perfumes en perfumería) */}
+              {(servicesEnabled || isPerfumery) && currentShift && (posTab === 'perfumes' || !query.trim()) && (
                 <div className="flex gap-2 bg-surface-light dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-xl p-1">
+                  {isPerfumery && (
+                    <button
+                      onClick={() => setPosTab('perfumes')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                        posTab === 'perfumes'
+                          ? 'bg-primary text-white'
+                          : 'text-text-secondary hover:bg-background-light dark:hover:bg-background-dark'
+                      }`}
+                    >
+                      <Droplets className="w-4 h-4" />
+                      Perfumes
+                    </button>
+                  )}
                   <button
                     onClick={() => setPosTab('products')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
@@ -2217,7 +2465,7 @@ function SalesPos() {
                     <ShoppingCart className="w-4 h-4" />
                     Productos
                   </button>
-                  <button
+                  {servicesEnabled && <button
                     onClick={() => setPosTab('services')}
                     className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
                       posTab === 'services'
@@ -2232,8 +2480,18 @@ function SalesPos() {
                         {services.length}
                       </span>
                     )}
-                  </button>
+                  </button>}
                 </div>
+              )}
+
+              {/* Perfumería: fragancia + presentación */}
+              {isPerfumery && currentShift && posTab === 'perfumes' && (
+                <PerfumeryPanel
+                  onAdd={addPerfumeToCart}
+                  onAddPack={addPerfumePackToCart}
+                  disabled={!currentShift}
+                  reservedMl={perfumeMlByEssence(cart)}
+                />
               )}
 
               {/* ✅ MÓDULO 17.2: Quick Sell Grid - Oculto cuando hay búsqueda activa */}
@@ -2647,11 +2905,11 @@ function SalesPos() {
                 </div>
               )}
 
-              {/* Selector de cliente para FIADO */}
-              {paymentMethod === 'FIADO' && (
+              {/* Selector de cliente para FIADO (y perfumería: rellenos e historial) */}
+              {(paymentMethod === 'FIADO' || cartHasPerfume) && (
                 <div className="bg-orange-50 rounded-xl p-3 border border-orange-200">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cliente <span className="text-red-500">*</span>
+                    Cliente {(paymentMethod === 'FIADO' || cartHasRefill) && <span className="text-red-500">*</span>}
                   </label>
                   {selectedCustomer ? (
                     <div className="flex justify-between items-center bg-white p-2 rounded border">
@@ -2681,6 +2939,24 @@ function SalesPos() {
                     >
                       + Seleccionar Cliente
                     </button>
+                  )}
+                  {cartHasPerfume && selectedCustomer && perfumeHistory && (
+                    <div className="mt-2 text-xs space-y-1">
+                      <p className={perfumeHistory.refillEligible ? 'text-green-700 font-medium' : 'text-gray-600'}>
+                        {perfumeHistory.refillEligible ? 'Puede llevar relleno' : 'Sin compra previa de frasco (no puede llevar relleno)'}
+                      </p>
+                      {perfumeHistory.purchases.length > 0 && (
+                        <p className="text-gray-600">
+                          Última vez: {perfumeHistory.purchases.slice(0, 3).map((p) => `${p.fragranceCode} ${p.presentationName}`).join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {cartHasRefill && userRole === 'OWNER' && (
+                    <label className="mt-2 flex items-center gap-2 text-xs text-gray-700">
+                      <input type="checkbox" checked={refillOverride} onChange={(e) => setRefillOverride(e.target.checked)} />
+                      Autorizar relleno sin compra previa (dueño)
+                    </label>
                   )}
                 </div>
               )}
@@ -3087,7 +3363,8 @@ function SalesPos() {
                       key={customer.id}
                       onClick={() => {
                         // ✅ Validar límite de balance de FIADO
-                        if (operationalLimits?.maxReceivableBalance !== null && 
+                        if (paymentMethod === 'FIADO' &&
+                            operationalLimits?.maxReceivableBalance !== null && 
                             operationalLimits?.maxReceivableBalance !== undefined) {
                           const saleTotal = getCartTotal(cart, globalDiscount, appliedCoupon);
                           const newBalance = customer.totalBalance + saleTotal;
@@ -3856,5 +4133,5 @@ export default function POSPage() {
       </AuthLayout>
     );
   }
-  return <SalesPos />;
+  return <SalesPos profile={profile} />;
 }

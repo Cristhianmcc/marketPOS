@@ -1,5 +1,12 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
+import { sanitizePerfumeAttributes } from '@/lib/perfumery/catalogAttributes';
 import type { CatalogPublishProductInput } from '../domain/catalog-server.types';
+
+/** Atributos de perfumería saneados; sin ellos la columna queda en NULL. */
+const catalogAttributesOf = (product: CatalogPublishProductInput) => {
+  const attributes = sanitizePerfumeAttributes(product.attributes);
+  return attributes ? (attributes as unknown as Prisma.InputJsonValue) : Prisma.DbNull;
+};
 
 type DBClient = PrismaClient | Prisma.TransactionClient;
 
@@ -29,6 +36,7 @@ export class CatalogProductRepository {
         catalogImagePath: true,
         catalogVisible: true,
         catalogUpdatedAt: true,
+        catalogAttributes: true,
         price: true,
         product: { select: { name: true } },
       },
@@ -79,6 +87,7 @@ export class CatalogProductRepository {
           catalogImagePath: product.imageUrl,
           catalogVisible: product.visible,
           catalogUpdatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+          catalogAttributes: catalogAttributesOf(product),
           price: product.price,
         },
       });
@@ -116,6 +125,7 @@ export class CatalogProductRepository {
             catalogImagePath: product.imageUrl,
             catalogVisible: product.visible,
             catalogUpdatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+            catalogAttributes: catalogAttributesOf(product),
           },
           update: {
             price: product.price,
@@ -126,6 +136,7 @@ export class CatalogProductRepository {
             catalogImagePath: product.imageUrl,
             catalogVisible: product.visible,
             catalogUpdatedAt: product.updatedAt ? new Date(product.updatedAt) : new Date(),
+            catalogAttributes: catalogAttributesOf(product),
           },
         });
       }

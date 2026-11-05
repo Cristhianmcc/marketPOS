@@ -189,6 +189,18 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfile, BusinessProfilePr
     ],
     suggestedCategories: ['Celulares', 'Fundas', 'Cargadores', 'Audífonos', 'Cables', 'Reparación'],
   },
+
+  PERFUMERIA: {
+    profile: 'PERFUMERIA' as BusinessProfile,
+    name: 'Perfumería',
+    description: 'Perfumes de equivalencia: se vende la fragancia en una presentación (50 ml, 100 ml, relleno) y se descuentan los ml de esencia y el envase.',
+    icon: '🌸',
+    enabledFlags: [
+      // La venta por fragancia + presentación se habilita por el perfil (pantalla
+      // propia en /pos). Flags de plan via suscripción.
+    ],
+    suggestedCategories: ['Fragancias Mujer', 'Fragancias Hombre', 'Fragancias Unisex', 'Envases', 'Feromonas', 'Accesorios'],
+  },
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -320,6 +332,16 @@ const FARMACIA_DEFAULT_CATS: DefaultCategory[] = [
   { name: 'Otros Medicamentos',     slug: 'otros-medicamentos',     color: '#9CA3AF', icon: '📦', sortOrder: 14 },
 ];
 
+const PERFUMERIA_DEFAULT_CATS: DefaultCategory[] = [
+  { name: 'Fragancias Mujer',  slug: 'fragancias-mujer',  color: '#EC4899', icon: '🌸', sortOrder: 1 },
+  { name: 'Fragancias Hombre', slug: 'fragancias-hombre', color: '#3B82F6', icon: '🧔', sortOrder: 2 },
+  { name: 'Fragancias Unisex', slug: 'fragancias-unisex', color: '#8B5CF6', icon: '✨', sortOrder: 3 },
+  { name: 'Envases',           slug: 'envases',           color: '#0EA5E9', icon: '🧴', sortOrder: 4 },
+  { name: 'Feromonas',         slug: 'feromonas',         color: '#F43F5E', icon: '💘', sortOrder: 5 },
+  { name: 'Accesorios',        slug: 'accesorios-perfumeria', color: '#F59E0B', icon: '🎁', sortOrder: 6 },
+  { name: 'Otros',             slug: 'otros',             color: '#9CA3AF', icon: '📦', sortOrder: 7 },
+];
+
 const DEFAULT_CATEGORIES_BY_PROFILE: Record<BusinessProfile, DefaultCategory[]> = {
   BODEGA:     BODEGA_DEFAULT_CATS,
   FERRETERIA: FERRETERIA_DEFAULT_CATS,
@@ -361,6 +383,7 @@ const DEFAULT_CATEGORIES_BY_PROFILE: Record<BusinessProfile, DefaultCategory[]> 
     { name: 'Reparación',    slug: 'reparacion',    color: '#10B981', icon: '🔧', sortOrder: 6 },
     { name: 'Otros',         slug: 'otros',         color: '#9CA3AF', icon: '📦', sortOrder: 7 },
   ],
+  PERFUMERIA: PERFUMERIA_DEFAULT_CATS,
 };
 
 /**

@@ -19,8 +19,9 @@ import {
   GlobeAltIcon as Globe,
   BeakerIcon as Pill,
   ClipboardDocumentListIcon as ClipboardList,
+  SparklesIcon as Sparkles,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { ShortcutsButton } from '@/components/shortcuts/ShortcutsModal';
 import { useFlags } from '@/hooks/useFlags';
@@ -43,12 +44,27 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
   const isOwner = user?.role?.toUpperCase() === 'OWNER';
 
+  // Rubro de la tienda (mismo caché de sesión que usa el POS).
+  const [businessProfile, setBusinessProfile] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem('pos-business-profile');
+      if (cached) { setBusinessProfile(cached); return; }
+    } catch { /* sin almacenamiento */ }
+    fetch('/api/store')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setBusinessProfile(data?.store?.businessProfile ?? null))
+      .catch(() => {});
+  }, []);
+
   const mainNavItems = [
     { icon: ShoppingCart, label: 'Punto de Venta', href: '/' },
     { icon: DollarSign, label: 'Turnos / Caja', href: '/shifts' },
     { icon: FileText, label: 'Ventas', href: '/sales' },
     // Taller y lavandería: órdenes con seguimiento y adelanto
     ...(isOn('ENABLE_WORK_ORDERS') ? [{ icon: ClipboardList, label: 'Órdenes', href: '/work-orders' }] : []),
+    // Perfumería: catálogo de fragancias y presentaciones de la sede
+    ...(businessProfile === 'PERFUMERIA' && isOwner ? [{ icon: Sparkles, label: 'Perfumería', href: '/perfumeria' }] : []),
     { icon: Receipt, label: 'Cuentas por Cobrar', href: '/receivables' },
     { icon: Package, label: 'Inventario', href: '/inventory' },
     { icon: Globe, label: 'Catálogo Web', href: '/settings/catalog' },

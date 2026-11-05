@@ -19,6 +19,8 @@ export const CatalogPublishPayloadSchema = z.object({
       imageUrl: z.string().nullable(),
       visible: z.boolean(),
       updatedAt: z.string().nullable(),
+      // Perfumería: se sanea en el repositorio (sanitizePerfumeAttributes).
+      attributes: z.unknown().optional(),
     }),
   ).min(1),
 });

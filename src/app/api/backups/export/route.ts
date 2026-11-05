@@ -215,6 +215,10 @@ export async function GET(request: NextRequest) {
       nthPromotions,
       operationalLimit,
       catalogSettings,
+      fragrances,
+      perfumePresentations,
+      perfumeExtras,
+      perfumePacks,
     ] = await Promise.all([
       prisma.category.findMany({ where: { storeId: storeIdToExport } }),
       prisma.unitConversion.findMany({ where: { storeId: storeIdToExport } }),
@@ -235,6 +239,11 @@ export async function GET(request: NextRequest) {
       prisma.nthPromotion.findMany({ where: { storeId: storeIdToExport } }),
       prisma.operationalLimit.findUnique({ where: { storeId: storeIdToExport } }),
       prisma.catalogSettings.findUnique({ where: { storeId: storeIdToExport } }),
+      // Perfumería: fragancias (esencia = storeProduct) y presentaciones.
+      prisma.fragrance.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.perfumePresentation.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.perfumeExtra.findMany({ where: { storeId: storeIdToExport } }),
+      prisma.perfumePack.findMany({ where: { storeId: storeIdToExport } }),
     ]);
 
     // Extraer ProductMasters únicos: los de la tienda y los referenciados por
@@ -338,6 +347,10 @@ export async function GET(request: NextRequest) {
       nthPromotions,
       operationalLimit,
       catalogSettings,
+      fragrances,
+      perfumePresentations,
+      perfumeExtras,
+      perfumePacks,
     };
 
     // Calcular checksum SHA-256 del contenido de data.json
@@ -388,6 +401,10 @@ export async function GET(request: NextRequest) {
         coupons: coupons.length,
         categoryPromotions: categoryPromotions.length,
         volumePromotions: volumePromotions.length,
+        fragrances: fragrances.length,
+        perfumePresentations: perfumePresentations.length,
+        perfumeExtras: perfumeExtras.length,
+        perfumePacks: perfumePacks.length,
         nthPromotions: nthPromotions.length,
         operationalLimits: operationalLimit ? 1 : 0,
         catalogSettings: catalogSettings ? 1 : 0,

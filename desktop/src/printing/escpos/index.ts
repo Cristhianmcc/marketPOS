@@ -567,6 +567,13 @@ class EscposPrintManager {
     if (itemDiscounts > 0) {
       discounts.push({ type: 'item', description: 'Desc. por producto', amount: itemDiscounts });
     }
+    // Perfumería: 2x1 / 3x2 por presentación (solo líneas de perfume).
+    const perfumePromo = (sale.items || [])
+      .filter((item: any) => item.perfumeDetail && Number(item.nthPromoDiscount) > 0)
+      .reduce((sum: number, item: any) => sum + Number(item.nthPromoDiscount), 0);
+    if (perfumePromo > 0) {
+      discounts.push({ type: 'promo', description: 'Promo perfumes', amount: Math.round(perfumePromo * 100) / 100 });
+    }
     const discountTotal = Number(sale.discountTotal || 0);
     if (discountTotal > 0) {
       discounts.push({ type: 'order', description: 'Descuento general', amount: discountTotal });

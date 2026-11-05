@@ -28,6 +28,7 @@ interface SaleItem {
   volumePromoDiscount: number;
   // Promociones n-ésimo (Módulo 14.2-C2)
   nthPromoName: string | null;
+  perfumeDetail?: unknown;
   nthPromoQty: number | null;
   nthPromoPercent: number | null;
   nthPromoDiscount: number;
@@ -387,6 +388,8 @@ export default function ReceiptPage() {
                 && Number(item.quantityOriginal) > 0
                 && item.sellUnitPriceApplied != null;
               const displayUnitPrice = bySellUnit ? Number(item.sellUnitPriceApplied) : item.unitPrice;
+              // Perfumería: la línea ya dice frascos × precio; los ml son internos.
+              const isPerfume = Boolean(item.perfumeDetail);
 
               // La cantidad mostrada siempre multiplica al precio mostrado.
               const getQuantityDisplay = () => {
@@ -429,13 +432,13 @@ export default function ReceiptPage() {
                     <span>{formatMoney(item.subtotal)}</span>
                   </div>
                   {/* ✅ MÓDULO F2.2: Equivalencia de la presentación en unidad base */}
-                  {bySellUnit && (
+                  {bySellUnit && !isPerfume && (
                     <div className="item-conversion" style={{ fontSize: '10px', color: '#6b7280' }}>
                       = {Number(item.quantityBase ?? item.quantity)} {item.unitSymbol || 'unid. base'}
                     </div>
                   )}
                   {/* ✅ MÓDULO F2.3: Mostrar si se usó precio por presentación */}
-                  {item.pricingMode === 'SELL_UNIT_OVERRIDE' && item.sellUnitPriceApplied && (
+                  {item.pricingMode === 'SELL_UNIT_OVERRIDE' && item.sellUnitPriceApplied && !isPerfume && (
                     <div className="item-packprice" style={{ fontSize: '10px', color: '#16a34a' }}>
                       Precio {item.unitSymbol || 'pack'}: {formatMoney(item.sellUnitPriceApplied)}
                     </div>
@@ -471,7 +474,7 @@ export default function ReceiptPage() {
                 {item.nthPromoDiscount > 0 && item.nthPromoName && (
                   <div className="item-discount">
                     <span>
-                      {item.nthPromoQty}° al {item.nthPromoPercent}%: {item.nthPromoName}
+                      {isPerfume ? `Promo ${item.nthPromoName}` : `${item.nthPromoQty}° al ${item.nthPromoPercent}%: ${item.nthPromoName}`}
                     </span>
                     <span>-{formatMoney(item.nthPromoDiscount)}</span>
                   </div>

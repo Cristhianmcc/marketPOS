@@ -144,6 +144,7 @@ enum BusinessProfile {
   BOTICA
   FARMACIA    // Farmacia: más completa que botica, con campos clínicos y FEFO
   ACCESORIOS
+  PERFUMERIA  // Perfumes de equivalencia: fragancia (esencia en ml) + presentación
 }
 
 //// MODELS
@@ -163,6 +164,10 @@ model Store {
 
   users              User[]
   storeProducts      StoreProduct[]
+  fragrances           Fragrance[] // Perfumería
+  perfumePresentations PerfumePresentation[] // Perfumería
+  perfumeExtras        PerfumeExtra[] // Perfumería
+  perfumePacks         PerfumePack[] // Perfumería
   sales              Sale[]
   shifts             Shift[]
   movements          Movement[]
@@ -357,6 +362,7 @@ model StoreProduct {
   catalogCategory     String?                    @map("catalog_category")
   catalogVisible      Boolean   @default(true)   @map("catalog_visible")
   catalogUpdatedAt    DateTime?                  @map("catalog_updated_at")
+  catalogAttributes   Json?                      @map("catalog_attributes") // Perfumería: género, familia y precios por presentación en el catálogo web
 
   // Tributos: el precio es el final al cliente. Gravado incluye IGV; exonerado
   // e inafecto no llevan IGV. ICBPER se suma aparte por unidad vendida (bolsas).
@@ -371,6 +377,10 @@ model StoreProduct {
   workOrderItems WorkOrderItem[] // ✅ MÓDULO F2: Items de órdenes de trabajo
   batches        ProductBatch[]  // ✅ MÓDULO PH2: Lotes y vencimiento
   purchaseOrderItems PurchaseOrderItem[] // ✅ MÓDULO PH9: Items de órdenes de compra
+  fragrance          Fragrance? // Perfumería: esta esencia es una fragancia
+  perfumeContainerOf PerfumePresentation[] @relation("PerfumeContainer")
+  perfumeExtraOf     PerfumeExtra[]        @relation("PerfumeExtraProduct")
+  perfumePackGiftOf  PerfumePack[]         @relation("PerfumePackGift")
 
   @@unique([storeId, productId])
   @@index([storeId])
@@ -547,6 +557,11 @@ model SaleItem {
   // ✅ MÓDULO PH3: FEFO — snapshot JSON de lotes consumidos
   // Ejemplo: [{batchNumber:"L001",qty:10,expiry:"2026-05-01"},{...}]
   batchBreakdown Json? @map("batch_breakdown")
+
+  // Perfumería: snapshot de la línea (fragancia, presentación, ml y envase).
+  // storeProductId es la esencia; quantity, los ml descontados. La anulación
+  // usa containerStoreProductId/containerQty para devolver el envase.
+  perfumeDetail Json? @map("perfume_detail")
 
   // ✅ MÓDULO PH8: Snapshot farmacéutico para ticket y SUNAT
   commercialName     String? @map("commercial_name")      // Nombre comercial
@@ -1865,4 +1880,110 @@ model DrugInteractionLog {
   @@index([storeId, createdAt])
   @@index([patientId])
   @@map("drug_interaction_logs")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PERFUMERÍA (perfil PERFUMERIA)
+// La fragancia es una esencia de la sede: un StoreProduct medido en ml con su
+// stock, costo y movimientos. La presentación (100 ml Azul, relleno 120 ml)
+// fija el precio, los ml que consume y el envase que descuenta.
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Fragrance {
+  id             String   @id @default(cuid())
+  storeId        String   @map("store_id")
+  storeProductId String   @unique @map("store_product_id")
+  code           String // F754, M1141
+  reference      String? // Perfume de referencia: J'adore
+  referenceBrand String?  @map("reference_brand") // Dior
+  gender         String? // HOMBRE | MUJER | UNISEX
+  family         String? // Florales Románticos, Amaderados Elegantes...
+  aromas         String[] @default([])
+  seasons        String[] @default([])
+  occasions      String[] @default([])
+  scent          String? // "Floral, especiado y suave"
+  description    String?  @db.Text
+  imageUrl       String?  @map("image_url")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  store        Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeProduct StoreProduct @relation(fields: [storeProductId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, code])
+  @@index([storeId, gender])
+  @@map("fragrances")
+}
+
+model PerfumePresentation {
+  id                      String   @id @default(cuid())
+  storeId                 String   @map("store_id")
+  name                    String // "100 ml Azul", "Relleno 120 ml"
+  sku                     String?
+  essenceMl               Decimal  @map("essence_ml") @db.Decimal(10, 3) // ml de fragancia que consume
+  price                   Decimal  @db.Decimal(10, 2)
+  listPrice               Decimal? @map("list_price") @db.Decimal(10, 2) // precio tachado
+  containerStoreProductId String?  @map("container_store_product_id") // envase que descuenta (null en relleno)
+  isRefill                Boolean  @default(false) @map("is_refill")
+  requiresPriorPurchase   Boolean  @default(false) @map("requires_prior_purchase") // relleno: solo con compra previa
+  grantsRefill            Boolean  @default(false) @map("grants_refill") // comprarla habilita rellenos
+  promoBuy                Int?     @map("promo_buy") // 2x1: lleva 2...
+  promoPay                Int?     @map("promo_pay") // ...paga 1
+  sortOrder               Int      @default(0) @map("sort_order")
+  active                  Boolean  @default(true)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  store     Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  container StoreProduct? @relation("PerfumeContainer", fields: [containerStoreProductId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, name])
+  @@index([storeId, active])
+  @@map("perfume_presentations")
+}
+
+// Perfumería: agregado de la línea (feromonas, gramos extra de esencia).
+model PerfumeExtra {
+  id             String   @id @default(cuid())
+  storeId        String   @map("store_id")
+  name           String // "Feromonas dama 10 g", "Esencia extra 5 g"
+  price          Decimal  @db.Decimal(10, 2) // se suma al precio del frasco
+  storeProductId String?  @map("store_product_id") // producto que descuenta (feromona)
+  productQty     Decimal  @default(1) @map("product_qty") @db.Decimal(10, 3)
+  extraEssenceMl Decimal? @map("extra_essence_ml") @db.Decimal(10, 3) // o ml extra de la misma fragancia
+  sortOrder      Int      @default(0) @map("sort_order")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  store        Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeProduct StoreProduct? @relation("PerfumeExtraProduct", fields: [storeProductId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, name])
+  @@map("perfume_extras")
+}
+
+// Perfumería: pack a precio cerrado (2x100 ml, 3x50 ml...). Se vende como una
+// línea por fragancia con el precio del pack prorrateado; cada frasco puede
+// ser de cualquier presentación (color) con esos ml que no sea relleno.
+model PerfumePack {
+  id                 String   @id @default(cuid())
+  storeId            String   @map("store_id")
+  name               String // "Pack 3 x 100 ml"
+  essenceMl          Decimal  @map("essence_ml") @db.Decimal(10, 3) // tamaño del frasco; el color se elige al vender
+  fragranceCount     Int      @map("fragrance_count")
+  price              Decimal  @db.Decimal(10, 2)
+  listPrice          Decimal? @map("list_price") @db.Decimal(10, 2)
+  giftStoreProductId String?  @map("gift_store_product_id") // regalo (atomizador)
+  sortOrder          Int      @default(0) @map("sort_order")
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  store Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  gift  StoreProduct? @relation("PerfumePackGift", fields: [giftStoreProductId], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, name])
+  @@map("perfume_packs")
 }

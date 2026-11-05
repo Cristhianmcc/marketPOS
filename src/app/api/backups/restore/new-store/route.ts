@@ -297,6 +297,7 @@ export async function POST(request: NextRequest) {
       'suppliers', 'purchaseOrders', 'workOrders', 'patients', 'patientMedications',
       'controlledBookEntries', 'drugInteractionLogs', 'promotions', 'coupons',
       'categoryPromotions', 'volumePromotions', 'nthPromotions',
+      'fragrances', 'perfumePresentations', 'perfumeExtras', 'perfumePacks',
     ];
     for (const key of sectionArrays) {
       if (backupData[key] === undefined) continue;
@@ -760,6 +761,137 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // 5.2b Perfumería: presentaciones (con su envase) y fragancias (su esencia).
+      const perfumePresentationIdMap = new Map<string, string>();
+      if (hasSection('perfumePresentations')) {
+        restorePhase = 'RESTORE_PERFUME_PRESENTATIONS';
+        for (const presentation of backupData.perfumePresentations) {
+          const created = await tx.perfumePresentation.create({
+            data: {
+              storeId: newStore.id,
+              name: presentation.name,
+              sku: presentation.sku ?? null,
+              essenceMl: presentation.essenceMl,
+              price: presentation.price,
+              listPrice: presentation.listPrice ?? null,
+              containerStoreProductId: presentation.containerStoreProductId
+                ? requireStoreProduct(presentation.containerStoreProductId, 'una presentación de perfume')
+                : null,
+              isRefill: presentation.isRefill ?? false,
+              requiresPriorPurchase: presentation.requiresPriorPurchase ?? false,
+              grantsRefill: presentation.grantsRefill ?? false,
+              promoBuy: presentation.promoBuy ?? null,
+              promoPay: presentation.promoPay ?? null,
+              sortOrder: presentation.sortOrder ?? 0,
+              active: presentation.active ?? true,
+              createdAt: optionalDate(presentation.createdAt) ?? undefined,
+            },
+          });
+          perfumePresentationIdMap.set(presentation.id, created.id);
+        }
+      }
+      if (hasSection('fragrances')) {
+        restorePhase = 'RESTORE_FRAGRANCES';
+        for (const fragrance of backupData.fragrances) {
+          await tx.fragrance.create({
+            data: {
+              storeId: newStore.id,
+              storeProductId: requireStoreProduct(fragrance.storeProductId, 'una fragancia'),
+              code: fragrance.code,
+              reference: fragrance.reference ?? null,
+              referenceBrand: fragrance.referenceBrand ?? null,
+              gender: fragrance.gender ?? null,
+              family: fragrance.family ?? null,
+              aromas: Array.isArray(fragrance.aromas) ? fragrance.aromas : [],
+              seasons: Array.isArray(fragrance.seasons) ? fragrance.seasons : [],
+              occasions: Array.isArray(fragrance.occasions) ? fragrance.occasions : [],
+              scent: fragrance.scent ?? null,
+              description: fragrance.description ?? null,
+              imageUrl: fragrance.imageUrl ?? null,
+              active: fragrance.active ?? true,
+              createdAt: optionalDate(fragrance.createdAt) ?? undefined,
+            },
+          });
+        }
+      }
+      const perfumeExtraIdMap = new Map<string, string>();
+      if (hasSection('perfumeExtras')) {
+        restorePhase = 'RESTORE_PERFUME_EXTRAS';
+        for (const extra of backupData.perfumeExtras) {
+          const created = await tx.perfumeExtra.create({
+            data: {
+              storeId: newStore.id,
+              name: extra.name,
+              price: extra.price,
+              storeProductId: extra.storeProductId
+                ? requireStoreProduct(extra.storeProductId, 'un extra de perfume')
+                : null,
+              productQty: extra.productQty ?? 1,
+              extraEssenceMl: extra.extraEssenceMl ?? null,
+              sortOrder: extra.sortOrder ?? 0,
+              active: extra.active ?? true,
+              createdAt: optionalDate(extra.createdAt) ?? undefined,
+            },
+          });
+          perfumeExtraIdMap.set(extra.id, created.id);
+        }
+      }
+      const perfumePackIdMap = new Map<string, string>();
+      if (hasSection('perfumePacks')) {
+        restorePhase = 'RESTORE_PERFUME_PACKS';
+        for (const pack of backupData.perfumePacks) {
+          const created = await tx.perfumePack.create({
+            data: {
+              storeId: newStore.id,
+              name: pack.name,
+              essenceMl: pack.essenceMl,
+              fragranceCount: pack.fragranceCount,
+              price: pack.price,
+              listPrice: pack.listPrice ?? null,
+              giftStoreProductId: pack.giftStoreProductId
+                ? requireStoreProduct(pack.giftStoreProductId, 'un pack de perfume')
+                : null,
+              sortOrder: pack.sortOrder ?? 0,
+              active: pack.active ?? true,
+              createdAt: optionalDate(pack.createdAt) ?? undefined,
+            },
+          });
+          perfumePackIdMap.set(pack.id, created.id);
+        }
+      }
+      // El snapshot de la línea apunta a ids de la tienda original.
+      const remapProductId = (id: unknown) => (typeof id === 'string' ? storeProductIdMap.get(id) ?? null : null);
+      const remapPerfumeDetail = (detail: any) => {
+        if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return undefined;
+        return {
+          ...detail,
+          presentationId: perfumePresentationIdMap.get(detail.presentationId) ?? detail.presentationId,
+          containerStoreProductId: detail.containerStoreProductId
+            ? storeProductIdMap.get(detail.containerStoreProductId) ?? null
+            : null,
+          ...(Array.isArray(detail.extras)
+            ? {
+                extras: detail.extras.map((extra: any) => ({
+                  ...extra,
+                  id: perfumeExtraIdMap.get(extra?.id) ?? extra?.id,
+                  storeProductId: remapProductId(extra?.storeProductId),
+                })),
+              }
+            : {}),
+          ...(Array.isArray(detail.stockUses)
+            ? {
+                // Sin producto en la tienda restaurada no hay stock que devolver.
+                stockUses: detail.stockUses
+                  .map((use: any) => ({ ...use, storeProductId: remapProductId(use?.storeProductId) }))
+                  .filter((use: any) => use.storeProductId),
+              }
+            : {}),
+          ...(detail.pack && typeof detail.pack === 'object'
+            ? { pack: { ...detail.pack, id: perfumePackIdMap.get(detail.pack.id) ?? detail.pack.id } }
+            : {}),
+        };
+      };
+
       // 5.3 Servicios antes de las ventas que los referencian.
       const serviceIdMap = new Map<string, string>();
       if (hasSection('services')) {
@@ -943,6 +1075,7 @@ export async function POST(request: NextRequest) {
               igvAmount: item.igvAmount ?? null,
               icbperQuantity: item.icbperQuantity ?? null,
               icbperAmount: item.icbperAmount ?? 0,
+              perfumeDetail: remapPerfumeDetail(item.perfumeDetail),
             },
           });
           saleItemsRestored++;
@@ -1348,6 +1481,10 @@ export async function POST(request: NextRequest) {
           receivablePayments: receivablePaymentsRestored,
           categories: categoryIdMap.size,
           productBatches: batchIdMap.size,
+          perfumePresentations: perfumePresentationIdMap.size,
+          perfumeExtras: perfumeExtraIdMap.size,
+          perfumePacks: perfumePackIdMap.size,
+          fragrances: hasSection('fragrances') ? backupData.fragrances.length : 0,
           services: serviceIdMap.size,
           suppliers: supplierIdMap.size,
           purchaseOrders: hasSection('purchaseOrders') ? backupData.purchaseOrders.length : 0,

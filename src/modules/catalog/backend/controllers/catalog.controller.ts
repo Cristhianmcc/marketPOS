@@ -1,4 +1,5 @@
 import { prisma } from '@/infra/db/prisma';
+import { sanitizePerfumeAttributes } from '@/lib/perfumery/catalogAttributes';
 import type {
   CatalogPublishInput,
   CatalogPublishResult,
@@ -104,6 +105,7 @@ export class CatalogController {
         imageUrl: product.catalogImagePath,
         visible: product.catalogVisible,
         updatedAt: product.catalogUpdatedAt?.toISOString() ?? null,
+        attributes: sanitizePerfumeAttributes(product.catalogAttributes),
       })),
     };
   }

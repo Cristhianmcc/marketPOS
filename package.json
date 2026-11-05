@@ -22,6 +22,7 @@
     "test:checkout:taxes": "tsx scripts/test-checkout-taxes-isolated.ts",
     "test:botica:isolated": "tsx scripts/test-botica-flow-isolated.ts",
     "test:lavanderia:isolated": "tsx scripts/test-lavanderia-flow-isolated.ts",
+    "test:perfumeria:isolated": "tsx scripts/test-perfumeria-flow-isolated.ts",
     "test:catalog:isolated": "tsx scripts/test-catalog-publish-isolated.ts",
     "test:license-credentials:isolated": "tsx scripts/test-license-credentials-isolated.ts",
     "test:desktop-env:isolated": "node scripts/test-desktop-package-env-isolated.cjs",

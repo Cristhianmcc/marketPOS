@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast, Toaster } from 'sonner';
 
 // ✅ MÓDULO V1: Tipos de perfiles de negocio
-type BusinessProfile = 'BODEGA' | 'FERRETERIA' | 'TALLER' | 'LAVANDERIA' | 'POLLERIA' | 'HOSTAL' | 'BOTICA' | 'FARMACIA' | 'ACCESORIOS';
+type BusinessProfile = 'BODEGA' | 'FERRETERIA' | 'TALLER' | 'LAVANDERIA' | 'POLLERIA' | 'HOSTAL' | 'BOTICA' | 'FARMACIA' | 'ACCESORIOS' | 'PERFUMERIA';
 
 // Flags de rubro (NO son de plan) con sus perfiles por defecto
 // SUNAT ya NO aparece aquí — es un flag de plan (solo BUSINESS y DEMO lo activan automáticamente)

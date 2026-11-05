@@ -28,6 +28,7 @@ import { normalizeToBaseUnit } from '@/lib/units'; // ✅ MÓDULO V2: Conversion
 import { computeLineTaxes } from '@/lib/sales/lineTaxes';
 import { PharmacyTraceError, registerPharmacyTrace } from '@/lib/sales/pharmacyTrace';
 import { consumeSaleInventory, InventoryMutationError } from '@/lib/inventory/stockMutations';
+import { isPerfumeItem, perfumeSaleItemData, PerfumeCheckoutError, preparePerfumeLines } from '@/lib/perfumery/checkoutLines';
 import {
   createCheckoutSaleId,
   createCheckoutRequestHash,
@@ -57,6 +58,13 @@ interface CheckoutItem {
   rxPatientName?: string;
   rxPrescriptionNumber?: string;
   rxObservation?: string;
+  // Perfumería: storeProductId es la esencia y quantity, los frascos.
+  perfumePresentationId?: string;
+  perfumeExtraIds?: string[];
+  // Pack de perfumería: una fragancia + presentación por frasco del pack.
+  perfumePackId?: string;
+  packItems?: Array<{ storeProductId?: string; perfumePresentationId?: string }>;
+  refillOverride?: boolean; // relleno sin compra previa (solo OWNER)
 }
 
 interface PaymentSplit {
@@ -125,7 +133,7 @@ function persistedCheckoutPayload(
 }
 
 async function executeCheckout(
-  session: { storeId: string; userId: string },
+  session: { storeId: string; userId: string; role?: string },
   items: CheckoutItem[],
   shiftId: string | null, // ✅ Puede ser null para FIADO
   paymentMethod: 'CASH' | 'YAPE' | 'PLIN' | 'CARD' | 'FIADO' | 'MIXED',
@@ -150,7 +158,8 @@ async function executeCheckout(
     const isDemoMode = store?.isDemoStore ?? false;
 
     // ✅ MÓDULO F3: Separar items de productos, servicios y ventas libres
-    const productItems = items.filter(i => !i.isService && !i.isFreeItem && i.storeProductId);
+    const productItems = items.filter(i => !i.isService && !i.isFreeItem && i.storeProductId && !isPerfumeItem(i));
+    const perfumeItems = items.filter(isPerfumeItem);
     const serviceItems = items.filter(i => i.isService && i.serviceId);
     const freeItems = items.filter(i => i.isFreeItem && i.productName);
 
@@ -736,16 +745,33 @@ async function executeCheckout(
       };
     });
 
-    // 4. Calcular totales (productos + servicios + ventas libres)
-    const productsSubtotal = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0);
+    // Perfumería: fragancia + presentación (precio de la presentación guardada).
+    let perfumeLines: Awaited<ReturnType<typeof preparePerfumeLines>> = [];
+    try {
+      perfumeLines = await preparePerfumeLines(tx, session.storeId, perfumeItems, {
+        customerId: customerId ?? null,
+        role: session.role,
+      });
+    } catch (error) {
+      if (error instanceof PerfumeCheckoutError) {
+        throw new CheckoutError(error.code, error.statusCode, error.message, error.details);
+      }
+      throw error;
+    }
+
+    // 4. Calcular totales (productos + servicios + ventas libres + perfumes)
+    const productsSubtotal = itemsWithDiscounts.reduce((sum, item) => sum + item.subtotalItem, 0)
+      + perfumeLines.reduce((sum, line) => sum + line.subtotal, 0);
     const servicesSubtotal = servicesWithTotals.reduce((sum, item) => sum + item.subtotalItem, 0);
     const freeItemsSubtotal = freeItemsWithTotals.reduce((sum, item) => sum + item.subtotalItem, 0);
     const subtotalBeforeDiscounts = productsSubtotal + servicesSubtotal + freeItemsSubtotal;
     const promotionsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.promotionDiscount, 0);
     const categoryPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.categoryPromoDiscount, 0);
     const volumePromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.volumePromoDiscount, 0); // ✅ Módulo 14.2-C1
-    const nthPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.nthPromoDiscount, 0); // ✅ Módulo 14.2-C2
-    const itemDiscountsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0);
+    const nthPromosTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.nthPromoDiscount, 0) // ✅ Módulo 14.2-C2
+      + perfumeLines.reduce((sum, line) => sum + line.promoDiscount, 0); // Perfumería: 2x1/3x2
+    const itemDiscountsTotal = itemsWithDiscounts.reduce((sum, item) => sum + item.discountAmount, 0)
+      + perfumeLines.reduce((sum, line) => sum + line.discountAmount, 0);
     const subtotalAfterItemDiscounts = subtotalBeforeDiscounts - promotionsTotal - categoryPromosTotal - volumePromosTotal - nthPromosTotal - itemDiscountsTotal;
     
     // Tax (usando lógica actual, puede ser 0)
@@ -1043,6 +1069,18 @@ async function executeCheckout(
       paymentDetails: { checkoutRequestHash: checkoutHash },
     };
 
+    // Perfumería: el cliente queda en la venta (historial y rellenos).
+    if (paymentMethod !== 'FIADO' && customerId && perfumeLines.length > 0) {
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, storeId: session.storeId, active: true },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new CheckoutError('CUSTOMER_NOT_FOUND', 404, 'Cliente no encontrado o inactivo');
+      }
+      saleData.customerId = customerId;
+    }
+
     // Para FIADO: shiftId es null, amountPaid y changeAmount null, agregar customerId
     if (paymentMethod === 'FIADO') {
       saleData.shiftId = null;
@@ -1203,7 +1241,12 @@ async function executeCheckout(
       )
     );
 
-    const saleItems = [...productSaleItems, ...serviceSaleItems, ...freeItemSaleItems];
+    // Perfumería: una línea por fragancia + presentación.
+    const perfumeSaleItems = await Promise.all(
+      perfumeLines.map((line) => tx.saleItem.create({ data: perfumeSaleItemData(sale.id, line) }))
+    );
+
+    const saleItems = [...productSaleItems, ...serviceSaleItems, ...freeItemSaleItems, ...perfumeSaleItems];
 
     // La trazabilidad farmacéutica forma parte de la misma transacción que la venta.
     // Una referencia inválida revierte también la venta y el descuento de stock.
@@ -1292,6 +1335,49 @@ async function executeCheckout(
       })
     );
 
+    // Perfumería: salida de esencia (ml) y del envase.
+    await Promise.all(
+      perfumeLines.flatMap((line) => [
+        tx.movement.create({
+          data: {
+            storeId: session.storeId,
+            storeProductId: line.essenceStoreProductId,
+            type: 'SALE',
+            quantity: new Prisma.Decimal(-line.essenceMl),
+            unitPrice: new Prisma.Decimal(line.unitPricePerMl),
+            total: new Prisma.Decimal(line.subtotal),
+            notes: `Venta #${nextSaleNumber} - ${line.bottles} × ${line.detail.presentationName}`,
+            createdById: session.userId,
+            isDemo: isDemoMode,
+          },
+        }),
+        ...(line.container
+          ? [tx.movement.create({
+              data: {
+                storeId: session.storeId,
+                storeProductId: line.container.storeProductId,
+                type: 'SALE',
+                quantity: new Prisma.Decimal(-line.bottles),
+                notes: `Venta #${nextSaleNumber} - envase de ${line.detail.fragranceCode}`,
+                createdById: session.userId,
+                isDemo: isDemoMode,
+              },
+            })]
+          : []),
+        ...line.otherStock.map((use) => tx.movement.create({
+          data: {
+            storeId: session.storeId,
+            storeProductId: use.storeProductId,
+            type: 'SALE',
+            quantity: new Prisma.Decimal(-use.quantity),
+            notes: `Venta #${nextSaleNumber} - ${use.kind === 'GIFT' ? 'regalo' : 'extra'} de ${line.detail.fragranceCode}`,
+            createdById: session.userId,
+            isDemo: isDemoMode,
+          },
+        })),
+      ])
+    );
+
     // 7b/8. Consumir stock general y lotes con updates condicionales atómicos.
     // Si otra operación consumió existencias desde la lectura inicial, el helper
     // falla y toda la transacción de venta se revierte.
@@ -1308,7 +1394,29 @@ async function executeCheckout(
               quantity: item.quantityBase,
               tracksStock: sp.stock !== null,
             };
-          }),
+          })
+          .concat(perfumeLines.flatMap((line) => [
+            {
+              storeProductId: line.essenceStoreProductId,
+              productName: line.productName,
+              quantity: line.essenceMl,
+              tracksStock: line.essenceTracksStock,
+            },
+            ...(line.container
+              ? [{
+                  storeProductId: line.container.storeProductId,
+                  productName: line.container.name,
+                  quantity: line.bottles,
+                  tracksStock: line.container.tracksStock,
+                }]
+              : []),
+            ...line.otherStock.map((use) => ({
+              storeProductId: use.storeProductId,
+              productName: use.name,
+              quantity: use.quantity,
+              tracksStock: use.tracksStock,
+            })),
+          ])),
         batches: [...fefoAllocation.entries()].flatMap(([storeProductId, consumed]) =>
           consumed.map((batch) => ({
             storeProductId,
@@ -1560,6 +1668,16 @@ export async function POST(req: NextRequest) {
             code: 'INVALID_ITEM_FORMAT',
             message: 'Formato de venta libre inválido',
             details: { requiredFields: ['productName', 'quantity', 'unitPrice'] },
+          };
+          return NextResponse.json(error, { status: 400 });
+        }
+      } else if (item.perfumePackId) {
+        // Pack de perfumería: sin storeProductId propio; cada frasco trae el suyo.
+        if (!Array.isArray(item.packItems) || item.packItems.length === 0 || typeof item.quantity !== 'number') {
+          const error: ErrorResponse = {
+            code: 'INVALID_ITEM_FORMAT',
+            message: 'Formato de pack inválido',
+            details: { requiredFields: ['perfumePackId', 'packItems', 'quantity'] },
           };
           return NextResponse.json(error, { status: 400 });
         }

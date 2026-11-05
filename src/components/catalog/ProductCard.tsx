@@ -1,20 +1,43 @@
+'use client';
+
+import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { CategoryIcon } from '@/components/pos/categoryIcon';
 import type { PublicCatalogProduct } from '@/types/catalog';
 
 interface ProductCardProps {
   product: PublicCatalogProduct;
-  quantity: number;
-  onAdd: () => void;
-  onRemove: () => void;
+  getQuantity: (productId: string) => number;
+  onAdd: (product: PublicCatalogProduct) => void;
+  onRemove: (product: PublicCatalogProduct) => void;
+}
+
+/**
+ * Perfumería: cada presentación es un ítem distinto del pedido
+ * ("F754 Inspirado en J'adore - 100 ml" a su precio).
+ */
+function perfumeVariant(product: PublicCatalogProduct, index: number): PublicCatalogProduct {
+  const option = product.attributes?.options[index];
+  if (!option) return product;
+  return { ...product, id: `${product.id}::${index}`, name: `${product.name} - ${option.name}`, price: option.price };
 }
 
 export function ProductCard({
   product,
-  quantity,
-  onAdd,
-  onRemove,
+  getQuantity,
+  onAdd: addProduct,
+  onRemove: removeProduct,
 }: ProductCardProps) {
+  const options = product.attributes?.options ?? [];
+  const [optionIndex, setOptionIndex] = useState(() => {
+    const regular = options.findIndex((option) => !option.note);
+    return regular >= 0 ? regular : 0;
+  });
+  const item = options.length ? perfumeVariant(product, optionIndex) : product;
+  const option = options[optionIndex];
+  const quantity = getQuantity(item.id);
+  const onAdd = () => addProduct(item);
+  const onRemove = () => removeProduct(item);
   return (
     <div className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[var(--cat-shadow)] transition-all duration-300 hover:-translate-y-0.5">
       <div className="relative aspect-[5/4] overflow-hidden">
@@ -48,10 +71,27 @@ export function ProductCard({
             {product.description}
           </p>
         ) : null}
+        {options.length > 0 && (
+          <select
+            value={optionIndex}
+            onChange={(e) => setOptionIndex(Number(e.target.value))}
+            className="mb-1 h-8 w-full rounded-lg border border-neutral-200 bg-white px-2 text-xs text-[var(--cat-ink)]"
+            aria-label="Presentación"
+          >
+            {options.map((o, index) => (
+              <option key={`${o.name}-${index}`} value={index}>
+                {o.name} · S/ {o.price.toFixed(2)}{o.note ? ` (${o.note.toLowerCase()})` : ''}
+              </option>
+            ))}
+          </select>
+        )}
 
         <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
           <p className="text-lg font-black tracking-tight text-[var(--cat-ink)]">
-            S/ {product.price.toFixed(2)}
+            S/ {item.price.toFixed(2)}
+            {option?.listPrice && option.listPrice > option.price ? (
+              <span className="ml-1.5 text-xs font-semibold text-neutral-400 line-through">S/ {option.listPrice.toFixed(2)}</span>
+            ) : null}
           </p>
 
           {quantity === 0 ? (

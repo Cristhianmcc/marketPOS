@@ -35,16 +35,20 @@ export async function GET(
     }
 
     const saleDate = new Date(sale.createdAt);
-    const items = sale.items.map((item) => ({
-      name: item.productContent
-        ? `${item.productName} ${item.productContent}`
-        : item.productName,
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice),
-      subtotal: Number(item.totalLine || item.subtotal),
-      discount: Number(item.discountAmount),
-      unit: item.unitSymbol || item.unitType,
-    }));
+    const items = sale.items.map((item) => {
+      // Perfumería: se imprimen frascos al precio del frasco (los ml son internos).
+      const perfume = item.perfumeDetail !== null && item.quantityOriginal !== null && item.sellUnitPriceApplied !== null;
+      return {
+        name: item.productContent
+          ? `${item.productName} ${item.productContent}`
+          : item.productName,
+        quantity: perfume ? Number(item.quantityOriginal) : Number(item.quantity),
+        unitPrice: perfume ? Number(item.sellUnitPriceApplied) : Number(item.unitPrice),
+        subtotal: Number(item.totalLine || item.subtotal),
+        discount: Number(item.discountAmount),
+        unit: perfume ? 'und' : item.unitSymbol || item.unitType,
+      };
+    });
 
     const discounts: Array<{
       type: 'item' | 'order' | 'coupon' | 'promo';
@@ -62,6 +66,14 @@ export async function GET(
         description: 'Desc. por producto',
         amount: itemDiscounts,
       });
+    }
+
+    // Perfumería: 2x1 / 3x2 por presentación.
+    const perfumePromo = sale.items
+      .filter((item) => item.perfumeDetail !== null)
+      .reduce((sum, item) => sum + Number(item.nthPromoDiscount), 0);
+    if (perfumePromo > 0) {
+      discounts.push({ type: 'promo', description: 'Promo perfumes', amount: Math.round(perfumePromo * 100) / 100 });
     }
 
     const couponDiscount = Number(sale.couponDiscount);

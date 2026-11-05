@@ -51,6 +51,7 @@ export async function GET(
         items: {
           select: {
             id: true,
+            perfumeDetail: true, // Perfumería: el ticket muestra frascos, no ml
             productName: true,
             productContent: true,
             unitType: true,

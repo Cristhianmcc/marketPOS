@@ -22,7 +22,7 @@ es `docs/audits/2026-09-26-pos.md`.
 
 - Aplicación web: Next.js **15.1.0**, App Router, React **19**, TypeScript estricto.
 - Interfaz: Tailwind CSS 3, lucide-react, sonner; páginas cliente grandes.
-- Persistencia: PostgreSQL, Prisma **5.22**; 44 modelos en `prisma/schema.prisma`.
+- Persistencia: PostgreSQL, Prisma **5.22**; 49 modelos en `prisma/schema.prisma`.
 - Sesiones: iron-session en cookie `market_pos_session`; contraseñas con bcrypt.
 - Escritorio: Electron 28, electron-builder/NSIS Windows x64, versión **0.2.0**.
 - Impresión: ESC/POS USB/red/Bluetooth, raster/HTML; servicio local adicional.
@@ -77,6 +77,7 @@ es `docs/audits/2026-09-26-pos.md`.
 | Comprobantes electrónicos | `src/domain/sunat/*`, `src/lib/sunat/*`, `src/app/api/sunat/*`, `src/worker/sunatWorker.ts` |
 | Ticket/impresión | `src/app/receipt/[id]/page.tsx`, `src/app/api/print/sale/[saleId]/route.ts`, `desktop/src/printing/*`, `print-service` |
 | Catálogo público | `/c/[slug]`, `src/modules/catalog/*`, `src/app/api/catalog/*`, rutas desktop de publicación |
+| Perfumería (fragancia + presentación, extras, packs) | `src/lib/perfumery/*`, `src/app/api/perfumery/*`, `src/app/perfumeria/*`, `src/components/pos/PerfumeryPanel.tsx`, checkout, `cancelSaleLocally`, publicación del catálogo web |
 | Backups | `desktop/src/backupScheduler.ts`, `desktop/src/sync/cloudBackupSync.ts`, `src/app/api/cloud-backups/*`, `src/lib/s3Client.ts` |
 | Arranque/instalador | `desktop/src/main.ts`, `server.ts`, `runtime/postgres/*`, `updater/*`, `desktop/scripts/*`, ambos package.json |
 
@@ -170,6 +171,54 @@ es `docs/audits/2026-09-26-pos.md`.
   guarda las prendas recibidas; salen en ambos tickets y en el detalle. El aviso
   de orden lista abre `wa.me` con el mensaje (`readyWhatsappLink`, celular
   peruano a +51); en el escritorio el enlace se abre fuera de la app.
+- Perfumería (perfil `PERFUMERIA`, 05/11/2026; estudio en
+  `docs/plans/2026-11-05-perfumeria.md`): cada sede es una `Store` con su
+  stock, caja y comprobantes. La fragancia (`Fragrance`, código `F754`,
+  referencia, género, familia, aromas) es 1:1 con un `StoreProduct` de esencia
+  medido en ml (unidad ML/MLT). `PerfumePresentation` fija precio, ml que
+  consume y envase (`containerStoreProductId`, null en relleno). El POS muestra
+  la pestaña Perfumes y envía `{ storeProductId: esencia, perfumePresentationId,
+  perfumeExtraIds?, quantity: frascos }` o un pack `{ perfumePackId, packItems:
+  [{ storeProductId, perfumePresentationId }], quantity }`.
+  `preparePerfumeLines` toma precios de presentación, extras y pack (no del
+  cliente), admite descuento manual (no en packs) y no aplica las promociones
+  generales. La línea guarda `quantity` = ml, `quantityOriginal` = frascos,
+  `SELL_UNIT_OVERRIDE` + `sellUnitPriceApplied` = precio del frasco y
+  `unitSunatCodeUsed = NIU`, así ticket y SUNAT informan frascos.
+  `SaleItem.perfumeDetail` guarda el snapshot (envase, extras, pack,
+  `stockUses` con feromonas y regalo, promo, `costTotal`); la anulación
+  devuelve envase y `stockUses`. Fase 2 (migración
+  `20261105010000_perfumeria_packs_extras`):
+  - `PerfumeExtra`: se suma al frasco en la misma línea; descuenta ml extra de
+    la misma fragancia o un producto (feromona).
+  - `PerfumePack`: precio cerrado por N frascos de `essenceMl`; el color se
+    elige por frasco (presentación no relleno con esos ml). Una línea por
+    frasco con el precio repartido (`splitPackPrice`); regalo en la primera.
+  - Rellenos: `requiresPriorPurchase` exige cliente de la sede con venta no
+    anulada de una presentación `grantsRefill` (o en la misma venta); el OWNER
+    puede enviar `refillOverride`. Con perfumes, el checkout guarda
+    `Sale.customerId` aunque no sea FIADO.
+  - Promo `promoBuy`/`promoPay` por presentación (`promo.ts`): cuenta en toda
+    la venta y reparte el descuento entre las líneas en `nthPromoDiscount`
+    (ninguna línea queda en 0 para la boleta). El POS calcula la misma vista
+    previa.
+  - `GET /api/perfumery/report` (OWNER): consumo, margen y reposición; excluye
+    anuladas (total y subtotal en 0) y demo. `customer-history` alimenta el POS.
+  - Catálogo web: `POST /api/perfumery/catalog-publish` marca las fragancias;
+    al publicar, `perfumeCatalogEntries` manda precio "desde" y `attributes`
+    (género, familia, temporadas, opciones agrupadas por ml y precio). La nube
+    los guarda saneados (`sanitizePerfumeAttributes`) en
+    `StoreProduct.catalogAttributes`; `/c/[slug]` filtra por género, familia y
+    temporada y cada presentación es un ítem del pedido. La nube necesita la
+    migración para guardar los atributos.
+  Catálogo de la sede: `POST /api/perfumery/import` (JSON o CSV, solo OWNER y
+  rubro Perfumería; no cambia stock existente; con `useDefaultPresentations`
+  carga presentaciones, extras y packs de referencia) y
+  `GET /api/perfumery/export` para otra sede. El respaldo incluye
+  `fragrances`, `perfumePresentations`, `perfumeExtras` y `perfumePacks` y
+  remapea `perfumeDetail` al restaurar. Catálogo de referencia extraído de la
+  web pública en `data/perfumeria/`. Banco: `npm run test:perfumeria:isolated`
+  (18 pasos, PostgreSQL desechable).
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

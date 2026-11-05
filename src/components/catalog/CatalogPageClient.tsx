@@ -27,9 +27,27 @@ export interface CartItem extends PublicCatalogProduct {
 const PRODUCTS_PER_PAGE = 20;
 const FEATURED_PRODUCTS = 8;
 
+const GENDER_LABELS: Record<string, string> = { MUJER: 'Mujer', HOMBRE: 'Hombre', UNISEX: 'Unisex' };
+const fold = (text: string) => text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’`´]/g, '');
+
 export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
+  // Perfumería: filtros por género, familia olfativa y temporada.
+  const [gender, setGender] = useState('');
+  const [family, setFamily] = useState('');
+  const [season, setSeason] = useState('');
+  const perfumeFilters = useMemo(() => {
+    const perfumes = products.filter((product) => product.attributes?.kind === 'perfume');
+    if (!perfumes.length) return null;
+    const unique = (values: Array<string | null | undefined>) =>
+      [...new Set(values.filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b, 'es'));
+    return {
+      genders: unique(perfumes.map((p) => p.attributes!.gender)).filter((g) => GENDER_LABELS[g]),
+      families: unique(perfumes.map((p) => p.attributes!.family)),
+      seasons: unique(perfumes.flatMap((p) => p.attributes!.seasons)),
+    };
+  }, [products]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -63,23 +81,30 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
       const matchesCategory =
         selectedCategory === 'Todos' || categoryOf(product) === selectedCategory;
 
-      const term = search.trim().toLowerCase();
+      const term = fold(search.trim());
+      const attributes = product.attributes;
 
       const matchesSearch =
         !term ||
-        product.name.toLowerCase().includes(term) ||
-        (product.description || '').toLowerCase().includes(term) ||
-        (product.category || '').toLowerCase().includes(term);
+        fold(product.name).includes(term) ||
+        fold(product.description || '').includes(term) ||
+        fold(product.category || '').includes(term) ||
+        (attributes ? fold([attributes.code, attributes.reference, ...attributes.aromas].filter(Boolean).join(' ')).includes(term) : false);
 
-      return matchesCategory && matchesSearch;
+      const matchesPerfume =
+        (!gender || attributes?.gender === gender) &&
+        (!family || attributes?.family === family) &&
+        (!season || Boolean(attributes?.seasons.includes(season)));
+
+      return matchesCategory && matchesSearch && matchesPerfume;
     });
 
     return filtered;
-  }, [products, search, selectedCategory]);
+  }, [products, search, selectedCategory, gender, family, season]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedCategory, products]);
+  }, [search, selectedCategory, products, gender, family, season]);
 
   const paginatedProducts = useMemo(() => {
     const startIdx = (currentPage - 1) * PRODUCTS_PER_PAGE;
@@ -149,7 +174,7 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
     searchRef.current?.focus({ preventScroll: true });
   };
 
-  const searching = search.trim() !== '';
+  const searching = search.trim() !== '' || Boolean(gender || family || season);
   const showHome = selectedCategory === 'Todos' && !searching;
   const whatsappLink = store.whatsappNumber
     ? `https://wa.me/${store.whatsappNumber.replace(/[^\d]/g, '')}`
@@ -179,6 +204,44 @@ export function CatalogPageClient({ store, products }: CatalogPageClientProps) {
             className="w-full h-12 pl-12 pr-4 bg-white rounded-full text-sm outline-none shadow-[var(--cat-shadow)] focus:ring-2 focus:ring-[var(--cat-accent)]"
           />
         </div>
+        {perfumeFilters && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {['', ...perfumeFilters.genders].map((value) => (
+              <button
+                key={value || 'all'}
+                type="button"
+                onClick={() => setGender(value)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                  gender === value ? 'bg-[var(--cat-primary)] text-white' : 'bg-white text-[var(--cat-ink)] shadow-[var(--cat-shadow)]'
+                }`}
+              >
+                {value ? GENDER_LABELS[value] : 'Todos'}
+              </button>
+            ))}
+            {perfumeFilters.families.length > 0 && (
+              <select
+                value={family}
+                onChange={(e) => setFamily(e.target.value)}
+                className="h-8 rounded-full bg-white px-3 text-xs text-[var(--cat-ink)] shadow-[var(--cat-shadow)]"
+                aria-label="Familia olfativa"
+              >
+                <option value="">Todas las familias</option>
+                {perfumeFilters.families.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            )}
+            {perfumeFilters.seasons.length > 0 && (
+              <select
+                value={season}
+                onChange={(e) => setSeason(e.target.value)}
+                className="h-8 rounded-full bg-white px-3 text-xs text-[var(--cat-ink)] shadow-[var(--cat-shadow)]"
+                aria-label="Temporada"
+              >
+                <option value="">Toda temporada</option>
+                {perfumeFilters.seasons.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            )}
+          </div>
+        )}
       </div>
 
       {!searching && (

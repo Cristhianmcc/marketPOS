@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { readPerfumeDetail } from '@/lib/perfumery/saleLine';
 
 type DbClient = PrismaClient | any;
 
@@ -61,6 +62,40 @@ export async function cancelSaleLocally(
         where: { id: item.storeProductId },
         data: { stock: { increment: item.quantity } },
       });
+
+      // Perfumería: la línea descontó también el envase, los extras con
+      // producto (feromonas) y el regalo del pack; se devuelven con su movimiento.
+      const perfume = readPerfumeDetail(item.perfumeDetail);
+      if (perfume) {
+        const uses = [
+          ...(perfume.containerStoreProductId && perfume.containerQty > 0
+            ? [{ storeProductId: perfume.containerStoreProductId, quantity: perfume.containerQty, label: 'envase' }]
+            : []),
+          ...perfume.stockUses.map((use) => ({
+            storeProductId: use.storeProductId,
+            quantity: use.quantity,
+            label: use.kind === 'GIFT' ? 'regalo' : 'extra',
+          })),
+        ];
+        for (const use of uses) {
+          const restored = await tx.storeProduct.updateMany({
+            where: { id: use.storeProductId, storeId: sale.storeId },
+            data: { stock: { increment: use.quantity } },
+          });
+          if (restored.count === 1) {
+            await tx.movement.create({
+              data: {
+                storeId: sale.storeId,
+                storeProductId: use.storeProductId,
+                type: 'ADJUSTMENT',
+                quantity: use.quantity,
+                notes: `Anulación ticket #${sale.saleNumber}: ${use.label} de ${perfume.fragranceCode}`,
+                createdById: actorUserId,
+              },
+            });
+          }
+        }
+      }
 
       const breakdown = Array.isArray(item.batchBreakdown)
         ? item.batchBreakdown as unknown as BatchBreakdownEntry[]

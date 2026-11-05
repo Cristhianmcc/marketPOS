@@ -60,9 +60,9 @@ export function ProductGrid({ products, getQuantity, onAdd, onRemove }: ProductG
         >
           <ProductCard
             product={product}
-            quantity={getQuantity(product.id)}
-            onAdd={() => onAdd(product)}
-            onRemove={() => onRemove(product)}
+            getQuantity={getQuantity}
+            onAdd={onAdd}
+            onRemove={onRemove}
           />
         </div>
       ))}

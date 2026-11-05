@@ -322,6 +322,7 @@ const CATEGORIES_BY_PROFILE: Record<BusinessProfile, CategorySeed[]> = {
   BOTICA:     BOTICA_CATEGORIES,
   FARMACIA:   FARMACIA_CATEGORIES,
   ACCESORIOS: FERRETERIA_CATEGORIES, // Accesorios tech
+  PERFUMERIA: BODEGA_CATEGORIES, // Perfumería: categorías propias en businessProfiles.ts
 };
 
 // ════════════════════════════════════════════════════════════════════════════

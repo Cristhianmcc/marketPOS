@@ -250,6 +250,20 @@ const RUBRO_SEEDS: Record<string, RubroSeedItem> = {
     ],
   },
 
+  // Perfumería: las fragancias se cargan con el importador del catálogo
+  // (Perfumería → Importar). Aquí solo categorías, envases y extras base.
+  PERFUMERIA: {
+    categories: [
+      { name: 'Fragancias Mujer',  icon: '🌸', color: '#EC4899', order: 1 },
+      { name: 'Fragancias Hombre', icon: '🧔', color: '#3B82F6', order: 2 },
+      { name: 'Fragancias Unisex', icon: '✨', color: '#8B5CF6', order: 3 },
+      { name: 'Envases',           icon: '🧴', color: '#0EA5E9', order: 4 },
+      { name: 'Feromonas',         icon: '💘', color: '#F43F5E', order: 5 },
+      { name: 'Accesorios',        icon: '🎁', color: '#F59E0B', order: 6 },
+    ],
+    products: [],
+  },
+
   ACCESORIOS: {
     categories: [
       { name: 'Bisutería', icon: '💍', color: '#F59E0B', order: 1 },

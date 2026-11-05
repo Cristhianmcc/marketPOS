@@ -431,6 +431,7 @@ export default function SetupPage() {
                       <option value="POLLERIA">Pollería / Restaurante</option>
                       <option value="HOSTAL">Hostal / Hotel</option>
                       <option value="ACCESORIOS">Accesorios / Tecnología</option>
+                      <option value="PERFUMERIA">Perfumería</option>
                     </select>
                     <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                   </div>

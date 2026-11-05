@@ -1,3 +1,5 @@
+import type { PerfumeCatalogAttributes } from '@/lib/perfumery/catalogAttributes';
+
 export interface PublicCatalogStore {
   id: string;
   name: string;
@@ -23,6 +25,8 @@ export interface PublicCatalogProduct {
   imageUrl: string | null;
   visible: boolean;
   updatedAt: string | null;
+  /** Perfumería: filtros (género, familia, temporada) y precios por presentación. */
+  attributes?: PerfumeCatalogAttributes | null;
 }
 
 export interface PublicCatalogResponse {

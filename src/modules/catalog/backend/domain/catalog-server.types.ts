@@ -1,3 +1,5 @@
+import type { PerfumeCatalogAttributes } from '@/lib/perfumery/catalogAttributes';
+
 export interface CatalogPublishProductInput {
   localProductId: string;
   name: string;
@@ -7,6 +9,8 @@ export interface CatalogPublishProductInput {
   imageUrl: string | null;
   visible: boolean;
   updatedAt: string | null;
+  /** Perfumería: dato del instalador, se sanea antes de guardar. */
+  attributes?: unknown;
 }
 
 export interface CatalogPublishInput {
@@ -61,6 +65,7 @@ export interface PublicCatalogProduct {
   imageUrl: string | null;
   visible: boolean;
   updatedAt: string | null;
+  attributes?: PerfumeCatalogAttributes | null;
 }
 
 export interface PublicCatalogResponse {

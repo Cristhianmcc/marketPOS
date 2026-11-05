@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/session';
 import { prisma } from '@/lib/prisma';
 import { catalogCloudHeaders } from '@/lib/catalog/catalogImageUpload';
+import { perfumeCatalogEntries } from '@/lib/perfumery/catalogPublish';
 
 const CLOUD_URL = (process.env.CLOUD_URL || '').replace(/\/+$/, '');
 
@@ -90,6 +91,24 @@ export async function POST(_req: NextRequest) {
       } catch {
         // ignorar
       }
+    }
+
+    // Perfumería: la esencia se publica con precio "desde" (no el precio por
+    // ml) y con sus atributos para los filtros del catálogo.
+    try {
+      const perfumeStore = await prisma.store.findUnique({
+        where: { id: session.storeId },
+        select: { businessProfile: true },
+      });
+      if (perfumeStore?.businessProfile === 'PERFUMERIA') {
+        const entries = await perfumeCatalogEntries(prisma, session.storeId, products.map((p) => p.localProductId));
+        products = products.map((p) => {
+          const entry = entries.get(p.localProductId);
+          return entry ? { ...p, price: entry.price ?? p.price, attributes: entry.attributes } : p;
+        });
+      }
+    } catch (error) {
+      console.error('[publish-catalog] Atributos de perfumería no disponibles:', error);
     }
 
     if (products.length === 0) {

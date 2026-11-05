@@ -36,9 +36,9 @@ export function FeaturedProducts({
           <div key={product.id} className="w-40 shrink-0 sm:w-48">
             <ProductCard
               product={product}
-              quantity={getQuantity(product.id)}
-              onAdd={() => onAdd(product)}
-              onRemove={() => onRemove(product)}
+              getQuantity={getQuantity}
+              onAdd={onAdd}
+              onRemove={onRemove}
             />
           </div>
         ))}

@@ -24,6 +24,12 @@ const nextConfig: NextConfig = {
         hostname: 'res.cloudinary.com',
         pathname: '/**',
       },
+      // Perfumería: fotos del catálogo de referencia (importado de la tienda web).
+      {
+        protocol: 'https',
+        hostname: 'cdn.shopify.com',
+        pathname: '/s/files/**',
+      },
     ],
   },
   // Excluir carpetas del análisis

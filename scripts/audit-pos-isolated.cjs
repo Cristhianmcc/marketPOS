@@ -163,7 +163,9 @@ async function main() {
   console.log(`${productDenied ? 'PASS' : 'FAIL'} H09: purchase order must reject a foreign store product. Observed status=${purchase.status}, ownershipLookups=${productOwnershipLookups}`);
   if (!productDenied) failures++;
 
-  const { cancelSaleLocally } = loadRoute('src/lib/sales/cancelSaleLocally.ts', {});
+  const { cancelSaleLocally } = loadRoute('src/lib/sales/cancelSaleLocally.ts', {
+    '@/lib/perfumery/saleLine': loadRoute('src/lib/perfumery/saleLine.ts', {}),
+  });
   const cancellationState = {
     total: 30,
     subtotal: 30,
