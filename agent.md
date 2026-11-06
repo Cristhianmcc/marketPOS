@@ -219,8 +219,14 @@ es `docs/audits/2026-09-26-pos.md`.
   `GET /api/perfumery/export` para otra sede. El respaldo incluye
   `fragrances`, `perfumePresentations`, `perfumeExtras` y `perfumePacks` y
   remapea `perfumeDetail` al restaurar. Catálogo de referencia extraído de la
-  web pública en `data/perfumeria/`. Banco: `npm run test:perfumeria:isolated`
-  (18 pasos, PostgreSQL desechable).
+  web pública en `data/perfumeria/`; `perfumarte-catalogo.zip` (lo arma
+  `scripts/perfumeria-build-zip.cjs`) trae `catalogo.json` + `imagenes/` y se
+  importa en el escritorio con `POST /api/perfumery/import/zip`: las fotos se
+  guardan en `Documents/MonterrialPOS/local-images` (como el ZIP de
+  inventario) y la fragancia queda con `/api/desktop/local-image/<id>`; el
+  exportador solo lleva enlaces https. En el POS, la pestaña Perfumes usa la
+  barra de búsqueda principal. Banco: `npm run test:perfumeria:isolated`
+  (19 pasos, PostgreSQL desechable).
 - `stock = null` identifica productos sin control de existencias y debe
   conservarse; no convertirlo implícitamente en cero durante una venta.
 - La anulación actual se identifica poniendo total/subtotal/impuesto a cero,

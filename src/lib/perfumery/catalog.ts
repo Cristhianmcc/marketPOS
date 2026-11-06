@@ -237,7 +237,10 @@ export function validateCatalog(input: unknown, { maxFragrances = 2000 } = {}): 
       occasions: cleanList(raw.occasions),
       scent: cleanText(raw.scent),
       description: cleanText(raw.description, 4000),
-      imageUrl: /^https:\/\//.test(String(raw.imageUrl ?? '')) ? String(raw.imageUrl).slice(0, 500) : null,
+      // Enlace web (https) o foto guardada en la PC por la importación ZIP.
+      imageUrl: /^https:\/\/|^\/api\/desktop\/local-image\/[A-Za-z0-9_-]+$/.test(String(raw.imageUrl ?? ''))
+        ? String(raw.imageUrl).slice(0, 500)
+        : null,
       stockMl: positiveOrNull(raw.stockMl),
       costPerMl: positiveOrNull(raw.costPerMl),
     });
@@ -724,7 +727,8 @@ export async function exportPerfumeryCatalog(
       occasions: f.occasions,
       scent: f.scent,
       description: f.description,
-      imageUrl: f.imageUrl,
+      // Las fotos guardadas en esta PC no sirven en otra sede: solo se exportan enlaces web.
+      imageUrl: f.imageUrl?.startsWith('https://') ? f.imageUrl : null,
       costPerMl: f.storeProduct.costPrice?.toNumber() ?? null,
     })),
     presentations: presentations.map((p) => ({

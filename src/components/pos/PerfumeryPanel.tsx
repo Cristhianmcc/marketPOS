@@ -83,11 +83,14 @@ export function PerfumeryPanel({
   disabled,
   /** ml ya reservados en el carrito por esencia (para avisar antes de cobrar). */
   reservedMl,
+  /** Texto de la barra de búsqueda principal del POS: si se pasa, el panel no muestra la suya. */
+  externalQuery,
 }: {
   onAdd: (fragrance: PerfumeFragrance, presentation: PerfumePresentationOption, extras: PerfumeExtraOption[]) => void;
   onAddPack: (pack: PerfumePackOption, slots: PerfumePackSlot[]) => void;
   disabled?: boolean;
   reservedMl: Record<string, number>;
+  externalQuery?: string;
 }) {
   const [query, setQuery] = useState('');
   const [gender, setGender] = useState('');
@@ -106,6 +109,8 @@ export function PerfumeryPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
+  const useExternalSearch = externalQuery !== undefined;
+  const searchTerm = (useExternalSearch ? externalQuery : query).trim();
 
   useEffect(() => {
     Promise.all([
@@ -124,7 +129,7 @@ export function PerfumeryPanel({
   const load = useCallback(() => {
     const requestId = ++requestRef.current;
     const params = new URLSearchParams();
-    if (query.trim()) params.set('q', query.trim());
+    if (searchTerm) params.set('q', searchTerm);
     if (gender) params.set('gender', gender);
     if (family) params.set('family', family);
     setLoading(true);
@@ -137,7 +142,7 @@ export function PerfumeryPanel({
       })
       .catch((e: Error) => requestId === requestRef.current && setError(e.message))
       .finally(() => requestId === requestRef.current && setLoading(false));
-  }, [query, gender, family]);
+  }, [searchTerm, gender, family]);
 
   useEffect(() => {
     const timer = setTimeout(load, 250);
@@ -231,6 +236,8 @@ export function PerfumeryPanel({
             ))}
           </div>
         )}
+        {/* Sin barra del POS (externalQuery undefined) el panel trae la suya. */}
+        {!useExternalSearch && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
           <input
@@ -246,6 +253,7 @@ export function PerfumeryPanel({
             </button>
           )}
         </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           {GENDER_TABS.map((tab) => (
             <button
@@ -320,7 +328,12 @@ export function PerfumeryPanel({
                 <ul className="space-y-1">
                   {slots.map((slot, index) => (
                     <li key={`${slot.fragrance.id}-${index}`} className="flex items-center justify-between text-sm bg-background-light dark:bg-background-dark rounded-lg px-3 py-1.5">
-                      <span><b className="text-primary">{slot.fragrance.code}</b> · {slot.presentation.name}</span>
+                      <span className="min-w-0 truncate">
+                        <b className="text-primary">{slot.fragrance.code}</b>
+                        {' · '}
+                        {[slot.fragrance.reference, slot.fragrance.referenceBrand].filter(Boolean).join(' · ') || slot.fragrance.name}
+                        <span className="text-text-secondary"> — {slot.presentation.name}</span>
+                      </span>
                       <button onClick={() => setSlots((prev) => prev.filter((_, i) => i !== index))} aria-label="Quitar" className="text-text-secondary hover:text-red-600">
                         <X className="w-4 h-4" />
                       </button>
@@ -422,7 +435,7 @@ export function PerfumeryPanel({
         <div className="py-10 text-center text-sm text-text-secondary">Cargando fragancias…</div>
       ) : fragrances.length === 0 ? (
         <div className="py-10 text-center text-sm text-text-secondary">
-          {query || gender || family ? 'No hay fragancias con ese filtro.' : 'Aún no hay fragancias. Impórtalas en Perfumería.'}
+          {searchTerm || gender || family ? 'No hay fragancias con ese filtro.' : 'Aún no hay fragancias. Impórtalas en Perfumería.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">

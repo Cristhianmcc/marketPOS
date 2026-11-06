@@ -37,7 +37,9 @@ interface ParsedFile {
   extras?: unknown[];
   packs?: unknown[];
   csv?: string;
-  count: number;
+  /** ZIP con catalogo.json e imagenes/ (solo escritorio). */
+  zip?: File;
+  count: number | null;
 }
 
 const inputClass =
@@ -82,6 +84,10 @@ export default function PerfumeryPage() {
   const readFile = async (selected: File | undefined) => {
     setImportErrors([]);
     if (!selected) return setFile(null);
+    if (selected.name.toLowerCase().endsWith('.zip')) {
+      setFile({ name: selected.name, zip: selected, count: null });
+      return;
+    }
     const text = await selected.text();
     if (selected.name.toLowerCase().endsWith('.csv')) {
       const rows = text.split(/\r?\n/).filter((line) => line.trim()).length - 1;
@@ -112,21 +118,32 @@ export default function PerfumeryPage() {
     setImporting(true);
     setImportErrors([]);
     try {
-      const res = await fetch('/api/perfumery/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fragrances: file?.fragrances ?? [],
-          presentations: file?.presentations ?? [],
-          extras: file?.extras ?? [],
-          packs: file?.packs ?? [],
-          csv: file?.csv,
-          useDefaultPresentations: useDefaults,
-          initialStockMl: stockMl === '' ? null : Number(stockMl),
-          initialContainerStock: containerStock === '' ? null : Number(containerStock),
-          updateExisting,
-        }),
-      });
+      const res = file?.zip
+        ? await fetch(`/api/perfumery/import/zip?${new URLSearchParams({
+            useDefaultPresentations: useDefaults ? '1' : '0',
+            updateExisting: updateExisting ? '1' : '0',
+            initialStockMl: stockMl,
+            initialContainerStock: containerStock,
+          })}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/zip' },
+            body: file.zip,
+          })
+        : await fetch('/api/perfumery/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fragrances: file?.fragrances ?? [],
+              presentations: file?.presentations ?? [],
+              extras: file?.extras ?? [],
+              packs: file?.packs ?? [],
+              csv: file?.csv,
+              useDefaultPresentations: useDefaults,
+              initialStockMl: stockMl === '' ? null : Number(stockMl),
+              initialContainerStock: containerStock === '' ? null : Number(containerStock),
+              updateExisting,
+            }),
+          });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setImportErrors(data.details ?? []);
@@ -136,7 +153,8 @@ export default function PerfumeryPage() {
       toast.success(
         `Fragancias: ${r.fragrancesCreated} nuevas, ${r.fragrancesUpdated} actualizadas, ${r.fragrancesSkipped} ya existían. ` +
         `Presentaciones: ${r.presentationsCreated} nuevas. Envases: ${r.containersCreated} nuevos. ` +
-        `Extras: ${r.extrasCreated} nuevos. Packs: ${r.packsCreated} nuevos.`
+        `Extras: ${r.extrasCreated} nuevos. Packs: ${r.packsCreated} nuevos.` +
+        (r.imagesSaved !== undefined ? ` Fotos guardadas en la PC: ${r.imagesSaved}.` : '')
       );
       setFile(null);
       setReloadKey((key) => key + 1);
@@ -250,14 +268,20 @@ export default function PerfumeryPage() {
         <section className={card}>
           <h2 className="font-semibold text-text-main dark:text-text-light mb-1 flex items-center gap-2"><Upload className="w-4 h-4" /> Importar catálogo</h2>
           <p className="text-xs text-text-secondary mb-4">
-            JSON exportado de otra sede o del catálogo web, o CSV con columnas: codigo, perfume, marca, genero, familia, aromas,
-            temporadas, ocasiones, olor, stock_ml, costo_ml. Las fragancias que ya existen no cambian su stock.
+            ZIP con fotos (perfumarte-catalogo.zip: las fotos quedan en la PC y se ven sin internet), JSON exportado de otra
+            sede o CSV con columnas: codigo, perfume, marca, genero, familia, aromas, temporadas, ocasiones, olor, stock_ml,
+            costo_ml. Las fragancias que ya existen no cambian su stock; para ponerles las fotos del ZIP marca
+            &quot;Actualizar datos&quot;.
           </p>
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block text-sm">
               <span className="text-text-secondary">Archivo (.json o .csv)</span>
-              <input type="file" accept=".json,.csv,application/json,text/csv" onChange={(e) => readFile(e.target.files?.[0])} className="block mt-1 text-sm" />
-              {file && <span className="text-xs text-primary">{file.name}: {file.count} fragancias</span>}
+              <input type="file" accept=".zip,.json,.csv,application/zip,application/json,text/csv" onChange={(e) => readFile(e.target.files?.[0])} className="block mt-1 text-sm" />
+              {file && (
+                <span className="text-xs text-primary">
+                  {file.name}: {file.count === null ? 'ZIP con fotos' : `${file.count} fragancias`}
+                </span>
+              )}
             </label>
             <div className="space-y-2 text-sm">
               <label className="flex items-center gap-2">

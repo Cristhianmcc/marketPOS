@@ -2316,7 +2316,7 @@ function SalesPos({ profile }: { profile?: string }) {
                       id="product-search"
                       type="text"
                       autoFocus
-                      placeholder="Buscar producto o escanear código..."
+                      placeholder={isPerfumery && posTab === 'perfumes' ? 'Código (F754), perfume, marca u olor…' : 'Buscar producto o escanear código...'}
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       onKeyDown={(e) => {
@@ -2491,6 +2491,7 @@ function SalesPos({ profile }: { profile?: string }) {
                   onAddPack={addPerfumePackToCart}
                   disabled={!currentShift}
                   reservedMl={perfumeMlByEssence(cart)}
+                  externalQuery={query}
                 />
               )}
 
@@ -2572,8 +2573,8 @@ function SalesPos({ profile }: { profile?: string }) {
                 </div>
               )}
 
-              {/* Results */}
-              {products.length > 0 && (
+              {/* Results (en la pestaña Perfumes, la barra de arriba filtra fragancias) */}
+              {products.length > 0 && !(isPerfumery && posTab === 'perfumes') && (
                 <div>
                   <h3 className="mb-3 text-lg font-bold text-text-main dark:text-text-light">
                     Resultados de búsqueda <span className="text-sm font-medium text-text-secondary">({products.length})</span>

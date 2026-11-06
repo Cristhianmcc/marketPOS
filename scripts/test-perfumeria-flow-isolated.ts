@@ -385,6 +385,51 @@ async function flowWorker(contextPath: string) {
   }
   steps.P17 = { status: restored.status, error: restored.status === 200 ? null : restoredBody?.message ?? null, restored: restoredCheck };
 
+  // P18 ZIP con fotos (escritorio): las fotos quedan en la PC (USERPROFILE temporal).
+  const zipRoute = require('../src/app/api/perfumery/import/zip/route');
+  const AdmZipLib = require('adm-zip'); // eslint-disable-line @typescript-eslint/no-require-imports
+  const tinyJpg = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAAA//EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AP//Z', 'base64');
+  const buildZip = () => {
+    const z = new AdmZipLib();
+    z.addFile('catalogo.json', Buffer.from(JSON.stringify({ fragrances: [
+      { code: 'Z900', reference: 'Prueba ZIP', gender: 'UNISEX', imageUrl: 'imagenes/Z900.jpg' },
+      { code: 'F754', reference: "J'adore", referenceBrand: 'Dior', gender: 'MUJER', imageUrl: 'imagenes/F754.jpg' },
+    ] })));
+    z.addFile('imagenes/Z900.jpg', tinyJpg);
+    z.addFile('imagenes/F754.jpg', tinyJpg);
+    return z.toBuffer();
+  };
+  const postZip = (query: string) => {
+    const body = buildZip();
+    return zipRoute.POST(new NextRequest(`http://127.0.0.1/api/perfumery/import/zip?${query}`, {
+      method: 'POST', headers: { 'content-type': 'application/zip', 'content-length': String(body.length) }, body,
+    }));
+  };
+  if (!os.homedir().includes('marketpos-perfumeria-')) throw new Error('P18: la carpeta de usuario no es temporal; no se prueban fotos');
+  const webZip = await read(await postZip('initialStockMl=100'));
+  process.env.DESKTOP_MODE = 'true';
+  const firstZip = await read(await postZip('initialStockMl=100'));
+  const imageOf = async (code: string) => (await prisma.fragrance.findFirst({ where: { storeId: ctx.storeId, code } }))?.imageUrl ?? null;
+  const z900 = await imageOf('Z900');
+  const f754Before = await imageOf('F754');
+  const updateZip = await read(await postZip('updateExisting=1'));
+  const f754After = await imageOf('F754');
+  delete process.env.DESKTOP_MODE;
+  const localPath = (url: string | null) => {
+    const id = url?.split('/').pop();
+    const index = JSON.parse(fs.readFileSync(path.join(os.homedir(), 'Documents', 'MonterrialPOS', 'local-images', 'index.json'), 'utf8'));
+    return Boolean(id && index[id] && fs.existsSync(path.join(os.homedir(), 'Documents', 'MonterrialPOS', 'local-images', index[id].filename)));
+  };
+  steps.P18 = {
+    web: webZip.status,
+    first: firstZip.body?.result && [firstZip.body.result.fragrancesCreated, firstZip.body.result.fragrancesSkipped, firstZip.body.result.imagesSaved],
+    z900: Boolean(z900?.startsWith('/api/desktop/local-image/')) && localPath(z900),
+    f754KeptWebImage: Boolean(f754Before?.startsWith('https://')),
+    update: updateZip.body?.result && [updateZip.body.result.fragrancesUpdated, updateZip.body.result.imagesSaved],
+    f754Local: Boolean(f754After?.startsWith('/api/desktop/local-image/')) && localPath(f754After),
+    tempHome: os.homedir().includes('marketpos-perfumeria-'),
+  };
+
   console.log(`RESULT:${JSON.stringify(steps)}`);
 }
 
@@ -504,6 +549,15 @@ const EXPECTATIONS: Array<{ id: string; title: string; check: (s: Steps) => stri
     ...eq('respuesta', [s.P17?.status, s.P17?.error], [200, null]),
     ...eq('restaurado', s.P17?.restored, { extras: 4, packs: 6, promo: 2, extraIds: true, stockUses: true, packId: true, gift: true }),
   ] },
+  { id: 'P18', title: 'ZIP con fotos: solo escritorio, fotos en la PC y actualizar existentes', check: (s) => [
+    ...eq('carpeta temporal', s.P18?.tempHome, true),
+    ...eq('web rechaza', s.P18?.web, 400),
+    ...eq('primera (nueva, existente, fotos)', s.P18?.first, [1, 1, 1]),
+    ...eq('foto local nueva', s.P18?.z900, true),
+    ...eq('existente sin actualizar conserva su foto', s.P18?.f754KeptWebImage, true),
+    ...eq('actualizar (fragancias, fotos)', s.P18?.update, [2, 2]),
+    ...eq('existente con foto local', s.P18?.f754Local, true),
+  ] },
 ];
 
 async function main() {
@@ -529,7 +583,8 @@ async function main() {
     console.log('Perfumería: ejecutando el flujo con los handlers reales...\n');
     const worker = spawnSync(process.execPath, [tsxCli, __filename, '--mode=flow', `--context=${contextPath}`], {
       cwd: root, encoding: 'utf8', timeout: 300_000, windowsHide: true,
-      env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url, NODE_ENV: 'test', SUPERADMIN_EMAILS: '', DESKTOP_INTERNAL_TOKEN: INTERNAL_TOKEN },
+      // USERPROFILE/HOME temporales: las fotos del ZIP no tocan Documentos del usuario.
+      env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url, NODE_ENV: 'test', SUPERADMIN_EMAILS: '', DESKTOP_INTERNAL_TOKEN: INTERNAL_TOKEN, USERPROFILE: tempRoot, HOME: tempRoot },
     });
     const resultLine = String(worker.stdout || '').split(/\r?\n/).find((l) => l.startsWith('RESULT:'));
     if (worker.status !== 0 || !resultLine) throw new Error(`Worker falló (${worker.status})\n${worker.stdout}${worker.stderr}`);

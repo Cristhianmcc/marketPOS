@@ -579,6 +579,10 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-medium text-text-main">
                             S/ {sp.price.toFixed(2)}
+                            {/* Perfumería: la esencia se vende por ml */}
+                            {(sp.product as any).baseUnitDisplay === 'ml' && (
+                              <span className="text-xs text-gray-500 font-normal"> / ml</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right">
                             {sp.stock !== null ? (
